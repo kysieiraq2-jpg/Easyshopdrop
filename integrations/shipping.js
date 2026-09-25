@@ -1,0 +1,1 @@
+export const shippingAdapter={provider:'unconfigured',async getRates(){return {status:'not_available',rates:[],message:'No courier rates available.'}},async createShipment(){throw Error('Courier integration not configured')}};

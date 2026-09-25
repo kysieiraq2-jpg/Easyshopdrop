@@ -1,0 +1,1 @@
+export const paymentAdapter={provider:'unconfigured',async createPayment({orderId}){return {provider:'unconfigured',status:'not_available',orderId,checkoutUrl:null,message:'No payment provider connected; no money collected.'}}};
