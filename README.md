@@ -40,3 +40,7 @@ See `LAUNCH_GUIDE.md` and `V19_RELEASE_NOTES.md`. This remains a local-developme
 
 ## V20 upgrade note
 This package upgrades the existing Shop&Drop test deployment; it does not require a new domain or GitHub repository. Back up the current deployment/database first. For an existing V19 database, apply `db/v20_migration.sql` once. Real payments, courier APIs, FX rates, payouts and social posting remain disabled until providers are selected and securely integrated.
+
+
+## V23 administrator portals
+V23 provides separate administrator entry points for marketplace control, order/delivery/financial operations, and Marketing & Promotion. These are not part of the public customer/seller menu and require the authenticated backend for live use. Raw card/CVV data is never exposed in these portals.
