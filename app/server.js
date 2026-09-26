@@ -12,25 +12,41 @@ const {Pool}=pg;
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const pool=new Pool({connectionString:process.env.DATABASE_URL});
 const PORT=Number(process.env.PORT||3000);
+const IS_PROD=process.env.NODE_ENV==='production';
+const MAX_BODY_BYTES=Number(process.env.MAX_BODY_BYTES||262144);
+const PUBLIC_ORIGIN=(process.env.PUBLIC_ORIGIN||'').replace(/\/$/,'');
+const loginAttempts=new Map();
 
-function json(res,c,d,h={}){res.writeHead(c,{'Content-Type':'application/json; charset=utf-8',...h});res.end(JSON.stringify(d))}
-async function body(req){let s='';for await(const x of req)s+=x;return s}
+function securityHeaders(){return {
+ 'X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY','Referrer-Policy':'strict-origin-when-cross-origin',
+ 'Permissions-Policy':'camera=(), microphone=(), geolocation=()',
+ 'Content-Security-Policy':"default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+ ...(IS_PROD?{'Strict-Transport-Security':'max-age=31536000; includeSubDomains'}:{})
+}}
+function json(res,c,d,h={}){res.writeHead(c,{...securityHeaders(),'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...h});res.end(JSON.stringify(d))}
+async function body(req){let s='',n=0;for await(const x of req){n+=x.length;if(n>MAX_BODY_BYTES){let e=Error('Request body too large');e.statusCode=413;throw e}s+=x}return s}
+function requestOriginAllowed(req){if(!PUBLIC_ORIGIN)return true;const o=req.headers.origin;if(!o)return true;return o===PUBLIC_ORIGIN}
+function rateKey(req,scope){return `${scope}:${req.socket.remoteAddress||'unknown'}`}
+function rateLimited(req,scope,limit=10,windowMs=15*60*1000){const k=rateKey(req,scope),now=Date.now(),old=loginAttempts.get(k)||[];const fresh=old.filter(t=>now-t<windowMs);fresh.push(now);loginAttempts.set(k,fresh);return fresh.length>limit}
+function validEmail(v){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v||''))}
+function strongPassword(v){v=String(v||'');return v.length>=12&&v.length<=128&&/[A-Za-z]/.test(v)&&/\d/.test(v)}
 function cookies(req){return Object.fromEntries((req.headers.cookie||'').split(';').filter(Boolean).map(x=>{let i=x.indexOf('=');return [x.slice(0,i).trim(),decodeURIComponent(x.slice(i+1))]}))}
 async function user(req){let t=cookies(req).esd_session;if(!t)return null;let r=await pool.query(`SELECT u.id,u.email,u.role,u.full_name FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now()`,[sha256(t)]);return r.rows[0]||null}
 function okRole(u,roles){return u&&roles.includes(u.role)}
 async function audit(u,a,t,id,d={}){await pool.query(`INSERT INTO audit_log(actor_user_id,action,entity_type,entity_id,details) VALUES($1,$2,$3,$4,$5)`,[u?.id||null,a,t,id||null,JSON.stringify(d)])}
-async function signin(res,u){let t=newSessionToken(),h=Number(process.env.SESSION_TTL_HOURS||24);await pool.query(`INSERT INTO sessions(user_id,token_hash,expires_at) VALUES($1,$2,now()+($3||' hours')::interval)`,[u.id,sha256(t),h]);json(res,200,{user:u},{'Set-Cookie':`esd_session=${encodeURIComponent(t)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${h*3600}`})}
+async function signin(res,u){let t=newSessionToken(),h=Number(process.env.SESSION_TTL_HOURS||24);await pool.query(`INSERT INTO sessions(user_id,token_hash,expires_at) VALUES($1,$2,now()+($3||' hours')::interval)`,[u.id,sha256(t),h]);json(res,200,{user:u},{'Set-Cookie':`esd_session=${encodeURIComponent(t)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${h*3600}${IS_PROD?'; Secure':''}`})}
 
 async function route(req,res){
  const u=new URL(req.url,`http://${req.headers.host}`), me=await user(req);
  try{
+  if(['POST','PUT','PATCH','DELETE'].includes(req.method)&&!requestOriginAllowed(req))return json(res,403,{error:'Origin not allowed'});
   if(req.method==='GET'&&u.pathname==='/api/me')return json(res,200,{user:me});
   if(req.method==='POST'&&u.pathname==='/api/register'){
-   let b=JSON.parse(await body(req)||'{}');if(!b.email||!b.password||!b.fullName||b.password.length<8)return json(res,400,{error:'Valid name, email and 8+ character password required'});
+   let b=JSON.parse(await body(req)||'{}');if(rateLimited(req,'register',5))return json(res,429,{error:'Too many registration attempts. Try again later.'});if(!validEmail(b.email)||!strongPassword(b.password)||String(b.fullName||'').trim().length<2)return json(res,400,{error:'Valid name/email and a 12+ character password containing letters and numbers required'});
    try{let r=await pool.query(`INSERT INTO users(email,password_hash,role,full_name) VALUES($1,$2,'customer',$3) RETURNING id,email,role,full_name`,[b.email.toLowerCase().trim(),hashPassword(b.password),b.fullName.trim()]);return signin(res,r.rows[0])}catch(e){if(e.code==='23505')return json(res,409,{error:'Email already registered'});throw e}
   }
   if(req.method==='POST'&&u.pathname==='/api/login'){
-   let b=JSON.parse(await body(req)||'{}'),r=await pool.query(`SELECT id,email,password_hash,role,full_name FROM users WHERE email=$1`,[(b.email||'').toLowerCase().trim()]);
+   let b=JSON.parse(await body(req)||'{}');if(rateLimited(req,'login',10))return json(res,429,{error:'Too many login attempts. Try again later.'});let r=await pool.query(`SELECT id,email,password_hash,role,full_name FROM users WHERE email=$1`,[(b.email||'').toLowerCase().trim()]);
    if(!r.rows[0]||!verifyPassword(b.password||'',r.rows[0].password_hash))return json(res,401,{error:'Invalid email or password'});
    let x=r.rows[0];delete x.password_hash;return signin(res,x)
   }
@@ -264,13 +280,18 @@ async function route(req,res){
    return json(res,200,{orders:r.rows,refundExecutionEnabled:false,
      note:'Review queue only; no actual refund has been initiated by this endpoint.'});
   }
-  if(req.method==='GET'&&u.pathname==='/api/health'){await pool.query('SELECT 1');return json(res,200,{ok:true,version:'20.0.0'})}
-  if(req.method==='POST'&&u.pathname==='/api/payments/webhook')return json(res,503,{error:'Live payment webhook disabled until a verified provider adapter is installed'});
+  if(req.method==='GET'&&u.pathname==='/api/health'){await pool.query('SELECT 1');return json(res,200,{ok:true,version:'21.0.0',livePaymentsEnabled:false,liveShippingEnabled:false})}
+  if(req.method==='POST'&&u.pathname==='/api/payments/webhook'){
+   const raw=await body(req),secret=process.env.PAYMENT_WEBHOOK_SECRET||'',sig=String(req.headers['x-shopdrop-signature']||'');
+   if(!secret||secret.startsWith('disabled-'))return json(res,503,{error:'Live payment webhook disabled until a verified provider adapter is installed'});
+   if(!verifyHmac(raw,sig,secret))return json(res,401,{error:'Invalid webhook signature'});
+   return json(res,503,{error:'Signature verified, but live settlement processing remains disabled pending provider certification'});
+  }
 
   if(req.method==='GET'){
-   let f=u.pathname==='/'?'/index.html':u.pathname,root=path.resolve(__dirname,'..','public'),p=path.resolve(root,'.'+f);if(p.startsWith(root+path.sep)&&fs.existsSync(p)&&fs.statSync(p).isFile()){let ext=path.extname(p),types={'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml'};res.writeHead(200,{'Content-Type':types[ext]||'application/octet-stream'});return res.end(fs.readFileSync(p))}
+   let f=u.pathname==='/'?'/index.html':u.pathname,root=path.resolve(__dirname,'..','public'),p=path.resolve(root,'.'+f);if(p.startsWith(root+path.sep)&&fs.existsSync(p)&&fs.statSync(p).isFile()){let ext=path.extname(p),types={'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml'};res.writeHead(200,{...securityHeaders(),'Content-Type':types[ext]||'application/octet-stream','Cache-Control':ext==='.html'?'no-store':'public, max-age=300'});return res.end(fs.readFileSync(p))}
   }
   return json(res,404,{error:'Not found'})
- }catch(e){console.error(e);return json(res,500,{error:'Internal server error'})}
+ }catch(e){console.error(e);return json(res,e.statusCode||500,{error:e.statusCode===413?'Request body too large':'Internal server error'})}
 }
-http.createServer((q,r)=>route(q,r)).listen(PORT,()=>console.log(`Shop&Drop V20 on ${PORT}`));
+http.createServer((q,r)=>route(q,r)).listen(PORT,()=>console.log(`Shop&Drop V21 on ${PORT}`));
