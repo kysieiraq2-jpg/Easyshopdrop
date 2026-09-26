@@ -280,7 +280,7 @@ async function route(req,res){
    return json(res,200,{orders:r.rows,refundExecutionEnabled:false,
      note:'Review queue only; no actual refund has been initiated by this endpoint.'});
   }
-  if(req.method==='GET'&&u.pathname==='/api/health'){await pool.query('SELECT 1');return json(res,200,{ok:true,version:'22.0.0',livePaymentsEnabled:false,liveShippingEnabled:false})}
+  if(req.method==='GET'&&u.pathname==='/api/health'){await pool.query('SELECT 1');return json(res,200,{ok:true,version:'23.0.0',livePaymentsEnabled:false,liveShippingEnabled:false})}
   if(req.method==='POST'&&u.pathname==='/api/payments/webhook'){
    const raw=await body(req),secret=process.env.PAYMENT_WEBHOOK_SECRET||'',sig=String(req.headers['x-shopdrop-signature']||'');
    if(!secret||secret.startsWith('disabled-'))return json(res,503,{error:'Live payment webhook disabled until a verified provider adapter is installed'});
@@ -294,4 +294,4 @@ async function route(req,res){
   return json(res,404,{error:'Not found'})
  }catch(e){console.error(e);return json(res,e.statusCode||500,{error:e.statusCode===413?'Request body too large':'Internal server error'})}
 }
-http.createServer((q,r)=>route(q,r)).listen(PORT,()=>console.log(`Shop&Drop V21 on ${PORT}`));
+http.createServer((q,r)=>route(q,r)).listen(PORT,()=>console.log(`Shop&Drop V23 on ${PORT}`));
