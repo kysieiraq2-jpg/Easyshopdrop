@@ -1,4 +1,4 @@
-# Shop&Drop — Version 13 customer checkout demo
+# Shop&Drop — V20 - Worldwide Marketplace upgrade
 
 A local development prototype, not a production or payment-ready marketplace.
 
