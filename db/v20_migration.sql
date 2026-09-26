@@ -1,0 +1,45 @@
+-- Shop&Drop V20 worldwide marketplace upgrade (safe additive migration)
+CREATE TABLE IF NOT EXISTS categories (
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(), parent_id UUID REFERENCES categories(id) ON DELETE CASCADE,
+ name TEXT NOT NULL, slug TEXT NOT NULL UNIQUE, active BOOLEAN NOT NULL DEFAULT true, sort_order INTEGER NOT NULL DEFAULT 0,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS services (
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(), category_id UUID REFERENCES categories(id), title TEXT NOT NULL,
+ description TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'pending', created_by UUID REFERENCES users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS platform_feedback (
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES users(id), order_id UUID REFERENCES orders(id),
+ audience TEXT NOT NULL CHECK(audience IN ('buyer','seller')), rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+ topic TEXT NOT NULL DEFAULT 'overall', comments TEXT NOT NULL DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS marketing_channels (
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name TEXT NOT NULL, platform TEXT NOT NULL, active BOOLEAN NOT NULL DEFAULT false,
+ configuration JSONB NOT NULL DEFAULT '{}'::jsonb, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE seller_profiles ADD COLUMN IF NOT EXISTS seller_type TEXT NOT NULL DEFAULT 'individual';
+ALTER TABLE seller_profiles ADD COLUMN IF NOT EXISTS country_code TEXT DEFAULT '';
+ALTER TABLE seller_profiles ADD COLUMN IF NOT EXISTS phone TEXT DEFAULT '';
+ALTER TABLE seller_profiles ADD COLUMN IF NOT EXISTS whatsapp TEXT DEFAULT '';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS brand TEXT DEFAULT '';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS condition TEXT NOT NULL DEFAULT 'new';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS currency_code TEXT NOT NULL DEFAULT 'ZAR';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS price_zar_cents INTEGER;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS fx_rate_to_zar NUMERIC(18,8);
+ALTER TABLE products ADD COLUMN IF NOT EXISTS fx_updated_at TIMESTAMPTZ;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS is_special BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS special_price_cents INTEGER;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS special_starts_at TIMESTAMPTZ;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS special_ends_at TIMESTAMPTZ;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS delivery_scope TEXT NOT NULL DEFAULT 'national';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS weight_grams INTEGER;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS category_id UUID REFERENCES categories(id);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS product_subtotal_cents INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_fee_cents INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_processing_fee_cents INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS shopdrop_commission_cents INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS seller_proceeds_cents INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS currency_code TEXT NOT NULL DEFAULT 'ZAR';
+ALTER TABLE shipments ADD COLUMN IF NOT EXISTS handed_to_courier_at TIMESTAMPTZ;
+ALTER TABLE shipments ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMPTZ;
+ALTER TABLE seller_payouts ADD COLUMN IF NOT EXISTS eligible_at TIMESTAMPTZ;
