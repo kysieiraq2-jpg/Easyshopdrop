@@ -1,4 +1,4 @@
-# Easy Shop & Drop SA — Version 13 customer checkout demo
+# Shop&Drop — Version 13 customer checkout demo
 
 A local development prototype, not a production or payment-ready marketplace.
 
@@ -37,3 +37,6 @@ Admin operations preview: visit /operations.html after signing in as an admin. S
 
 ## Version 19
 See `LAUNCH_GUIDE.md` and `V19_RELEASE_NOTES.md`. This remains a local-development prototype; do not accept real payments.
+
+## V20 upgrade note
+This package upgrades the existing Shop&Drop test deployment; it does not require a new domain or GitHub repository. Back up the current deployment/database first. For an existing V19 database, apply `db/v20_migration.sql` once. Real payments, courier APIs, FX rates, payouts and social posting remain disabled until providers are selected and securely integrated.
