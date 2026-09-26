@@ -1,6 +1,6 @@
 {
-  "name": "easy-shop-drop-sa",
-  "version": "19.0.0",
+  "name": "shop-and-drop",
+  "version": "20.0.0",
   "private": true,
   "type": "module",
   "scripts": {
