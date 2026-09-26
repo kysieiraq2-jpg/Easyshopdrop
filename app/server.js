@@ -37,20 +37,19 @@ async function route(req,res){
   if(req.method==='POST'&&u.pathname==='/api/logout'){let t=cookies(req).esd_session;if(t)await pool.query(`DELETE FROM sessions WHERE token_hash=$1`,[sha256(t)]);return json(res,200,{ok:true},{'Set-Cookie':'esd_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0'})}
 
   if(req.method==='GET'&&u.pathname==='/api/categories'){
-   let r=await pool.query(`SELECT category,count(*)::int product_count FROM products WHERE status='approved' GROUP BY category ORDER BY category`);return json(res,200,{categories:r.rows})
+   let r=await pool.query(`SELECT c.id,c.name category,c.slug,c.parent_id,COALESCE(count(p.id),0)::int product_count FROM categories c LEFT JOIN products p ON (p.category_id=c.id OR (p.category_id IS NULL AND p.category=c.name)) AND p.status='approved' WHERE c.active=true GROUP BY c.id,c.name,c.slug,c.parent_id,c.sort_order ORDER BY c.sort_order,c.name`);return json(res,200,{categories:r.rows})
   }
   if(req.method==='GET'&&u.pathname==='/api/products'){
-   let q=(u.searchParams.get('q')||'').trim(),cat=(u.searchParams.get('category')||'').trim(),seller=(u.searchParams.get('seller')||'').trim();
+   let q=(u.searchParams.get('q')||'').trim(),cat=(u.searchParams.get('category')||'').trim();
    let vals=[],w=[`p.status='approved'`];
    if(q){vals.push(`%${q}%`);w.push(`(p.name ILIKE $${vals.length} OR p.description ILIKE $${vals.length} OR p.sku ILIKE $${vals.length})`)}
    if(cat){vals.push(cat);w.push(`p.category=$${vals.length}`)}
-   if(seller){vals.push(seller);w.push(`s.user_id=$${vals.length}`)}
-   let r=await pool.query(`SELECT p.*,s.store_name,s.slug seller_slug,COALESCE(round(avg(rv.rating),1),0) rating,count(rv.id)::int review_count FROM products p JOIN seller_profiles s ON s.user_id=p.seller_id LEFT JOIN product_reviews rv ON rv.product_id=p.id AND rv.status='published' WHERE ${w.join(' AND ')} GROUP BY p.id,s.store_name,s.slug ORDER BY p.created_at DESC`,vals);
+   let r=await pool.query(`SELECT p.id,p.name,p.description,p.category,p.brand,p.condition,p.price_cents,p.currency_code,p.price_zar_cents,p.stock,p.image_url,p.is_special,p.special_price_cents,p.delivery_scope,p.created_at,COALESCE(round(avg(rv.rating),1),0) rating,count(rv.id)::int review_count FROM products p LEFT JOIN product_reviews rv ON rv.product_id=p.id AND rv.status='published' WHERE ${w.join(' AND ')} GROUP BY p.id ORDER BY p.is_special DESC,p.created_at DESC`,vals);
    return json(res,200,{products:r.rows})
   }
   if(req.method==='GET'&&u.pathname.startsWith('/api/products/')){
-   let id=u.pathname.split('/').pop(),r=await pool.query(`SELECT p.*,s.store_name,s.slug seller_slug,COALESCE(round(avg(rv.rating),1),0) rating,count(rv.id)::int review_count FROM products p JOIN seller_profiles s ON s.user_id=p.seller_id LEFT JOIN product_reviews rv ON rv.product_id=p.id AND rv.status='published' WHERE p.id=$1 AND p.status='approved' GROUP BY p.id,s.store_name,s.slug`,[id]);
-   if(!r.rows[0])return json(res,404,{error:'Product not found'});let reviews=await pool.query(`SELECT rv.rating,rv.review_text,rv.created_at,u.full_name FROM product_reviews rv JOIN users u ON u.id=rv.customer_id WHERE rv.product_id=$1 AND rv.status='published' ORDER BY rv.created_at DESC`,[id]);return json(res,200,{product:r.rows[0],reviews:reviews.rows})
+   let id=u.pathname.split('/').pop(),r=await pool.query(`SELECT p.id,p.name,p.description,p.category,p.brand,p.condition,p.price_cents,p.currency_code,p.price_zar_cents,p.stock,p.image_url,p.is_special,p.special_price_cents,p.delivery_scope,p.created_at,COALESCE(round(avg(rv.rating),1),0) rating,count(rv.id)::int review_count FROM products p LEFT JOIN product_reviews rv ON rv.product_id=p.id AND rv.status='published' WHERE p.id=$1 AND p.status='approved' GROUP BY p.id`,[id]);
+   if(!r.rows[0])return json(res,404,{error:'Product not found'});let reviews=await pool.query(`SELECT rv.rating,rv.review_text,rv.created_at,'Verified buyer' AS reviewer FROM product_reviews rv WHERE rv.product_id=$1 AND rv.status='published' ORDER BY rv.created_at DESC`,[id]);return json(res,200,{product:r.rows[0],reviews:reviews.rows})
   }
 
   if(req.method==='GET'&&u.pathname==='/api/cart'){
@@ -63,7 +62,7 @@ async function route(req,res){
   }
 
   if(req.method==='GET'&&u.pathname==='/api/wishlist'){
-   if(!me)return json(res,401,{error:'Login required'});let r=await pool.query(`SELECT p.* FROM wishlists w JOIN products p ON p.id=w.product_id WHERE w.user_id=$1 ORDER BY w.created_at DESC`,[me.id]);return json(res,200,{products:r.rows})
+   if(!me)return json(res,401,{error:'Login required'});let r=await pool.query(`SELECT p.id,p.name,p.description,p.category,p.brand,p.condition,p.price_cents,p.currency_code,p.price_zar_cents,p.stock,p.image_url,p.is_special,p.special_price_cents,p.delivery_scope FROM wishlists w JOIN products p ON p.id=w.product_id WHERE w.user_id=$1 ORDER BY w.created_at DESC`,[me.id]);return json(res,200,{products:r.rows})
   }
   if(req.method==='POST'&&u.pathname==='/api/wishlist'){
    if(!me)return json(res,401,{error:'Login required'});let b=JSON.parse(await body(req)||'{}');if(b.remove)await pool.query(`DELETE FROM wishlists WHERE user_id=$1 AND product_id=$2`,[me.id,b.productId]);else await pool.query(`INSERT INTO wishlists(user_id,product_id) VALUES($1,$2) ON CONFLICT DO NOTHING`,[me.id,b.productId]);return json(res,200,{ok:true})
@@ -88,13 +87,13 @@ async function route(req,res){
    if(!r.rows.length)return json(res,400,{error:'Cart is empty'});
    if(r.rows.some(x=>x.status!=='approved'||x.stock<x.quantity))return json(res,409,{error:'Cart includes unavailable stock'});
    const subtotalCents=r.rows.reduce((n,x)=>n+x.quantity*x.price_cents,0);
-   return json(res,200,{address:a.rows[0],subtotalCents,deliveryFeeCents:null,totalCents:null,paymentAvailable:false,shippingQuoteAvailable:false,message:'Delivery quote and payment gateway are not configured. No final payable total is available.'});
+   const commissionCents=Math.round(subtotalCents*0.10),sellerProceedsCents=subtotalCents-commissionCents; return json(res,200,{address:a.rows[0],productSubtotalCents:subtotalCents,shopdropCommissionCents:commissionCents,sellerProceedsCents,deliveryFeeCents:null,paymentProcessingFeeCents:null,totalCents:null,paymentAvailable:false,shippingQuoteAvailable:false,message:'Product accounting is separated. Live courier quote and payment processing fee require connected providers before a final payable total can be shown.'});
   }
   if(req.method==='POST'&&u.pathname==='/api/orders'){
    if(!okRole(me,['customer']))return json(res,401,{error:'Customer login required'});let b=JSON.parse(await body(req)||'{}'),items=b.items;
    if(!Array.isArray(items)||!items.length)return json(res,400,{error:'Cart is empty'});if(!b.addressId)return json(res,400,{error:'Select a saved delivery address'});let c=await pool.connect();try{await c.query('BEGIN');const addr=await c.query(`SELECT id,label,recipient_name,line1,line2,city,province,postal_code,phone FROM customer_addresses WHERE id=$1 AND user_id=$2`,[b.addressId,me.id]);if(!addr.rows[0])throw Error('Delivery address not found');let total=0,checked=[];
     for(let x of items){let r=await c.query(`SELECT id,seller_id,price_cents,stock,status FROM products WHERE id=$1 FOR UPDATE`,[x.productId]),p=r.rows[0],q=Number(x.quantity);if(!p||p.status!=='approved'||!Number.isInteger(q)||q<1||p.stock<q)throw Error('A product is unavailable or out of stock');total+=p.price_cents*q;checked.push({p,q})}
-    let o=await c.query(`INSERT INTO orders(customer_id,total_cents,delivery_address_snapshot) VALUES($1,$2,$3) RETURNING *`,[me.id,total,JSON.stringify(addr.rows[0])]);for(let x of checked){await c.query(`INSERT INTO order_items(order_id,product_id,seller_id,quantity,unit_price_cents) VALUES($1,$2,$3,$4,$5)`,[o.rows[0].id,x.p.id,x.p.seller_id,x.q,x.p.price_cents]);await c.query(`UPDATE products SET stock=stock-$1,updated_at=now() WHERE id=$2`,[x.q,x.p.id])}await c.query(`INSERT INTO payments(order_id,amount_cents) VALUES($1,$2)`,[o.rows[0].id,total]);await c.query(`INSERT INTO shipments(order_id) VALUES($1)`,[o.rows[0].id]);await c.query(`DELETE FROM cart_items WHERE user_id=$1`,[me.id]);await c.query('COMMIT');return json(res,201,{order:o.rows[0],payment:await paymentAdapter.createPayment({orderId:o.rows[0].id,amountCents:total}),deliveryFeeCents:null,finalTotalCents:null,message:'Demo order only. No payment collected, delivery quote or courier booking.'})
+    let o=await c.query(`INSERT INTO orders(customer_id,total_cents,product_subtotal_cents,shopdrop_commission_cents,seller_proceeds_cents,delivery_address_snapshot) VALUES($1,$2,$2,round($2*0.10),$2-round($2*0.10),$3) RETURNING *`,[me.id,total,JSON.stringify(addr.rows[0])]);for(let x of checked){await c.query(`INSERT INTO order_items(order_id,product_id,seller_id,quantity,unit_price_cents) VALUES($1,$2,$3,$4,$5)`,[o.rows[0].id,x.p.id,x.p.seller_id,x.q,x.p.price_cents]);await c.query(`UPDATE products SET stock=stock-$1,updated_at=now() WHERE id=$2`,[x.q,x.p.id])}await c.query(`INSERT INTO payments(order_id,amount_cents) VALUES($1,$2)`,[o.rows[0].id,total]);await c.query(`INSERT INTO shipments(order_id) VALUES($1)`,[o.rows[0].id]); await c.query(`INSERT INTO seller_payouts(seller_id,order_id,gross_cents,commission_cents,net_cents,status) SELECT seller_id,$1,SUM(quantity*unit_price_cents)::int,round(SUM(quantity*unit_price_cents)*0.10)::int,(SUM(quantity*unit_price_cents)-round(SUM(quantity*unit_price_cents)*0.10))::int,'held' FROM order_items WHERE order_id=$1 GROUP BY seller_id`,[o.rows[0].id]);await c.query(`DELETE FROM cart_items WHERE user_id=$1`,[me.id]);await c.query('COMMIT');return json(res,201,{order:o.rows[0],payment:await paymentAdapter.createPayment({orderId:o.rows[0].id,amountCents:total}),deliveryFeeCents:null,finalTotalCents:null,message:'Demo order only. No payment collected, delivery quote or courier booking.'})
    }catch(e){await c.query('ROLLBACK');return json(res,400,{error:e.message})}finally{c.release()}
   }
   if(req.method==='GET'&&u.pathname==='/api/orders'){
@@ -110,12 +109,11 @@ async function route(req,res){
   }
   if(req.method==='POST'&&u.pathname==='/api/sellers/apply'){
    if(!okRole(me,['customer']))return json(res,403,{error:'Customer account required'});
-   const b=JSON.parse(await body(req)||'{}');const storeName=String(b.storeName||'').trim();
-   if(storeName.length<3||storeName.length>100)return json(res,400,{error:'Store name must be 3–100 characters'});
+   const b=JSON.parse(await body(req)||'{}'); const sellerType=String(b.sellerType||'individual'); const storeName=String(b.storeName||me.full_name||'Individual seller').trim(); if(!['individual','home_business','business','second_hand'].includes(sellerType))return json(res,400,{error:'Invalid seller type'}); if(storeName.length<2||storeName.length>100)return json(res,400,{error:'Seller/display name must be 2–100 characters'});
    const c=await pool.connect();try{await c.query('BEGIN');
     const existing=await c.query('SELECT 1 FROM seller_profiles WHERE user_id=$1',[me.id]);
     if(existing.rowCount){await c.query('ROLLBACK');return json(res,409,{error:'Seller application already exists'});}
-    await c.query("INSERT INTO seller_profiles(user_id,store_name,status) VALUES($1,$2,'pending')",[me.id,storeName]);
+    await c.query("INSERT INTO seller_profiles(user_id,store_name,status,seller_type,country_code,phone,whatsapp) VALUES($1,$2,'pending',$3,$4,$5,$6)",[me.id,storeName,sellerType,String(b.countryCode||''),String(b.phone||''),String(b.whatsapp||'')]);
     await c.query("UPDATE users SET role='seller' WHERE id=$1",[me.id]);await c.query('COMMIT');
     return json(res,201,{status:'pending',storeName});
    }catch(e){await c.query('ROLLBACK');throw e}finally{c.release()}
@@ -206,10 +204,28 @@ async function route(req,res){
   if(req.method==='POST'&&u.pathname==='/api/seller/profile'){
    if(!okRole(me,['seller']))return json(res,403,{error:'Seller access required'});let b=JSON.parse(await body(req)||'{}');let r=await pool.query(`UPDATE seller_profiles SET store_name=COALESCE($1,store_name),description=COALESCE($2,description),logo_url=COALESCE($3,logo_url),slug=COALESCE($4,slug) WHERE user_id=$5 RETURNING *`,[b.storeName,b.description,b.logoUrl,b.slug,me.id]);return json(res,200,{profile:r.rows[0]})
   }
-  if(req.method==='GET'&&u.pathname.startsWith('/api/store/')){
-   let slug=u.pathname.split('/').pop(),r=await pool.query(`SELECT s.*,u.full_name FROM seller_profiles s JOIN users u ON u.id=s.user_id WHERE s.slug=$1 AND s.status='approved'`,[slug]);if(!r.rows[0])return json(res,404,{error:'Store not found'});let p=await pool.query(`SELECT * FROM products WHERE seller_id=$1 AND status='approved' ORDER BY created_at DESC`,[r.rows[0].user_id]);return json(res,200,{store:r.rows[0],products:p.rows})
+  if(req.method==='POST'&&/^\/api\/seller\/shipments\/[0-9a-f-]{36}$/.test(u.pathname)){
+   if(!okRole(me,['seller']))return json(res,403,{error:'Seller access required'}); const b=JSON.parse(await body(req)||'{}'),orderId=u.pathname.split('/').pop();
+   const allowed=['preparing','courier_booked','collected','in_transit','out_for_delivery','delivered']; if(!allowed.includes(b.status))return json(res,400,{error:'Invalid shipment status'});
+   const owns=await pool.query(`SELECT 1 FROM order_items WHERE order_id=$1 AND seller_id=$2 LIMIT 1`,[orderId,me.id]); if(!owns.rowCount)return json(res,404,{error:'Order not found'});
+   const r=await pool.query(`UPDATE shipments SET status=$1,tracking_number=COALESCE(NULLIF($2,''),tracking_number),handed_to_courier_at=CASE WHEN $1 IN ('collected','in_transit','out_for_delivery','delivered') THEN COALESCE(handed_to_courier_at,now()) ELSE handed_to_courier_at END,delivered_at=CASE WHEN $1='delivered' THEN COALESCE(delivered_at,now()) ELSE delivered_at END,updated_at=now() WHERE order_id=$3 RETURNING *`,[b.status,String(b.trackingNumber||''),orderId]); return json(res,200,{shipment:r.rows[0]});
   }
-
+  if(req.method==='POST'&&u.pathname==='/api/admin/categories'){
+   if(!okRole(me,['admin']))return json(res,403,{error:'Admin access required'}); const b=JSON.parse(await body(req)||'{}');
+   const name=String(b.name||'').trim(),slug=String(b.slug||name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')).trim(); if(name.length<2||!slug)return json(res,400,{error:'Category name required'});
+   const r=await pool.query(`INSERT INTO categories(name,slug,parent_id,sort_order) VALUES($1,$2,$3,$4) RETURNING *`,[name,slug,b.parentId||null,Number(b.sortOrder)||0]); return json(res,201,{category:r.rows[0]});
+  }
+  if(req.method==='POST'&&/^\/api\/admin\/products\/[0-9a-f-]{36}\/special$/.test(u.pathname)){
+   if(!okRole(me,['admin']))return json(res,403,{error:'Admin access required'}); const b=JSON.parse(await body(req)||'{}'),id=u.pathname.split('/')[4];
+   const sp=b.specialPriceCents==null?null:Number(b.specialPriceCents); const r=await pool.query(`UPDATE products SET is_special=$1,special_price_cents=$2,special_starts_at=$3,special_ends_at=$4 WHERE id=$5 RETURNING id,is_special,special_price_cents`,[!!b.isSpecial,sp,b.startsAt||null,b.endsAt||null,id]); return json(res,r.rowCount?200:404,r.rowCount?{product:r.rows[0]}:{error:'Product not found'});
+  }
+  if(req.method==='POST'&&u.pathname==='/api/feedback'){
+   if(!me)return json(res,401,{error:'Login required'}); const b=JSON.parse(await body(req)||'{}'),rating=Number(b.rating),audience=me.role==='seller'?'seller':'buyer'; if(!Number.isInteger(rating)||rating<1||rating>5)return json(res,400,{error:'Rating must be 1 to 5'});
+   await pool.query(`INSERT INTO platform_feedback(user_id,order_id,audience,rating,topic,comments) VALUES($1,$2,$3,$4,$5,$6)`,[me.id,b.orderId||null,audience,rating,String(b.topic||'overall'),String(b.comments||'')]); return json(res,201,{ok:true});
+  }
+  if(req.method==='GET'&&u.pathname==='/api/admin/feedback'){
+   if(!okRole(me,['admin']))return json(res,403,{error:'Admin access required'}); const r=await pool.query(`SELECT f.*,u.email FROM platform_feedback f JOIN users u ON u.id=f.user_id ORDER BY f.created_at DESC LIMIT 200`); return json(res,200,{feedback:r.rows});
+  }
   if(req.method==='GET'&&u.pathname==='/api/admin/summary'){
    if(!okRole(me,['admin']))return json(res,403,{error:'Admin access required'});let qs=['SELECT count(*)::int n FROM users',`SELECT count(*)::int n FROM seller_profiles WHERE status='approved'`,'SELECT count(*)::int n FROM products','SELECT count(*)::int n FROM orders','SELECT COALESCE(sum(net_cents),0)::int n FROM seller_payouts'];let a=await Promise.all(qs.map(q=>pool.query(q)));return json(res,200,{users:a[0].rows[0].n,sellers:a[1].rows[0].n,products:a[2].rows[0].n,orders:a[3].rows[0].n,payoutsCents:a[4].rows[0].n})
   }
@@ -248,7 +264,7 @@ async function route(req,res){
    return json(res,200,{orders:r.rows,refundExecutionEnabled:false,
      note:'Review queue only; no actual refund has been initiated by this endpoint.'});
   }
-  if(req.method==='GET'&&u.pathname==='/api/health'){await pool.query('SELECT 1');return json(res,200,{ok:true,version:'19.0.0'})}
+  if(req.method==='GET'&&u.pathname==='/api/health'){await pool.query('SELECT 1');return json(res,200,{ok:true,version:'20.0.0'})}
   if(req.method==='POST'&&u.pathname==='/api/payments/webhook')return json(res,503,{error:'Live payment webhook disabled until a verified provider adapter is installed'});
 
   if(req.method==='GET'){
@@ -257,4 +273,4 @@ async function route(req,res){
   return json(res,404,{error:'Not found'})
  }catch(e){console.error(e);return json(res,500,{error:'Internal server error'})}
 }
-http.createServer((q,r)=>route(q,r)).listen(PORT,()=>console.log(`Easy Shop & Drop SA V19 on ${PORT}`));
+http.createServer((q,r)=>route(q,r)).listen(PORT,()=>console.log(`Shop&Drop V20 on ${PORT}`));
