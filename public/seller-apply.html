@@ -1,1 +1,80 @@
-<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Become a seller | Easy Shop & Drop SA</title><style>body{font:16px Arial;background:#f2f5f8;color:#17202a;margin:0}main{max-width:580px;margin:8vh auto;background:white;padding:30px;border-radius:12px}input,button{font:inherit;padding:12px;border-radius:7px}input{width:95%;border:1px solid #ccc}button{background:#0f766e;color:white;border:0;margin-top:12px;cursor:pointer}</style><main><a href="/">← Marketplace</a><h1>Sell on Easy Shop & Drop SA</h1><p>Sign in as a customer first. Apply to open a store; your application requires administrator approval.</p><form id="form"><label for="store">Your store name</label><p><input id="store" required minlength="3" maxlength="100" placeholder="Business or store name"></p><button>Submit application</button></form><p id="message" role="status"></p><a href="/seller.html">Seller Centre</a></main><script>document.getElementById('form').onsubmit=async e=>{e.preventDefault();const r=await fetch('/api/sellers/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({storeName:document.getElementById('store').value})});const d=await r.json();document.getElementById('message').textContent=r.ok?'Application received. Status: pending approval.':(d.error||'Unable to apply');};</script></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Become a Seller | Shop&Drop</title>
+<style>
+body{font-family:Arial,sans-serif;margin:0;background:#f3f5f8;color:#17202a}
+header{background:#101827;color:white;padding:22px}
+header b{font-size:28px;color:#20c997}
+main{max-width:650px;margin:30px auto;padding:20px}
+.card{background:white;padding:24px;border-radius:12px}
+h1{margin-top:0}
+label{display:block;font-weight:bold;margin-top:18px}
+input,select,textarea{width:100%;padding:12px;margin-top:7px;box-sizing:border-box;border:1px solid #ccc;border-radius:6px}
+textarea{min-height:100px}
+button{width:100%;margin-top:24px;padding:14px;background:#101827;color:white;border:0;border-radius:7px;font-size:17px}
+.note{color:#64748b;font-size:14px}
+</style>
+</head>
+<body>
+
+<header><b>Shop&Drop</b></header>
+
+<main>
+<div class="card">
+
+<h1>Become a Seller</h1>
+<p>Join Shop&Drop and sell your products to customers around the world.</p>
+
+<form id="sellerForm">
+
+<label>Seller type</label>
+<select name="sellerType" required>
+<option value="">Select seller type</option>
+<option>Private Seller</option>
+<option>Business</option>
+</select>
+
+<label>Full name</label>
+<input name="fullName" required>
+
+<label>Business / Store name</label>
+<input name="businessName">
+
+<label>Email address</label>
+<input type="email" name="email" required>
+
+<label>Phone number</label>
+<input type="tel" name="phone" required>
+
+<label>Country</label>
+<input name="country" required>
+
+<label>What do you plan to sell?</label>
+<textarea name="products" required></textarea>
+
+<label>
+<input type="checkbox" required style="width:auto">
+I confirm that the information supplied is correct.
+</label>
+
+<button type="submit">Submit Seller Application</button>
+
+</form>
+
+<p class="note">Submitting an application does not automatically approve a seller account.</p>
+
+</div>
+</main>
+
+<script>
+document.getElementById('sellerForm').addEventListener('submit',function(e){
+e.preventDefault();
+alert('Thank you. Your Shop&Drop seller application has been received.');
+});
+</script>
+
+</body>
+</html>
