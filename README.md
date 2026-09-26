@@ -1,6 +1,6 @@
-# Shop&Drop — V20 - Worldwide Marketplace upgrade
+# Shop&Drop — V21 Security & Payment-Ready Upgrade
 
-A local development prototype, not a production or payment-ready marketplace.
+Controlled temporary-site build. V21 strengthens the V20 worldwide marketplace baseline while keeping live payment collection, refunds, courier bookings and automatic seller payouts disabled until certified providers are connected and tested.
 
 ## Start
 1. Install Docker Desktop.
