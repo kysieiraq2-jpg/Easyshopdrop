@@ -73,7 +73,7 @@ async function route(req,res){
   }
   if(req.method==='POST'&&u.pathname==='/api/cart'){
    if(!me)return json(res,401,{error:'Login required'});let b=JSON.parse(await body(req)||'{}');let q=Number(b.quantity);if(!b.productId||!Number.isInteger(q)||q<0)return json(res,400,{error:'Invalid cart item'});
-   if(q===0)await pool.query(`DELETE FROM cart_items WHERE user_id=$1 AND product_id=$2`,[me.id,b.productId]);else await pool.query(`INSERT INTO cart_items(user_id,product_id,quantity) VALUES($1,$2,$3) ON CONFLICT(user_id,product_id) DO UPDATE SET quantity=EXCLUDED.quantity,updated_at=now()`,[me.id,b.productId,q]);
+   if(q===0)await pool.query(`DELETE FROM cart_items WHERE user_id=$1 AND product_id=$2`,[me.id,b.productId]);else {const avail=await pool.query(`SELECT stock,status FROM products WHERE id=$1`,[b.productId]);if(!avail.rows[0]||avail.rows[0].status!=='approved'||avail.rows[0].stock<q)return json(res,409,{error:'Requested quantity is not available'});await pool.query(`INSERT INTO cart_items(user_id,product_id,quantity) VALUES($1,$2,$3) ON CONFLICT(user_id,product_id) DO UPDATE SET quantity=EXCLUDED.quantity,updated_at=now()`,[me.id,b.productId,q]);}
    return json(res,200,{ok:true})
   }
 
@@ -109,7 +109,11 @@ async function route(req,res){
    if(!okRole(me,['customer']))return json(res,401,{error:'Customer login required'});let b=JSON.parse(await body(req)||'{}'),items=b.items;
    if(!Array.isArray(items)||!items.length)return json(res,400,{error:'Cart is empty'});if(!b.addressId)return json(res,400,{error:'Select a saved delivery address'});let c=await pool.connect();try{await c.query('BEGIN');const addr=await c.query(`SELECT id,label,recipient_name,line1,line2,city,province,postal_code,phone FROM customer_addresses WHERE id=$1 AND user_id=$2`,[b.addressId,me.id]);if(!addr.rows[0])throw Error('Delivery address not found');let total=0,checked=[];
     for(let x of items){let r=await c.query(`SELECT id,seller_id,price_cents,stock,status FROM products WHERE id=$1 FOR UPDATE`,[x.productId]),p=r.rows[0],q=Number(x.quantity);if(!p||p.status!=='approved'||!Number.isInteger(q)||q<1||p.stock<q)throw Error('A product is unavailable or out of stock');total+=p.price_cents*q;checked.push({p,q})}
-    let o=await c.query(`INSERT INTO orders(customer_id,total_cents,product_subtotal_cents,shopdrop_commission_cents,seller_proceeds_cents,delivery_address_snapshot) VALUES($1,$2,$2,round($2*0.10),$2-round($2*0.10),$3) RETURNING *`,[me.id,total,JSON.stringify(addr.rows[0])]);for(let x of checked){await c.query(`INSERT INTO order_items(order_id,product_id,seller_id,quantity,unit_price_cents) VALUES($1,$2,$3,$4,$5)`,[o.rows[0].id,x.p.id,x.p.seller_id,x.q,x.p.price_cents]);await c.query(`UPDATE products SET stock=stock-$1,updated_at=now() WHERE id=$2`,[x.q,x.p.id])}await c.query(`INSERT INTO payments(order_id,amount_cents) VALUES($1,$2)`,[o.rows[0].id,total]);await c.query(`INSERT INTO shipments(order_id) VALUES($1)`,[o.rows[0].id]); await c.query(`INSERT INTO seller_payouts(seller_id,order_id,gross_cents,commission_cents,net_cents,status) SELECT seller_id,$1,SUM(quantity*unit_price_cents)::int,round(SUM(quantity*unit_price_cents)*0.10)::int,(SUM(quantity*unit_price_cents)-round(SUM(quantity*unit_price_cents)*0.10))::int,'held' FROM order_items WHERE order_id=$1 GROUP BY seller_id`,[o.rows[0].id]);await c.query(`DELETE FROM cart_items WHERE user_id=$1`,[me.id]);await c.query('COMMIT');return json(res,201,{order:o.rows[0],payment:await paymentAdapter.createPayment({orderId:o.rows[0].id,amountCents:total}),deliveryFeeCents:null,finalTotalCents:null,message:'Demo order only. No payment collected, delivery quote or courier booking.'})
+    let o=await c.query(`INSERT INTO orders(customer_id,total_cents,product_subtotal_cents,shopdrop_commission_cents,seller_proceeds_cents,delivery_address_snapshot) VALUES($1,$2,$2,round($2*0.10),$2-round($2*0.10),$3) RETURNING *`,[me.id,total,JSON.stringify(addr.rows[0])]);for(let x of checked){await c.query(`INSERT INTO order_items(order_id,product_id,seller_id,quantity,unit_price_cents) VALUES($1,$2,$3,$4,$5)`,[o.rows[0].id,x.p.id,x.p.seller_id,x.q,x.p.price_cents]);await c.query(`UPDATE products SET stock=stock-$1,updated_at=now() WHERE id=$2`,[x.q,x.p.id])}await c.query(`INSERT INTO payments(order_id,amount_cents) VALUES($1,$2)`,[o.rows[0].id,total]);await c.query(`INSERT INTO shipments(order_id) VALUES($1)`,[o.rows[0].id]); await c.query(`INSERT INTO seller_payouts(seller_id,order_id,gross_cents,commission_cents,net_cents,status) SELECT seller_id,$1,SUM(quantity*unit_price_cents)::int,round(SUM(quantity*unit_price_cents)*0.10)::int,(SUM(quantity*unit_price_cents)-round(SUM(quantity*unit_price_cents)*0.10))::int,'held' FROM order_items WHERE order_id=$1 GROUP BY seller_id`,[o.rows[0].id]);
+    await c.query(`INSERT INTO fulfilment_groups(order_id,seller_id,gross_cents,commission_cents,seller_proceeds_cents) SELECT $1,seller_id,SUM(quantity*unit_price_cents)::int,round(SUM(quantity*unit_price_cents)*0.10)::int,(SUM(quantity*unit_price_cents)-round(SUM(quantity*unit_price_cents)*0.10))::int FROM order_items WHERE order_id=$1 GROUP BY seller_id ON CONFLICT(order_id,seller_id) DO NOTHING`,[o.rows[0].id]);
+    await c.query(`INSERT INTO fulfilment_shipments(fulfilment_group_id,order_id,seller_id) SELECT id,order_id,seller_id FROM fulfilment_groups WHERE order_id=$1 ON CONFLICT DO NOTHING`,[o.rows[0].id]);
+    await c.query(`INSERT INTO notifications(user_id,order_id,fulfilment_group_id,channel,template_key,payload) SELECT fg.seller_id,fg.order_id,fg.id,'in_app','seller_order_received',jsonb_build_object('orderId',fg.order_id,'grossCents',fg.gross_cents) FROM fulfilment_groups fg WHERE fg.order_id=$1`,[o.rows[0].id]);
+    await c.query(`DELETE FROM cart_items WHERE user_id=$1`,[me.id]);await c.query('COMMIT');return json(res,201,{order:o.rows[0],payment:await paymentAdapter.createPayment({orderId:o.rows[0].id,amountCents:total}),deliveryFeeCents:null,finalTotalCents:null,message:'Demo order only. No payment collected, delivery quote or courier booking.'})
    }catch(e){await c.query('ROLLBACK');return json(res,400,{error:e.message})}finally{c.release()}
   }
   if(req.method==='GET'&&u.pathname==='/api/orders'){
@@ -208,6 +212,35 @@ async function route(req,res){
    if(!okRole(me,['admin']))return json(res,403,{error:'Admin access required'});
    const r=await pool.query('SELECT id,name,status,price_cents,stock FROM products ORDER BY created_at DESC');return json(res,200,{products:r.rows});
   }
+  // V24 services marketplace and transaction support.
+  if(req.method==='GET'&&u.pathname==='/api/services'){
+   let q=(u.searchParams.get('q')||'').trim(),unit=(u.searchParams.get('pricingUnit')||'').trim(),vals=[],w=[`s.status='approved'`];
+   if(q){vals.push(`%${q}%`);w.push(`(s.title ILIKE $${vals.length} OR s.description ILIKE $${vals.length} OR s.service_area ILIKE $${vals.length})`)}
+   if(unit){vals.push(unit);w.push(`s.pricing_unit=$${vals.length}`)}
+   const r=await pool.query(`SELECT s.id,s.title,s.description,s.pricing_unit,s.unit_price_cents,s.currency_code,s.minimum_units,s.service_area,s.country_code,s.image_url,c.name category FROM service_listings s LEFT JOIN categories c ON c.id=s.category_id WHERE ${w.join(' AND ')} ORDER BY s.created_at DESC`,vals);return json(res,200,{services:r.rows});
+  }
+  if(req.method==='POST'&&u.pathname==='/api/seller/services'){
+   if(!okRole(me,['seller']))return json(res,403,{error:'Seller/provider access required'});const b=JSON.parse(await body(req)||'{}'),units=['hour','day','kilometre','gig','event','job','treatment'],price=Number(b.unitPriceCents),min=Number(b.minimumUnits||1);
+   if(String(b.title||'').trim().length<2||!units.includes(b.pricingUnit)||!Number.isSafeInteger(price)||price<0||!Number.isFinite(min)||min<=0)return json(res,400,{error:'Valid title, pricing unit, price and minimum units required'});
+   const approved=await pool.query(`SELECT 1 FROM seller_profiles WHERE user_id=$1 AND status='approved'`,[me.id]);if(!approved.rowCount)return json(res,403,{error:'Provider not approved'});
+   const r=await pool.query(`INSERT INTO service_listings(provider_id,category_id,title,description,pricing_unit,unit_price_cents,currency_code,minimum_units,service_area,country_code,image_url) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,[me.id,b.categoryId||null,String(b.title).trim(),String(b.description||''),b.pricingUnit,price,String(b.currencyCode||'ZAR'),min,String(b.serviceArea||''),String(b.countryCode||''),String(b.imageUrl||'')]);return json(res,201,{service:r.rows[0]});
+  }
+  if(req.method==='GET'&&u.pathname==='/api/seller/services'){
+   if(!okRole(me,['seller']))return json(res,403,{error:'Seller/provider access required'});const r=await pool.query(`SELECT * FROM service_listings WHERE provider_id=$1 ORDER BY created_at DESC`,[me.id]);return json(res,200,{services:r.rows});
+  }
+  if(req.method==='POST'&&u.pathname==='/api/service-bookings/preview'){
+   if(!okRole(me,['customer']))return json(res,401,{error:'Customer login required'});const b=JSON.parse(await body(req)||'{}'),units=Number(b.units);const r=await pool.query(`SELECT id,provider_id,title,pricing_unit,unit_price_cents,currency_code,minimum_units,status FROM service_listings WHERE id=$1`,[b.serviceId]);const s=r.rows[0];if(!s||s.status!=='approved')return json(res,404,{error:'Service unavailable'});if(!Number.isFinite(units)||units<Number(s.minimum_units))return json(res,400,{error:'Invalid quantity/duration'});const subtotal=Math.round(units*s.unit_price_cents),commission=Math.round(subtotal*.10);return json(res,200,{service:s,units,subtotalCents:subtotal,shopdropCommissionCents:commission,providerProceedsCents:subtotal-commission,paymentAvailable:false,message:'Preview only. Live booking payment activates after a certified payment provider is connected.'});
+  }
+  if(req.method==='GET'&&u.pathname==='/api/order-tracking'){
+   if(!me)return json(res,401,{error:'Login required'});const orderId=u.searchParams.get('orderId');const own=await pool.query(`SELECT id,status,created_at FROM orders WHERE id=$1 AND (customer_id=$2 OR $3='admin' OR EXISTS(SELECT 1 FROM order_items oi WHERE oi.order_id=orders.id AND oi.seller_id=$2))`,[orderId,me.id,me.role]);if(!own.rowCount)return json(res,404,{error:'Order not found'});const groups=await pool.query(`SELECT fg.id,fg.seller_id,fg.status,fs.provider,fs.tracking_number,fs.status shipment_status,fs.handed_to_courier_at,fs.delivered_at FROM fulfilment_groups fg LEFT JOIN fulfilment_shipments fs ON fs.fulfilment_group_id=fg.id WHERE fg.order_id=$1 ORDER BY fg.created_at`,[orderId]);return json(res,200,{order:own.rows[0],fulfilments:groups.rows});
+  }
+  if(req.method==='POST'&&u.pathname==='/api/category-requests'){
+   const b=JSON.parse(await body(req)||'{}'),name=String(b.requestedName||'').trim();if(name.length<2)return json(res,400,{error:'Requested category/service name required'});const r=await pool.query(`INSERT INTO category_requests(user_id,requested_name,description) VALUES($1,$2,$3) RETURNING id,status`,[me?.id||null,name,String(b.description||'')]);return json(res,201,{request:r.rows[0]});
+  }
+  if(req.method==='POST'&&u.pathname==='/api/referrals'){
+   if(!me)return json(res,401,{error:'Login required'});const b=JSON.parse(await body(req)||'{}'),code=crypto.randomBytes(9).toString('base64url');const r=await pool.query(`INSERT INTO referrals(referrer_user_id,order_id,referral_code,channel) VALUES($1,$2,$3,$4) RETURNING referral_code`,[me.id,b.orderId||null,code,String(b.channel||'share')]);return json(res,201,{referralCode:r.rows[0].referral_code});
+  }
+
   if(req.method==='POST'&&u.pathname==='/api/reviews'){
    if(!okRole(me,['customer']))return json(res,401,{error:'Customer login required'});let b=JSON.parse(await body(req)||'{}'),rating=Number(b.rating);if(!b.productId||!Number.isInteger(rating)||rating<1||rating>5)return json(res,400,{error:'Rating must be 1 to 5'});
    let bought=await pool.query(`SELECT 1 FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE o.customer_id=$1 AND oi.product_id=$2 AND o.status='delivered' LIMIT 1`,[me.id,b.productId]);if(!bought.rows[0])return json(res,403,{error:'Only customers who received the product can review it'});
@@ -280,7 +313,7 @@ async function route(req,res){
    return json(res,200,{orders:r.rows,refundExecutionEnabled:false,
      note:'Review queue only; no actual refund has been initiated by this endpoint.'});
   }
-  if(req.method==='GET'&&u.pathname==='/api/health'){await pool.query('SELECT 1');return json(res,200,{ok:true,version:'23.1.0',livePaymentsEnabled:false,liveShippingEnabled:false})}
+  if(req.method==='GET'&&u.pathname==='/api/health'){await pool.query('SELECT 1');return json(res,200,{ok:true,version:'24.0.0',livePaymentsEnabled:false,liveShippingEnabled:false})}
   if(req.method==='POST'&&u.pathname==='/api/payments/webhook'){
    const raw=await body(req),secret=process.env.PAYMENT_WEBHOOK_SECRET||'',sig=String(req.headers['x-shopdrop-signature']||'');
    if(!secret||secret.startsWith('disabled-'))return json(res,503,{error:'Live payment webhook disabled until a verified provider adapter is installed'});
@@ -294,4 +327,4 @@ async function route(req,res){
   return json(res,404,{error:'Not found'})
  }catch(e){console.error(e);return json(res,e.statusCode||500,{error:e.statusCode===413?'Request body too large':'Internal server error'})}
 }
-http.createServer((q,r)=>route(q,r)).listen(PORT,()=>console.log(`Shop&Drop V23 on ${PORT}`));
+http.createServer((q,r)=>route(q,r)).listen(PORT,()=>console.log(`Shop&Drop V24 on ${PORT}`));
