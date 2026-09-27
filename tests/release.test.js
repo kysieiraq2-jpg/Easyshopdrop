@@ -6,7 +6,7 @@ test('live payment callback remains disabled',()=>assert.match(server,/Live paym
 test('health endpoint is present',()=>assert.match(server,/\/api\/health/));
 test('V23 security headers are present',()=>{assert.match(server,/Content-Security-Policy/);assert.match(server,/X-Content-Type-Options/)});
 test('V23 login throttling and origin checks are present',()=>{assert.match(server,/Too many login attempts/);assert.match(server,/Origin not allowed/)});
-test('V24+ health version is present',()=>assert.match(server,/version:'24\.(?:0|1)\.0'/));
+test('V24+ health version is present',()=>assert.match(server,/version:'24\.(?:0|1|2)\.0'/));
 
 const home=readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
 const seller=readFileSync(new URL('../public/seller.html',import.meta.url),'utf8');
@@ -33,7 +33,7 @@ const migration241=readFileSync(new URL('../db/v24_1_migration.sql',import.meta.
 const account241=readFileSync(new URL('../public/account.html',import.meta.url),'utf8');
 const seller241=readFileSync(new URL('../public/seller.html',import.meta.url),'utf8');
 const adminMarket241=readFileSync(new URL('../public/admin-marketplace.html',import.meta.url),'utf8');
-test('V24.1 health version and configurable commission engine are present',()=>{assert.match(server,/version:'24\.1\.0'/);assert.match(server,/commissionQuote/);assert.match(server,/\/api\/commission\/preview/)});
+test('V24.1 health version and configurable commission engine are present',()=>{assert.match(server,/version:'24\.(?:1|2)\.0'/);assert.match(server,/commissionQuote/);assert.match(server,/\/api\/commission\/preview/)});
 test('V24.1 progressive commission schema is configurable',()=>{assert.match(migration241,/commission_rules/);assert.match(migration241,/rate_basis_points/);assert.match(migration241,/commission_snapshots/)});
 test('V24.1 returns disputes and risk exception schema is present',()=>{assert.match(migration241,/return_disputes/);assert.match(migration241,/risk_flags/);assert.match(server,/\/api\/admin\/exceptions/)});
 test('V24.1 pet supplies are product categories not service categories',()=>{assert.match(migration241,/Pet Supplies/);assert.match(migration241,/Fish & Aquarium/);assert.doesNotMatch(services,/Pet Services/)});
@@ -41,3 +41,16 @@ test('V24.1 seller service form has controlled category description scheduling a
 test('V24.1 account exposes tracking feedback sharing and disputes',()=>{assert.match(account241,/Track order/);assert.match(account241,/Leave feedback/);assert.match(account241,/Tell a Friend/);assert.match(account241,/Returns & Disputes Centre/)});
 test('V24.1 admin is automation-first and exception-based',()=>{assert.match(adminMarket241,/Exception Queue/);assert.match(adminMarket241,/Commission Rules/);assert.match(adminMarket241,/owns no seller inventory/)});
 test('V24.1 homepage restores admin sign in and inclusive overview',()=>{assert.match(home,/Administrator Sign In/);assert.match(home,/private individuals/);assert.match(home,/Registration and listing are FREE/)});
+
+const taxonomy242=readFileSync(new URL('../public/taxonomy.json',import.meta.url),'utf8');
+const migration242=readFileSync(new URL('../db/v24_2_taxonomy.sql',import.meta.url),'utf8');
+test('V24.2 master taxonomy covers major Shop&Drop departments',()=>{for(const x of ['Automotive','Baby & Toddler','Beauty & Personal Care','Cellphones & Wearables','Computers & Tablets','Fashion','Home & Kitchen','Pet Supplies','Arts, Crafts & Handmade','Industrial & Business Supplies'])assert.match(taxonomy242,new RegExp(x.replace(/[&]/g,'&')))});
+test('V24.2 taxonomy migration is idempotent and hierarchical',()=>{assert.match(migration242,/NOT EXISTS/);assert.match(migration242,/parent_id/);assert.match(migration242,/Pet Supplies/)});
+test('V24.2 seller product form uses controlled category selection',()=>{assert.match(seller241,/Choose product category/);assert.match(seller241,/taxonomy\.json/)});
+
+const conditionMigration2421=readFileSync(new URL('../db/v24_2_1_condition.sql',import.meta.url),'utf8');
+test('V24.2.1 second-hand is a condition filter across the master taxonomy',()=>{assert.doesNotMatch(taxonomy242,/\"name\": \"Second-Hand & Pre-Owned\"/);assert.match(home,/Second-Hand & Pre-Owned/);assert.match(home,/condition=used/);assert.match(home,/condition=refurbished/);assert.match(conditionMigration2421,/active=false/)});
+test('V24.2.1 seller captures product condition',()=>{for(const x of ['New','Like New','Used / Pre-Owned','Refurbished'])assert.match(seller241,new RegExp(x));assert.match(server,/p\.condition=\$/)});
+
+// V24.2.2 handmade furniture taxonomy
+test('V24.2.2 adds handmade furniture and woodwork branches',()=>{for(const x of ['Handmade Furniture — Tables & Desks','Handmade Furniture — Custom & Bespoke Furniture','Handmade Furniture — Outdoor & Garden Furniture']) assert.match(taxonomy242,new RegExp(x.replace(/[&]/g,'&')))})
