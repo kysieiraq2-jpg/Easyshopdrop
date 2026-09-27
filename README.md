@@ -1,4 +1,4 @@
-# Shop&Drop — V24.1 Marketplace Engine & Services
+# Shop&Drop — V24.2 Marketplace Engine & Services
 
 V24.1 is the next development baseline after V23.2. It combines the tested Shop&Drop mobile interface with the database/workflow architecture for inventory, multi-seller orders, fulfilment, seller notifications/payout controls and clearly-priced once-off Services & Dispatching.
 
@@ -19,3 +19,7 @@ See `V24.1_RELEASE_NOTES.md` and `db/v24_migration.sql` and `db/v24_1_migration.
 
 ## Important
 GitHub Pages is a frontend preview only. Real accounts, database inventory, payments, courier integrations, notifications and payouts require the Node/PostgreSQL backend and approved external providers. Do not process real customer money until those integrations and security/compliance tests are complete.
+
+
+## V24.2 master product taxonomy
+Shop&Drop now includes a broad database-driven product taxonomy shared by seller listing, search and administration. The structure is Shop&Drop-owned and remains expandable through Admin/category requests.
