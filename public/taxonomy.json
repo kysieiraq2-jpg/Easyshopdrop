@@ -1,0 +1,424 @@
+{
+  "version": "24.2.1",
+  "departments": [
+    {
+      "name": "Appliances",
+      "subcategories": [
+        "Large Appliances",
+        "Small Kitchen Appliances",
+        "Laundry Appliances",
+        "Heating & Cooling",
+        "Vacuum Cleaners & Floor Care",
+        "Irons & Garment Care",
+        "Water Purification"
+      ]
+    },
+    {
+      "name": "Automotive",
+      "subcategories": [
+        "Car Accessories",
+        "Car Care & Cleaning",
+        "Car Electronics",
+        "Replacement Parts",
+        "Tyres & Wheels",
+        "Motorcycle Accessories",
+        "Tools & Garage Equipment",
+        "Towing & Recovery"
+      ]
+    },
+    {
+      "name": "Baby & Toddler",
+      "subcategories": [
+        "Baby Clothing",
+        "Feeding",
+        "Nappies & Changing",
+        "Nursery",
+        "Prams & Travel Systems",
+        "Car Seats",
+        "Baby Safety",
+        "Baby Toys",
+        "Bath & Skincare",
+        "Maternity"
+      ]
+    },
+    {
+      "name": "Beauty & Personal Care",
+      "subcategories": [
+        "Skincare",
+        "Makeup",
+        "Hair Care",
+        "Hair Styling Tools",
+        "Fragrances",
+        "Nail Care",
+        "Bath & Body",
+        "Shaving & Grooming",
+        "Beauty Tools & Accessories"
+      ]
+    },
+    {
+      "name": "Books & Learning",
+      "subcategories": [
+        "Books",
+        "Children’s Books",
+        "Textbooks & Study Guides",
+        "Educational Materials",
+        "Languages",
+        "Maps & Atlases",
+        "Magazines & Periodicals"
+      ]
+    },
+    {
+      "name": "Cameras & Photography",
+      "subcategories": [
+        "Digital Cameras",
+        "Action Cameras",
+        "Lenses",
+        "Tripods & Supports",
+        "Lighting & Studio",
+        "Camera Bags & Cases",
+        "Memory Cards & Storage",
+        "Binoculars & Optics"
+      ]
+    },
+    {
+      "name": "Cellphones & Wearables",
+      "subcategories": [
+        "Smartphones",
+        "Feature Phones",
+        "Phone Cases & Covers",
+        "Screen Protectors",
+        "Chargers & Cables",
+        "Power Banks",
+        "Smartwatches",
+        "Fitness Trackers",
+        "Phone Parts & Repair",
+        "Car Phone Accessories"
+      ]
+    },
+    {
+      "name": "Computers & Tablets",
+      "subcategories": [
+        "Laptops",
+        "Desktop Computers",
+        "Tablets",
+        "Monitors",
+        "Printers & Scanners",
+        "Computer Components",
+        "Storage & Drives",
+        "Networking",
+        "Keyboards & Mice",
+        "Laptop Accessories",
+        "Software"
+      ]
+    },
+    {
+      "name": "Electronics",
+      "subcategories": [
+        "Smart Home",
+        "GPS & Navigation",
+        "Batteries & Chargers",
+        "Electronic Accessories",
+        "Security Cameras & Systems",
+        "Drones",
+        "Calculators & Translators"
+      ]
+    },
+    {
+      "name": "TV, Audio & Video",
+      "subcategories": [
+        "Televisions",
+        "Streaming Devices",
+        "Home Theatre",
+        "Speakers",
+        "Headphones & Earphones",
+        "Portable Audio",
+        "Hi-Fi Components",
+        "Projectors",
+        "Cables & AV Accessories"
+      ]
+    },
+    {
+      "name": "Gaming",
+      "subcategories": [
+        "Consoles",
+        "Video Games",
+        "Gaming PCs & Laptops",
+        "Controllers",
+        "Gaming Headsets",
+        "Gaming Chairs",
+        "Gaming Accessories",
+        "Collectible Gaming"
+      ]
+    },
+    {
+      "name": "Fashion",
+      "subcategories": [
+        "Women’s Clothing",
+        "Men’s Clothing",
+        "Kids’ Clothing",
+        "Shoes",
+        "Bags & Handbags",
+        "Jewellery",
+        "Watches",
+        "Accessories",
+        "Sportswear",
+        "Workwear",
+        "Traditional & Cultural Clothing"
+      ]
+    },
+    {
+      "name": "Home & Kitchen",
+      "subcategories": [
+        "Furniture",
+        "Kitchen & Dining",
+        "Cookware & Bakeware",
+        "Bedding",
+        "Bathroom",
+        "Home Décor",
+        "Lighting",
+        "Storage & Organisation",
+        "Cleaning Supplies",
+        "Laundry & Home Care"
+      ]
+    },
+    {
+      "name": "DIY, Tools & Machinery",
+      "subcategories": [
+        "Hand Tools",
+        "Power Tools",
+        "Tool Accessories",
+        "Hardware & Fasteners",
+        "Electrical",
+        "Plumbing",
+        "Paint & Supplies",
+        "Safety Equipment",
+        "Generators & Power Equipment",
+        "Welding",
+        "Machinery"
+      ]
+    },
+    {
+      "name": "Garden, Pool & Patio",
+      "subcategories": [
+        "Garden Tools",
+        "Plants & Seeds",
+        "Outdoor Furniture",
+        "Braais & Outdoor Cooking",
+        "Pool & Spa",
+        "Irrigation & Watering",
+        "Lawn Care",
+        "Outdoor Lighting",
+        "Pest & Weed Control Products"
+      ]
+    },
+    {
+      "name": "Groceries & Household",
+      "subcategories": [
+        "Pantry Food",
+        "Snacks & Sweets",
+        "Coffee & Tea",
+        "Non-Alcoholic Beverages",
+        "Baking",
+        "Cooking Ingredients",
+        "Household Cleaning",
+        "Paper & Disposable Products",
+        "Food Storage"
+      ]
+    },
+    {
+      "name": "Health & Wellness",
+      "subcategories": [
+        "Vitamins & Supplements",
+        "First Aid",
+        "Mobility & Daily Living",
+        "Medical Devices",
+        "Oral Care",
+        "Eye Care",
+        "Wellness & Relaxation",
+        "Fitness Recovery",
+        "Personal Hygiene"
+      ]
+    },
+    {
+      "name": "Office & Stationery",
+      "subcategories": [
+        "Writing & Correction",
+        "Paper & Notebooks",
+        "Filing & Storage",
+        "Labels",
+        "Desk Accessories",
+        "Office Furniture",
+        "Presentation Supplies",
+        "School Stationery",
+        "Art & Craft Supplies",
+        "Business Machines"
+      ]
+    },
+    {
+      "name": "Pet Supplies",
+      "subcategories": [
+        "Dogs",
+        "Cats",
+        "Birds",
+        "Fish & Aquarium",
+        "Reptiles",
+        "Small Animals",
+        "Pet Food",
+        "Pet Beds & Housing",
+        "Pet Toys",
+        "Pet Grooming",
+        "Pet Travel & Accessories"
+      ]
+    },
+    {
+      "name": "Sport & Fitness",
+      "subcategories": [
+        "Fitness Equipment",
+        "Running",
+        "Cycling",
+        "Team Sports",
+        "Racquet Sports",
+        "Golf",
+        "Swimming",
+        "Combat Sports",
+        "Sports Nutrition Accessories",
+        "Fan & Supporter Gear"
+      ]
+    },
+    {
+      "name": "Camping & Outdoors",
+      "subcategories": [
+        "Camping Tents & Shelters",
+        "Sleeping Gear",
+        "Outdoor Cooking",
+        "Hiking",
+        "Fishing",
+        "Hunting Accessories",
+        "Climbing",
+        "Outdoor Clothing",
+        "Coolers & Hydration",
+        "Travel Outdoor Gear"
+      ]
+    },
+    {
+      "name": "Toys & Games",
+      "subcategories": [
+        "Baby & Toddler Toys",
+        "Dolls & Accessories",
+        "Action Figures",
+        "Building Sets",
+        "Board Games",
+        "Puzzles",
+        "Educational Toys",
+        "Remote Control",
+        "Outdoor Toys",
+        "Arts & Crafts Toys",
+        "Collectibles"
+      ]
+    },
+    {
+      "name": "Luggage & Travel",
+      "subcategories": [
+        "Suitcases",
+        "Travel Bags",
+        "Backpacks",
+        "Travel Accessories",
+        "Travel Organisers",
+        "Locks & Security",
+        "Cooler Bags"
+      ]
+    },
+    {
+      "name": "Music & Musical Instruments",
+      "subcategories": [
+        "Guitars",
+        "Keyboards & Pianos",
+        "Drums & Percussion",
+        "Orchestral Instruments",
+        "DJ Equipment",
+        "Microphones",
+        "Studio & Recording",
+        "Instrument Accessories",
+        "Sheet Music"
+      ]
+    },
+    {
+      "name": "Arts, Crafts & Handmade",
+      "subcategories": [
+        "Handmade Home Décor",
+        "Handmade Jewellery",
+        "Candles & Soaps",
+        "Woodwork",
+        "Handmade Furniture — Tables & Desks",
+        "Handmade Furniture — Chairs & Benches",
+        "Handmade Furniture — Shelving & Storage",
+        "Handmade Furniture — Cabinets & Cupboards",
+        "Handmade Furniture — Beds & Bedroom Furniture",
+        "Handmade Furniture — Outdoor & Garden Furniture",
+        "Handmade Furniture — Children’s Furniture",
+        "Handmade Furniture — Custom & Bespoke Furniture",
+        "Handmade Furniture — Woodwork & Decorative Pieces",
+        "Handmade Furniture — Other",
+        "Pottery & Ceramics",
+        "Sewing & Needlecraft",
+        "Painting & Drawing",
+        "Craft Materials",
+        "Personalised Gifts",
+        "Print-on-Demand"
+      ]
+    },
+    {
+      "name": "Industrial & Business Supplies",
+      "subcategories": [
+        "Industrial Tools",
+        "Material Handling",
+        "Packaging & Shipping Supplies",
+        "Safety & PPE",
+        "Commercial Cleaning Supplies",
+        "Restaurant & Catering Equipment",
+        "Retail & POS Equipment",
+        "Office & Business Equipment",
+        "Agricultural Supplies"
+      ]
+    },
+    {
+      "name": "Home Improvement & Building Supplies",
+      "subcategories": [
+        "Building Materials",
+        "Doors & Windows",
+        "Flooring",
+        "Roofing",
+        "Bathroom Fixtures",
+        "Kitchen Fixtures",
+        "Locks & Security Hardware",
+        "Insulation",
+        "Tiles & Surfaces"
+      ]
+    },
+    {
+      "name": "Party, Events & Gifts",
+      "subcategories": [
+        "Party Supplies",
+        "Decorations",
+        "Gift Wrap",
+        "Greeting Cards",
+        "Wedding Supplies",
+        "Event Accessories",
+        "Novelty Gifts"
+      ]
+    },
+    {
+      "name": "Collectibles & Hobbies",
+      "subcategories": [
+        "Trading Cards",
+        "Coins & Currency",
+        "Stamps",
+        "Model Kits",
+        "Model Trains",
+        "Memorabilia",
+        "Antiques & Vintage",
+        "Hobby Tools & Supplies"
+      ]
+    }
+  ]
+}
