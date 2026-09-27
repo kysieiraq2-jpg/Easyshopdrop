@@ -6,7 +6,7 @@ test('live payment callback remains disabled',()=>assert.match(server,/Live paym
 test('health endpoint is present',()=>assert.match(server,/\/api\/health/));
 test('V23 security headers are present',()=>{assert.match(server,/Content-Security-Policy/);assert.match(server,/X-Content-Type-Options/)});
 test('V23 login throttling and origin checks are present',()=>{assert.match(server,/Too many login attempts/);assert.match(server,/Origin not allowed/)});
-test('V24 health version is present',()=>assert.match(server,/version:'24\.0\.0'/));
+test('V24+ health version is present',()=>assert.match(server,/version:'24\.(?:0|1)\.0'/));
 
 const home=readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
 const seller=readFileSync(new URL('../public/seller.html',import.meta.url),'utf8');
@@ -28,3 +28,16 @@ test('V24 service marketplace schema supports flexible pricing',()=>{assert.matc
 test('V24 services page includes agreed service categories',()=>{assert.match(services,/Pest Control/);assert.match(services,/Once-off Cleaning/);assert.match(services,/Entertainment & Performers/);assert.match(services,/Special Occasion Vehicles/)});
 test('V24 server supports service and tracking APIs',()=>{assert.match(server,/\/api\/services/);assert.match(server,/\/api\/service-bookings\/preview/);assert.match(server,/\/api\/order-tracking/)});
 test('V24 homepage exposes services',()=>assert.match(home,/Services & Dispatching/));
+
+const migration241=readFileSync(new URL('../db/v24_1_migration.sql',import.meta.url),'utf8');
+const account241=readFileSync(new URL('../public/account.html',import.meta.url),'utf8');
+const seller241=readFileSync(new URL('../public/seller.html',import.meta.url),'utf8');
+const adminMarket241=readFileSync(new URL('../public/admin-marketplace.html',import.meta.url),'utf8');
+test('V24.1 health version and configurable commission engine are present',()=>{assert.match(server,/version:'24\.1\.0'/);assert.match(server,/commissionQuote/);assert.match(server,/\/api\/commission\/preview/)});
+test('V24.1 progressive commission schema is configurable',()=>{assert.match(migration241,/commission_rules/);assert.match(migration241,/rate_basis_points/);assert.match(migration241,/commission_snapshots/)});
+test('V24.1 returns disputes and risk exception schema is present',()=>{assert.match(migration241,/return_disputes/);assert.match(migration241,/risk_flags/);assert.match(server,/\/api\/admin\/exceptions/)});
+test('V24.1 pet supplies are product categories not service categories',()=>{assert.match(migration241,/Pet Supplies/);assert.match(migration241,/Fish & Aquarium/);assert.doesNotMatch(services,/Pet Services/)});
+test('V24.1 seller service form has controlled category description scheduling and minimum booking',()=>{assert.match(seller241,/Choose service category/);assert.match(seller241,/Service description/);assert.match(seller241,/Minimum booking \/ units/);assert.match(seller241,/Available from/)});
+test('V24.1 account exposes tracking feedback sharing and disputes',()=>{assert.match(account241,/Track order/);assert.match(account241,/Leave feedback/);assert.match(account241,/Tell a Friend/);assert.match(account241,/Returns & Disputes Centre/)});
+test('V24.1 admin is automation-first and exception-based',()=>{assert.match(adminMarket241,/Exception Queue/);assert.match(adminMarket241,/Commission Rules/);assert.match(adminMarket241,/owns no seller inventory/)});
+test('V24.1 homepage restores admin sign in and inclusive overview',()=>{assert.match(home,/Administrator Sign In/);assert.match(home,/private individuals/);assert.match(home,/Registration and listing are FREE/)});
