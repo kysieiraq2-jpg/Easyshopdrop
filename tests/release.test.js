@@ -104,3 +104,13 @@ test('V25.5 categories hub reuses core ShopDrop destinations',()=>{assert.match(
 test('V25.5 help page explains products services dispatch references and protection',()=>{for(const x of ['Sell a product — FREE','Other Services','Dispatching & Transport','SD Order','ST reference','protection period'])assert.match(help255,new RegExp(x))});
 test('V25.5 Other Services taxonomy is expanded and controlled',()=>{for(const x of ['Automotive Services','Cleaning Services','Personal & Beauty Services','Pet Services','Repair & Maintenance Services','Other Service — requires approval']){assert.match(services,new RegExp(x));assert.match(seller,new RegExp(x))}});
 test('V25.5 checkout preview gives explicit empty-bag feedback',()=>assert.match(checkout,/Your bag is empty in this preview/));
+
+const register256=readFileSync(new URL('../public/register.html',import.meta.url),'utf8');
+const signin256=readFileSync(new URL('../public/sign-in.html',import.meta.url),'utf8');
+const adminLogin256=readFileSync(new URL('../public/admin-login.html',import.meta.url),'utf8');
+const migration256=readFileSync(new URL('../db/v25_6_accounts_and_admin.sql',import.meta.url),'utf8');
+test('V25.6 category cards expose real taxonomy subcategories',()=>{assert.match(categories255,/Tap to view subcategories/);assert.match(categories255,/class="subcat"/);assert.match(categories255,/d\.subcategories\.map/)});
+test('V25.6 supports browse-first simple account onboarding',()=>{assert.match(register256,/One simple Shop&Drop account/);assert.match(signin256,/Browse Shop&Drop without signing in/);assert.match(home,/Sign In \/ Create Account/)});
+test('V25.6 administrator sign in is role-gated and not self-provisioned',()=>{assert.match(adminLogin256,/pre-authorised/);assert.match(adminLogin256,/role!=='admin'/);assert.doesNotMatch(adminLogin256,/Preview Admin Control Centre/)});
+test('V25.6 account capabilities and central ledger groundwork exist',()=>{assert.match(migration256,/user_capabilities/);assert.match(migration256,/platform_ledger_entries/);assert.match(migration256,/service_provider/);assert.match(migration256,/dispatch_customer/)});
+test('V25.6 seller account can still buy',()=>{assert.match(server,/function canBuy/);assert.match(server,/user_capabilities/)});
