@@ -67,3 +67,11 @@ test('V25 payment boundary supports marketplace collection and seller payout',()
 test('V25 provider registry includes South African and optional international paths',()=>{assert.match(providers25,/Stitch/);assert.match(providers25,/Payfast/);assert.match(providers25,/FNB eCommerce/);assert.match(providers25,/PayPal/)});
 test('V25 courier boundary preserves seller dispatch and integrated future mode',()=>{assert.match(shipping25,/Seller packs\/dispatches/);assert.match(shipping25,/Seller-arranged courier/);assert.match(migration25,/booking_mode/);assert.match(migration25,/courier_options/)});
 test('V25 notification delivery logging supports automated channels',()=>{assert.match(migration25,/notification_delivery_log/);assert.match(providers25,/WhatsApp Business Platform/);assert.match(providers25,/SMS provider/)});
+
+
+test('V25.1 progressive marketplace service fee test schedule is present',()=>{
+ const feeSql=readFileSync(new URL('../db/v25_1_fee_schedule.sql',import.meta.url),'utf8');
+ assert.match(feeSql,/100000,800/);assert.match(feeSql,/500000,650/);assert.match(feeSql,/2000000,500/);assert.match(feeSql,/NULL,400/);
+ assert.match(seller,/function previewServiceFee/);assert.match(seller,/Math\.max\(1000,fee\)/);
+ assert.match(server,/SHOPDROP_MIN_SERVICE_FEE_CENTS\|\|1000/);
+});
