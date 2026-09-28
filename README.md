@@ -4,7 +4,7 @@ V24.1 is the next development baseline after V23.2. It combines the tested Shop&
 
 ## Core business model
 - Registration/listing remains free.
-- Shop&Drop commission is configurable. A 10% ordinary-transaction baseline is retained for testing, while progressive/category tiers can be configured before real-money launch based on unit economics.
+- Shop&Drop marketplace service fee is configurable. A fee rules are configurable and will be finalized before real-money launch using unit-economics testing.
 - Seller/provider direct contact and sensitive payout details are not publicly exposed.
 - Buyers transact through Shop&Drop.
 
@@ -23,3 +23,6 @@ GitHub Pages is a frontend preview only. Real accounts, database inventory, paym
 
 ## V24.2 master product taxonomy
 Shop&Drop now includes a broad database-driven product taxonomy shared by seller listing, search and administration. The structure is Shop&Drop-owned and remains expandable through Admin/category requests.
+
+## V25 transaction orchestration
+V25 adds the LI/SD/ST/SH reference chain, transparent configurable Shop&Drop marketplace service fee, provider-neutral marketplace collection/payout model, buyer-selectable courier architecture and event-driven multi-channel notifications. Real money, courier bookings and outbound messaging remain disabled until sandbox/provider integration testing is complete.
