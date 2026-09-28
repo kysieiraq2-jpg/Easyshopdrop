@@ -75,3 +75,11 @@ test('V25.1 progressive marketplace service fee test schedule is present',()=>{
  assert.match(seller,/function previewServiceFee/);assert.match(seller,/Math\.max\(1000,fee\)/);
  assert.match(server,/SHOPDROP_MIN_SERVICE_FEE_CENTS\|\|1000/);
 });
+
+
+test('V25.2 service listings use transparent provider target plus fee model',()=>{
+ const migration252=readFileSync(new URL('../db/v25_2_service_fee_transparency.sql',import.meta.url),'utf8');
+ assert.match(seller,/Amount you want to receive per unit/);assert.match(seller,/serviceFeePreview/);assert.match(seller,/final customer rate/);
+ assert.match(server,/sellerTargetUnitCents/);assert.match(server,/seller_target_unit_cents/);assert.match(server,/published_unit_price_cents/);
+ assert.match(migration252,/shopdrop_service_fee_unit_cents/);
+});
