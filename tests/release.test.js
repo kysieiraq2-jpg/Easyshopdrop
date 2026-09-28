@@ -11,7 +11,7 @@ test('V24+ health version is present',()=>assert.match(server,/version:'(?:24\.(
 const home=readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
 const seller=readFileSync(new URL('../public/seller.html',import.meta.url),'utf8');
 const checkout=readFileSync(new URL('../public/checkout.html',import.meta.url),'utf8');
-test('V23 homepage menu is present',()=>{assert.match(home,/☰ Menu/);assert.match(home,/Seller Centre/);assert.match(home,/Help \/ How Shop&Drop Works/)});
+test('V23 homepage menu is present',()=>{assert.match(home,/☰ Menu/);assert.match(home,/Seller \/ Service Provider Centre/);assert.match(home,/How Shop&Drop Works/)});
 test('V23 seller preview validation is present',()=>{assert.match(seller,/Enter a product name/);assert.match(seller,/Preview mode: Seller Centre/)});
 test('V23 worldwide checkout fields are present',()=>{assert.match(checkout,/State \/ Province \/ Region/);assert.match(checkout,/Country/);assert.match(checkout,/Preview order/)});
 
@@ -25,9 +25,9 @@ const migration24=readFileSync(new URL('../db/v24_migration.sql',import.meta.url
 const services=readFileSync(new URL('../public/services.html',import.meta.url),'utf8');
 test('V24 multi-seller fulfilment schema is present',()=>{assert.match(migration24,/fulfilment_groups/);assert.match(migration24,/fulfilment_shipments/);assert.match(migration24,/notifications/)});
 test('V24 service marketplace schema supports flexible pricing',()=>{assert.match(migration24,/service_listings/);assert.match(migration24,/kilometre/);assert.match(migration24,/gig/);assert.match(migration24,/treatment/)});
-test('V24 services page includes agreed service categories',()=>{assert.match(services,/Pest Control/);assert.match(services,/Once-off Cleaning/);assert.match(services,/Entertainment & Performers/);assert.match(services,/Special Occasion Vehicles/)});
+test('V24 services page includes agreed service categories',()=>{assert.match(services,/Pest Control/);assert.match(services,/Cleaning Services/);assert.match(services,/Entertainment & Performers/);assert.match(services,/Special Occasion Vehicles/)});
 test('V24 server supports service and tracking APIs',()=>{assert.match(server,/\/api\/services/);assert.match(server,/\/api\/service-bookings\/preview/);assert.match(server,/\/api\/order-tracking/)});
-test('V24 homepage exposes services',()=>assert.match(home,/Services & Dispatching/));
+test('V25.4 homepage separates Other Services and dispatching',()=>{assert.match(home,/>Other Services</);assert.match(home,/Dispatching & Transport/)});
 
 const migration241=readFileSync(new URL('../db/v24_1_migration.sql',import.meta.url),'utf8');
 const account241=readFileSync(new URL('../public/account.html',import.meta.url),'utf8');
@@ -36,7 +36,7 @@ const adminMarket241=readFileSync(new URL('../public/admin-marketplace.html',imp
 test('V24.1+ configurable fee engine is present',()=>{assert.match(server,/serviceFeeQuote/);assert.match(server,/\/api\/service-fee\/preview/)});
 test('V24.1 progressive commission schema is configurable',()=>{assert.match(migration241,/commission_rules/);assert.match(migration241,/rate_basis_points/);assert.match(migration241,/commission_snapshots/)});
 test('V24.1 returns disputes and risk exception schema is present',()=>{assert.match(migration241,/return_disputes/);assert.match(migration241,/risk_flags/);assert.match(server,/\/api\/admin\/exceptions/)});
-test('V24.1 pet supplies are product categories not service categories',()=>{assert.match(migration241,/Pet Supplies/);assert.match(migration241,/Fish & Aquarium/);assert.doesNotMatch(services,/Pet Services/)});
+test('V24.1 pet supplies are product categories not service categories',()=>{assert.match(migration241,/Pet Supplies/);assert.match(migration241,/Fish & Aquarium/);assert.match(services,/Pet Services/);assert.match(services,/physical pet products remain in Product listings/)});
 test('V24.1 seller service form has controlled category description scheduling and minimum booking',()=>{assert.match(seller241,/Choose service category/);assert.match(seller241,/Service description/);assert.match(seller241,/Minimum booking \/ units/);assert.match(seller241,/Available from/)});
 test('V24.1 account exposes tracking feedback sharing and disputes',()=>{assert.match(account241,/Track order/);assert.match(account241,/Leave feedback/);assert.match(account241,/Tell a Friend/);assert.match(account241,/Returns & Disputes Centre/)});
 test('V24.1 admin is automation-first and exception-based',()=>{assert.match(adminMarket241,/Exception Queue/);assert.match(adminMarket241,/Marketplace Service Fee Rules/);assert.match(adminMarket241,/owns no seller inventory/)});
@@ -83,3 +83,24 @@ test('V25.2 service listings use transparent provider target plus fee model',()=
  assert.match(server,/sellerTargetUnitCents/);assert.match(server,/seller_target_unit_cents/);assert.match(server,/published_unit_price_cents/);
  assert.match(migration252,/shopdrop_service_fee_unit_cents/);
 });
+
+
+const dispatch253=readFileSync(new URL('../public/dispatching.html',import.meta.url),'utf8');
+const migration253=readFileSync(new URL('../db/v25_3_dispatch_completion.sql',import.meta.url),'utf8');
+test('V25.4 separates Other Services from dispatching',()=>{assert.match(services,/<h1>Other Services<\/h1>/);assert.doesNotMatch(services,/<b>Transport & Dispatch<\/b>/);assert.match(dispatch253,/Request Dispatching & Transport/);assert.match(home,/dispatching\.html/)});
+test('V25.3 dispatching captures dedicated transport request details',()=>{for(const x of ['Collection location','Delivery destination','Load description','Approximate weight','Special requirements'])assert.match(dispatch253,new RegExp(x));assert.match(migration253,/dispatch_requests/);assert.match(migration253,/dispatch_offers/);assert.match(migration253,/request_ref/)});
+test('V25.3 tracking and disputes use explicit SD references',()=>{assert.match(tracking,/Shop&Drop SD Order Number/);const returns253=readFileSync(new URL('../public/returns.html',import.meta.url),'utf8');assert.match(returns253,/SD Order and ST seller transaction automatically/)});
+test('V25.3 completion supports buyer confirmation plus automatic protection expiry',()=>{assert.match(tracking,/Buyer may confirm received or report a problem/);assert.match(tracking,/automatically after the protection period/);assert.match(migration253,/buyer_confirmed_at/);assert.match(migration253,/protection_deadline/)});
+test('V25.3 checkout keeps buyer total transparent without exposing seller allocation',()=>{assert.match(checkout,/each ST seller portion/);assert.match(checkout,/SD Order total/);assert.match(checkout,/Applicable taxes/)});
+
+// V25.4 Other Services discovery and dispatch preview
+test('V25.4 Other Services cards drive Shop&Drop listing search',()=>{assert.match(services,/service-card/);assert.match(services,/data-category=\"Pest Control\"/);assert.match(services,/approved Shop&Drop service listing/);assert.match(services,/Customers browse only Shop&Drop service listings/)});
+test('V25.4 dispatch preview shows request summary and unit guidance',()=>{assert.match(dispatch253,/Dispatch Request Preview/);assert.match(dispatch253,/Approximate weight \(kg, optional\)/);assert.match(dispatch253,/Live submission will create the DR reference/)});
+
+const categories255=readFileSync(new URL('../public/categories.html',import.meta.url),'utf8');
+const help255=readFileSync(new URL('../public/help.html',import.meta.url),'utf8');
+test('V25.5 main menu is a functional first-time visitor map',()=>{for(const x of ['Shop New Products','Second-Hand & Pre-Owned','Categories & Search','Other Services','Dispatching & Transport','Sell a Product — FREE','List a Service — FREE','My Bag / Checkout','My Orders','Track My Order','Returns & Disputes','Seller / Service Provider Centre','How Shop&Drop Works'])assert.match(home,new RegExp(x.replace(/[&]/g,'&')));assert.match(home,/categories\.html/);assert.match(home,/help\.html/)});
+test('V25.5 categories hub reuses core ShopDrop destinations',()=>{assert.match(categories255,/New Products/);assert.match(categories255,/Second-Hand & Pre-Owned/);assert.match(categories255,/services\.html/);assert.match(categories255,/dispatching\.html/);assert.match(categories255,/taxonomy\.json/)});
+test('V25.5 help page explains products services dispatch references and protection',()=>{for(const x of ['Sell a product — FREE','Other Services','Dispatching & Transport','SD Order','ST reference','protection period'])assert.match(help255,new RegExp(x))});
+test('V25.5 Other Services taxonomy is expanded and controlled',()=>{for(const x of ['Automotive Services','Cleaning Services','Personal & Beauty Services','Pet Services','Repair & Maintenance Services','Other Service — requires approval']){assert.match(services,new RegExp(x));assert.match(seller,new RegExp(x))}});
+test('V25.5 checkout preview gives explicit empty-bag feedback',()=>assert.match(checkout,/Your bag is empty in this preview/));
