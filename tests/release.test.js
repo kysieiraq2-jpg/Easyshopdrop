@@ -17,7 +17,7 @@ test('V23 worldwide checkout fields are present',()=>{assert.match(checkout,/Sta
 
 const tracking=readFileSync(new URL('../public/tracking.html',import.meta.url),'utf8');
 const adminTracking=readFileSync(new URL('../public/admin-tracking.html',import.meta.url),'utf8');
-test('V23.1 customer tracking portal is present',()=>{assert.match(tracking,/Track My Order/);assert.match(tracking,/Seller payout eligible/)});
+test('V23.1 customer tracking portal is present',()=>{assert.match(tracking,/Track My Order/);assert.match(tracking,/Order completed/)});
 test('V23.1 admin transaction tracking portal is present',()=>{assert.match(adminTracking,/Transaction Tracking/);assert.match(adminTracking,/Shop&Drop (?:commission|marketplace service fee)/)});
 test('V23.1 homepage exposes tracking and preview search feedback',()=>{assert.match(home,/Track My Order/);assert.match(home,/Search preview/)});
 
@@ -89,13 +89,13 @@ const dispatch253=readFileSync(new URL('../public/dispatching.html',import.meta.
 const migration253=readFileSync(new URL('../db/v25_3_dispatch_completion.sql',import.meta.url),'utf8');
 test('V25.4 separates Other Services from dispatching',()=>{assert.match(services,/<h1>Other Services<\/h1>/);assert.doesNotMatch(services,/<b>Transport & Dispatch<\/b>/);assert.match(dispatch253,/Request Dispatching & Transport/);assert.match(home,/dispatching\.html/)});
 test('V25.3 dispatching captures dedicated transport request details',()=>{for(const x of ['Collection location','Delivery destination','Load description','Approximate weight','Special requirements'])assert.match(dispatch253,new RegExp(x));assert.match(migration253,/dispatch_requests/);assert.match(migration253,/dispatch_offers/);assert.match(migration253,/request_ref/)});
-test('V25.3 tracking and disputes use explicit SD references',()=>{assert.match(tracking,/Shop&Drop SD Order Number/);const returns253=readFileSync(new URL('../public/returns.html',import.meta.url),'utf8');assert.match(returns253,/SD Order and ST seller transaction automatically/)});
+test('V25.7 customer tracking and disputes use plain-language order labels',()=>{assert.match(tracking,/Shop&Drop Order Number/);const returns253=readFileSync(new URL('../public/returns.html',import.meta.url),'utf8');assert.match(returns253,/correct Shop&Drop order and seller transaction automatically/)});
 test('V25.3 completion supports buyer confirmation plus automatic protection expiry',()=>{assert.match(tracking,/Buyer may confirm received or report a problem/);assert.match(tracking,/automatically after the protection period/);assert.match(migration253,/buyer_confirmed_at/);assert.match(migration253,/protection_deadline/)});
-test('V25.3 checkout keeps buyer total transparent without exposing seller allocation',()=>{assert.match(checkout,/each ST seller portion/);assert.match(checkout,/SD Order total/);assert.match(checkout,/Applicable taxes/)});
+test('V25.7 checkout keeps buyer total transparent without exposing technical references',()=>{assert.match(checkout,/each seller portion/);assert.match(checkout,/complete Shop&Drop order total/);assert.match(checkout,/Applicable taxes/)});
 
 // V25.4 Other Services discovery and dispatch preview
 test('V25.4 Other Services cards drive Shop&Drop listing search',()=>{assert.match(services,/service-card/);assert.match(services,/data-category=\"Pest Control\"/);assert.match(services,/approved Shop&Drop service listing/);assert.match(services,/Customers browse only Shop&Drop service listings/)});
-test('V25.4 dispatch preview shows request summary and unit guidance',()=>{assert.match(dispatch253,/Dispatch Request Preview/);assert.match(dispatch253,/Approximate weight \(kg, optional\)/);assert.match(dispatch253,/Live submission will create the DR reference/)});
+test('V25.4 dispatch preview shows request summary and unit guidance',()=>{assert.match(dispatch253,/Dispatch Request Preview/);assert.match(dispatch253,/Approximate weight \(kg, optional\)/);assert.match(dispatch253,/Live submission will create the Shop&Drop dispatch reference/)});
 
 const categories255=readFileSync(new URL('../public/categories.html',import.meta.url),'utf8');
 const help255=readFileSync(new URL('../public/help.html',import.meta.url),'utf8');
@@ -103,7 +103,7 @@ test('V25.5 main menu is a functional first-time visitor map',()=>{for(const x o
 test('V25.5 categories hub reuses core ShopDrop destinations',()=>{assert.match(categories255,/New Products/);assert.match(categories255,/Second-Hand & Pre-Owned/);assert.match(categories255,/services\.html/);assert.match(categories255,/dispatching\.html/);assert.match(categories255,/taxonomy\.json/)});
 test('V25.5 help page explains products services dispatch references and protection',()=>{for(const x of ['Sell a product — FREE','Other Services','Dispatching & Transport','SD Order','ST reference','protection period'])assert.match(help255,new RegExp(x))});
 test('V25.5 Other Services taxonomy is expanded and controlled',()=>{for(const x of ['Automotive Services','Cleaning Services','Personal & Beauty Services','Pet Services','Repair & Maintenance Services','Other Service — requires approval']){assert.match(services,new RegExp(x));assert.match(seller,new RegExp(x))}});
-test('V25.5 checkout preview gives explicit empty-bag feedback',()=>assert.match(checkout,/Your bag is empty in this preview/));
+test('V25.7 checkout preview gives explicit empty-bag feedback',()=>assert.match(checkout,/Preview order unavailable: your shopping bag is empty/));
 
 const register256=readFileSync(new URL('../public/register.html',import.meta.url),'utf8');
 const signin256=readFileSync(new URL('../public/sign-in.html',import.meta.url),'utf8');
@@ -114,3 +114,9 @@ test('V25.6 supports browse-first simple account onboarding',()=>{assert.match(r
 test('V25.6 administrator sign in is role-gated and not self-provisioned',()=>{assert.match(adminLogin256,/pre-authorised/);assert.match(adminLogin256,/role!=='admin'/);assert.doesNotMatch(adminLogin256,/Preview Admin Control Centre/)});
 test('V25.6 account capabilities and central ledger groundwork exist',()=>{assert.match(migration256,/user_capabilities/);assert.match(migration256,/platform_ledger_entries/);assert.match(migration256,/service_provider/);assert.match(migration256,/dispatch_customer/)});
 test('V25.6 seller account can still buy',()=>{assert.match(server,/function canBuy/);assert.match(server,/user_capabilities/)});
+
+// V25.7 mobile-test corrections
+test('V25.7 mobile menu reaches true bottom and preowned remains under categories',()=>{assert.match(home,/100dvh/);assert.match(home,/Administrator Sign In/);assert.doesNotMatch(home,/categories\.html\?view=preowned/)});
+test('V25.7 disputes accept evidence and Other requires description',()=>{const r=readFileSync(new URL('../public/returns.html',import.meta.url),'utf8');assert.match(r,/Photos \/ evidence/);assert.match(r,/reason.value==='other'/)});
+test('V25.7 customer password rule is user-friendly',()=>{assert.match(register256,/minlength=8/);assert.doesNotMatch(register256,/minlength=12/)});
+test('V25.7 account preview includes profile security seller status and sign out',()=>{assert.match(account241,/Account & profile/);assert.match(account241,/password\/security/);assert.match(account241,/Selling & services/);assert.match(account241,/sign-out controls/)});
