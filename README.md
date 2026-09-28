@@ -26,3 +26,6 @@ Shop&Drop now includes a broad database-driven product taxonomy shared by seller
 
 ## V25 transaction orchestration
 V25 adds the LI/SD/ST/SH reference chain, transparent configurable Shop&Drop marketplace service fee, provider-neutral marketplace collection/payout model, buyer-selectable courier architecture and event-driven multi-channel notifications. Real money, courier bookings and outbound messaging remain disabled until sandbox/provider integration testing is complete.
+
+## V25.6 account and navigation update
+Browsing remains open. Sign-in/registration is required when a visitor wants to transact or manage private activity. Product departments expose their taxonomy subcategories. Administrator authentication has a dedicated restricted sign-in page. See `V25_6_RELEASE_NOTES.md`.
