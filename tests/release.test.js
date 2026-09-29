@@ -120,3 +120,13 @@ test('V25.7 mobile menu reaches true bottom and preowned remains under categorie
 test('V25.7 disputes accept evidence and Other requires description',()=>{const r=readFileSync(new URL('../public/returns.html',import.meta.url),'utf8');assert.match(r,/Photos \/ evidence/);assert.match(r,/reason.value==='other'/)});
 test('V25.7 customer password rule is user-friendly',()=>{assert.match(register256,/minlength=8/);assert.doesNotMatch(register256,/minlength=12/)});
 test('V25.7 account preview includes profile security seller status and sign out',()=>{assert.match(account241,/Account & profile/);assert.match(account241,/password\/security/);assert.match(account241,/Selling & services/);assert.match(account241,/sign-out controls/)});
+
+test('V25.8 international marketplace fields are present', () => {
+  const seller = readFileSync(new URL('../public/seller.html',import.meta.url),'utf8');
+  const dispatch = readFileSync(new URL('../public/dispatching.html',import.meta.url),'utf8');
+  const categories = readFileSync(new URL('../public/categories.html',import.meta.url),'utf8');
+  assert.match(seller, /Where this item is physically|physically stored|productCountry/);
+  assert.match(seller, /Add multiple products/);
+  assert.match(dispatch, /Cross-border \/ international route/);
+  assert.match(categories, /one worldwide catalogue/i);
+});
