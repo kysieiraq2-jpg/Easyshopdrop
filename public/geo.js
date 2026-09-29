@@ -2,5 +2,8 @@ window.ShopDropGeo={"countries":[{"code":"AF","name":"Afghanistan","currency":"A
 ShopDropGeo.countryOptions=(selected='')=>'<option value="">Choose country</option>'+ShopDropGeo.countries.map(c=>`<option value="${c.code}" ${c.code===selected?'selected':''}>${c.name} (${c.code})</option>`).join('');
 ShopDropGeo.currencyOptions=(selected='ZAR')=>[...new Set(ShopDropGeo.countries.map(c=>c.currency).filter(Boolean))].sort().map(x=>`<option ${x===selected?'selected':''}>${x}</option>`).join('');
 
-ShopDropGeo.dialOptions=(selected='+27')=>ShopDropGeo.countries.filter(c=>ShopDropGeo.dialCodes[c.code]).map(c=>{const d=ShopDropGeo.dialCodes[c.code];return `<option value="${d}" ${d===selected?'selected':''}>${c.code} ${d}</option>`}).join('');
+ShopDropGeo.dialEntries=()=>ShopDropGeo.countries.filter(c=>ShopDropGeo.dialCodes[c.code]).map(c=>({code:c.code,name:c.name,dial:ShopDropGeo.dialCodes[c.code],label:`${c.name} (${c.code}) ${ShopDropGeo.dialCodes[c.code]}`}));
+ShopDropGeo.dialOptions=(selected='+27')=>ShopDropGeo.dialEntries().map(c=>`<option value="${c.label}">`).join('');
+ShopDropGeo.dialLabelForCountry=(code)=>{const c=ShopDropGeo.dialEntries().find(x=>x.code===code);return c?c.label:''};
+ShopDropGeo.extractDial=(value)=>{const m=String(value||'').match(/(\+\d+)\s*$/);return m?m[1]:''};
 ShopDropGeo.currencyForCountry=(code)=>ShopDropGeo.countries.find(c=>c.code===code)?.currency||'USD';
