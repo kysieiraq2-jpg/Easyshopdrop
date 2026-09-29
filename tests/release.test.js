@@ -130,3 +130,20 @@ test('V25.8 international marketplace fields are present', () => {
   assert.match(dispatch, /Cross-border \/ international route/);
   assert.match(categories, /one worldwide catalogue/i);
 });
+
+test('V25.9 mobile selects and international phone controls are present', () => {
+  const seller = read('public/seller-apply.html');
+  const cats = read('public/categories.html');
+  const geo = read('public/geo.js');
+  assert.match(seller, /id=dial/);
+  assert.match(seller, /id=whatsappDial/);
+  assert.match(geo, /ShopDropGeo\.dialOptions/);
+  assert.match(cats, /#buyerCountry,#locationScope\{width:100%/);
+});
+
+test('V25.9 buyer country determines display currency groundwork', () => {
+  const cats = read('public/categories.html');
+  const geo = read('public/geo.js');
+  assert.match(cats, /Prices will display in/);
+  assert.match(geo, /ShopDropGeo\.currencyForCountry/);
+});
