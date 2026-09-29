@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+const read=(p)=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const server=readFileSync(new URL('../app/server.js',import.meta.url),'utf8');
 test('live payment callback remains disabled',()=>assert.match(server,/Live payment webhook disabled/));
 test('health endpoint is present',()=>assert.match(server,/\/api\/health/));
@@ -146,4 +147,18 @@ test('V25.9 buyer country determines display currency groundwork', () => {
   const geo = read('public/geo.js');
   assert.match(cats, /Prices will display in/);
   assert.match(geo, /ShopDropGeo\.currencyForCountry/);
+});
+
+test('V25.10 dialing-code fields are searchable with full country labels',()=>{
+  const sellerApply=read('public/seller-apply.html');
+  const geo=read('public/geo.js');
+  assert.match(sellerApply, /list=dialCodes/);
+  assert.match(sellerApply, /Search country or code/);
+  assert.match(geo, /dialLabelForCountry/);
+  assert.match(geo, /extractDial/);
+});
+test('V25.10 checkout preview uses explicit accessible status element',()=>{
+  assert.match(checkout, /id="orderStatus"/);
+  assert.match(checkout, /aria-live="polite"/);
+  assert.match(checkout, /orderStatus\.textContent='Preview order unavailable/);
 });
