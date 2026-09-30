@@ -1,5 +1,5 @@
 {
-  "version": "24.2.1",
+  "version": "25.16",
   "departments": [
     {
       "name": "Appliances",
@@ -418,6 +418,29 @@
         "Memorabilia",
         "Antiques & Vintage",
         "Hobby Tools & Supplies"
+      ]
+    },
+    {
+      "name": "Homemade Food & Pantry",
+      "subcategories": [
+        "Baked Goods",
+        "Jams, Preserves & Spreads",
+        "Sauces, Chutneys & Condiments",
+        "Spices, Herbs & Seasonings",
+        "Sweets & Confectionery",
+        "Snacks & Treats",
+        "Other Homemade Pantry Foods"
+      ]
+    },
+    {
+      "name": "Wine",
+      "subcategories": [
+        "Red Wine",
+        "White Wine",
+        "Rosé Wine",
+        "Sparkling Wine",
+        "Dessert & Fortified Wine",
+        "Other Wine"
       ]
     }
   ]
