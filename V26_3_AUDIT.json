@@ -1,0 +1,19 @@
+{
+  "version": "V26-3",
+  "tracking_checks": {
+    "webhook": true,
+    "polling": true,
+    "verified_manual": true,
+    "normalized_tracking": true,
+    "proof_of_delivery": true,
+    "pod_links_refs": true,
+    "pod_payout_inspection": true
+  },
+  "all_tracking_checks_pass": true,
+  "v25_financial_authority_changed": [],
+  "v25_commission_preserved": true,
+  "js_syntax_failures": {},
+  "duplicate_html_ids": {},
+  "missing_local_html_links": [],
+  "ready": true
+}
