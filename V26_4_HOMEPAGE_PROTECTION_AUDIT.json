@@ -1,0 +1,27 @@
+{
+  "version": "V26-4-PROTECTED",
+  "v26_3_homepage_existing_ids_lost": [],
+  "existing_homepage_ids_all_preserved": true,
+  "category_subcategory_terms_before_after": {
+    "category": [
+      true,
+      true
+    ],
+    "subcategory": [
+      false,
+      false
+    ]
+  },
+  "v26_4_visual_layer_present": true,
+  "v25_financial_files_same_as_v26_3": {
+    "app/server.js": true,
+    "integrations/payment.js": true,
+    "integrations/shipping.js": true,
+    "db/v24_1_migration.sql": true,
+    "db/v25_1_fee_schedule.sql": true,
+    "db/v25_transaction_orchestration.sql": true
+  },
+  "v25_financial_preserved": true,
+  "js_syntax_failures": {},
+  "rule": "Existing homepage Category/Subcategory blocks are protected and must not be removed/replaced/reorganized by later visual layers."
+}
