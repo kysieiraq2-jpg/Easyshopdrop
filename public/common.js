@@ -20,9 +20,26 @@ window.ShopDropV26.renderProductionNestedCategories = async function(target) {
   if (!target) return;
   target.setAttribute("aria-busy","true");
   try {
-    let data = null;
-    try { data = await api('/api/categories'); } catch (_) {}
-    const categories = Array.isArray(data?.categories) ? data.categories : [];
+    let categories = [];
+    // Live backend is preferred, but GitHub Pages/static preview must use the
+    // packaged authoritative taxonomy instead of collapsing to a single link.
+    try {
+      const data = await ShopDrop.api('/api/categories');
+      categories = Array.isArray(data?.categories) ? data.categories : [];
+    } catch (_) {}
+    if (!categories.length) {
+      try {
+        const r = await fetch('./taxonomy.json', {cache:'force-cache'});
+        const t = await r.json();
+        categories = (Array.isArray(t?.departments) ? t.departments : []).map(d => ({
+          name: d.name,
+          slug: d.slug || d.name,
+          subcategories: (d.subcategories || []).map(sub =>
+            typeof sub === 'string' ? {name: sub, slug: sub} : sub
+          )
+        }));
+      } catch (_) {}
+    }
     target.replaceChildren();
 
     if (!categories.length) {
