@@ -1,0 +1,19 @@
+{
+  "version": "V26-2",
+  "new_controls": {
+    "financial_statement": true,
+    "chargebacks": true,
+    "inventory_reservation": true,
+    "fulfilment_deadlines": true,
+    "dispute_evidence": true,
+    "payout_statement": true,
+    "backend_contract": true
+  },
+  "all_new_controls_present": true,
+  "v25_financial_authority_changed": [],
+  "v25_commission_preserved": true,
+  "js_syntax_failures": {},
+  "duplicate_html_ids": {},
+  "missing_local_html_links": [],
+  "ready": true
+}
