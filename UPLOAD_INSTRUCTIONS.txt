@@ -1,0 +1,9 @@
+Shop&Drop V26-10 FINAL — GitHub Changed Files
+Compared against V26-9 FINAL_WITH_LAUNCH.
+
+Upload ONLY the files/folders contained in this changed-files package, preserving paths.
+- Files under public/ go into GitHub's existing public/ folder.
+- Root index.html is included only if it genuinely differs from V26-9.
+Do not upload audit/release-note history.
+Do not delete unrelated existing GitHub files.
+Supabase changes are NOT part of this GitHub changed-files package.
