@@ -1,0 +1,16 @@
+{
+  "previously_missing_five": {
+    "draft_save_continue": true,
+    "receipt_history": true,
+    "calendar_availability": true,
+    "report_listing": true,
+    "website_change_request": true
+  },
+  "all_five_now_live": true,
+  "financial_authority_files_changed": [],
+  "financial_authority_preserved": true,
+  "js_syntax_failures": {},
+  "duplicate_html_ids": {},
+  "missing_local_html_links": [],
+  "ready": true
+}
