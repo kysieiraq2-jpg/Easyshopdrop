@@ -1,0 +1,17 @@
+{
+  "commission_backend_files_byte_for_byte_unchanged": {
+    "app/server.js": true,
+    "integrations/payment.js": true,
+    "integrations/shipping.js": true,
+    "db/v24_1_migration.sql": true,
+    "db/v25_1_fee_schedule.sql": true,
+    "db/v25_transaction_orchestration.sql": true
+  },
+  "commission_backend_all_unchanged": true,
+  "server_progressive_fee_logic_present": true,
+  "seller_existing_fee_preview_logic_present": true,
+  "checkout_existing_core_present": true,
+  "seller_checkout_modified_only_additively_for_v26": true,
+  "js_syntax_failures": {},
+  "note": "Seller/checkout HTML are intentionally extended by V26, but V25.24 commission backend/migrations/payment logic remain byte-for-byte unchanged."
+}
