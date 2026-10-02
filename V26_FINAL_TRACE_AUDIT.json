@@ -1,0 +1,27 @@
+{
+  "repair_checks": {
+    "nested_menu_code": true,
+    "homepage_mount": true,
+    "categories_mount": true,
+    "browse_all": true,
+    "product_extension": true,
+    "seller_extension": true,
+    "checkout_extension": true,
+    "service_extension": true,
+    "dispatch_extension": true,
+    "returns_extension": true,
+    "account_extension": true,
+    "feedback_page": true,
+    "cancellations_page": true,
+    "policy_pages": true,
+    "v26_source_preserved": true,
+    "supabase_source_preserved": true
+  },
+  "all_repair_checks_pass": true,
+  "financial_authority_files_changed": [],
+  "financial_authority_preserved": true,
+  "js_syntax_failures": {},
+  "duplicate_html_ids": {},
+  "missing_local_html_links": [],
+  "ready": true
+}
