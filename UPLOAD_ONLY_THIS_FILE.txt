@@ -1,0 +1,10 @@
+Shop&Drop V26-8 FINAL changed files
+
+Compared directly against V26-7.
+ONLY ONE live website file changed:
+  public/index.html
+
+Upload public/index.html into the existing GitHub public folder and replace the current public/index.html.
+Do NOT re-upload the other public files.
+Do NOT delete existing files.
+The root 282/283-byte index.html launcher remains correct and does not need another upload.
