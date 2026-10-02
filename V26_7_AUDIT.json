@@ -1,0 +1,31 @@
+{
+  "version": "V26-7",
+  "checks": {
+    "six_edge_functions": true,
+    "storage_rls": true,
+    "config_toml": true,
+    "security_tests": true,
+    "route_map": true,
+    "no_service_role_public": true
+  },
+  "edge_functions": [
+    "cancellations",
+    "change-requests",
+    "courier-quotes",
+    "create-listing-reference",
+    "create-payment-session",
+    "create-payout",
+    "dispute-evidence",
+    "disputes",
+    "feedback",
+    "listing-reports",
+    "payment-webhook",
+    "verify-dispatch-arrival",
+    "verify-service-arrival"
+  ],
+  "v25_financial_authority_changed": [],
+  "v25_commission_preserved": true,
+  "js_syntax_failures": {},
+  "important": "Prepared Supabase code is NOT to be run until compatibility audit against existing database.",
+  "ready_for_github_then_supabase_compatibility_audit": true
+}
