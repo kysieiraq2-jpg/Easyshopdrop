@@ -1,0 +1,18 @@
+{
+  "version": "V26-6",
+  "appearance_checks": {
+    "appearance_css_present": true,
+    "homepage_links_preserved": true,
+    "category_blocks_marker_preserved": true,
+    "v26_4_homepage_layer_preserved": true,
+    "no_photo_background": true,
+    "responsive": true,
+    "reduced_motion": true
+  },
+  "lost_preexisting_homepage_hrefs": [],
+  "protected_functional_files_changed": [],
+  "protected_functionality_preserved": true,
+  "js_syntax_failures": {},
+  "homepage_duplicate_ids": [],
+  "ready": true
+}
