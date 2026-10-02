@@ -1,0 +1,10 @@
+Shop&Drop V26-7 — GitHub Changed Files
+
+These files differ from the V25.24 deployed baseline and are the files to upload/replace for the GitHub website test.
+Preserve every folder path exactly (especially public/).
+
+IMPORTANT:
+- The Supabase V26 migration/Edge Function package is deliberately excluded from this GitHub first-pass changed-files ZIP.
+- First upload/test the website on GitHub.
+- Then perform the read-only Supabase compatibility audit before applying any Supabase changes.
+- Keep Shop_and_Drop_V26_7.zip as the complete V26-7 recovery/master package.
