@@ -1,0 +1,2 @@
+# Shop&Drop V26-5
+Wires six previously UI-only operational forms through one protected submission adapter with honest pending-backend errors, busy/double-submit protection and future signed-file-upload contract. Adds shared lazy-image/async-decoding policy for static and dynamically inserted images. No service worker/offline caching added. V25.24 commission authority and protected homepage category blocks remain unchanged.
