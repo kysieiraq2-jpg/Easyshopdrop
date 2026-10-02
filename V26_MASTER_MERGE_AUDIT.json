@@ -1,0 +1,14 @@
+{
+  "baseline": "V25.24 FINAL + V25.24 changed-files-only overlay",
+  "v26_source": "ShopDrop_V26_NEWEST_COMPLETE_2026-10-02.zip",
+  "financial_authority_files_changed": [
+    "public/seller.html",
+    "public/checkout.html"
+  ],
+  "commission_preserved": false,
+  "js_syntax_failures": {},
+  "duplicate_html_ids": {},
+  "missing_local_html_links": [],
+  "v26_source_preserved_inside_package": true,
+  "note": "V26 source retained under v26-newest-source; V25.24 financial/commission authority remains byte-for-byte unchanged."
+}
