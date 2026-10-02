@@ -1,0 +1,23 @@
+{
+  "version": "V26-4",
+  "homepage_checks": {
+    "hero_tagline": true,
+    "prominent_search": true,
+    "three_entrances": true,
+    "free_actions": true,
+    "category_preview": true,
+    "new_section": true,
+    "popular_section": true,
+    "specials_section": true,
+    "quick_help": true,
+    "no_full_page_photo_background": true,
+    "mobile_responsive": true
+  },
+  "all_homepage_checks_pass": true,
+  "v25_financial_authority_changed": [],
+  "v25_commission_preserved": true,
+  "js_syntax_failures": {},
+  "duplicate_html_ids": {},
+  "missing_local_html_links": [],
+  "ready": true
+}
