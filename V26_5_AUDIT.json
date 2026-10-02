@@ -1,0 +1,24 @@
+{
+  "version": "V26-5",
+  "form_checks": {
+    "admin-change-request.html": true,
+    "cancellations.html": true,
+    "dispute-evidence.html": true,
+    "feedback.html": true,
+    "payment-disputes.html": true,
+    "report-listing.html": true
+  },
+  "checks": {
+    "all_six_forms_wired": true,
+    "form_adapter": true,
+    "dynamic_lazy_images": true,
+    "lazy_loading_present": true,
+    "no_service_worker_added": true
+  },
+  "v25_financial_authority_changed": [],
+  "v25_commission_preserved": true,
+  "js_syntax_failures": {},
+  "duplicate_html_ids": {},
+  "missing_local_html_links": [],
+  "ready": true
+}
