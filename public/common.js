@@ -1,3 +1,5 @@
+const SHOPDROP_SUPABASE_URL = 'https://dtkdvvxpwonywtsgqmdx.supabase.co';
+
 window.ShopDrop={
  isStatic: location.hostname.endsWith('github.io'), apiBase:'',
  async api(path,options={}){
