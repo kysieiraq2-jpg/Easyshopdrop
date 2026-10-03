@@ -407,3 +407,34 @@ function renderProductCards(target,listings=[]){
  const el=typeof target==="string"?document.querySelector(target):target;if(!el)return;el.replaceChildren();
  listings.slice(0,SHOPDROP_BROWSE_PAGE_SIZE||24).forEach(x=>el.appendChild(renderSharedMarketplaceCard(x)));
 }
+
+
+// V26_11_POINT1_MAIN_MENU_CATEGORY_REPAIR
+// Uses the authoritative taxonomy.json and the existing Main Menu category mount.
+async function shopdropMountMainMenuCategories(){
+  const host =
+    document.getElementById("mainMenuCategories") ||
+    document.getElementById("v26NestedCategoryMenu") ||
+    document.querySelector("[data-v26-category-menu]");
+  if(!host) return false;
+
+  // Earlier builds could leave the correct mount hidden, producing the blank block seen live.
+  host.hidden=false;
+  host.removeAttribute("hidden");
+  host.setAttribute("aria-label","Product categories");
+  host.classList.add("shopdrop-main-menu-categories");
+
+  try{
+    await renderMainMenuCategories(host);
+    return host.children.length>0;
+  }catch(err){
+    console.error("Shop&Drop category menu could not load",err);
+    host.replaceChildren();
+    const fallback=document.createElement("a");
+    fallback.href="./categories.html";
+    fallback.textContent="Browse Product Categories";
+    host.appendChild(fallback);
+    return false;
+  }
+}
+document.addEventListener("DOMContentLoaded",shopdropMountMainMenuCategories);

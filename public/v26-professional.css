@@ -63,3 +63,105 @@ footer{max-width:1180px;margin:24px auto;padding:20px var(--sd-space);color:var(
   .v26-menu-subcategories a{display:block}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
+
+/* V26_11_HOME_ACTION_GRID — homepage layout only */
+.v26-home-action-block{margin:1.25rem auto;padding:1.25rem;max-width:980px}
+.v26-home-action-block>h2{margin:0 0 1rem}
+.v26-home-action-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+.v26-home-action-grid>section,.v26-home-action-grid>article,.v26-home-action-grid>.card,.v26-home-action-grid>.panel,.v26-home-action-grid>.v26-card{margin:0;min-width:0;height:100%}
+@media(max-width:520px){
+ .v26-home-action-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem}
+ .v26-home-action-block{padding:.75rem}
+ .v26-home-action-grid h2,.v26-home-action-grid h3{font-size:1.05rem}
+}
+
+/* V26_11_HOMEPAGE_RECONSTRUCTION — presentation only */
+.v26-home-action-block{
+  background:var(--sd-surface,#fff);
+  border:1px solid var(--sd-line,#dfe4ea);
+  border-radius:20px;
+  box-shadow:var(--sd-shadow,0 8px 24px rgba(20,31,44,.08));
+}
+.v26-home-action-block>h2{
+  text-align:center;
+  letter-spacing:.02em;
+  font-size:clamp(1.25rem,4vw,1.75rem);
+}
+.v26-home-action-grid>*{
+  border:1px solid var(--sd-line,#dfe4ea);
+  border-radius:16px;
+  background:#fff;
+  box-shadow:0 3px 12px rgba(20,31,44,.05);
+  padding:clamp(.8rem,2.5vw,1.25rem);
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  min-height:120px;
+}
+.v26-home-action-tile{cursor:pointer}
+.v26-home-action-tile:focus-visible{outline:3px solid currentColor;outline-offset:3px}
+.v26-home-action-grid a{text-decoration:none}
+@media(max-width:360px){
+ .v26-home-action-grid{gap:.5rem}
+ .v26-home-action-grid>*{padding:.65rem;min-height:105px}
+}
+
+/* V26_11_POINT1_CATEGORY_MENU_STYLE */
+.shopdrop-main-menu-categories{display:block!important;padding:.35rem 0 .65rem}
+.shopdrop-main-menu-categories details{border-top:1px solid #e2e6ea;padding:.15rem 0}
+.shopdrop-main-menu-categories summary{cursor:pointer;padding:.7rem 1rem;font-weight:600;list-style-position:inside}
+.shopdrop-main-menu-categories details>div{display:grid;gap:.15rem;padding:0 .75rem .6rem 1.75rem}
+.shopdrop-main-menu-categories details>div>a{display:block;padding:.55rem .4rem;text-decoration:none}
+
+/* V26_11_CONTACT_PRESENTATION_STYLE */
+.v26-contact-admin{display:flex;flex-direction:column;gap:.7rem}
+.v26-contact-admin .v26-contact-link{
+ display:flex;align-items:center;gap:.55rem;width:max-content;max-width:100%;
+ padding:.65rem .9rem;border-radius:12px;text-decoration:none;font-weight:700;
+}
+.v26-contact-admin .v26-whatsapp-link{
+ background:#25D366;color:#fff;border:1px solid #1fb85a;
+}
+.v26-whatsapp-mark{
+ display:inline-grid;place-items:center;width:1.65rem;height:1.65rem;border:2px solid currentColor;
+ border-radius:50%;font-size:.9rem;line-height:1;
+}
+.v26-contact-admin .v26-email-link{
+ background:#fff;color:inherit;border:2px solid currentColor;text-decoration:underline;
+ text-underline-offset:.18em;
+}
+.v26-email-mark{font-size:1.25rem}
+.v26-contact-admin .v26-complaint-link{
+ padding-left:0;text-decoration:underline;text-underline-offset:.18em;
+}
+
+/* V26_11_HEADER_COSMETIC_STYLE — homepage/header presentation only */
+.v26-clean-header{display:block!important}
+.v26-clean-header .v26-header-brand-row{
+ display:flex;justify-content:center;align-items:center;width:100%;margin:0 0 1rem;
+}
+.v26-clean-header .v26-header-brand{
+ font-size:clamp(2rem,8vw,3rem)!important;font-weight:800!important;
+ text-align:center;line-height:1.05;white-space:nowrap;
+}
+.v26-clean-header .v26-header-search-row{
+ display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:.6rem;
+ align-items:stretch;width:100%;margin-bottom:.7rem;
+}
+.v26-clean-header .v26-header-search-input,
+.v26-clean-header .v26-header-search-button,
+.v26-clean-header .v26-header-menu-button{min-height:52px;height:100%;margin:0!important}
+.v26-clean-header .v26-header-links-row{
+ display:grid;grid-template-columns:1fr 1fr;gap:.7rem;width:100%;
+}
+.v26-clean-header .v26-header-bag,
+.v26-clean-header .v26-header-account{
+ width:100%!important;min-width:0!important;min-height:52px;
+ display:flex!important;align-items:center;justify-content:flex-start;
+ margin:0!important;box-sizing:border-box;
+}
+@media(max-width:420px){
+ .v26-clean-header .v26-header-search-row{gap:.4rem}
+ .v26-clean-header .v26-header-search-button,
+ .v26-clean-header .v26-header-menu-button{padding-left:.75rem!important;padding-right:.75rem!important}
+}
