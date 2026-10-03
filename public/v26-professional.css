@@ -251,3 +251,8 @@ footer{max-width:1180px;margin:24px auto;padding:20px var(--sd-space);color:var(
  .shopdrop-header-secondary{grid-template-columns:1fr 1fr!important}
  .shopdrop-header-bag{width:50%!important}
 }
+
+/* V26_24 FINAL HEADER ALIGNMENT — Sign In / Account + Menu on one row; Bag below */
+.shopdrop-header-secondary .shopdrop-header-account{order:1;grid-column:auto!important;grid-row:auto!important}
+.shopdrop-header-secondary .shopdrop-menuwrap{order:2;grid-column:auto!important;grid-row:auto!important}
+.shopdrop-header-secondary .shopdrop-menu-button{grid-column:auto!important;grid-row:auto!important}
