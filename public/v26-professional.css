@@ -238,3 +238,16 @@ footer{max-width:1180px;margin:24px auto;padding:20px var(--sd-space);color:var(
  .shopdrop-header-search .searchbtn,.shopdrop-menu-button{font-size:.92rem;padding-left:9px!important;padding-right:9px!important}
  .shopdrop-header-account{font-size:.92rem}
 }
+
+
+/* V26_23 FINAL MOBILE POLISH — menu/account row + centred Bag */
+.shopdrop-header-search{grid-template-columns:minmax(0,1fr) auto!important}
+.shopdrop-header-actions{display:grid!important;grid-template-columns:1fr!important;gap:8px!important}
+.shopdrop-header-secondary{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:stretch}
+.shopdrop-header-secondary .shopdrop-menuwrap,.shopdrop-header-secondary .shopdrop-menu-button,.shopdrop-header-secondary .shopdrop-header-account{width:100%!important;min-width:0!important;min-height:48px!important}
+.shopdrop-header-bag{width:min(50%,320px)!important;justify-self:center!important}
+@media(max-width:720px){
+ .shopdrop-header-search{grid-template-columns:minmax(0,1fr) auto!important}
+ .shopdrop-header-secondary{grid-template-columns:1fr 1fr!important}
+ .shopdrop-header-bag{width:50%!important}
+}
