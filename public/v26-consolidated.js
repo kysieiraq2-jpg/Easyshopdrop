@@ -348,13 +348,14 @@ async function shopdropLoadTaxonomy(){
 }
 async function renderMainMenuCategories(target){
  const host=typeof target==="string"?document.querySelector(target):target;if(!host)return;
- const data=await shopdropLoadTaxonomy();const cats=Array.isArray(data)?data:(data.categories||[]);
+ const data=await shopdropLoadTaxonomy();const cats=Array.isArray(data)?data:(data.departments||data.categories||[]);
  host.replaceChildren();
  for(const c of cats){
   const d=document.createElement("details"),s=document.createElement("summary");s.textContent=c.name||c.label||"Category";d.appendChild(s);
   const w=document.createElement("div"),all=document.createElement("a");
-  all.href=`./categories.html?category=${encodeURIComponent(c.slug||c.id||c.name||"")}`;all.textContent=`Browse All ${c.name||c.label||""}`.trim();w.appendChild(all);
-  for(const sub of (c.subcategories||[])){const a=document.createElement("a");a.href=`./categories.html?category=${encodeURIComponent(c.slug||c.id||c.name||"")}&subcategory=${encodeURIComponent(sub.slug||sub.id||sub.name||"")}`;a.textContent=sub.name||sub.label||"Subcategory";w.appendChild(a);}
+  const categoryName=c.slug||c.id||c.name||"";
+  all.href=`./categories.html?category=${encodeURIComponent(categoryName)}`;all.textContent=`Browse All ${c.name||c.label||""}`.trim();w.appendChild(all);
+  for(const sub of (c.subcategories||[])){const subName=typeof sub==="string"?sub:(sub.slug||sub.id||sub.name||"");const a=document.createElement("a");a.href=`./categories.html?category=${encodeURIComponent(categoryName)}&subcategory=${encodeURIComponent(subName)}`;a.textContent=typeof sub==="string"?sub:(sub.name||sub.label||"Subcategory");w.appendChild(a);}
   d.appendChild(w);host.appendChild(d);
  }
 }
