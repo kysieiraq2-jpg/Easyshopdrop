@@ -129,50 +129,7 @@
     }
 
     
-    // V26_11_HEADER_COSMETIC_REPAIR — layout only; reuse existing controls and handlers.
-    const pageHeader=document.querySelector("header");
-    if(pageHeader){
-      pageHeader.classList.add("v26-clean-header");
-      const brand=[...pageHeader.querySelectorAll("a,div,strong,h1,h2")].find(el=>norm(el.textContent)==="shop&drop");
-      const menu=[...pageHeader.querySelectorAll("button,a")].find(el=>norm(el.textContent).includes("menu"));
-      const searchInput=pageHeader.querySelector('input[type="search"],input[placeholder*="Search" i]');
-      const searchButton=[...pageHeader.querySelectorAll("button,input[type='submit']")].find(el=>norm(el.textContent||el.value)==="search");
-      const bag=[...pageHeader.querySelectorAll("a,button")].find(el=>norm(el.textContent)==="bag");
-      const account=[...pageHeader.querySelectorAll("a,button")].find(el=>/sign in\s*\/\s*account/i.test(el.textContent||""));
-
-      if(brand) brand.classList.add("v26-header-brand");
-      if(searchInput) searchInput.classList.add("v26-header-search-input");
-      if(searchButton) searchButton.classList.add("v26-header-search-button");
-      if(menu) menu.classList.add("v26-header-menu-button");
-      if(bag) bag.classList.add("v26-header-bag");
-      if(account) account.classList.add("v26-header-account");
-
-      // Build layout wrappers by MOVING the existing elements only.
-      if(brand && !pageHeader.querySelector(".v26-header-brand-row")){
-        const row=document.createElement("div"); row.className="v26-header-brand-row";
-        brand.parentNode.insertBefore(row,brand); row.appendChild(brand);
-      }
-      if(account && menu && !pageHeader.querySelector(".v26-header-account-menu-row")){
-        const row=document.createElement("div"); row.className="v26-header-account-menu-row";
-        account.parentNode.insertBefore(row,account);
-        // V26_13_MENU_CONTAINMENT_REPAIR:
-        // Move the complete .menuwrap (button + nav), not the button alone.
-        // The existing click-away handler relies on the button remaining inside .menuwrap.
-        const menuWrap=menu.closest(".menuwrap") || menu;
-        row.append(account,menuWrap);
-      }
-      if(searchInput && searchButton && !pageHeader.querySelector(".v26-header-search-row")){
-        const row=document.createElement("div"); row.className="v26-header-search-row";
-        const first=searchInput;
-        first.parentNode.insertBefore(row,first);
-        row.append(searchInput,searchButton);
-      }
-      if(bag && !pageHeader.querySelector(".v26-header-bag-row")){
-        const row=document.createElement("div"); row.className="v26-header-bag-row";
-        bag.parentNode.insertBefore(row,bag);
-        row.append(bag);
-      }
-    }
+    // V26_21: header is now stable static markup; no DOM re-parenting is permitted here.
 
     document.documentElement.dataset.shopdropHomepageLayout="v26-13";
   });
