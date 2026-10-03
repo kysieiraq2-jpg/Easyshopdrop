@@ -206,3 +206,35 @@ footer{max-width:1180px;margin:24px auto;padding:20px var(--sd-space);color:var(
  .shopdrop-header-search{gap:8px}
  .shopdrop-header-bag{min-width:88px}
 }
+
+/* V26_22 CONTROLLED HEADER + MENU REPAIR
+   Compact mobile hierarchy: brand; Search/Search/Menu; Bag/Account.
+   Products & Categories is first-level and its taxonomy is collapsed by default. */
+.shopdrop-header{padding:14px!important}
+.shopdrop-header-inner{gap:10px!important}
+.shopdrop-header-top{display:block!important;text-align:center}
+.shopdrop-header-brand{display:inline-block;font-size:clamp(2rem,9vw,2.75rem)!important;line-height:1.05}
+.shopdrop-header-search{display:grid!important;grid-template-columns:minmax(0,1fr) auto auto!important;gap:8px!important;align-items:stretch}
+.shopdrop-header-search .search,.shopdrop-header-search .searchbtn,.shopdrop-menu-button{min-height:48px!important}
+.shopdrop-menu-button{padding:10px 13px!important;white-space:nowrap!important}
+.shopdrop-header-actions{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important}
+.shopdrop-header-bag,.shopdrop-header-account{width:100%!important;min-width:0!important;min-height:48px!important}
+.shopdrop-menu-link{display:block;width:100%;border:0;background:#fff;color:#17202a;text-align:left;text-decoration:none;padding:12px 14px;border-radius:8px;font:inherit;cursor:pointer}
+.shopdrop-menu-link:hover,.shopdrop-menu-link:focus{background:#f1f5f9;outline:none}
+.shopdrop-products-toggle::after{content:'›';float:right;font-size:1.35em;line-height:1;transition:transform .15s ease}
+.shopdrop-products-toggle[aria-expanded="true"]::after{transform:rotate(90deg)}
+.shopdrop-menu-categories[hidden]{display:none!important}
+.shopdrop-menu-categories{margin:0 0 4px!important;padding:4px 12px 10px!important;border-top:0!important}
+@media(max-width:720px){
+ .shopdrop-header{padding:14px!important}
+ .shopdrop-header-inner{gap:10px!important}
+ .shopdrop-header-search{grid-template-columns:minmax(0,1fr) auto auto!important}
+ .shopdrop-header-search .search{padding:10px 12px!important}
+ .shopdrop-header-search .searchbtn,.shopdrop-menu-button{padding-left:11px!important;padding-right:11px!important}
+ .shopdrop-main-menu{top:14px!important;left:14px!important;right:14px!important;max-height:calc(100dvh - 28px)!important}
+}
+@media(max-width:390px){
+ .shopdrop-header-search{gap:6px!important}
+ .shopdrop-header-search .searchbtn,.shopdrop-menu-button{font-size:.92rem;padding-left:9px!important;padding-right:9px!important}
+ .shopdrop-header-account{font-size:.92rem}
+}
