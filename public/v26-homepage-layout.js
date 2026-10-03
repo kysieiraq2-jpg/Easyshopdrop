@@ -1,4 +1,4 @@
-/* Shop&Drop V26-11 homepage layout only.
+/* Shop&Drop V26-13 homepage layout + controlled menu containment repair.
    Reorders/groups EXISTING homepage sections.
    Does NOT alter hrefs, event handlers, listing logic, taxonomy, finance or backend behaviour. */
 (function () {
@@ -152,19 +152,28 @@
         const row=document.createElement("div"); row.className="v26-header-brand-row";
         brand.parentNode.insertBefore(row,brand); row.appendChild(brand);
       }
-      if(searchInput && searchButton && menu && !pageHeader.querySelector(".v26-header-search-row")){
+      if(account && menu && !pageHeader.querySelector(".v26-header-account-menu-row")){
+        const row=document.createElement("div"); row.className="v26-header-account-menu-row";
+        account.parentNode.insertBefore(row,account);
+        // V26_13_MENU_CONTAINMENT_REPAIR:
+        // Move the complete .menuwrap (button + nav), not the button alone.
+        // The existing click-away handler relies on the button remaining inside .menuwrap.
+        const menuWrap=menu.closest(".menuwrap") || menu;
+        row.append(account,menuWrap);
+      }
+      if(searchInput && searchButton && !pageHeader.querySelector(".v26-header-search-row")){
         const row=document.createElement("div"); row.className="v26-header-search-row";
         const first=searchInput;
         first.parentNode.insertBefore(row,first);
-        row.append(searchInput,searchButton,menu);
+        row.append(searchInput,searchButton);
       }
-      if(bag && account && !pageHeader.querySelector(".v26-header-links-row")){
-        const row=document.createElement("div"); row.className="v26-header-links-row";
+      if(bag && !pageHeader.querySelector(".v26-header-bag-row")){
+        const row=document.createElement("div"); row.className="v26-header-bag-row";
         bag.parentNode.insertBefore(row,bag);
-        row.append(bag,account);
+        row.append(bag);
       }
     }
 
-    document.documentElement.dataset.shopdropHomepageLayout="v26-11";
+    document.documentElement.dataset.shopdropHomepageLayout="v26-13";
   });
 })();

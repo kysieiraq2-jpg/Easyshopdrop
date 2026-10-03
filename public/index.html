@@ -47,7 +47,25 @@ menuButton.onclick=()=>menu.hidden=!menu.hidden;document.addEventListener('click
 async function loadHomeCategories(){try{const r=await fetch('./taxonomy.json',{cache:'force-cache'});const t=await r.json();const ds=[...t.departments].sort((a,b)=>a.name.localeCompare(b.name));cats.innerHTML=ds.map(d=>`<button type="button" data-category="${esc(d.name)}">${esc(d.name)}</button>`).join('');cats.querySelectorAll('button').forEach(b=>b.onclick=()=>{location.href='./categories.html?category='+encodeURIComponent(b.dataset.category)})}catch(e){cats.innerHTML='<span class="muted">Categories could not be loaded.</span>'}}
 loadHomeCategories();
 ['./categories.html','./services.html','./dispatching.html','./seller-apply.html','./seller.html'].forEach(h=>{const l=document.createElement('link');l.rel='prefetch';l.href=h;document.head.appendChild(l)});
-preownedButton.onclick=async()=>{status.hidden=false;if(ShopDrop.isStatic){status.textContent='Second-Hand & Pre-Owned preview: used and refurbished products will display here when available across all product categories when the backend catalogue is connected.';status.scrollIntoView({behavior:'smooth',block:'start'});return}try{const [l,u,r]=await Promise.all([api('/api/products?condition=like_new'),api('/api/products?condition=used'),api('/api/products?condition=refurbished')]);productGrid.innerHTML=[...l.products,...u.products,...r.products].map(card).join('')||'<p>No second-hand or refurbished products found.</p>';status.hidden=true}catch(e){status.textContent=e.message}};search.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();loadProducts(true)}});if(ShopDrop.isStatic)preview.hidden=false;loadProducts(false);
+preownedButton.onclick=async()=>{status.hidden=false;if(ShopDrop.isStatic){const message='Second-Hand & Pre-Owned preview: used and refurbished products will display here when available across all product categories when the backend catalogue is connected.';status.textContent=message;status.scrollIntoView({behavior:'smooth',block:'start'});window.alert(message);return}try{const [l,u,r]=await Promise.all([api('/api/products?condition=like_new'),api('/api/products?condition=used'),api('/api/products?condition=refurbished')]);productGrid.innerHTML=[...l.products,...u.products,...r.products].map(card).join('')||'<p>No second-hand or refurbished products found.</p>';status.hidden=true}catch(e){status.textContent=e.message}};search.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();loadProducts(true)}});
+// V26_15_PRODUCT_PREVIEW_FEEDBACK_REPAIR — keep the existing appearance; add visible feedback only.
+const featuredProductsSection=document.getElementById('products');
+if(featuredProductsSection){
+  const featuredHeading=featuredProductsSection.querySelector('h2');
+  if(featuredHeading){
+    featuredHeading.setAttribute('role','button');
+    featuredHeading.tabIndex=0;
+    const showFeaturedPreview=()=>{
+      if(ShopDrop.isStatic){
+        const message='New & featured products preview: products will display here when the live Shop&Drop catalogue is connected and products are available.';
+        status.textContent=message; status.hidden=false; window.alert(message);
+      } else { loadProducts(true); }
+    };
+    featuredHeading.addEventListener('click',showFeaturedPreview);
+    featuredHeading.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();showFeaturedPreview();}});
+  }
+}
+if(ShopDrop.isStatic)preview.hidden=false;loadProducts(false);
 </script><script src="v26-bridge.js"></script><section id="v26HomeExtension"><!-- V26_HOME_EXTENSION --><p><a href="feedback.html">Complaints & Suggestions</a></p><footer><a href="terms.html">Terms</a> · <a href="privacy.html">Privacy</a> · <a href="returns-policy.html">Returns Policy</a> · <a href="seller-provider-rules.html">Seller & Provider Rules</a> · <a href="restricted-listings.html">Restricted Listings</a></footer></section>
 
 <section id="v26MainMenuCategoryNavigation" aria-label="Browse categories">
@@ -82,7 +100,10 @@ window.ShopDropPublicContact = Object.freeze({
   [email,wa].filter(Boolean).forEach(link=>link.addEventListener('click',event=>{
     if(link.dataset.configured==='true') return;
     event.preventDefault();
-    if(note){note.textContent='This contact link is ready. The official Shop&Drop contact detail still needs to be inserted.';note.scrollIntoView({behavior:'smooth',block:'nearest'});}
+    const contactType = link === email ? 'email address' : 'WhatsApp Business number';
+    const message = `Shop&Drop ${contactType} has not been configured yet. The official contact detail will be added before the live launch.`;
+    if(note){note.textContent=message;}
+    window.alert(message);
   }));
 })();
 </script>
