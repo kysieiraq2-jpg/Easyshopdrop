@@ -1,9 +1,9 @@
 const SHOPDROP_SUPABASE_URL = 'https://dtkdvvxpwonywtsgqmdx.supabase.co';
 const SHOPDROP_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_vHQcyzuuSWDzshhcAF9N8Q_7JiGFq2q';
 window.ShopDrop={
- isStatic: location.hostname.endsWith('github.io'), apiBase: SHOPDROP_SUPABASE_URL + '/functions/v1',
+ isStatic: location.hostname.endsWith('github.io'), apiBase:'',
  async api(path,options={}){
-  if(false) return;
+  if(this.isStatic) throw new Error('Preview mode: live account, order, payment and database features require the Shop&Drop backend.');
   const r=await fetch(path,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options});
   const type=r.headers.get('content-type')||'';
   if(!type.includes('application/json')) throw new Error('Shop&Drop service is temporarily unavailable. Please try again later.');
