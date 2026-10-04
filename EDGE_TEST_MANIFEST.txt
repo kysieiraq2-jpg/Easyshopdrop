@@ -1,0 +1,16 @@
+Shop&Drop V26.24 — Edge Function Connection Test
+ADDITIVE DIAGNOSTIC ONLY
+
+Adds:
+public/supabase-edge-function-test.html
+
+Existing GitHub files modified: NONE
+Supabase backend code/configuration modified: NONE
+Database migrations: NONE
+RLS/Auth/Storage changes: NONE
+
+Test behavior:
+- Sends an unauthenticated empty POST to the existing deployed feedback Edge Function.
+- Does not provide a user JWT.
+- PASS means the deployed function is reachable and correctly rejects the unauthenticated request.
+- If the function unexpectedly accepts the request, the page reports REVIEW REQUIRED and integration must stop for authorization review.
