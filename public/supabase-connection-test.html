@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Shop&Drop Supabase Connection Test</title>
+</head>
+<body>
+  <main>
+    <h1>Shop&Drop Supabase Connection Test</h1>
+    <p>This temporary page does not modify the Shop&Drop website.</p>
+    <button id="runTest" type="button">Run Connection Test</button>
+    <pre id="result">Ready.</pre>
+  </main>
+
+  <script src="./common.js"></script>
+  <script src="./supabase-adapter.js"></script>
+  <script>
+    const result = document.getElementById('result');
+    document.getElementById('runTest').addEventListener('click', async () => {
+      result.textContent = 'Testing...';
+      try {
+        if (typeof SHOPDROP_SUPABASE_URL === 'undefined' ||
+            typeof SHOPDROP_SUPABASE_PUBLISHABLE_KEY === 'undefined') {
+          throw new Error('Supabase configuration constants are not available.');
+        }
+
+        const response = await fetch(SHOPDROP_SUPABASE_URL + '/auth/v1/settings', {
+          method: 'GET',
+          headers: {
+            'apikey': SHOPDROP_SUPABASE_PUBLISHABLE_KEY
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Supabase returned HTTP ' + response.status + '.');
+        }
+
+        const data = await response.json();
+        result.textContent =
+          'PASS\n\n' +
+          'GitHub Pages can reach the configured Supabase project.\n' +
+          'Supabase Auth endpoint responded successfully.\n' +
+          'Existing V26.24 pages and backend objects were not modified.\n\n' +
+          'Email provider available: ' + String(Boolean(data.external?.email));
+      } catch (error) {
+        result.textContent = 'FAIL\n\n' + (error?.message || String(error));
+      }
+    });
+  </script>
+</body>
+</html>
