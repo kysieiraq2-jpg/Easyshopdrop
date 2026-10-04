@@ -1,0 +1,15 @@
+Shop&Drop V26.24 — Supabase Connection Test
+Package type: ADDITIVE TEST ONLY
+
+Adds:
+- public/supabase-connection-test.html
+
+Replaces/modifies existing V26.24 files: NONE
+Modifies Supabase database/RLS/Auth/Storage/Edge Functions: NONE
+
+Purpose:
+- Verify the GitHub Pages origin can reach the configured Supabase Auth endpoint.
+- Verify the two approved Supabase frontend constants are available.
+- Does not write data.
+- Does not invoke payment, payout, dispute, fulfilment, or admin functions.
+- Can be removed after testing.
