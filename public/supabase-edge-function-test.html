@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shop&Drop Edge Function Connection Test</title>
+</head>
+<body>
+<main>
+<h1>Shop&Drop Edge Function Connection Test</h1>
+<p>Non-destructive diagnostic. This test does not change the Shop&Drop website or Supabase backend.</p>
+<button id="runTest" type="button">Run Edge Function Test</button>
+<pre id="result">Ready.</pre>
+</main>
+
+<script src="./common.js"></script>
+<script>
+const result=document.getElementById('result');
+
+document.getElementById('runTest').addEventListener('click',async()=>{
+  result.textContent='Testing...';
+  try{
+    if(typeof SHOPDROP_SUPABASE_URL==='undefined' ||
+       typeof SHOPDROP_SUPABASE_PUBLISHABLE_KEY==='undefined'){
+      throw new Error('Supabase configuration is unavailable.');
+    }
+
+    /*
+      Probe one deployed protected function without a user JWT and without a body.
+      Expected safe result: the function/gateway responds with an authentication
+      rejection (typically 401). That proves reachability without creating data.
+    */
+    const r=await fetch(
+      SHOPDROP_SUPABASE_URL + '/functions/v1/feedback',
+      {
+        method:'POST',
+        headers:{
+          'apikey':SHOPDROP_SUPABASE_PUBLISHABLE_KEY,
+          'Content-Type':'application/json'
+        },
+        body:JSON.stringify({})
+      }
+    );
+
+    const text=await r.text();
+
+    if(r.status===401 || r.status===403){
+      result.textContent=
+        'PASS\n\n' +
+        'GitHub Pages reached the deployed feedback Edge Function.\n' +
+        'The function/gateway correctly rejected an unauthenticated request.\n' +
+        'No authenticated user JWT was supplied.\n' +
+        'No Shop&Drop data was intentionally created or changed.\n\n' +
+        'HTTP status: ' + r.status +
+        (text ? '\nResponse: ' + text.slice(0,300) : '');
+      return;
+    }
+
+    if(r.ok){
+      result.textContent=
+        'REVIEW REQUIRED\n\n' +
+        'The Edge Function accepted an unauthenticated empty request.\n' +
+        'No further integration should be activated until its authorization behavior is reviewed.\n\n' +
+        'HTTP status: ' + r.status +
+        (text ? '\nResponse: ' + text.slice(0,300) : '');
+      return;
+    }
+
+    result.textContent=
+      'REACHED, REVIEW RESPONSE\n\n' +
+      'Supabase responded, but with an unexpected status.\n' +
+      'HTTP status: ' + r.status +
+      (text ? '\nResponse: ' + text.slice(0,300) : '');
+  }catch(e){
+    result.textContent='FAIL\n\n'+(e?.message||String(e));
+  }
+});
+</script>
+</body>
+</html>
