@@ -1,5 +1,5 @@
 const SHOPDROP_SUPABASE_URL = 'https://dtkdvvxpwonywtsgqmdx.supabase.co';
-const SHOPDROP_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_vHQcyzuuSWDzshhcAF9N8Q_7JiGFq2q';
+const SHOPDROP_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';
 window.ShopDrop={
  isStatic: location.hostname.endsWith('github.io'), apiBase:'',
  async api(path,options={}){
