@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Shop&Drop Supabase Connection Test V2</title>
+</head>
+<body>
+  <main>
+    <h1>Shop&Drop Supabase Connection Test V2</h1>
+    <p>This temporary diagnostic page does not modify the Shop&Drop website or Supabase backend.</p>
+    <button id="runTest" type="button">Run Connection Test</button>
+    <pre id="result">Ready.</pre>
+  </main>
+
+  <script src="./common.js"></script>
+  <script>
+    const result = document.getElementById('result');
+    document.getElementById('runTest').addEventListener('click', async () => {
+      result.textContent = 'Testing...';
+      try {
+        if (typeof SHOPDROP_SUPABASE_URL === 'undefined' ||
+            typeof SHOPDROP_SUPABASE_PUBLISHABLE_KEY === 'undefined') {
+          throw new Error('Supabase configuration constants are not available.');
+        }
+
+        // Read-only PostgREST gateway probe.
+        // No table is selected and no data is written.
+        const response = await fetch(SHOPDROP_SUPABASE_URL + '/rest/v1/', {
+          method: 'GET',
+          headers: {
+            'apikey': SHOPDROP_SUPABASE_PUBLISHABLE_KEY,
+            'Accept': 'application/openapi+json'
+          }
+        });
+
+        const text = await response.text();
+
+        if (!response.ok) {
+          throw new Error(
+            'Supabase returned HTTP ' + response.status +
+            (text ? '\n\n' + text.slice(0, 300) : '')
+          );
+        }
+
+        result.textContent =
+          'PASS\n\n' +
+          'GitHub Pages reached the configured Supabase project.\n' +
+          'The publishable browser key was accepted by the Supabase API gateway.\n' +
+          'No database row was read, inserted, updated or deleted.\n' +
+          'No existing Shop&Drop or Supabase file/configuration was modified.';
+      } catch (error) {
+        result.textContent = 'FAIL\n\n' + (error?.message || String(error));
+      }
+    });
+  </script>
+</body>
+</html>
