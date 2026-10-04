@@ -1,0 +1,13 @@
+Shop&Drop V26.24 Supabase Connection Test V2
+ADDITIVE / READ-ONLY DIAGNOSTIC
+
+Adds only:
+public/supabase-connection-test-v2.html
+
+Existing GitHub files modified: NONE
+Supabase backend modified: NONE
+Database writes: NONE
+Edge Functions invoked: NONE
+
+V2 uses a read-only PostgREST API-gateway probe with the publishable key.
+The earlier Auth settings endpoint returned HTTP 401 and is not used here.
