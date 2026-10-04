@@ -1,0 +1,6 @@
+Shop&Drop V26.24 Supabase Connection Test V3
+Adds only public/supabase-connection-test-v3.html.
+Existing GitHub files modified: NONE.
+Supabase backend modified: NONE.
+Writes: NONE.
+Uses official GET /auth/v1/health with the publishable key.
