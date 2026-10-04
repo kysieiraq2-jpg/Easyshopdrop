@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shop&Drop Supabase Connection Test V3</title>
+</head>
+<body>
+<main>
+<h1>Shop&Drop Supabase Connection Test V3</h1>
+<p>Read-only connectivity test. This page does not modify the Shop&Drop website or Supabase backend.</p>
+<button id="runTest" type="button">Run Connection Test</button>
+<pre id="result">Ready.</pre>
+</main>
+<script src="./common.js"></script>
+<script>
+const result=document.getElementById('result');
+document.getElementById('runTest').addEventListener('click',async()=>{
+  result.textContent='Testing...';
+  try{
+    if(typeof SHOPDROP_SUPABASE_URL==='undefined'||typeof SHOPDROP_SUPABASE_PUBLISHABLE_KEY==='undefined'){
+      throw new Error('Supabase configuration constants are not available.');
+    }
+    // Official Supabase Auth health endpoint; GET + publishable key; no writes.
+    const r=await fetch(SHOPDROP_SUPABASE_URL+'/auth/v1/health',{
+      method:'GET',
+      headers:{'apikey':SHOPDROP_SUPABASE_PUBLISHABLE_KEY,'Accept':'application/json'}
+    });
+    const text=await r.text();
+    let data={};
+    try{data=text?JSON.parse(text):{};}catch(_){}
+    if(!r.ok) throw new Error('Supabase returned HTTP '+r.status+(text?'\n\n'+text.slice(0,300):''));
+    result.textContent=
+      'PASS\n\n'+
+      'GitHub Pages reached the configured Supabase project.\n'+
+      'The corrected publishable key was accepted.\n'+
+      'Supabase Auth health endpoint responded successfully.\n'+
+      'No database row or backend configuration was changed.\n\n'+
+      'Service: '+String(data.name||'Supabase Auth')+
+      (data.version?'\nVersion: '+String(data.version):'');
+  }catch(e){result.textContent='FAIL\n\n'+(e?.message||String(e));}
+});
+</script>
+</body>
+</html>
