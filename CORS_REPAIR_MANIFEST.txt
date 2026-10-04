@@ -1,0 +1,26 @@
+Shop&Drop feedback Edge Function — controlled CORS repair
+
+SOURCE:
+Exact feedback.zip downloaded from the deployed Supabase feedback function.
+
+CHANGES ONLY:
+1. Added CORS response headers.
+2. Added OPTIONS preflight handling before authentication.
+3. Existing JSON responses now include the same CORS headers.
+
+PRESERVED:
+- requireUser() authentication logic
+- JWT validation
+- SUPABASE_SERVICE_ROLE_KEY usage
+- integration_events insert
+- event_type platform_feedback
+- reference generation
+- payload/user_id behavior
+- success/error response bodies
+- No database schema/RLS/Auth/Storage changes
+- No GitHub/V26.24 frontend changes
+- No other Edge Function changes
+
+Deployment target:
+Supabase Edge Function: feedback
+File: index.ts
