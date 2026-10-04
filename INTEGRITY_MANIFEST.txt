@@ -1,0 +1,18 @@
+{
+  "baseline": "V26.24 / GitHub checkpoint b965074",
+  "package_type": "ADDITIVE ONLY",
+  "files_added": [
+    "public/supabase-adapter.js"
+  ],
+  "existing_files_modified": [],
+  "supabase_backend_modified": false,
+  "auto_activation": false,
+  "notes": [
+    "No existing V26.24 file is replaced.",
+    "No HTML/CSS/common.js/routes are modified.",
+    "No database/RLS/Auth/Storage/Edge Function is modified.",
+    "Adapter is inert until a future controlled page explicitly loads/calls it.",
+    "change-requests excluded pending server-side admin authorization.",
+    "payment-webhook excluded because it is server/provider initiated."
+  ]
+}
