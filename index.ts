@@ -3,7 +3,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 function adminClient() {
   const url = Deno.env.get("SUPABASE_URL")!;
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  return createClient(url, key, { auth: { persistSession: false } });
+  return createClient(url, key, {
+    auth: { persistSession: false }
+  });
 }
 
 async function requireUser(req: Request) {
@@ -35,7 +37,7 @@ function json(data: unknown, status = 200) {
   });
 }
 
-Deno.serve(async req => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -44,15 +46,16 @@ Deno.serve(async req => {
     const u = await requireUser(req);
     const b = await req.json();
     const db = adminClient();
-    const ref = `RPT-${crypto.randomUUID()}`;
+    const ref = `CAN-${crypto.randomUUID()}`;
 
-    const { error } = await db.from("listing_reports").insert({
-      reporter_user_id: u.id,
-      listing_type: b.listing_type || "unknown",
-      listing_id: b.listing_id,
-      reason: b.reason || "other",
-      details: b.details || null
-    });
+    const { error } = await db
+      .from("integration_events")
+      .insert({
+        event_type: "cancellation_requested",
+        external_reference: ref,
+        payload: { ...b, user_id: u.id },
+        status: "received"
+      });
 
     if (error) throw error;
 
@@ -70,8 +73,8 @@ Deno.serve(async req => {
     }
 
     return json({
-      code: "report_failed",
-      user_message: "Listing report could not be submitted."
+      code: "cancellation_failed",
+      user_message: "Cancellation request could not be submitted."
     }, 400);
   }
 });
