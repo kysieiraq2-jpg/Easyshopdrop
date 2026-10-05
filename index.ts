@@ -44,13 +44,13 @@ Deno.serve(async req => {
     const u = await requireUser(req);
     const b = await req.json();
     const db = adminClient();
-    const ref = `EVD-${crypto.randomUUID()}`;
+    const ref = `DSP-${crypto.randomUUID()}`;
 
     const { error } = await db.from("integration_events").insert({
-      event_type: "dispute_evidence_metadata",
+      event_type: "payment_dispute_submitted",
       external_reference: ref,
       payload: { ...b, user_id: u.id },
-      status: "awaiting_signed_upload"
+      status: "received"
     });
 
     if (error) throw error;
@@ -58,7 +58,7 @@ Deno.serve(async req => {
     return json({
       ok: true,
       reference: ref,
-      status: "awaiting_signed_upload"
+      status: "submitted"
     });
   } catch (e) {
     if (e instanceof Error && e.message === "UNAUTHORIZED") {
@@ -69,8 +69,8 @@ Deno.serve(async req => {
     }
 
     return json({
-      code: "evidence_failed",
-      user_message: "Evidence metadata could not be submitted."
+      code: "dispute_failed",
+      user_message: "Payment dispute could not be submitted."
     }, 400);
   }
 });
