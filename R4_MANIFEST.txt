@@ -1,0 +1,14 @@
+Shop&Drop R4 controlled repair — dispute-evidence
+Source: exact Supabase ZIP supplied by user.
+
+Changes only:
+- Add CORS headers.
+- Handle OPTIONS preflight before authentication.
+- Include CORS headers on JSON responses.
+- Return HTTP 401 for the existing UNAUTHORIZED condition.
+
+Preserved:
+- Existing JWT/auth.getUser logic.
+- Existing service-role handling.
+- Existing database targets, event types, payloads, references and statuses.
+- No V26.24 file included or modified.
