@@ -44,13 +44,14 @@ Deno.serve(async req => {
     const u = await requireUser(req);
     const b = await req.json();
     const db = adminClient();
-    const ref = `DSP-${crypto.randomUUID()}`;
+    const ref = `RPT-${crypto.randomUUID()}`;
 
-    const { error } = await db.from("integration_events").insert({
-      event_type: "payment_dispute_submitted",
-      external_reference: ref,
-      payload: { ...b, user_id: u.id },
-      status: "received"
+    const { error } = await db.from("listing_reports").insert({
+      reporter_user_id: u.id,
+      listing_type: b.listing_type || "unknown",
+      listing_id: b.listing_id,
+      reason: b.reason || "other",
+      details: b.details || null
     });
 
     if (error) throw error;
@@ -69,8 +70,8 @@ Deno.serve(async req => {
     }
 
     return json({
-      code: "dispute_failed",
-      user_message: "Payment dispute could not be submitted."
+      code: "report_failed",
+      user_message: "Listing report could not be submitted."
     }, 400);
   }
 });
