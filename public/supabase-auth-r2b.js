@@ -1,6 +1,66 @@
-(()=>{"use strict";const U="https://dtkdvvxpwonywtsgqmdx.supabase.co",K="sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q",S="shopdrop_r2b_session";
-async function q(p,o={}){const r=await fetch(U+p,{...o,headers:{apikey:K,"Content-Type":"application/json",...(o.headers||{})},cache:"no-store"});const t=await r.text();let b;try{b=t?JSON.parse(t):{}}catch{b={raw:t}}return{ok:r.ok,status:r.status,body:b}}
-async function signUp(e,p){return q("/auth/v1/signup",{method:"POST",body:JSON.stringify({email:e,password:p,data:{full_name:"Shop&Drop R2-B Test User"}})})}
-async function signIn(e,p){const r=await q("/auth/v1/token?grant_type=password",{method:"POST",body:JSON.stringify({email:e,password:p})});if(r.ok&&r.body?.access_token)sessionStorage.setItem(S,JSON.stringify({access_token:r.body.access_token,refresh_token:r.body.refresh_token,expires_in:r.body.expires_in,user_id:r.body.user?.id||null}));return r}
-function summary(){try{const s=JSON.parse(sessionStorage.getItem(S)||"null");return s?{has_access_token:!!s.access_token,has_refresh_token:!!s.refresh_token,expires_in:s.expires_in??null,user_id:s.user_id??null}:null}catch{return null}}
-window.ShopDropR2B=Object.freeze({signUp,signIn,summary,clear:()=>sessionStorage.removeItem(S)})})();
+/* Shop&Drop R2-B session diagnostic repair.
+   Additive diagnostic file only — no V26.24 file is modified. */
+(() => {
+  "use strict";
+
+  const URL = "https://dtkdvvxpwonywtsgqmdx.supabase.co";
+  const KEY = "sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q";
+  let memorySession = null;
+
+  async function request(path, options = {}) {
+    const response = await fetch(URL + path, {
+      ...options,
+      headers: {
+        "apikey": KEY,
+        "Content-Type": "application/json",
+        ...(options.headers || {})
+      },
+      cache: "no-store"
+    });
+    const text = await response.text();
+    let body;
+    try { body = text ? JSON.parse(text) : {}; }
+    catch { body = { raw: text }; }
+    return { ok: response.ok, status: response.status, body };
+  }
+
+  async function signUp(email, password) {
+    return request("/auth/v1/signup", {
+      method: "POST",
+      body: JSON.stringify({
+        email,
+        password,
+        data: { full_name: "Shop&Drop R2-B Test User" }
+      })
+    });
+  }
+
+  async function signIn(email, password) {
+    const r = await request("/auth/v1/token?grant_type=password", {
+      method: "POST",
+      body: JSON.stringify({ email, password })
+    });
+
+    if (r.ok && r.body && r.body.access_token) {
+      memorySession = {
+        access_token: r.body.access_token,
+        refresh_token: r.body.refresh_token || null,
+        expires_in: r.body.expires_in || null,
+        user_id: r.body.user?.id || null
+      };
+    }
+    return r;
+  }
+
+  function summary() {
+    if (!memorySession) return null;
+    return {
+      has_access_token: Boolean(memorySession.access_token),
+      has_refresh_token: Boolean(memorySession.refresh_token),
+      expires_in: memorySession.expires_in,
+      user_id: memorySession.user_id
+    };
+  }
+
+  window.ShopDropR2B = Object.freeze({ signUp, signIn, summary });
+})();
