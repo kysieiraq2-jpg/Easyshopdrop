@@ -1,0 +1,6 @@
+(()=>{"use strict";const U="https://dtkdvvxpwonywtsgqmdx.supabase.co",K="sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q",S="shopdrop_r2b_session";
+async function q(p,o={}){const r=await fetch(U+p,{...o,headers:{apikey:K,"Content-Type":"application/json",...(o.headers||{})},cache:"no-store"});const t=await r.text();let b;try{b=t?JSON.parse(t):{}}catch{b={raw:t}}return{ok:r.ok,status:r.status,body:b}}
+async function signUp(e,p){return q("/auth/v1/signup",{method:"POST",body:JSON.stringify({email:e,password:p,data:{full_name:"Shop&Drop R2-B Test User"}})})}
+async function signIn(e,p){const r=await q("/auth/v1/token?grant_type=password",{method:"POST",body:JSON.stringify({email:e,password:p})});if(r.ok&&r.body?.access_token)sessionStorage.setItem(S,JSON.stringify({access_token:r.body.access_token,refresh_token:r.body.refresh_token,expires_in:r.body.expires_in,user_id:r.body.user?.id||null}));return r}
+function summary(){try{const s=JSON.parse(sessionStorage.getItem(S)||"null");return s?{has_access_token:!!s.access_token,has_refresh_token:!!s.refresh_token,expires_in:s.expires_in??null,user_id:s.user_id??null}:null}catch{return null}}
+window.ShopDropR2B=Object.freeze({signUp,signIn,summary,clear:()=>sessionStorage.removeItem(S)})})();
