@@ -30,7 +30,7 @@
      const u = await requireUser(req);
      const b = await req.json();
 @@ -50,6 +61,13 @@
-       status: "awaiting_signed_upload"
+       status: "submitted"
      });
    } catch (e) {
 +    if (e instanceof Error && e.message === "UNAUTHORIZED") {
@@ -41,5 +41,5 @@
 +    }
 +
      return json({
-       code: "evidence_failed",
-       user_message: "Evidence metadata could not be submitted."
+       code: "dispute_failed",
+       user_message: "Payment dispute could not be submitted."
