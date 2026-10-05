@@ -1,0 +1,45 @@
+--- original/index.ts
++++ repaired/index.ts
+@@ -18,10 +18,17 @@
+   return data.user;
+ }
+ 
++const corsHeaders = {
++  "Access-Control-Allow-Origin": "*",
++  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
++  "Access-Control-Allow-Methods": "POST, OPTIONS"
++};
++
+ function json(data: unknown, status = 200) {
+   return new Response(JSON.stringify(data), {
+     status,
+     headers: {
++      ...corsHeaders,
+       "content-type": "application/json",
+       "cache-control": "no-store"
+     }
+@@ -29,6 +36,10 @@
+ }
+ 
+ Deno.serve(async req => {
++  if (req.method === "OPTIONS") {
++    return new Response("ok", { headers: corsHeaders });
++  }
++
+   try {
+     const u = await requireUser(req);
+     const b = await req.json();
+@@ -50,6 +61,13 @@
+       status: "awaiting_signed_upload"
+     });
+   } catch (e) {
++    if (e instanceof Error && e.message === "UNAUTHORIZED") {
++      return json({
++        code: "unauthorized",
++        user_message: "Authentication required."
++      }, 401);
++    }
++
+     return json({
+       code: "evidence_failed",
+       user_message: "Evidence metadata could not be submitted."
