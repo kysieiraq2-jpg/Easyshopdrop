@@ -44,13 +44,13 @@ Deno.serve(async req => {
     const u = await requireUser(req);
     const b = await req.json();
     const db = adminClient();
-    const ref = `FBK-${crypto.randomUUID()}`;
+    const ref = `EVD-${crypto.randomUUID()}`;
 
     const { error } = await db.from("integration_events").insert({
-      event_type: "platform_feedback",
+      event_type: "dispute_evidence_metadata",
       external_reference: ref,
       payload: { ...b, user_id: u.id },
-      status: "received"
+      status: "awaiting_signed_upload"
     });
 
     if (error) throw error;
@@ -58,12 +58,19 @@ Deno.serve(async req => {
     return json({
       ok: true,
       reference: ref,
-      status: "submitted"
+      status: "awaiting_signed_upload"
     });
   } catch (e) {
+    if (e instanceof Error && e.message === "UNAUTHORIZED") {
+      return json({
+        code: "unauthorized",
+        user_message: "Authentication required."
+      }, 401);
+    }
+
     return json({
-      code: "feedback_failed",
-      user_message: "Feedback could not be submitted."
+      code: "evidence_failed",
+      user_message: "Evidence metadata could not be submitted."
     }, 400);
   }
 });
