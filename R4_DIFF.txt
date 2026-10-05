@@ -29,7 +29,7 @@
    try {
      const u = await requireUser(req);
      const b = await req.json();
-@@ -50,6 +61,13 @@
+@@ -51,6 +62,13 @@
        status: "submitted"
      });
    } catch (e) {
@@ -41,5 +41,5 @@
 +    }
 +
      return json({
-       code: "dispute_failed",
-       user_message: "Payment dispute could not be submitted."
+       code: "report_failed",
+       user_message: "Listing report could not be submitted."
