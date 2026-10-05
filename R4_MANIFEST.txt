@@ -1,4 +1,4 @@
-Shop&Drop R4 controlled repair — dispute-evidence
+Shop&Drop R4 controlled repair — disputes
 Source: exact Supabase ZIP supplied by user.
 
 Changes only:
