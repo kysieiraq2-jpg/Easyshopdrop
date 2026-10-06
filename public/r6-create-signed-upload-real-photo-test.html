@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shop&Drop R6 Real Photo Upload Test</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:760px;margin:auto;padding:24px;line-height:1.5}
+input,button{box-sizing:border-box;width:100%;padding:14px;margin:8px 0 14px;font:inherit}
+pre{white-space:pre-wrap;word-break:break-word;background:#f5f5f5;padding:16px}
+.note{background:#f7f2e9;padding:14px}
+</style></head><body>
+<h1>Shop&amp;Drop R6 Real Photo Upload Test</h1>
+<p class="note"><b>Controlled diagnostic.</b> Choose or take one normal JPEG/PNG/WebP photo. The test signs in, obtains a user-owned signed upload authorization, and uploads only that selected photo to the diagnostic path. It does not modify V26.24.</p>
+<label>Email</label><input id="email" type="email" autocomplete="username">
+<label>Shop&amp;Drop password</label><input id="password" type="password" autocomplete="current-password">
+<label>Choose or take one photo</label><input id="photo" type="file" accept="image/jpeg,image/png,image/webp" capture="environment">
+<button id="run">Sign In + Securely Upload Test Photo</button>
+<pre id="out">READY.</pre>
+<script>
+const U='https://dtkdvvxpwonywtsgqmdx.supabase.co', E='https://dtkdvvxpwonywtsgqmdx.supabase.co/functions/v1/create-signed-upload', K='sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';
+const out=document.getElementById("out");
+document.getElementById("run").onclick=async()=>{
+ try {
+   const file=document.getElementById("photo").files[0];
+   if(!file){ out.textContent="SELECT ONE PHOTO FIRST."; return; }
+   const allowed=["image/jpeg","image/png","image/webp"];
+   if(!allowed.includes(file.type)){ out.textContent="PHOTO TYPE REVIEW REQUIRED\nDetected type: "+(file.type||"unknown"); return; }
+   if(file.size<=0 || file.size>10*1024*1024){ out.textContent="PHOTO SIZE REVIEW REQUIRED\nMaximum: 10 MB\nSelected bytes: "+file.size; return; }
+
+   out.textContent="SIGNING IN...";
+   let r=await fetch(U+"/auth/v1/token?grant_type=password",{
+     method:"POST",
+     headers:{apikey:K,"content-type":"application/json"},
+     body:JSON.stringify({email:document.getElementById("email").value.trim(),password:document.getElementById("password").value}),
+     cache:"no-store"
+   });
+   const a=await r.json();
+   if(!r.ok || !a.access_token || !a.user?.id){ out.textContent="SIGN IN REVIEW REQUIRED\nHTTP status: "+r.status; return; }
+
+   out.textContent="REQUESTING SIGNED UPLOAD...";
+   r=await fetch(E,{
+     method:"POST", mode:"cors",
+     headers:{apikey:K,Authorization:"Bearer "+a.access_token,"content-type":"application/json","x-client-info":"shopdrop-r6-real-photo-test"},
+     body:JSON.stringify({upload_type:"listing_image",reference:"R6-PHOTO-DIAGNOSTIC",mime_type:file.type,file_size:file.size}),
+     cache:"no-store"
+   });
+   const data=await r.json();
+   if(!r.ok || !data?.ok || !data?.signed_url || !data?.token || !data?.path){
+     out.textContent="SIGNED AUTHORIZATION REVIEW REQUIRED\nHTTP status: "+r.status+"\nResponse: "+JSON.stringify(data); return;
+   }
+
+   const expected=a.user.id+"/R6-PHOTO-DIAGNOSTIC/";
+   if(!data.path.startsWith(expected)){ out.textContent="PATH SECURITY REVIEW REQUIRED\nPath: "+data.path; return; }
+
+   out.textContent="AUTHORIZATION PASSED. UPLOADING TEST PHOTO...";
+   const uploadUrl = data.signed_url.includes("token=") ? data.signed_url :
+     data.signed_url + (data.signed_url.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(data.token);
+
+   const up=await fetch(uploadUrl,{
+     method:"PUT",
+     headers:{"content-type":file.type,"x-upsert":"false"},
+     body:file,
+     cache:"no-store"
+   });
+   const upText=await up.text();
+   if(!up.ok){
+     out.textContent="R6 REAL PHOTO UPLOAD REVIEW REQUIRED\nUpload HTTP status: "+up.status+"\nResponse: "+upText+"\nDiagnostic path reserved: "+data.path; return;
+   }
+
+   out.textContent=
+     "R6 REAL PHOTO UPLOAD PASS\n"+
+     "Authenticated user: YES\n"+
+     "Signed authorization: YES\n"+
+     "User-owned path: YES\n"+
+     "Bucket: "+data.bucket+"\n"+
+     "Photo type: "+file.type+"\n"+
+     "Photo size: "+file.size+" bytes\n"+
+     "Upload HTTP status: "+up.status+"\n"+
+     "Stored diagnostic path: "+data.path+"\n"+
+     "V26.24 modified: NO";
+ } catch(e) {
+   out.textContent="R6 REAL PHOTO UPLOAD REVIEW REQUIRED\nError: "+String(e);
+ }
+};
+</script></body></html>
