@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shop&Drop R6 Authenticated Signed Upload Test</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:760px;margin:auto;padding:24px;line-height:1.5}
+input,button{box-sizing:border-box;width:100%;padding:14px;margin:8px 0 14px;font:inherit}
+pre{white-space:pre-wrap;word-break:break-word;background:#f5f5f5;padding:16px}
+.note{background:#f7f2e9;padding:14px}
+</style></head><body>
+<h1>Shop&amp;Drop R6 Authenticated Signed Upload Test</h1>
+<p class="note"><b>Controlled diagnostic.</b> This signs in and asks the new R6 backend to prepare a signed listing-image upload. It does not upload a photo and does not modify V26.24.</p>
+<label>Email</label><input id="email" type="email" autocomplete="username">
+<label>Shop&amp;Drop password</label><input id="password" type="password" autocomplete="current-password">
+<button id="run">Sign In + Test Signed Upload Authorization</button>
+<pre id="out">READY.</pre>
+<script>
+const U='https://dtkdvvxpwonywtsgqmdx.supabase.co', E='https://dtkdvvxpwonywtsgqmdx.supabase.co/functions/v1/create-signed-upload', K='sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';
+const out=document.getElementById("out");
+document.getElementById("run").onclick=async()=>{
+ out.textContent="SIGNING IN...";
+ try {
+   let r=await fetch(U+"/auth/v1/token?grant_type=password",{
+     method:"POST",
+     headers:{"apikey":K,"content-type":"application/json"},
+     body:JSON.stringify({
+       email:document.getElementById("email").value.trim(),
+       password:document.getElementById("password").value
+     }),
+     cache:"no-store"
+   });
+   const a=await r.json();
+   if(!r.ok || !a.access_token || !a.user?.id){
+     out.textContent="SIGN IN REVIEW REQUIRED\nHTTP status: "+r.status;
+     return;
+   }
+
+   out.textContent="SIGNED IN. REQUESTING SECURE UPLOAD AUTHORIZATION...";
+   r=await fetch(E,{
+     method:"POST",
+     mode:"cors",
+     headers:{
+       "apikey":K,
+       "Authorization":"Bearer "+a.access_token,
+       "content-type":"application/json",
+       "x-client-info":"shopdrop-r6-auth-signed-upload-test"
+     },
+     body:JSON.stringify({
+       upload_type:"listing_image",
+       reference:"R6-DIAGNOSTIC",
+       mime_type:"image/jpeg",
+       file_size:1000
+     }),
+     cache:"no-store"
+   });
+
+   const text=await r.text();
+   let data=null;
+   try{ data=JSON.parse(text); }catch{}
+
+   const expectedPrefix=a.user.id+"/R6-DIAGNOSTIC/";
+   const pathOK=!!data?.path && data.path.startsWith(expectedPrefix) && data.path.endsWith(".jpg");
+   const authOK=r.status===200 && data?.ok===true && data?.bucket==="listing-images" &&
+                pathOK && !!data?.token && !!data?.signed_url;
+
+   if(authOK){
+     out.textContent=
+       "R6 AUTHENTICATED SIGNED UPLOAD PASS\n"+
+       "Authenticated user authorized.\n"+
+       "HTTP status: 200\n"+
+       "Bucket: "+data.bucket+"\n"+
+       "User-owned path confirmed: YES\n"+
+       "Path: "+data.path+"\n"+
+       "Signed upload token returned: YES\n"+
+       "No file uploaded.";
+   } else {
+     out.textContent=
+       "R6 AUTHENTICATED SIGNED UPLOAD REVIEW REQUIRED\n"+
+       "HTTP status: "+r.status+"\n"+
+       "Response: "+text;
+   }
+ } catch(e) {
+   out.textContent="R6 AUTHENTICATED SIGNED UPLOAD REVIEW REQUIRED\nError: "+String(e);
+ }
+};
+</script></body></html>
