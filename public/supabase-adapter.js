@@ -6,15 +6,9 @@
 (function () {
   'use strict';
 
+  // Public browser configuration only. Never put service-role keys here.
   function config() {
-    if (typeof SHOPDROP_SUPABASE_URL === 'undefined' ||
-        typeof SHOPDROP_SUPABASE_PUBLISHABLE_KEY === 'undefined') {
-      throw new Error('Shop&Drop Supabase configuration is unavailable.');
-    }
-    return {
-      url: SHOPDROP_SUPABASE_URL,
-      key: SHOPDROP_SUPABASE_PUBLISHABLE_KEY
-    };
+    return { url: 'https://dtkdvvxpwonywtsgqmdx.supabase.co', key: 'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q' };
   }
 
   async function invoke(functionName, accessToken, body) {
@@ -55,11 +49,11 @@
   }
 
   const functions = Object.freeze({
+    createCheckoutOrder: (token, body) => invoke('create-checkout-order', token, body),
     cancellations: (token, body) => invoke('cancellations', token, body),
     courierQuotes: (token, body) => invoke('courier-quotes', token, body),
     createListingReference: (token, body) => invoke('create-listing-reference', token, body),
     createPaymentSession: (token, body) => invoke('create-payment-session', token, body),
-    createPayout: (token, body) => invoke('create-payout', token, body),
     disputeEvidence: (token, body) => invoke('dispute-evidence', token, body),
     disputes: (token, body) => invoke('disputes', token, body),
     feedback: (token, body) => invoke('feedback', token, body),
@@ -71,6 +65,7 @@
   // Deliberately not exposed here:
   // - change-requests: requires verified admin authorization before activation.
   // - payment-webhook: provider-to-server webhook; must never be browser invoked.
+  // - create-payout: privileged payout execution; must never be exposed as a browser helper.
 
   window.ShopDropSupabaseAdapter = Object.freeze({
     invoke,
