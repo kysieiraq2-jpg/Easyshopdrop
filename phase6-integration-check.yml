@@ -1,0 +1,46 @@
+name: Phase 6 Integration Branch Check
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+      - name: Verify integration files and static references
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF_NAME}" = "shopdrop-phase6-integration"
+          test -f public/sign-in.html
+          test -f public/register.html
+          test -f public/account.html
+          test -f public/shopdrop-checkout-connector.js
+          test -f public/supabase-adapter.js
+          test -f public/shopdrop-integration-check.html
+          python3 - <<'PYCODE'
+          from pathlib import Path
+          import re,sys
+          root=Path('public')
+          errors=[]
+          for page in ('sign-in.html','register.html','account.html','shopdrop-integration-check.html'):
+              text=(root/page).read_text(encoding='utf-8')
+              for src in re.findall(r'<script[^>]+src=["\']([^"\']+)',text,re.I):
+                  if src.startswith(('https://','http://','//','data:')): continue
+                  local=(root/src.lstrip('/').split('?')[0]) if src.startswith('/') else (root/src.split('?')[0])
+                  if not local.exists(): errors.append(f'{page}: missing script {src}')
+          if errors:
+              print('\n'.join(errors));sys.exit(1)
+          print('Integration branch files and local script references verified.')
+          PYCODE
+      - name: Upload isolated branch snapshot (not deployed)
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase6-branch-snapshot
+          path: public/
+          retention-days: 3
