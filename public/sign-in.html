@@ -13,7 +13,8 @@ formEl.addEventListener('submit',async(event)=>{
   const {data:verified,error:verifyError}=await client.auth.getUser();
   if(verifyError||!verified.user||verified.user.id!==data.user?.id)throw Error('Account verification failed.');
   document.getElementById('password').value='';
-  ShopDrop.msg(messageEl,'Signed in successfully with Supabase. Account-page integration is the next step.');
+  ShopDrop.msg(messageEl,'Signed in successfully. Opening your account...');
+  window.location.assign('./account.html');
  }catch(error){ShopDrop.msg(messageEl,error.message||'Sign-in failed.','error')}
  finally{submit.disabled=false}
 });
