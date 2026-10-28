@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shop&Drop — Supabase Connection Check</title><style>body{font:16px system-ui,sans-serif;max-width:580px;margin:3rem auto;padding:1rem;color:#18212b}button{background:#08796e;color:white;border:0;border-radius:8px;padding:14px 18px;font:inherit}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f2f5f6;padding:16px;border-radius:8px}</style></head><body><h1>Shop&Drop Integration</h1><p>Step 4 — Read-only Supabase authentication connectivity test. No passwords or orders are submitted.</p><button id="check">Check connection</button><pre id="result" role="status" aria-live="polite">Ready.</pre><script src="./supabase-auth-session.js"></script><script src="./supabase-adapter.js"></script><script>
+const result=document.getElementById('result');
+document.getElementById('check').addEventListener('click',async()=>{
+ result.textContent='Checking...';
+ try{
+  if(!window.ShopDropAuthSessionR2A?.authHealth) throw Error('Authentication bridge not loaded');
+  if(!window.ShopDropSupabaseAdapter) { result.textContent='Auth bridge loaded; Supabase adapter name requires verification. Checking Auth health...'; }
+  const health=await window.ShopDropAuthSessionR2A.authHealth();
+  result.textContent=health.ok ? 'PASS — Supabase Auth health responded (HTTP '+health.status+'). This does not verify login or checkout.' : 'NOT VERIFIED — '+(health.message||'HTTP '+health.status);
+ }catch(e){result.textContent='NOT VERIFIED — '+e.message;}
+});
+</script></body></html>
