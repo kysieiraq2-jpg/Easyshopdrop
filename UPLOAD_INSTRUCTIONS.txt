@@ -1,8 +1,8 @@
-Shop&Drop V26-11 FINAL — GitHub update
+SHOP&DROP PHASE 6 — FIRST GITHUB INTEGRATION PACKAGE
 
-Upload ONLY the files in this package, preserving their paths.
-Files under public/ go into the existing GitHub public/ folder.
-Do not delete unrelated existing files.
-This update contains the approved homepage/header changes and Main Menu Products & Categories repair.
-After GitHub Pages redeploys, verify the visible homepage layout and the Main Menu Category -> Subcategory dropdown.
-If those changes work, proceed to the planned Supabase compatibility/integration audit.
+1. Extract ZIP on your phone, then tap VIEW.
+2. Open yellow folder ShopDrop_Phase6_GitHub_Integration_Package, then public.
+3. In GitHub select branch shopdrop-phase6-integration (NOT main).
+4. Open GitHub public folder and upload ONLY shopdrop-checkout-connector.js.
+5. Do not upload the ZIP or UPLOAD_INSTRUCTIONS.txt to GitHub.
+6. Do not modify checkout.html or common.js yet. The connector is inactive until deliberately wired.
