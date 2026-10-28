@@ -69,7 +69,46 @@
   // - payment-webhook: provider-to-server webhook; must never be browser invoked.
   // - create-payout: privileged payout execution; must never be exposed as a browser helper.
 
+  // Authenticated browser calls: obtain the token from the same Supabase Auth
+  // storage/session used by sign-in and registration, never from page input.
+  // This is a convenience boundary only; Edge Functions must enforce RLS and
+  // server-side authorization for every request.
+  let clientPromise;
+  async function authClient() {
+    if (!clientPromise) {
+      clientPromise = import('https://esm.sh/@supabase/supabase-js@2')
+        .then(({ createClient }) => {
+          const { url, key } = config();
+          return createClient(url, key, {
+            auth: { persistSession: true, autoRefreshToken: true,
+                    detectSessionInUrl: true }
+          });
+        }).catch(error => { clientPromise = null; throw error; });
+    }
+    return clientPromise;
+  }
+
+  async function verifiedToken() {
+    const client = await authClient();
+    const { data: sessionData, error: sessionError } = await client.auth.getSession();
+    if (sessionError) throw sessionError;
+    const token = sessionData?.session?.access_token;
+    if (!token) throw new Error('Please sign in to Shop&Drop first.');
+    const { data: userData, error: userError } = await client.auth.getUser(token);
+    if (userError || !userData?.user?.id) {
+      throw new Error('Session expired. Please sign in again.');
+    }
+    return token;
+  }
+
+  const authenticatedFunctions = Object.freeze(
+    Object.fromEntries(Object.entries(functions).map(([name, fn]) => [
+      name, async (body) => fn(await verifiedToken(), body)
+    ]))
+  );
+
   window.ShopDropSupabaseAdapter = Object.freeze({
-    functions
+    functions,
+    authenticatedFunctions
   });
 })();
