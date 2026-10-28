@@ -62,13 +62,14 @@
     verifyServiceArrival: (token, body) => invoke('verify-service-arrival', token, body)
   });
 
+  // Only explicitly approved functions are exposed to frontend pages.
+  // The generic invoke method remains private to this module.
   // Deliberately not exposed here:
   // - change-requests: requires verified admin authorization before activation.
   // - payment-webhook: provider-to-server webhook; must never be browser invoked.
   // - create-payout: privileged payout execution; must never be exposed as a browser helper.
 
   window.ShopDropSupabaseAdapter = Object.freeze({
-    invoke,
     functions
   });
 })();
