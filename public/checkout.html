@@ -10,6 +10,13 @@
 <option value="paypal_wallet">PayPal</option>
 </select>
 <p class="muted" id="phase6PaymentNotice" role="status">Payment methods are being integrated. No provider is active and no payment will be collected on this page.</p>
+</section><section class="panel" id="phase6CourierSearch" aria-labelledby="phase6CourierSearchTitle">
+<h2 id="phase6CourierSearchTitle">Find a courier</h2>
+<p class="muted">Search supported local or international couriers. Only verified couriers with a real quotation can be booked. No private addresses are shared during search.</p>
+<label for="phase6CourierQuery">Courier company</label>
+<input id="phase6CourierQuery" type="search" placeholder="Search courier name" autocomplete="off">
+<div id="phase6CourierResults" role="status" aria-live="polite"></div>
+<p class="muted" id="phase6CourierSelection">No courier selected. Live quotations and bookings are not enabled.</p>
 </section><section class="panel"><h2>Order confirmation</h2><p>Preview checkout only: no payment or courier booking occurs on GitHub Pages. The live checkout will show each seller portion, its eligible courier options and delivery charge, applicable taxes where required, the complete Shop&Drop order total and available payment methods before confirmation. One buyer payment is preferred where supported.</p><button id="previewOrderButton" onclick="place()">Preview order</button><div id="orderStatus" role="status" aria-live="polite"></div></section></main><script src="./common.js"></script>
 <script src="./v26-consolidated.js"></script><script src="./geo.js"></script><script src="./shopdrop-payment-selection.js"></script>
 <script src="./supabase-adapter.js"></script>
@@ -24,4 +31,4 @@
 </section>
 
 <section id="v262ReservationNote"><!-- V26_2_RESERVATION_NOTE --><p>Stock may be temporarily reserved while payment is pending. Unpaid reservations expire and stock is released automatically according to the configured backend reservation window.</p></section>
-</body></html>
+<script src="./shopdrop-courier-search.js" defer></script></body></html>
