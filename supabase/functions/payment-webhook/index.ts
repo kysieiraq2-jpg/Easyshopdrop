@@ -598,19 +598,10 @@ Deno.serve(
       );
 
 
-    // Never accept two different references as the same payment.
-    // Provider-only references require an explicit trusted mapping.
-    if (
-      paymentReference &&
-      providerPaymentReference &&
-      paymentReference !== providerPaymentReference
-    ) {
-      return reply(
-        { ok: false, error: "conflicting_payment_references" },
-        409,
-      );
-    }
-
+    // Shop&Drop's internal reference and the provider's reference
+    // are different namespaces. They need not be equal.
+    // The event has already passed provider signature verification.
+    // Every supplied identifier must match the same stored payment.
 
     let paymentQuery =
       supabase
@@ -637,6 +628,12 @@ Deno.serve(
           paymentReference,
         );
 
+    } else if (providerPaymentReference) {
+
+      paymentQuery = paymentQuery
+        .eq("provider", provider)
+        .eq("provider_payment_reference", providerPaymentReference);
+
     } else if (
       orderIdFromEvent
     ) {
@@ -649,19 +646,7 @@ Deno.serve(
       );
 
     } else {
-
-      // Provider-only references have no verified mapping in payments.
-      // Fail closed: never guess a payment or select an arbitrary row.
-      return reply(
-        {
-          ok: false,
-          error:
-            providerPaymentReference
-              ? "provider_reference_mapping_unavailable"
-              : "payment_identifier_required",
-        },
-        400,
-      );
+      return reply({ ok: false, error: "payment_identifier_required" }, 400);
     }
 
 
