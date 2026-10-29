@@ -598,6 +598,20 @@ Deno.serve(
       );
 
 
+    // Never accept two different references as the same payment.
+    // Provider-only references require an explicit trusted mapping.
+    if (
+      paymentReference &&
+      providerPaymentReference &&
+      paymentReference !== providerPaymentReference
+    ) {
+      return reply(
+        { ok: false, error: "conflicting_payment_references" },
+        409,
+      );
+    }
+
+
     let paymentQuery =
       supabase
         .from("payments")
@@ -613,7 +627,9 @@ Deno.serve(
           paymentId,
         );
 
-    } else if (paymentReference) {
+    } else if (
+      paymentReference
+    ) {
 
       paymentQuery =
         paymentQuery.eq(
@@ -640,11 +656,15 @@ Deno.serve(
 
     } else {
 
+      // Provider-only references have no verified mapping in payments.
+      // Fail closed: never guess a payment or select an arbitrary row.
       return reply(
         {
           ok: false,
           error:
-            "payment_identifier_required",
+            providerPaymentReference
+              ? "provider_reference_mapping_unavailable"
+              : "payment_identifier_required",
         },
         400,
       );
@@ -700,6 +720,19 @@ Deno.serve(
       clean(
         payment.order_id,
       );
+
+
+    // All supplied internal identifiers must agree with the matched row.
+    if (
+      (paymentId && paymentId !== clean(payment.id)) ||
+      (paymentReference && paymentReference !== clean(payment.payment_reference)) ||
+      (orderIdFromEvent && orderIdFromEvent !== clean(payment.order_id))
+    ) {
+      return reply(
+        { ok: false, error: "payment_identifier_mismatch" },
+        409,
+      );
+    }
 
 
     if (!orderId) {
