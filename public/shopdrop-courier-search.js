@@ -7,7 +7,23 @@
   const results=document.getElementById('phase6CourierResults');
   const selection=document.getElementById('phase6CourierSelection');
   if(!input||!results||!selection)return;
-  const catalog=[]; // Only backend-verified, serviceable couriers may populate this.
+  let catalog=[]; // Only active providers returned by the approved Supabase directory.
+  const API='https://dtkdvvxpwonywtsgqmdx.supabase.co/rest/v1/rpc/shopdrop_search_courier_directory';
+  const KEY='sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';
+  let searchSequence=0;
+  async function searchDirectory(q){
+    const seq=++searchSequence;
+    if(!q){catalog=[];render();return;}
+    results.textContent='Searching approved courier directory…';
+    try{
+      const response=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY},body:JSON.stringify({p_query:q})});
+      if(!response.ok)throw Error('Courier directory unavailable');
+      const data=await response.json();
+      if(seq!==searchSequence)return;
+      catalog=Array.isArray(data)?data.filter(x=>typeof x.provider_name==='string' && typeof x.provider_code==='string').map(x=>({name:x.provider_name,provider_code:x.provider_code,service_code:null})):[];
+      render();
+    }catch(e){if(seq!==searchSequence)return;catalog=[];results.textContent='Courier directory temporarily unavailable. Please try again.';}
+  }
   let chosen=null;
   window.ShopDropCourierSelection=Object.freeze({
     getSelected:()=>chosen ? {...chosen} : null,
@@ -21,20 +37,18 @@
     if(!q){results.textContent='Enter a courier name to search verified providers.';return;}
     const matches=catalog.filter(c=>c.name.toLocaleLowerCase().includes(q)).slice(0,10);
     if(!matches.length){
-      results.textContent='No verified courier is available for this search yet. Shop&Drop will add supported courier networks before launch.';
+      results.textContent='No active courier matches. Coverage, real quotes and bookings must be verified before selection.';
       return;
     }
     for(const c of matches){
       const b=document.createElement('button');
       b.type='button';
       b.textContent=c.name;
-      b.addEventListener('click',()=>{
-        chosen={provider_code:c.provider_code,service_code:c.service_code};
-        selection.textContent='Courier selected for quotation only. Booking remains disabled until a verified live quote is received.';
-      });
+      b.disabled=true; // Directory match alone is not a serviceable live quote.
+      b.title='Available only after coverage and real quote verification';
       results.appendChild(b);
     }
   }
-  input.addEventListener('input',render);
+  input.addEventListener('input',()=>searchDirectory(input.value.trim()));
   render();
 })();
