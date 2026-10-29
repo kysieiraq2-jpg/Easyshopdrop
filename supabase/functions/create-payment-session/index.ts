@@ -722,209 +722,30 @@ Deno.serve(
      */
 
 
-    const requestedProvider =
-      cleanProvider(
-        input.provider,
-      );
-
-
-    let providerQuery =
-      admin
-        .from(
-          "payment_providers",
-        )
-        .select("*");
-
-
-    if (requestedProvider) {
-      providerQuery =
-        providerQuery.eq(
-          "provider_code",
-          requestedProvider,
-        );
+    // A69: provider selection is authoritative and service-role only.
+    // Require an explicit payment method; never guess card type or provider.
+    const methodCode = cleanProvider(input.method_code ?? input.payment_method);
+    if (!country || !methodCode) {
+      return reply({ ok: false, version: VERSION,
+        error: "payment_country_and_method_required" }, 400);
     }
 
-
-    const {
-      data: providerRows,
-      error: providerError,
-    } =
-      await providerQuery;
-
-
-    if (providerError) {
-      console.error(
-        VERSION,
-        providerError,
-      );
-
-      return reply(
-        {
-          ok: false,
-          version: VERSION,
-          error:
-            "payment_provider_registry_error",
-        },
-        500,
-      );
-    }
-
-
-    const providers =
-      (
-        providerRows ??
-        []
-      ).filter(
-        (
-          provider:
-            Record<
-              string,
-              unknown
-            >,
-        ) => {
-
-          const active =
-            provider.active ??
-            provider.enabled ??
-            provider.is_active ??
-            true;
-
-
-          if (
-            active === false
-          ) {
-            return false;
-          }
-
-
-          const currencies =
-            Array.isArray(
-              provider.currencies,
-            )
-              ? provider.currencies
-                  .map(
-                    (
-                      value:
-                        unknown,
-                    ) =>
-                      String(
-                        value,
-                      )
-                        .toUpperCase(),
-                  )
-              : null;
-
-
-          if (
-            currencies &&
-            currencies.length &&
-            !currencies.includes(
-              currency,
-            )
-          ) {
-            return false;
-          }
-
-
-          const countries =
-            Array.isArray(
-              provider.countries,
-            )
-              ? provider.countries
-                  .map(
-                    (
-                      value:
-                        unknown,
-                    ) =>
-                      String(
-                        value,
-                      )
-                        .toUpperCase(),
-                  )
-              : null;
-
-
-          if (
-            country &&
-            countries &&
-            countries.length &&
-            !countries.includes(
-              country,
-            )
-          ) {
-            return false;
-          }
-
-
-          return true;
-        },
-      );
-
-
-    if (!providers.length) {
-      return reply(
-        {
-          ok: false,
-          version: VERSION,
-          error:
-            "payment_provider_not_available",
-          country,
-          currency,
-        },
-        503,
-      );
-    }
-
-
-    providers.sort(
-      (
-        a:
-          Record<
-            string,
-            unknown
-          >,
-        b:
-          Record<
-            string,
-            unknown
-          >,
-      ) =>
-        Number(
-          a.priority ??
-          999,
-        )
-        -
-        Number(
-          b.priority ??
-          999,
-        ),
+    const { data: route, error: routeError } = await admin.rpc(
+      "shopdrop_select_payment_provider",
+      { p_country_code: country, p_currency: currency,
+        p_method_code: methodCode },
     );
-
-
-    const selected =
-      providers[0];
-
-
-    const providerCode =
-      cleanProvider(
-        selected.provider_code ??
-        selected.code ??
-        selected.provider_name,
-      );
-
-
-    if (!providerCode) {
-      return reply(
-        {
-          ok: false,
-          version: VERSION,
-          error:
-            "invalid_payment_provider_configuration",
-        },
-        500,
-      );
+    if (routeError || !route || route.ok !== true) {
+      return reply({ ok: false, version: VERSION,
+        error: routeError ? "payment_routing_error" :
+          (route?.error ?? "no_active_payment_provider") }, 503);
     }
-
+    const providerCode = cleanProvider(route.provider_code);
+    const requestedProvider = cleanProvider(input.provider);
+    if (!providerCode || (requestedProvider && requestedProvider !== providerCode)) {
+      return reply({ ok: false, version: VERSION,
+        error: "payment_provider_not_available" }, 409);
+    }
 
     const providerEnvName =
       providerCode
