@@ -223,8 +223,7 @@ Deno.serve(async (req) => {
     String(order.seller_id ?? "");
 
   if (
-    user.id !== buyerId &&
-    user.id !== sellerId
+    user.id !== buyerId
   ) {
     return reply(
       {
@@ -242,16 +241,14 @@ Deno.serve(async (req) => {
   const originCountry =
     isoCountry(
       order.origin_country_code ??
-      order.seller_country_code ??
-      input.origin_country_code,
+      order.seller_country_code,
     );
 
   const destinationCountry =
     isoCountry(
       order.destination_country_code ??
       order.delivery_country_code ??
-      order.buyer_country_code ??
-      input.destination_country_code,
+      order.buyer_country_code,
     );
 
   if (!originCountry || !destinationCountry) {
@@ -267,8 +264,7 @@ Deno.serve(async (req) => {
   const quoteCurrency =
     isoCurrency(
       order.shipping_currency ??
-      order.currency ??
-      input.currency,
+      order.currency,
     );
 
   if (!quoteCurrency) {
@@ -288,8 +284,7 @@ Deno.serve(async (req) => {
   const weightKg =
     positiveNumber(
       order.shipping_weight_kg ??
-      order.weight_kg ??
-      input.weight_kg,
+      order.weight_kg,
     );
 
   if (!weightKg) {
@@ -304,20 +299,17 @@ Deno.serve(async (req) => {
 
   const lengthCm =
     positiveNumber(
-      order.shipping_length_cm ??
-      input.length_cm,
+      order.shipping_length_cm,
     );
 
   const widthCm =
     positiveNumber(
-      order.shipping_width_cm ??
-      input.width_cm,
+      order.shipping_width_cm,
     );
 
   const heightCm =
     positiveNumber(
-      order.shipping_height_cm ??
-      input.height_cm,
+      order.shipping_height_cm,
     );
 
   /*
@@ -363,12 +355,9 @@ Deno.serve(async (req) => {
           );
 
         const enabled =
-          row.enabled ??
-          row.active ??
-          row.is_active ??
-          true;
+          row.is_active === true;
 
-        if (!code || enabled === false) {
+        if (!code || !enabled) {
           return null;
         }
 
