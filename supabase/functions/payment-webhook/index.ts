@@ -701,11 +701,13 @@ Deno.serve(
       );
 
 
-    // All supplied internal identifiers must agree with the matched row.
+    // Every supplied identifier and the authenticated provider must match the same payment.
     if (
       (paymentId && paymentId !== clean(payment.id)) ||
       (paymentReference && paymentReference !== clean(payment.payment_reference)) ||
-      (orderIdFromEvent && orderIdFromEvent !== clean(payment.order_id))
+      (orderIdFromEvent && orderIdFromEvent !== clean(payment.order_id)) ||
+      (providerPaymentReference && providerPaymentReference !== clean(payment.provider_payment_reference)) ||
+      (provider !== clean(payment.provider))
     ) {
       return reply(
         { ok: false, error: "payment_identifier_mismatch" },
