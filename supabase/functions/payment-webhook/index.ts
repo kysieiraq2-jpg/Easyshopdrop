@@ -641,18 +641,12 @@ Deno.serve(
       orderIdFromEvent
     ) {
 
-      paymentQuery =
-        paymentQuery
-          .eq(
-            "order_id",
-            orderIdFromEvent,
-          )
-          .order(
-            "created_at",
-            {
-              ascending: false,
-            },
-          );
+      // An order can have multiple payment attempts.
+      // Never select the newest attempt from an order ID alone.
+      return reply(
+        { ok: false, error: "payment_attempt_identifier_required" },
+        409,
+      );
 
     } else {
 
