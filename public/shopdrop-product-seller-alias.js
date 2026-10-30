@@ -18,7 +18,7 @@
       const rows=await r.json();
       const alias=Array.isArray(rows)?rows[0]?.seller_alias:rows?.seller_alias;
       if(typeof alias!=='string'||!alias.trim())return;
-      const name=document.createElement('strong');name.textContent=alias;
+      const name=document.createElement('a');name.textContent=alias;name.href='./seller-products.html?alias='+encodeURIComponent(alias);name.setAttribute('aria-label','View all products from '+alias);
       const note=document.createElement('p');note.className='muted';
       note.textContent='Public seller name. Personal and business contact details remain private.';
       content.replaceChildren(name,note);
