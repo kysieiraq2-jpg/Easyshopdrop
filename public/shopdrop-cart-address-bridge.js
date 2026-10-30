@@ -27,18 +27,53 @@
       if(c.error) throw c.error;
       if(a.error) throw a.error;
       cart = c.data || [];
+      // A152: display approved product names and trusted catalogue prices.
+      // This is informational; the server must independently calculate checkout totals.
+      const productIds = [...new Set(cart.map(row => row.product_id))];
+      let productMap = new Map();
+      if (productIds.length) {
+        const {data: products, error: productError} = await db.from('products')
+          .select('id,title,price,currency,quantity,listing_status')
+          .in('id', productIds);
+        if (productError) throw productError;
+        productMap = new Map((products || []).map(product => [product.id, product]));
+      }
+      let subtotal = 0;
+      let subtotalCurrency = null;
+      let totalsAvailable = cart.length > 0;
       const list = $('items'); list.replaceChildren();
       if (!cart.length) list.textContent = 'Your shopping bag is empty.';
       for (const item of cart) {
         const div=document.createElement('div'); div.className='item';
-        div.append(document.createTextNode('Product '+item.product_id+' — quantity '+item.quantity+' '));
+        const product = productMap.get(item.product_id);
+        const available = product && product.listing_status === 'active' &&
+          Number(product.quantity) >= Number(item.quantity);
+        const currency = String(product?.currency || '');
+        const price = Number(product?.price);
+        const validPrice = Number.isFinite(price) && price >= 0 && /^[A-Z]{3}$/.test(currency);
+        if (!available || !validPrice) totalsAvailable = false;
+        if (validPrice) {
+          if (subtotalCurrency && subtotalCurrency !== currency) totalsAvailable = false;
+          subtotalCurrency ||= currency;
+          subtotal += price * Number(item.quantity);
+        }
+        let line = product?.title || 'Unavailable product';
+        line += ' — quantity ' + item.quantity;
+        if (validPrice) {
+          try { line += ' — ' + new Intl.NumberFormat(undefined, {style:'currency',currency}).format(price * item.quantity); }
+          catch (_) { totalsAvailable = false; }
+        }
+        if (!available) line += ' — unavailable or insufficient stock';
+        div.append(document.createTextNode(line + ' '));
         for(const [symbol,qty] of [['−',item.quantity-1],['+',item.quantity+1]]){
           const btn=document.createElement('button');btn.type='button';btn.textContent=symbol;
           btn.addEventListener('click',()=>change(item,qty));div.append(btn);
         }
         list.append(div);
       }
-      $('total').textContent='Product prices and totals: awaiting trusted server quotation.';
+      $('total').textContent = totalsAvailable
+        ? 'Indicative product subtotal: ' + new Intl.NumberFormat(undefined,{style:'currency',currency:subtotalCurrency}).format(subtotal)
+        : 'Product subtotal unavailable; check item availability and currency.';
       $('quote').textContent='Delivery fee and final payable total: not yet quoted.';
       const select=$('addresses');select.replaceChildren(new Option('Choose delivery address',''));
       for(const addr of a.data||[]){
