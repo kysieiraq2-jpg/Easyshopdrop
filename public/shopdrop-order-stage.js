@@ -29,5 +29,15 @@
     return window.ShopDropCheckoutConnector.createOrder(cartItems(cart));
   }
   // Not connected to a click handler. Activation is deliberately blocked until backend gates are implemented.
-  window.ShopDropOrderStage = Object.freeze({prepareOrder});
+
+  // A160: Quote an already-created checkout order. This does NOT create an
+  // order, reserve stock, select a courier, or authorize payment/booking.
+  async function quoteForOrder(orderId) {
+    if (!/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(String(orderId || '')))
+      throw Error('A valid existing order ID is required for courier quotations.');
+    if (typeof window.ShopDropCourierQuoteBridge?.requestQuotes !== 'function')
+      throw Error('Courier quotation bridge unavailable.');
+    return window.ShopDropCourierQuoteBridge.requestQuotes(orderId);
+  }
+  window.ShopDropOrderStage = Object.freeze({prepareOrder,quoteForOrder});
 })();
