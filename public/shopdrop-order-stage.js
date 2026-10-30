@@ -17,16 +17,17 @@
       return {product_id, quantity};
     });
   }
-  async function prepareOrder({cart, addressId, methodCode, quoteVerified, inventoryGateVerified} = {}) {
-    // The backend must reserve all items atomically BEFORE payment. A77 does not claim that gate is wired.
-    if (quoteVerified !== true || inventoryGateVerified !== true) {
-      throw Error('Checkout order creation is disabled until trusted courier quotation and pre-payment inventory reservation are verified.');
-    }
-    if (!/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(String(addressId || ''))) throw Error('Choose a delivery address.');
+  async function prepareOrder({cart, addressId, methodCode} = {}) {
+    // Validate the request shape for future integration, but NEVER accept
+    // browser-provided flags as proof of stock reservation or courier pricing.
+    cartItems(cart);
+    if (!/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(String(addressId || '')))
+      throw Error('Choose a delivery address.');
     const methods = ['visa_debit','visa_credit','mastercard_debit','mastercard_credit','paypal_wallet'];
     if (!methods.includes(methodCode)) throw Error('Choose a supported payment method.');
-    if (typeof window.ShopDropCheckoutConnector?.createOrder !== 'function') throw Error('Checkout connector unavailable.');
-    return window.ShopDropCheckoutConnector.createOrder(cartItems(cart));
+    // Only a trusted backend orchestration step may authorize order creation,
+    // inventory reservation, confirmed courier pricing, and payment initiation.
+    throw Error('Checkout remains disabled until backend inventory and courier gates are connected.');
   }
   // Not connected to a click handler. Activation is deliberately blocked until backend gates are implemented.
 
