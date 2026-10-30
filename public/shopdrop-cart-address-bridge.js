@@ -125,7 +125,7 @@
         }
         const createSession=window.ShopDropSupabaseAdapter?.authenticatedFunctions?.createPaymentSession;
         if (typeof createSession!=='function') throw Error('Secure payment connector unavailable.');
-        const payment=await createSession({order_id:pendingOrderId,delivery_method:'integrated_courier'});
+        const payment=await createSession({order_id:pendingOrderId,delivery_method:'integrated_courier',method_code:method.method_code,country_code:method.country_code});
         if (payment?.ok===false || payment?.error) throw Error(payment.error||'Payment session was not created.');
         const checkoutUrl=payment?.checkout_url||payment?.redirect_url||payment?.url;
         if (checkoutUrl) {
