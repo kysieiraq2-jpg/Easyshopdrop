@@ -40,5 +40,18 @@
       throw Error('Courier quotation bridge unavailable.');
     return window.ShopDropCourierQuoteBridge.requestQuotes(orderId);
   }
-  window.ShopDropOrderStage = Object.freeze({prepareOrder,quoteForOrder});
+  // A162: trusted transport orchestration for an EXISTING order only.
+  // The server must have bound the buyer's delivery address and confirmed
+  // inventory eligibility before any payment session can be created.
+  // This helper never accepts browser-supplied quote/stock verification flags.
+  async function quoteExistingOrder({orderId} = {}) {
+    const result = await quoteForOrder(orderId);
+    return Object.freeze({
+      orderId,
+      quotes: result.quotes,
+      paymentEnabled: false,
+      bookingEnabled: false
+    });
+  }
+  window.ShopDropOrderStage = Object.freeze({prepareOrder,quoteForOrder,quoteExistingOrder});
 })();
