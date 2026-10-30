@@ -105,6 +105,7 @@
     }catch(e){say('Address save failed: '+e.message);}
   }
   let creatingOrder = false;
+  let pendingOrderId = null;
   async function place(){
     if (creatingOrder) return;
     const button=$('previewOrderButton');
@@ -115,17 +116,43 @@
       if (!cart.length) throw Error('Add a product to your shopping bag first.');
       if (!$('addresses').value) throw Error('Select a delivery address first.');
       if (!window.ShopDropCheckoutConnector?.createOrder) throw Error('Secure order connector is unavailable.');
+      if (pendingOrderId) {
+        const method=window.ShopDropPaymentSelection?.read();
+        if (!method) throw Error('Choose a payment method first.');
+        const courier=window.ShopDropCourierSelection;
+        if (!courier?.isBookingEnabled?.() || !courier?.getSelected?.()) {
+          throw Error('A verified courier quote is required before payment. Courier integration is the next activation step.');
+        }
+        const createSession=window.ShopDropSupabaseAdapter?.authenticatedFunctions?.createPaymentSession;
+        if (typeof createSession!=='function') throw Error('Secure payment connector unavailable.');
+        const payment=await createSession({order_id:pendingOrderId,delivery_method:'integrated_courier'});
+        if (payment?.ok===false || payment?.error) throw Error(payment.error||'Payment session was not created.');
+        const checkoutUrl=payment?.checkout_url||payment?.redirect_url||payment?.url;
+        if (checkoutUrl) {
+          const parsed=new URL(checkoutUrl);
+          if (parsed.protocol!=='https:') throw Error('Payment provider returned an invalid checkout URL.');
+          say('Payment session created. Opening secure payment provider.');
+          window.location.assign(parsed.href);
+        } else {
+          say('Payment session response received. Awaiting supported provider checkout URL; no payment taken on this page.');
+        }
+        return;
+      }
       const items=cart.map(x=>({product_id:x.product_id,quantity:Number(x.quantity)}));
       const result=await window.ShopDropCheckoutConnector.createOrder(items);
       const order=result?.order || result?.data?.order || result;
       const reference=order?.id || result?.order_id || result?.id;
-      say(reference ? 'Secure order created: '+reference+'. No payment taken. Courier quotation and payment activation are the next integration steps.' : 'Secure order request accepted. No payment taken. Check your order status before trying again.');
+      if (reference && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(String(reference))) {
+        pendingOrderId=String(reference);
+        if(button) button.textContent='Continue to secure payment';
+      }
+      say(reference ? 'Secure order created: '+reference+'. Select a verified courier quote, then continue to payment.' : 'Secure order request accepted. No payment taken. Check your order status before trying again.');
       // Keep the stable request ID until checkout/payment is safely completed.
     } catch(e) {say('Order creation failed: '+(e?.message||'Please try again.'));}
     finally {creatingOrder=false;if(button)button.disabled=false;}
   }
   const button=$('previewOrderButton');
-  if(button) button.textContent='Create secure order (no payment yet)';
+  if(button) button.textContent='Create secure order';
   window.saveAddress=saveAddress;
   window.place=place;
   window.ShopDropPhase6CartAddress=Object.freeze({load});
