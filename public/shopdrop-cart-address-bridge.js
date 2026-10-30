@@ -80,7 +80,7 @@
         select.add(new Option([addr.address_label,addr.address_line_1,addr.city,addr.country_code].filter(Boolean).join(' — '),addr.id));
         if(addr.is_default) select.value=addr.id;
       }
-      say('Cart and addresses loaded securely. Checkout/payment is not enabled.');
+      say('Cart and addresses loaded securely. Secure order creation available; payment is not yet enabled.');
     } catch(e) {say('Cannot load cart/addresses: '+e.message);}
   }
   async function change(item,quantity){
@@ -104,10 +104,28 @@
       await load();say('Delivery address saved. Payment remains disabled.');
     }catch(e){say('Address save failed: '+e.message);}
   }
-  function place(){
-    const method=window.ShopDropPaymentSelection?.read();
-    say(!method?'Choose a payment method. Payment remains disabled.':'Payment remains disabled until verified courier quotes, trusted totals and inventory reservation are connected. No order was placed.');
+  let creatingOrder = false;
+  async function place(){
+    if (creatingOrder) return;
+    const button=$('previewOrderButton');
+    creatingOrder=true;
+    if(button) button.disabled=true;
+    try {
+      await current();
+      if (!cart.length) throw Error('Add a product to your shopping bag first.');
+      if (!$('addresses').value) throw Error('Select a delivery address first.');
+      if (!window.ShopDropCheckoutConnector?.createOrder) throw Error('Secure order connector is unavailable.');
+      const items=cart.map(x=>({product_id:x.product_id,quantity:Number(x.quantity)}));
+      const result=await window.ShopDropCheckoutConnector.createOrder(items);
+      const order=result?.order || result?.data?.order || result;
+      const reference=order?.id || result?.order_id || result?.id;
+      say(reference ? 'Secure order created: '+reference+'. No payment taken. Courier quotation and payment activation are the next integration steps.' : 'Secure order request accepted. No payment taken. Check your order status before trying again.');
+      // Keep the stable request ID until checkout/payment is safely completed.
+    } catch(e) {say('Order creation failed: '+(e?.message||'Please try again.'));}
+    finally {creatingOrder=false;if(button)button.disabled=false;}
   }
+  const button=$('previewOrderButton');
+  if(button) button.textContent='Create secure order (no payment yet)';
   window.saveAddress=saveAddress;
   window.place=place;
   window.ShopDropPhase6CartAddress=Object.freeze({load});
