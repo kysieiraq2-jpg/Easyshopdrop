@@ -155,7 +155,7 @@
   if(button) button.textContent='Create secure order';
   window.saveAddress=saveAddress;
   window.place=place;
-  window.ShopDropPhase6CartAddress=Object.freeze({load});
+  window.ShopDropPhase6CartAddress=Object.freeze({load,getPendingOrderId:()=>pendingOrderId});
   if(window.ShopDropGeo?.countryOptions) $('country').innerHTML=window.ShopDropGeo.countryOptions('ZA');
   load();
 })();
