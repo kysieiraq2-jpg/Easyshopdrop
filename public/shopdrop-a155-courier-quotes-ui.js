@@ -10,13 +10,14 @@
   const quoteList=document.createElement('div');quoteList.setAttribute('role','status');
   section.append(button,quoteList);
   let chosen=null;
+  let quotedOrderId=null;
   // Quotes must be persisted and priced by trusted backend before enabling payment.
   window.ShopDropCourierSelection=Object.freeze({
-    getSelected:()=>chosen?{...chosen}:null,
+    getSelected:()=>chosen && quotedOrderId===window.ShopDropPhase6CartAddress?.getPendingOrderId?.()?{...chosen}:null,
     isBookingEnabled:()=>false
   });
   button.addEventListener('click',async()=>{
-    button.disabled=true;chosen=null;quoteList.replaceChildren();
+    button.disabled=true;chosen=null;quotedOrderId=null;quoteList.replaceChildren();
     try{
       const orderId=window.ShopDropPhase6CartAddress?.getPendingOrderId?.();
       if(!orderId)throw Error('Create your secure order first.');
@@ -25,6 +26,8 @@
       status.textContent='Requesting verified courier quotations…';
       const response=await bridge.requestQuotes(orderId);
       const quotes=response.quotes||[];
+      if(window.ShopDropPhase6CartAddress?.getPendingOrderId?.()!==orderId)throw Error('Order changed. Request new courier quotes.');
+      quotedOrderId=orderId;
       if(!quotes.length)throw Error('No courier quotes are available for this route.');
       status.textContent='Choose a quoted courier. Payment remains protected until server-side quote confirmation is connected.';
       quotes.forEach(q=>{
@@ -34,6 +37,8 @@
         const name=String(q.service_name||q.provider||'Courier');
         row.textContent=name+' — '+new Intl.NumberFormat(undefined,{style:'currency',currency}).format(amount);
         row.addEventListener('click',()=>{
+          if(window.ShopDropPhase6CartAddress?.getPendingOrderId?.()!==orderId){status.textContent='Order changed. Request new quotes.';chosen=null;return;}
+          if(!q.quote_reference || !q.provider){status.textContent='This quote lacks a provider reference. Select another quote.';return;}
           chosen={provider:q.provider,quote_reference:q.quote_reference,service_code:q.service_code,amount,currency,order_id:orderId};
           status.textContent='Selected: '+row.textContent+'. Awaiting trusted checkout price confirmation.';
         });
