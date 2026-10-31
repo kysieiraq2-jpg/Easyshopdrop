@@ -18,6 +18,42 @@
     if(!value(id)||!Number.isFinite(n)||n<=0)throw Error('Enter a valid '+label+'.');
     return n;
   }
+  // Optional private collection address; no address details are published on the listing.
+  async function preparePickupAddresses(sb,userId){
+    if(el('shopdropPickupAddress'))return;
+    const anchor=el('shippingWeightKg');
+    if(!anchor)return;
+    const wrapper=document.createElement('div');
+    wrapper.id='shopdropPickupAddressWrapper';
+    const label=document.createElement('label');
+    label.htmlFor='shopdropPickupAddress';
+    label.textContent='Courier collection address (optional)';
+    const select=document.createElement('select');
+    select.id='shopdropPickupAddress';
+    const fallback=new Option('Use my default registered address','');
+    select.add(fallback);
+    const {data,error}=await sb.from('addresses')
+      .select('id,address_label,city,country_code,is_default')
+      .eq('user_id',userId).order('is_default',{ascending:false});
+    if(error)throw Error('Cannot load your private collection addresses: '+error.message);
+    for(const a of data||[]){
+      select.add(new Option([a.address_label||'Saved address',a.city,a.country_code]
+        .filter(Boolean).join(' — '),a.id));
+    }
+    const hint=document.createElement('small');
+    hint.textContent='To collect from another location, save that address privately in My Account first.';
+    wrapper.append(label,select,hint);
+    anchor.closest('label')?.after(wrapper) || anchor.parentElement?.after(wrapper);
+  }
+  async function initPickupAddress(){
+    try{
+      const sb=await client();
+      const {data:{user}}=await sb.auth.getUser();
+      if(user)await preparePickupAddresses(sb,user.id);
+    }catch(e){console.warn('ShopDrop pickup address selector:',e);}
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initPickupAddress,{once:true});
+  else initPickupAddress();
   async function submitProduct(){
     const status=el('productStatus');
     status.hidden=false;
@@ -49,6 +85,13 @@
         shipping_width_cm:positive('shippingWidthCm','packed width'),
         shipping_height_cm:positive('shippingHeightCm','packed height')
       };
+      const pickupAddressId=value('shopdropPickupAddress');
+      if(pickupAddressId){
+        const {data:owned,error:addressError}=await sb.from('addresses')
+          .select('id').eq('id',pickupAddressId).eq('user_id',user.id).maybeSingle();
+        if(addressError||!owned)throw Error('Select a collection address belonging to your account.');
+        payload.pickup_address_id=pickupAddressId;
+      }
       const {data,error}=await sb.from('products').insert(payload).select('id,listing_reference,listing_status').single();
       if(error)throw Error('Listing could not be saved: '+error.message);
       status.textContent='Product submitted for approval. Reference: '+(data.listing_reference||data.id)+'. Seller asking price preserved.';
