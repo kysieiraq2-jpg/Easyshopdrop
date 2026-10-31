@@ -21,7 +21,25 @@
   const client=()=>clientPromise ||= import('https://esm.sh/@supabase/supabase-js@2')
     .then(m=>m.createClient(endpoint,key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}));
   let currentOrder='', expiryMs=0, lastSync=0;
-  function orderId(){return window.ShopDropPhase6CartAddress?.getPendingOrderId?.() || '';}
+  const storageKey='shopdrop_checkout_countdown_order_v1';
+  const validId=value=>/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(String(value||''));
+  function orderId(){
+    const active=window.ShopDropPhase6CartAddress?.getPendingOrderId?.();
+    if(validId(active))return active;
+    // Used only to DISPLAY server-verified expiry after refresh.
+    // Never restore payment/order-creation authority from browser storage.
+    try {const saved=sessionStorage.getItem(storageKey);return validId(saved)?saved:'';}
+    catch(_){return '';}
+  }
+  function remember(id){
+    if(!validId(id))return;
+    try{sessionStorage.setItem(storageKey,id);}catch(_){}
+    currentOrder='';expiryMs=0;lastSync=0;sync();
+  }
+  function clear(){
+    try{sessionStorage.removeItem(storageKey);}catch(_){}
+    currentOrder='';expiryMs=0;lastSync=0;update();
+  }
   function update() {
     const id=orderId();
     if(id!==currentOrder){currentOrder=id;expiryMs=0;lastSync=0;}
@@ -56,7 +74,7 @@
   }
   window.ShopDropReservationCountdown=Object.freeze({
     mayStartPayment:()=>Boolean(expiryMs && Date.now()<expiryMs && currentOrder===orderId()),
-    refresh:sync
+    refresh:sync, remember, clear
   });
   setInterval(()=>{
     update();

@@ -90,6 +90,7 @@
         ?await db.from('cart_items').delete().eq('id',item.id).eq('user_id',uid)
         :await db.from('cart_items').update({quantity}).eq('id',item.id).eq('user_id',uid);
       if(result.error)throw result.error;
+      window.ShopDropReservationCountdown?.clear?.();
       await load();
     }catch(e){say('Cart update failed: '+e.message);}
   }
@@ -101,6 +102,7 @@
       const data={user_id:uid,address_label:$('label').value.trim()||'Delivery',recipient_name:$('recipient').value.trim(),address_line_1:$('line1').value.trim(),city:$('city').value.trim(),state_province:$('region').value.trim()||null,postal_code:$('postal').value.trim()||null,country_code:$('country').value.trim().toUpperCase(),is_default:false};
       const {error}=await db.from('addresses').insert(data);
       if(error)throw error;
+      window.ShopDropReservationCountdown?.clear?.();
       await load();say('Delivery address saved. Payment remains disabled.');
     }catch(e){say('Address save failed: '+e.message);}
   }
@@ -150,6 +152,7 @@
       const reference=order?.id || result?.order_id || result?.id;
       if (reference && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(String(reference))) {
         pendingOrderId=String(reference);
+        window.ShopDropReservationCountdown?.remember?.(pendingOrderId);
         if(button) button.textContent='Continue to secure payment';
       }
       say(reference ? 'Secure order created: '+reference+'. Select a verified courier quote, then continue to payment.' : 'Secure order request accepted. No payment taken. Check your order status before trying again.');
