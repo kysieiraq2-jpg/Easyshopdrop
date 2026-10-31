@@ -1,0 +1,53 @@
+name: Phase 6 Checkout Visual Preview
+on:
+  workflow_dispatch:
+  push:
+    branches: [shopdrop-phase6-integration]
+    paths:
+      - 'public/checkout.html'
+      - 'public/shopdrop-checkout-countdown.js'
+      - 'public/shopdrop-cart-address-bridge.js'
+      - '.github/workflows/phase6-checkout-preview.yml'
+permissions:
+  contents: read
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm integration branch and checkout files
+        run: |
+          test "$GITHUB_REF_NAME" = "shopdrop-phase6-integration"
+          test -f public/checkout.html
+          test -f public/shopdrop-checkout-countdown.js
+          test -f public/shopdrop-cart-address-bridge.js
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install browser
+        run: |
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Render local checkout screenshots
+        run: |
+          python3 -m http.server 8765 --directory public >/tmp/phase6-preview.log 2>&1 &
+          mkdir -p preview
+          node <<'JS'
+          const {chromium} = require('playwright');
+          (async () => {
+            const browser = await chromium.launch({headless:true});
+            const page = await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:1});
+            await page.goto('http://127.0.0.1:8765/checkout.html',{waitUntil:'domcontentloaded'});
+            await page.waitForTimeout(2500);
+            await page.screenshot({path:'preview/checkout-mobile.png',fullPage:true});
+            await page.setViewportSize({width:1280,height:900});
+            await page.screenshot({path:'preview/checkout-desktop.png',fullPage:true});
+            await browser.close();
+          })().catch(e=>{console.error(e);process.exit(1)});
+          JS
+      - name: Upload preview screenshots (not published)
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase6-checkout-preview-screenshots
+          path: preview/
+          retention-days: 7
