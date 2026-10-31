@@ -123,10 +123,10 @@
         if (!courier?.isBookingEnabled?.() || !courier?.getSelected?.()) {
           throw Error('A verified courier quote is required before payment. Courier integration is the next activation step.');
         }
+        // The backend creates the inventory reservation during payment-session
+        // creation. Do not require a reservation before invoking that backend.
+        // The server must enforce reservation expiry and payment eligibility.
         await window.ShopDropReservationCountdown?.refresh?.();
-        if (!window.ShopDropReservationCountdown?.mayStartPayment?.()) {
-          throw Error('No active server-confirmed inventory reservation. Payment cannot start.');
-        }
         const createSession=window.ShopDropSupabaseAdapter?.authenticatedFunctions?.createPaymentSession;
         if (typeof createSession!=='function') throw Error('Secure payment connector unavailable.');
         const payment=await createSession({order_id:pendingOrderId,delivery_method:'integrated_courier',method_code:method.method_code,country_code:method.country_code});
