@@ -1,0 +1,46 @@
+name: ShopDrop - Approved Courier Worker Deploy
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/deploy-requests/courier-booking-worker.txt'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shopdrop-approved-courier-booking-worker
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out approved integration revision
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify explicit deployment authorization and source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f .github/deploy-requests/courier-booking-worker.txt
+          test "$(cat .github/deploy-requests/courier-booking-worker.txt)" = 'DEPLOY courier-booking-worker'
+          test -s supabase/functions/courier-booking-worker/index.ts
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Deploy courier-booking-worker only
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$PROJECT_REF"
+          supabase functions deploy courier-booking-worker --project-ref "$PROJECT_REF"
