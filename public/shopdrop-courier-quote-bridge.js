@@ -10,7 +10,9 @@
       .then(m=>m.createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}))
       .catch(e=>{clientPromise=null;throw e;});
   }
-  async function requestQuotes(orderId){
+  async function requestQuotes(orderId, fulfilmentGroupId){
+    if(fulfilmentGroupId != null && !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(String(fulfilmentGroupId)))
+      throw Error('Invalid fulfilment group reference.');
     if(!/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(String(orderId||'')))
       throw Error('Invalid order reference.');
     const sb=await client();
@@ -19,12 +21,25 @@
     const response=await fetch(URL+'/functions/v1/courier-quotes',{
       method:'POST',
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token,'apikey':KEY},
-      body:JSON.stringify({order_id:orderId})
+      body:JSON.stringify({order_id:orderId,...(fulfilmentGroupId?{fulfilment_group_id:fulfilmentGroupId}:{})})
     });
     const result=await response.json().catch(()=>({}));
     if(!response.ok||result.ok!==true)throw Error(result.error||'Courier quotations unavailable.');
     if(result.order_id!==orderId||!Array.isArray(result.quotes))throw Error('Invalid courier quotation response.');
+    if(fulfilmentGroupId && result.fulfilment_group_id !== fulfilmentGroupId)
+      throw Error('Courier service has not confirmed the requested seller group.');
     return result; // Informational only. Never trust browser quotes for charging.
   }
-  window.ShopDropCourierQuoteBridge=Object.freeze({requestQuotes});
+  async function listFulfilmentGroups(orderId){
+    if(!/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(String(orderId||'')))
+      throw Error('Invalid order reference.');
+    const sb=await client();
+    const {data:{user},error:authError}=await sb.auth.getUser();
+    if(authError||!user)throw Error('Please sign in to view shipment groups.');
+    const {data,error}=await sb.from('fulfilment_groups')
+      .select('id,seller_id,order_id').eq('order_id',orderId).order('id');
+    if(error)throw Error('Shipment groups are not accessible yet: '+error.message);
+    return data||[];
+  }
+  window.ShopDropCourierQuoteBridge=Object.freeze({requestQuotes,listFulfilmentGroups});
 })();
