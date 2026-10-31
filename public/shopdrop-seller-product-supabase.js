@@ -40,6 +40,12 @@
       select.add(new Option([a.address_label||'Saved address',a.city,a.country_code]
         .filter(Boolean).join(' — '),a.id));
     }
+    // Keep the default choice as an explicit saved address ID for item-level linkage.
+    const defaultAddress=(data||[]).find(a=>a.is_default);
+    if(defaultAddress){fallback.value=defaultAddress.id;}
+    else if((data||[]).length){fallback.textContent='Choose a saved collection address';}
+    else {fallback.textContent='Save a collection address in My Account first';}
+
     const hint=document.createElement('small');
     hint.textContent='To collect from another location, save that address privately in My Account first.';
     wrapper.append(label,select,hint);
@@ -86,6 +92,9 @@
         shipping_height_cm:positive('shippingHeightCm','packed height')
       };
       const pickupAddressId=value('shopdropPickupAddress');
+      if(el('shopdropPickupAddress') && !pickupAddressId){
+        throw Error('Save or select a private courier collection address in My Account before listing.');
+      }
       if(pickupAddressId){
         const {data:owned,error:addressError}=await sb.from('addresses')
           .select('id').eq('id',pickupAddressId).eq('user_id',user.id).maybeSingle();
