@@ -11,40 +11,60 @@
   section.append(button,quoteList);
   let chosen=null;
   let quotedOrderId=null;
+  let selections=Object.create(null);
+  let requiredGroups=[];
   // Quotes must be persisted and priced by trusted backend before enabling payment.
   window.ShopDropCourierSelection=Object.freeze({
-    getSelected:()=>chosen && quotedOrderId===window.ShopDropPhase6CartAddress?.getPendingOrderId?.()?{...chosen}:null,
+    getSelected:()=>chosen && requiredGroups.length===1 && quotedOrderId===window.ShopDropPhase6CartAddress?.getPendingOrderId?.()?{...chosen}:null,
+    getSelections:()=>quotedOrderId===window.ShopDropPhase6CartAddress?.getPendingOrderId?.() && requiredGroups.length && requiredGroups.every(id=>selections[id])?requiredGroups.map(id=>({...selections[id]})):[],
     isBookingEnabled:()=>false
   });
   button.addEventListener('click',async()=>{
-    button.disabled=true;chosen=null;quotedOrderId=null;quoteList.replaceChildren();
+    button.disabled=true;chosen=null;quotedOrderId=null;selections=Object.create(null);requiredGroups=[];quoteList.replaceChildren();
     try{
       const orderId=window.ShopDropPhase6CartAddress?.getPendingOrderId?.();
       if(!orderId)throw Error('Create your secure order first.');
       const bridge=window.ShopDropCourierQuoteBridge;
       if(typeof bridge?.requestQuotes!=='function')throw Error('Courier quote connector unavailable.');
-      status.textContent='Requesting verified courier quotations…';
-      const response=await bridge.requestQuotes(orderId);
-      const quotes=response.quotes||[];
+      if(typeof bridge.listFulfilmentGroups!=='function')throw Error('Seller shipment groups are unavailable.');
+      status.textContent='Loading seller shipment groups…';
+      const groups=await bridge.listFulfilmentGroups(orderId);
+      if(!Array.isArray(groups)||!groups.length)throw Error('No seller shipment groups are available for this order.');
+      const ids=groups.map(g=>g.id);
+      if(ids.some(id=>typeof id!=='string')||new Set(ids).size!==ids.length)throw Error('Invalid seller shipment groups.');
+      requiredGroups=ids;
+      for(const [i,group] of groups.entries()){
+        if(window.ShopDropPhase6CartAddress?.getPendingOrderId?.()!==orderId)throw Error('Order changed. Request new courier quotes.');
+        const heading=document.createElement('div');
+        heading.textContent='Seller shipment '+(i+1)+' of '+groups.length;
+        quoteList.append(heading);
+        const response=await bridge.requestQuotes(orderId,group.id);
+        if(response.fulfilment_group_id!==group.id)throw Error('Courier quotation seller group mismatch.');
+        const quotes=response.quotes||[];
+        if(!Array.isArray(quotes)||!quotes.length){
+          const message=document.createElement('div');message.textContent='No courier quotes available for this seller shipment.';quoteList.append(message);continue;
+        }
+        quotes.forEach(q=>{
+          const amount=Number(q.amount), currency=String(q.currency||'');
+          if(!Number.isFinite(amount)||amount<=0||!/^[A-Z]{3}$/.test(currency))return;
+          const row=document.createElement('button');row.type='button';
+          const name=String(q.service_name||q.provider||'Courier');
+          row.textContent=name+' — '+new Intl.NumberFormat(undefined,{style:'currency',currency}).format(amount);
+          row.addEventListener('click',()=>{
+            if(window.ShopDropPhase6CartAddress?.getPendingOrderId?.()!==orderId){status.textContent='Order changed. Request new quotes.';chosen=null;selections=Object.create(null);return;}
+            if(!q.quote_reference||!q.provider){status.textContent='This quote lacks a provider reference. Select another quote.';return;}
+            const selection={provider:q.provider,quote_reference:q.quote_reference,service_code:q.service_code,amount,currency,order_id:orderId,fulfilment_group_id:group.id};
+            selections[group.id]=selection;
+            chosen=requiredGroups.length===1?selection:null;
+            status.textContent=requiredGroups.every(id=>selections[id])?'Courier selected for every seller shipment. Awaiting trusted checkout price confirmation.':'Courier selected for seller shipment '+(i+1)+'. Choose couriers for remaining shipments.';
+          });
+          quoteList.append(row,document.createTextNode(' '));
+        });
+      }
       if(window.ShopDropPhase6CartAddress?.getPendingOrderId?.()!==orderId)throw Error('Order changed. Request new courier quotes.');
       quotedOrderId=orderId;
-      if(!quotes.length)throw Error('No courier quotes are available for this route.');
-      status.textContent='Choose a quoted courier. Payment remains protected until server-side quote confirmation is connected.';
-      quotes.forEach(q=>{
-        const amount=Number(q.amount), currency=String(q.currency||'');
-        if(!Number.isFinite(amount)||amount<=0||!/^[A-Z]{3}$/.test(currency))return;
-        const row=document.createElement('button');row.type='button';
-        const name=String(q.service_name||q.provider||'Courier');
-        row.textContent=name+' — '+new Intl.NumberFormat(undefined,{style:'currency',currency}).format(amount);
-        row.addEventListener('click',()=>{
-          if(window.ShopDropPhase6CartAddress?.getPendingOrderId?.()!==orderId){status.textContent='Order changed. Request new quotes.';chosen=null;return;}
-          if(!q.quote_reference || !q.provider){status.textContent='This quote lacks a provider reference. Select another quote.';return;}
-          chosen={provider:q.provider,quote_reference:q.quote_reference,service_code:q.service_code,amount,currency,order_id:orderId};
-          status.textContent='Selected: '+row.textContent+'. Awaiting trusted checkout price confirmation.';
-        });
-        quoteList.append(row,document.createTextNode(' '));
-      });
-    }catch(e){status.textContent=e?.message||'Courier quotation unavailable.';}
+      status.textContent='Choose a courier for each seller shipment. Payment remains protected until server-side quote confirmation is connected.';
+    }catch(e){chosen=null;quotedOrderId=null;selections=Object.create(null);requiredGroups=[];quoteList.replaceChildren();status.textContent=e?.message||'Courier quotation unavailable.';}
     finally{button.disabled=false;}
   });
 })();
