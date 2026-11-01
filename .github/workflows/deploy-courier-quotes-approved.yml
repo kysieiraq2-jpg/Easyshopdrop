@@ -1,0 +1,64 @@
+name: ShopDrop - Approved Courier Quotes Deploy
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/deploy-requests/courier-quotes.txt'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shopdrop-approved-courier-quotes
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out approved integration revision
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Verify fresh deployment authorization and source
+        shell: bash
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          request='.github/deploy-requests/courier-quotes.txt'
+          test -f "$request"
+          test "$(cat "$request")" = 'DEPLOY courier-quotes'
+          test -s supabase/functions/courier-quotes/index.ts
+          # Require the authorization file to have changed in this push.
+          # An unchanged, previously approved request cannot trigger a redeploy.
+          if ! git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null; then
+            echo 'Cannot verify previous revision; refusing deployment.' >&2
+            exit 1
+          fi
+          git diff --name-only "$BEFORE_SHA" "$CURRENT_SHA" -- "$request" | grep -Fx "$request"
+          # Previous revision must not already have the same approval.
+          previous="$(git show "${BEFORE_SHA}:${request}" 2>/dev/null || true)"
+          if [ "$previous" = 'DEPLOY courier-quotes' ]; then
+            echo 'Existing approval cannot be reused. Refusing deployment.' >&2
+            exit 1
+          fi
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Deploy courier-quotes only
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$PROJECT_REF"
+          supabase functions deploy courier-quotes --project-ref "$PROJECT_REF"
