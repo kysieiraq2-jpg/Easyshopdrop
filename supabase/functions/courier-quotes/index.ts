@@ -1,6 +1,7 @@
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const VERSION = "SHOPDROP-R7-COURIER-V2";
+const VERSION = "SHOPDROP-R7-COURIER-V3-ADDRESS";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY =
@@ -208,6 +209,7 @@ Deno.serve(async (req) => {
 
   if (!order) {
     return reply(
+
       {
         ok: false,
         error: "order_not_found",
@@ -223,7 +225,8 @@ Deno.serve(async (req) => {
     String(order.seller_id ?? "");
 
   if (
-    user.id !== buyerId
+    user.id !== buyerId &&
+    user.id !== sellerId
   ) {
     return reply(
       {
@@ -234,21 +237,37 @@ Deno.serve(async (req) => {
     );
   }
 
+  /* Resolve trusted private addresses and product parcel data. */
+  if (!order.pickup_address_id || !order.delivery_address_id) {
+    return reply({ ok: false, error: "order_addresses_required" }, 409);
+  }
+  const [pickupResult, deliveryResult, productResult] = await Promise.all([
+    admin.from("addresses").select("*").eq("id", order.pickup_address_id).eq("user_id", sellerId).maybeSingle(),
+    admin.from("addresses").select("*").eq("id", order.delivery_address_id).eq("user_id", buyerId).maybeSingle(),
+    admin.from("products").select("*").eq("id", order.product_id).eq("seller_id", sellerId).maybeSingle(),
+  ]);
+  if (pickupResult.error || deliveryResult.error || productResult.error) {
+    return reply({ ok: false, error: "shipping_details_lookup_failed" }, 500);
+  }
+  const pickup = pickupResult.data;
+  const delivery = deliveryResult.data;
+  const product = productResult.data;
+  if (!pickup || !delivery || !product) {
+    return reply({ ok: false, error: "shipping_details_incomplete" }, 409);
+  }
+
   /*
    * INTERNATIONAL ROUTE
    */
 
   const originCountry =
     isoCountry(
-      order.origin_country_code ??
-      order.seller_country_code,
+      pickup.country_code,
     );
 
   const destinationCountry =
     isoCountry(
-      order.destination_country_code ??
-      order.delivery_country_code ??
-      order.buyer_country_code,
+      delivery.country_code,
     );
 
   if (!originCountry || !destinationCountry) {
@@ -264,7 +283,8 @@ Deno.serve(async (req) => {
   const quoteCurrency =
     isoCurrency(
       order.shipping_currency ??
-      order.currency,
+      order.currency ??
+      input.currency,
     );
 
   if (!quoteCurrency) {
@@ -283,8 +303,7 @@ Deno.serve(async (req) => {
 
   const weightKg =
     positiveNumber(
-      order.shipping_weight_kg ??
-      order.weight_kg,
+      product.shipping_weight_kg,
     );
 
   if (!weightKg) {
@@ -299,17 +318,17 @@ Deno.serve(async (req) => {
 
   const lengthCm =
     positiveNumber(
-      order.shipping_length_cm,
+      product.shipping_length_cm,
     );
 
   const widthCm =
     positiveNumber(
-      order.shipping_width_cm,
+      product.shipping_width_cm,
     );
 
   const heightCm =
     positiveNumber(
-      order.shipping_height_cm,
+      product.shipping_height_cm,
     );
 
   /*
@@ -355,9 +374,12 @@ Deno.serve(async (req) => {
           );
 
         const enabled =
-          row.is_active === true;
+          row.enabled ??
+          row.active ??
+          row.is_active ??
+          true;
 
-        if (!code || !enabled) {
+        if (!code || enabled === false) {
           return null;
         }
 
@@ -398,6 +420,7 @@ Deno.serve(async (req) => {
       async ({ code }) => {
         const envCode =
           code
+
             .toUpperCase()
             .replace(/[^A-Z0-9]/g, "_");
 
@@ -438,14 +461,10 @@ Deno.serve(async (req) => {
                     originCountry,
 
                   city:
-                    order.origin_city ??
-                    order.seller_city ??
-                    null,
+                    pickup.city ?? null,
 
                   postal_code:
-                    order.origin_postal_code ??
-                    order.seller_postal_code ??
-                    null,
+                    pickup.postal_code ?? null,
                 },
 
                 destination: {
@@ -453,14 +472,10 @@ Deno.serve(async (req) => {
                     destinationCountry,
 
                   city:
-                    order.destination_city ??
-                    order.delivery_city ??
-                    null,
+                    delivery.city ?? null,
 
                   postal_code:
-                    order.destination_postal_code ??
-                    order.delivery_postal_code ??
-                    null,
+                    delivery.postal_code ?? null,
                 },
 
                 parcel: {
