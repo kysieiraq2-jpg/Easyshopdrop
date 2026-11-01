@@ -50,10 +50,15 @@
           const row=document.createElement('button');row.type='button';
           const name=String(q.service_name||q.provider||'Courier');
           row.textContent=name+' — '+new Intl.NumberFormat(undefined,{style:'currency',currency}).format(amount);
-          row.addEventListener('click',()=>{
+          row.addEventListener('click',async()=>{
             if(window.ShopDropPhase6CartAddress?.getPendingOrderId?.()!==orderId){status.textContent='Order changed. Request new quotes.';chosen=null;selections=Object.create(null);return;}
             if(!q.quote_reference||!q.provider){status.textContent='This quote lacks a provider reference. Select another quote.';return;}
-            const selection={provider:q.provider,quote_reference:q.quote_reference,service_code:q.service_code,amount,currency,order_id:orderId,fulfilment_group_id:group.id};
+            if(!q.quote_id){status.textContent='This quote has not been stored securely. Request new quotes.';return;}
+            row.disabled=true;
+            try{
+              await bridge.selectQuote(orderId,group.id,q.quote_id);
+            }catch(error){status.textContent=error?.message||'Courier selection not confirmed.';row.disabled=false;return;}
+            const selection={provider:q.provider,quote_reference:q.quote_reference,quote_id:q.quote_id,service_code:q.service_code,amount,currency,order_id:orderId,fulfilment_group_id:group.id};
             selections[group.id]=selection;
             chosen=requiredGroups.length===1?selection:null;
             status.textContent=requiredGroups.every(id=>selections[id])?'Courier selected for every seller shipment. Awaiting trusted checkout price confirmation.':'Courier selected for seller shipment '+(i+1)+'. Choose couriers for remaining shipments.';
