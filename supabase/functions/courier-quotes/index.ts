@@ -221,39 +221,82 @@ Deno.serve(async (req) => {
   const buyerId =
     String(order.buyer_id ?? "");
 
-  const sellerId =
-    String(order.seller_id ?? "");
+  const requestedGroupId = String(input.fulfilment_group_id ?? input.fulfilmentGroupId ?? "").trim();
+  let sellerId = String(order.seller_id ?? "");
+  let pickupAddressId = order.pickup_address_id;
+  let deliveryAddressId = order.delivery_address_id;
+  let selectedProductId = order.product_id;
+  let groupId: string | null = null;
+  let selectedQuantity = Number(order.quantity ?? 1);
 
-  if (
-    user.id !== buyerId &&
-    user.id !== sellerId
-  ) {
-    return reply(
-      {
-        ok: false,
-        error: "order_access_denied",
-      },
-      403,
-    );
+  if (requestedGroupId) {
+    const { data: group, error: groupError } = await admin
+      .from("fulfilment_groups")
+      .select("id,order_id,seller_id,pickup_address_id,delivery_address_id")
+      .eq("id", requestedGroupId)
+      .eq("order_id", orderId)
+      .maybeSingle();
+    if (groupError) return reply({ ok: false, error: "fulfilment_group_lookup_failed" }, 500);
+    if (!group) return reply({ ok: false, error: "fulfilment_group_not_found" }, 404);
+    groupId = String(group.id);
+    sellerId = String(group.seller_id ?? "");
+    deliveryAddressId = group.delivery_address_id ?? order.delivery_address_id;
+
+    const { data: items, error: itemsError } = await admin
+      .from("order_items")
+      .select("id,product_id,seller_id,quantity")
+      .eq("order_id", orderId)
+      .eq("seller_id", sellerId);
+    if (itemsError) return reply({ ok: false, error: "fulfilment_items_lookup_failed" }, 500);
+    if (!items?.length) return reply({ ok: false, error: "fulfilment_items_missing" }, 409);
+
+    // Current provider adapters quote exactly one physical parcel.
+    // Never underquote a multi-item shipment by silently using one item's dimensions.
+    if (items.length !== 1 || Number(items[0].quantity) !== 1) {
+      return reply({ ok: false, error: "multi_parcel_quote_adapter_required", fulfilment_group_id: groupId }, 409);
+    }
+    selectedProductId = items[0].product_id;
+    selectedQuantity = Number(items[0].quantity);
+    pickupAddressId = group.pickup_address_id;
+  } else {
+    // Existing single-item compatibility. Multi-seller orders require an explicit group.
+    const { data: groups, error: groupsError } = await admin
+      .from("fulfilment_groups").select("id").eq("order_id", orderId).limit(2);
+    if (groupsError) return reply({ ok: false, error: "fulfilment_groups_lookup_failed" }, 500);
+    if ((groups ?? []).length > 1) {
+      return reply({ ok: false, error: "fulfilment_group_id_required" }, 400);
+    }
   }
 
-  /* Resolve trusted private addresses and product parcel data. */
-  if (!order.pickup_address_id || !order.delivery_address_id) {
+  if (user.id !== buyerId && user.id !== sellerId) {
+    return reply({ ok: false, error: "order_access_denied" }, 403);
+  }
+
+  // Resolve the product's chosen pickup address before the group's fallback.
+  const { data: product, error: productError } = await admin
+    .from("products").select("*")
+    .eq("id", selectedProductId).eq("seller_id", sellerId).maybeSingle();
+  if (productError) return reply({ ok: false, error: "product_lookup_failed" }, 500);
+  if (!product) return reply({ ok: false, error: "shipping_product_missing" }, 409);
+  pickupAddressId = product.pickup_address_id ?? pickupAddressId;
+  if (!pickupAddressId || !deliveryAddressId) {
     return reply({ ok: false, error: "order_addresses_required" }, 409);
   }
-  const [pickupResult, deliveryResult, productResult] = await Promise.all([
-    admin.from("addresses").select("*").eq("id", order.pickup_address_id).eq("user_id", sellerId).maybeSingle(),
-    admin.from("addresses").select("*").eq("id", order.delivery_address_id).eq("user_id", buyerId).maybeSingle(),
-    admin.from("products").select("*").eq("id", order.product_id).eq("seller_id", sellerId).maybeSingle(),
+  const [pickupResult, deliveryResult] = await Promise.all([
+    admin.from("addresses").select("*").eq("id", pickupAddressId).eq("user_id", sellerId).maybeSingle(),
+    admin.from("addresses").select("*").eq("id", deliveryAddressId).eq("user_id", buyerId).maybeSingle(),
   ]);
-  if (pickupResult.error || deliveryResult.error || productResult.error) {
+  if (pickupResult.error || deliveryResult.error) {
     return reply({ ok: false, error: "shipping_details_lookup_failed" }, 500);
   }
   const pickup = pickupResult.data;
   const delivery = deliveryResult.data;
-  const product = productResult.data;
-  if (!pickup || !delivery || !product) {
+  if (!pickup || !delivery) {
     return reply({ ok: false, error: "shipping_details_incomplete" }, 409);
+  }
+
+  if (!groupId && selectedQuantity !== 1) {
+    return reply({ ok: false, error: "multi_parcel_quote_adapter_required" }, 409);
   }
 
   /*
@@ -455,6 +498,7 @@ Deno.serve(async (req) => {
                 provider: code,
 
                 order_id: order.id,
+                ...(groupId ? { fulfilment_group_id: groupId } : {}),
 
                 origin: {
                   country_code:
@@ -603,6 +647,8 @@ Deno.serve(async (req) => {
 
     order_id:
       order.id,
+
+    ...(groupId ? { fulfilment_group_id: groupId } : {}),
 
     origin_country:
       originCountry,
