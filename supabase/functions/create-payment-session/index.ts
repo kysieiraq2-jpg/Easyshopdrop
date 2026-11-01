@@ -627,7 +627,7 @@ Deno.serve(
             "payment_allocations",
           )
           .select(
-            "amount,status",
+            "amount,status,fulfilment_group_id,currency",
           )
           .eq(
             "order_id",
@@ -714,6 +714,33 @@ Deno.serve(
             !Number.isSafeInteger(Math.round(amount * 100))) return NaN;
         return sum + Math.round(amount * 100);
       }, 0);
+      // Fix 18C: each courier allocation must match its own seller group.
+      // Matching only the order-wide sum could hide cross-seller misallocation.
+      const allocationsByGroup = new Map<string, number>();
+      for (const row of courierRows ?? []) {
+        const groupId = String(row.fulfilment_group_id ?? "");
+        const rowAmount = Number(row.amount);
+        const rowCents = Math.round(rowAmount * 100);
+        if (!groupId || !selectedQuoteIds.length ||
+            !Number.isFinite(rowAmount) || rowAmount <= 0 ||
+            !Number.isSafeInteger(rowCents) ||
+            row.currency !== currency ||
+            !fulfilmentGroups.some((group) => group.id === groupId) ||
+            allocationsByGroup.has(groupId)) {
+          return reply({ ok: false, version: VERSION,
+            error: "courier_allocation_group_invalid" }, 409);
+        }
+        allocationsByGroup.set(groupId, rowCents);
+      }
+      for (const group of fulfilmentGroups) {
+        const quote = quoteById.get(group.selected_quote_id);
+        const expectedCents = Math.round(Number(quote?.amount) * 100);
+        if (allocationsByGroup.get(group.id) !== expectedCents) {
+          return reply({ ok: false, version: VERSION,
+            error: "courier_allocation_group_mismatch" }, 409);
+        }
+      }
+
       if (!Number.isSafeInteger(allocationCents) ||
           allocationCents !== verifiedCourierTotalCents) {
         return reply({ ok: false, version: VERSION,
