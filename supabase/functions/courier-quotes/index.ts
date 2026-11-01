@@ -218,6 +218,44 @@ Deno.serve(async (req) => {
     );
   }
 
+  // Fix 18D: buyer-authorized selection of a previously stored provider quote.
+  // The browser supplies only the server-issued quote UUID, never its price.
+  if (input.action === "select_quote") {
+    if (user.id !== String(order.buyer_id ?? ""))
+      return reply({ ok: false, error: "buyer_access_required" }, 403);
+    const groupId = String(input.fulfilment_group_id ?? "");
+    const quoteId = String(input.quote_id ?? "");
+    const uuid = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+    if (!uuid.test(groupId) || !uuid.test(quoteId))
+      return reply({ ok: false, error: "valid_quote_and_group_required" }, 400);
+    const [{ data: group, error: groupError }, { data: quote, error: quoteError }] = await Promise.all([
+      admin.from("fulfilment_groups").select("id,order_id,selected_quote_id,status")
+        .eq("id", groupId).eq("order_id", orderId).maybeSingle(),
+      admin.from("courier_quotes")
+        .select("id,order_id,buyer_id,fulfilment_group_id,status,expires_at,amount,currency")
+        .eq("id", quoteId).eq("order_id", orderId)
+        .eq("buyer_id", user.id).eq("fulfilment_group_id", groupId).maybeSingle(),
+    ]);
+    if (groupError || quoteError) return reply({ ok: false, error: "quote_selection_lookup_failed" }, 500);
+    if (!group || !quote) return reply({ ok: false, error: "quote_selection_not_found" }, 404);
+    if (group.selected_quote_id === quoteId)
+      return reply({ ok: true, order_id: orderId, fulfilment_group_id: groupId, quote_id: quoteId });
+    if (group.selected_quote_id) return reply({ ok: false, error: "courier_selection_already_locked" }, 409);
+    const expiry = Date.parse(String(quote.expires_at ?? ""));
+    if (String(quote.status).toLowerCase() !== "quoted" ||
+        !Number.isFinite(expiry) || expiry <= Date.now() ||
+        !Number.isFinite(Number(quote.amount)) || Number(quote.amount) <= 0)
+      return reply({ ok: false, error: "courier_quote_expired_or_invalid" }, 409);
+    // A169 database protections remain authoritative for selection.
+    const { data: updated, error: updateError } = await admin.from("fulfilment_groups")
+      .update({ selected_quote_id: quoteId })
+      .eq("id", groupId).eq("order_id", orderId)
+      .is("selected_quote_id", null).select("id,selected_quote_id").maybeSingle();
+    if (updateError) return reply({ ok: false, error: "courier_quote_selection_rejected" }, 409);
+    if (!updated) return reply({ ok: false, error: "courier_selection_changed" }, 409);
+    return reply({ ok: true, order_id: orderId, fulfilment_group_id: groupId, quote_id: quoteId });
+  }
+
   const buyerId =
     String(order.buyer_id ?? "");
 
@@ -634,6 +672,46 @@ Deno.serve(async (req) => {
       },
       503,
     );
+  }
+
+  // Fix 18D: persist only actual provider-returned quotes; no browser-supplied price.
+  // Payment requires a persisted, unexpired quote tied to a seller group.
+  if (groupId) {
+    if (user.id !== buyerId)
+      return reply({ ok: false, error: "buyer_access_required" }, 403);
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    const persisted = [] as Record<string, unknown>[];
+    for (const quote of quotes as Record<string, unknown>[]) {
+      const reference = String(quote.quote_reference ?? "").trim();
+      const provider = String(quote.provider ?? "").trim();
+      const currency = isoCurrency(quote.currency);
+      const amount = Number(quote.amount);
+      if (!reference || !provider || !currency ||
+          !Number.isFinite(amount) || amount <= 0) continue;
+      const days = quote.estimated_days == null ? null : Number(quote.estimated_days);
+      const { data: saved, error: saveError } = await admin.from("courier_quotes")
+        .insert({
+          order_id: orderId,
+          buyer_id: buyerId,
+          fulfilment_group_id: groupId,
+          courier_name: provider,
+          service_name: String(quote.service_name ?? quote.service_code ?? provider),
+          quote_reference: reference,
+          amount,
+          currency,
+          estimated_days: days !== null && Number.isInteger(days) && days >= 0 ? days : null,
+          status: "quoted",
+          expires_at: expiresAt,
+        }).select("id").single();
+      if (saveError || !saved?.id) {
+        console.error(VERSION, "courier_quote_persist_failed", saveError);
+        return reply({ ok: false, error: "courier_quote_storage_failed" }, 503);
+      }
+      persisted.push({ ...quote, quote_id: saved.id, expires_at: expiresAt });
+    }
+    if (!persisted.length)
+      return reply({ ok: false, error: "no_persistable_courier_quotes" }, 503);
+    quotes.splice(0, quotes.length, ...persisted);
   }
 
   /*
