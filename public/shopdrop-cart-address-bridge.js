@@ -83,7 +83,12 @@
         if (sellerAlias) {
           const sellerLine = document.createElement('div');
           sellerLine.className = 'muted';
-          sellerLine.textContent = 'Seller: ' + sellerAlias;
+          sellerLine.append(document.createTextNode('Seller: ' + sellerAlias + ' — '));
+          const sellerLink = document.createElement('a');
+          sellerLink.href = './seller-products.html?alias=' + encodeURIComponent(sellerAlias);
+          sellerLink.textContent = 'View this seller\'s items';
+          sellerLink.setAttribute('aria-label', 'View all products from ' + sellerAlias);
+          sellerLine.append(sellerLink);
           div.append(sellerLine);
         }
         for(const [symbol,qty] of [['−',item.quantity-1],['+',item.quantity+1]]){
