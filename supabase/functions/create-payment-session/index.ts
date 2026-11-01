@@ -658,6 +658,68 @@ Deno.serve(
       }
 
 
+      // Fix 18B: verify selected courier quotes against trusted database records.
+      // Fail closed: browser quote amounts and unverified allocations are never charged.
+      const { data: fulfilmentGroups, error: groupsError } = await admin
+        .from("fulfilment_groups")
+        .select("id,order_id,selected_quote_id")
+        .eq("order_id", orderId);
+
+      if (groupsError || !fulfilmentGroups?.length ||
+          fulfilmentGroups.some((group) => !group.selected_quote_id)) {
+        return reply({ ok: false, version: VERSION,
+          error: "courier_quote_selection_required" }, 409);
+      }
+
+      const selectedQuoteIds = fulfilmentGroups.map((group) => group.selected_quote_id);
+      if (new Set(selectedQuoteIds).size !== selectedQuoteIds.length) {
+        return reply({ ok: false, version: VERSION,
+          error: "duplicate_courier_quote_selection" }, 409);
+      }
+
+      const { data: selectedQuotes, error: selectedQuotesError } = await admin
+        .from("courier_quotes")
+        .select("id,order_id,fulfilment_group_id,amount,currency,status,expires_at")
+        .in("id", selectedQuoteIds);
+
+      if (selectedQuotesError || selectedQuotes?.length !== fulfilmentGroups.length) {
+        return reply({ ok: false, version: VERSION,
+          error: "selected_courier_quotes_unavailable" }, 409);
+      }
+
+      let verifiedCourierTotalCents = 0;
+      const quoteById = new Map(selectedQuotes.map((quote) => [quote.id, quote]));
+      for (const group of fulfilmentGroups) {
+        const quote = quoteById.get(group.selected_quote_id);
+        const amount = Number(quote?.amount);
+        const amountCents = Math.round(amount * 100);
+        const expiry = quote?.expires_at ? Date.parse(quote.expires_at) : NaN;
+        if (!quote || quote.order_id !== orderId ||
+            quote.fulfilment_group_id !== group.id ||
+            quote.currency !== currency ||
+            !Number.isFinite(amount) || amount <= 0 ||
+            !Number.isSafeInteger(amountCents) ||
+            !Number.isFinite(expiry) || expiry <= Date.now() ||
+            ["cancelled", "expired", "invalid", "rejected"].includes(
+              String(quote.status ?? "").toLowerCase())) {
+          return reply({ ok: false, version: VERSION,
+            error: "selected_courier_quote_invalid_or_expired" }, 409);
+        }
+        verifiedCourierTotalCents += amountCents;
+      }
+
+      const allocationCents = (courierRows ?? []).reduce((sum, row) => {
+        const amount = Number(row.amount);
+        if (!Number.isFinite(amount) || amount < 0 ||
+            !Number.isSafeInteger(Math.round(amount * 100))) return NaN;
+        return sum + Math.round(amount * 100);
+      }, 0);
+      if (!Number.isSafeInteger(allocationCents) ||
+          allocationCents !== verifiedCourierTotalCents) {
+        return reply({ ok: false, version: VERSION,
+          error: "courier_allocation_quote_mismatch" }, 409);
+      }
+
       courierTotal =
         Math.round(
           (courierRows ?? [])
@@ -722,30 +784,209 @@ Deno.serve(
      */
 
 
-    // A69: provider selection is authoritative and service-role only.
-    // Require an explicit payment method; never guess card type or provider.
-    const methodCode = cleanProvider(input.method_code ?? input.payment_method);
-    if (!country || !methodCode) {
-      return reply({ ok: false, version: VERSION,
-        error: "payment_country_and_method_required" }, 400);
+    const requestedProvider =
+      cleanProvider(
+        input.provider,
+      );
+
+
+    let providerQuery =
+      admin
+        .from(
+          "payment_providers",
+        )
+        .select("*");
+
+
+    if (requestedProvider) {
+      providerQuery =
+        providerQuery.eq(
+          "provider_code",
+          requestedProvider,
+        );
     }
 
-    const { data: route, error: routeError } = await admin.rpc(
-      "shopdrop_select_payment_provider",
-      { p_country_code: country, p_currency: currency,
-        p_method_code: methodCode },
+
+    const {
+      data: providerRows,
+      error: providerError,
+    } =
+      await providerQuery;
+
+
+    if (providerError) {
+      console.error(
+        VERSION,
+        providerError,
+      );
+
+      return reply(
+        {
+          ok: false,
+          version: VERSION,
+          error:
+            "payment_provider_registry_error",
+        },
+        500,
+      );
+    }
+
+
+    const providers =
+      (
+        providerRows ??
+        []
+      ).filter(
+        (
+          provider:
+            Record<
+              string,
+              unknown
+            >,
+        ) => {
+
+          const active =
+            provider.active ??
+            provider.enabled ??
+            provider.is_active ??
+            true;
+
+
+          if (
+            active === false
+          ) {
+            return false;
+          }
+
+
+          const currencies =
+            Array.isArray(
+              provider.currencies,
+            )
+              ? provider.currencies
+                  .map(
+                    (
+                      value:
+                        unknown,
+                    ) =>
+                      String(
+                        value,
+                      )
+                        .toUpperCase(),
+                  )
+              : null;
+
+
+          if (
+            currencies &&
+            currencies.length &&
+            !currencies.includes(
+              currency,
+            )
+          ) {
+            return false;
+          }
+
+
+          const countries =
+            Array.isArray(
+              provider.countries,
+            )
+              ? provider.countries
+                  .map(
+                    (
+                      value:
+                        unknown,
+                    ) =>
+                      String(
+                        value,
+                      )
+                        .toUpperCase(),
+                  )
+              : null;
+
+
+          if (
+            country &&
+            countries &&
+            countries.length &&
+            !countries.includes(
+              country,
+            )
+          ) {
+            return false;
+          }
+
+
+          return true;
+        },
+      );
+
+
+    if (!providers.length) {
+      return reply(
+        {
+          ok: false,
+          version: VERSION,
+          error:
+            "payment_provider_not_available",
+          country,
+          currency,
+        },
+        503,
+      );
+    }
+
+
+    providers.sort(
+      (
+        a:
+          Record<
+            string,
+            unknown
+          >,
+        b:
+          Record<
+            string,
+            unknown
+          >,
+      ) =>
+        Number(
+          a.priority ??
+          999,
+        )
+        -
+        Number(
+          b.priority ??
+          999,
+        ),
     );
-    if (routeError || !route || route.ok !== true) {
-      return reply({ ok: false, version: VERSION,
-        error: routeError ? "payment_routing_error" :
-          (route?.error ?? "no_active_payment_provider") }, 503);
+
+
+    const selected =
+      providers[0];
+
+
+    const providerCode =
+      cleanProvider(
+        selected.provider_code ??
+        selected.code ??
+        selected.provider_name,
+      );
+
+
+    if (!providerCode) {
+      return reply(
+        {
+          ok: false,
+          version: VERSION,
+          error:
+            "invalid_payment_provider_configuration",
+        },
+        500,
+      );
     }
-    const providerCode = cleanProvider(route.provider_code);
-    const requestedProvider = cleanProvider(input.provider);
-    if (!providerCode || (requestedProvider && requestedProvider !== providerCode)) {
-      return reply({ ok: false, version: VERSION,
-        error: "payment_provider_not_available" }, 409);
-    }
+
 
     const providerEnvName =
       providerCode
@@ -1182,7 +1423,7 @@ Deno.serve(
         provider_id:
           selected.id ?? null,
 
-        payment_status:
+        status:
           "pending",
       };
 
@@ -1394,7 +1635,7 @@ Deno.serve(
         .from("payments")
         .update(
           {
-            payment_status:
+            status:
               "failed",
           },
         )
@@ -1612,7 +1853,7 @@ Deno.serve(
         .from("payments")
         .update(
           {
-            payment_status:
+            status:
               "failed",
           },
         )
@@ -1680,7 +1921,7 @@ Deno.serve(
         .from("payments")
         .update(
           {
-            payment_status:
+            status:
               "failed",
           },
         )
@@ -1744,7 +1985,7 @@ Deno.serve(
         string,
         unknown
       > = {
-        payment_status:
+        status:
           "session_created",
       };
 
