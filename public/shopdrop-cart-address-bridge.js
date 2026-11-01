@@ -38,6 +38,20 @@
         if (productError) throw productError;
         productMap = new Map((products || []).map(product => [product.id, product]));
       }
+      // Fix 14: Public seller aliases only, resolved through the restricted product RPC.
+      // Never read private seller profiles or expose seller identifiers in the bag.
+      const aliasMap = new Map();
+      if (productIds.length) {
+        await Promise.all(productIds.map(async productId => {
+          try {
+            const {data, error} = await db.rpc('public_product_seller_alias', {p_product_id:productId});
+            if (error) return; // Fail closed if RPC is unavailable.
+            const row = Array.isArray(data) ? data[0] : data;
+            const alias = row?.seller_alias;
+            if (typeof alias === 'string' && alias.trim()) aliasMap.set(productId,alias.trim());
+          } catch (_) { /* Optional display only; checkout remains unchanged. */ }
+        }));
+      }
       let subtotal = 0;
       let subtotalCurrency = null;
       let totalsAvailable = cart.length > 0;
@@ -65,6 +79,13 @@
         }
         if (!available) line += ' — unavailable or insufficient stock';
         div.append(document.createTextNode(line + ' '));
+        const sellerAlias = aliasMap.get(item.product_id);
+        if (sellerAlias) {
+          const sellerLine = document.createElement('div');
+          sellerLine.className = 'muted';
+          sellerLine.textContent = 'Seller: ' + sellerAlias;
+          div.append(sellerLine);
+        }
         for(const [symbol,qty] of [['−',item.quantity-1],['+',item.quantity+1]]){
           const btn=document.createElement('button');btn.type='button';btn.textContent=symbol;
           btn.addEventListener('click',()=>change(item,qty));div.append(btn);
