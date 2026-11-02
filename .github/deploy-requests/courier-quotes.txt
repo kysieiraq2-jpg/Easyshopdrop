@@ -1,1 +1,1 @@
-HOLD courier-quotes
+DEPLOY courier-quotes
