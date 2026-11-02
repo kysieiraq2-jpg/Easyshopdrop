@@ -1,1 +1,0 @@
-FIX19J DEPLOY AND VERIFY courier-booking-worker
