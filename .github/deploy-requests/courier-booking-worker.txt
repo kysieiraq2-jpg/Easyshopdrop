@@ -1,1 +1,1 @@
-DEPLOY courier-booking-worker
+HOLD courier-booking-worker
