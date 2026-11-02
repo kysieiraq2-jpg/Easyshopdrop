@@ -2025,6 +2025,24 @@ Deno.serve(
     }
 
 
+    // FIX 20D: Verify the scheduler's dedicated Vault token before refund access.
+    const workerToken = req.headers.get("x-shopdrop-worker-token") ?? "";
+    if (!/^[0-9a-f]{64}$/.test(workerToken)) {
+      return reply({ ok: false, error: "unauthorized" }, 401);
+    }
+    let authorized = false;
+    try {
+      const { data, error } = await db.rpc("shopdrop_verify_refund_worker", {
+        p_token: workerToken,
+      });
+      authorized = !error && data === true;
+    } catch (_error) {
+      authorized = false;
+    }
+    if (!authorized) {
+      return reply({ ok: false, error: "unauthorized" }, 401);
+    }
+
     /*
      * ========================================================
      * FIND REFUNDS READY FOR PROVIDER PROCESSING
