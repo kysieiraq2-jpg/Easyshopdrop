@@ -1580,6 +1580,21 @@ Deno.serve(
     }
 
 
+    // Fix 19A: require an independent secret for service-role booking operations.
+    // The scheduler must send x-shopdrop-worker-secret with every POST.
+    const workerSecret = Deno.env.get("SHOPDROP_COURIER_BOOKING_WORKER_SECRET") ?? "";
+    const suppliedSecret = req.headers.get("x-shopdrop-worker-secret") ?? "";
+    const encoder = new TextEncoder();
+    const expected = encoder.encode(workerSecret);
+    const supplied = encoder.encode(suppliedSecret);
+    let mismatch = expected.length ^ supplied.length;
+    for (let i = 0; i < Math.max(expected.length, supplied.length); i++) {
+      mismatch |= (expected[i] ?? 0) ^ (supplied[i] ?? 0);
+    }
+    if (!workerSecret || mismatch !== 0) {
+      return response({ ok: false, error: "unauthorized_worker" }, 401);
+    }
+
     const {
       data: claimed,
       error: claimError,
