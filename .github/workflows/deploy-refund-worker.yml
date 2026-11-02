@@ -61,4 +61,4 @@ jobs:
           set -euo pipefail
           test -n "$SUPABASE_ACCESS_TOKEN"
           test -n "$PROJECT_REF"
-          supabase functions deploy refund-worker --project-ref "$PROJECT_REF"
+          supabase functions deploy refund-worker --project-ref "$PROJECT_REF" --yes
