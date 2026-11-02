@@ -1,1 +1,1 @@
-DEPLOY refund-worker
+READY refund-worker
