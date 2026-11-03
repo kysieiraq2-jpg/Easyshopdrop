@@ -22,7 +22,7 @@
     return rows.filter(row => !needle || [row.title,row.description,row.category,row.subcategory,row.location]
       .some(value => String(value || '').toLocaleLowerCase().includes(needle)))
       .map(row => ({
-        title: row.title, description: row.description, category: row.category,
+        id: row.id, title: row.title, description: row.description, category: row.category,
         pricing_unit: row.pricing_unit || 'service',
         unit_price_cents: Math.round(Number(row.price || 0) * 100),
         currency_code: row.currency || 'ZAR',
