@@ -54,6 +54,7 @@
     courierQuotes: (token, body) => invoke('courier-quotes', token, body),
     createListingReference: (token, body) => invoke('create-listing-reference', token, body),
     createPaymentSession: (token, body) => invoke('create-payment-session', token, body),
+    createDispatchCheckout: (token, body) => invoke('create-dispatch-checkout', token, body),
     disputeEvidence: (token, body) => invoke('dispute-evidence', token, body),
     disputes: (token, body) => invoke('disputes', token, body),
     feedback: (token, body) => invoke('feedback', token, body),
