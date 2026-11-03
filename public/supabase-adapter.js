@@ -101,6 +101,15 @@
     return token;
   }
 
+  // Fix 22T: authenticated dispatch request creation through the existing RPC.
+  async function createDispatchRequest(body) {
+    const client = await authClient();
+    await verifiedToken();
+    const { data, error } = await client.rpc('shopdrop_create_dispatch_request', body);
+    if (error) throw new Error(error.message || 'Dispatch request failed.');
+    return data;
+  }
+
   const authenticatedFunctions = Object.freeze(
     Object.fromEntries(Object.entries(functions).map(([name, fn]) => [
       name, async (body) => fn(await verifiedToken(), body)
@@ -109,6 +118,7 @@
 
   window.ShopDropSupabaseAdapter = Object.freeze({
     functions,
-    authenticatedFunctions
+    authenticatedFunctions,
+    createDispatchRequest
   });
 })();
