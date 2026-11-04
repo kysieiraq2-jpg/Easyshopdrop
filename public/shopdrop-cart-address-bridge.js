@@ -134,6 +134,8 @@
   }
   let creatingOrder = false;
   let pendingOrderId = null;
+  // Fix 23H: preserve the address bound to the created order.
+  let pendingOrderAddressId = null;
   async function place(){
     if (creatingOrder) return;
     const button=$('previewOrderButton');
@@ -145,6 +147,8 @@
       if (!$('addresses').value) throw Error('Select a delivery address first.');
       if (!window.ShopDropCheckoutConnector?.createOrder) throw Error('Secure order connector is unavailable.');
       if (pendingOrderId) {
+        if (!pendingOrderAddressId || $('addresses').value !== pendingOrderAddressId)
+          throw Error('Delivery address changed after order creation. Re-select the original address or start a new checkout.');
         const method=window.ShopDropPaymentSelection?.read();
         if (!method) throw Error('Choose a payment method first.');
         const courier=window.ShopDropCourierSelection;
@@ -184,6 +188,7 @@
       const reference=order?.id || result?.order_id || result?.id;
       if (reference && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(String(reference))) {
         pendingOrderId=String(reference);
+        pendingOrderAddressId=$('addresses').value;
         window.ShopDropReservationCountdown?.remember?.(pendingOrderId);
         if(button) button.textContent='Continue to secure payment';
       }
