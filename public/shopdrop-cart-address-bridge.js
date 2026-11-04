@@ -148,8 +148,14 @@
         const method=window.ShopDropPaymentSelection?.read();
         if (!method) throw Error('Choose a payment method first.');
         const courier=window.ShopDropCourierSelection;
-        if (!courier?.isBookingEnabled?.() || !courier?.getSelected?.()) {
-          throw Error('A verified courier quote is required before payment. Courier integration is the next activation step.');
+        // Fix 23A: support one verified selection for EACH seller shipment.
+        // Selection is persisted by courier-quotes; the payment backend independently
+        // checks selected_quote_id and each trusted courier allocation/amount.
+        const selections=courier?.getSelections?.();
+        if (!Array.isArray(selections) || selections.length===0 ||
+            selections.some(s=>s.order_id!==pendingOrderId || !s.fulfilment_group_id || !s.quote_id) ||
+            new Set(selections.map(s=>s.fulfilment_group_id)).size!==selections.length) {
+          throw Error('Select a confirmed courier quote for every seller shipment before continuing.');
         }
         // The backend creates the inventory reservation during payment-session
         // creation. Do not require a reservation before invoking that backend.
