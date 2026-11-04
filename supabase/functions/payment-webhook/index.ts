@@ -1330,6 +1330,31 @@ Deno.serve(
       }
 
 
+      // FIX 23N-D: Queue a restricted, pending refund for a
+      // verified payment whose inventory could not be committed.
+      // This does not issue a provider refund or permit fulfilment.
+      const { error: lateRefundQueueError } = await supabase.rpc(
+        "shopdrop_queue_late_payment_refund",
+        { p_payment_id: payment.id },
+      );
+      if (lateRefundQueueError) {
+        console.error(
+          VERSION,
+          "CRITICAL: late-payment refund queue failed",
+          { orderId, paymentId: payment.id, lateRefundQueueError },
+        );
+        return reply(
+          {
+            ok: false,
+            payment_verified: true,
+            error: "late_payment_refund_queue_failed",
+            payment_id: payment.id,
+            order_id: orderId,
+          },
+          500,
+        );
+      }
+
       return reply(
         {
           ok: false,
