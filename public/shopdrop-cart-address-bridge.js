@@ -136,6 +136,14 @@
   let pendingOrderId = null;
   // Fix 23H: preserve the address bound to the created order.
   let pendingOrderAddressId = null;
+  // Fix 23I: freeze the bag represented by the pending order.
+  let pendingOrderCartSignature = null;
+  function cartSignature() {
+    return JSON.stringify(cart.map(item => ({
+      product_id: String(item.product_id).toLowerCase(),
+      quantity: Number(item.quantity)
+    })).sort((a,b) => a.product_id.localeCompare(b.product_id)));
+  }
   async function place(){
     if (creatingOrder) return;
     const button=$('previewOrderButton');
@@ -147,6 +155,8 @@
       if (!$('addresses').value) throw Error('Select a delivery address first.');
       if (!window.ShopDropCheckoutConnector?.createOrder) throw Error('Secure order connector is unavailable.');
       if (pendingOrderId) {
+        if (!pendingOrderCartSignature || cartSignature() !== pendingOrderCartSignature)
+          throw Error('Shopping bag changed after order creation. Start a new checkout before payment.');
         if (!pendingOrderAddressId || $('addresses').value !== pendingOrderAddressId)
           throw Error('Delivery address changed after order creation. Re-select the original address or start a new checkout.');
         const method=window.ShopDropPaymentSelection?.read();
@@ -189,6 +199,7 @@
       if (reference && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(String(reference))) {
         pendingOrderId=String(reference);
         pendingOrderAddressId=$('addresses').value;
+        pendingOrderCartSignature=cartSignature();
         window.ShopDropReservationCountdown?.remember?.(pendingOrderId);
         if(button) button.textContent='Continue to secure payment';
       }
