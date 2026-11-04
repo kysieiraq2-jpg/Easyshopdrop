@@ -1280,7 +1280,7 @@ Deno.serve(
        * automated exception/admin path can reconcile safely.
        */
 
-      await supabase
+      const { error: exceptionMarkError } = await supabase
         .from(
           "payment_allocations",
         )
@@ -1307,6 +1307,27 @@ Deno.serve(
             "payment_confirmed",
           ],
         );
+
+      // A failed exception write must never be silently ignored.
+      // The payment is real; fulfilment remains blocked and the
+      // webhook must be retried/reconciled by the existing system.
+      if (exceptionMarkError) {
+        console.error(
+          VERSION,
+          "CRITICAL: failed to persist inventory payment exception",
+          { orderId, paymentId: payment.id, exceptionMarkError },
+        );
+        return reply(
+          {
+            ok: false,
+            payment_verified: true,
+            error: "inventory_exception_record_failed",
+            payment_id: payment.id,
+            order_id: orderId,
+          },
+          500,
+        );
+      }
 
 
       return reply(
