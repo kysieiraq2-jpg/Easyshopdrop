@@ -193,13 +193,18 @@
         return;
       }
       const items=cart.map(x=>({product_id:x.product_id,quantity:Number(x.quantity)}));
-      const result=await window.ShopDropCheckoutConnector.createOrder(items, $('addresses').value);
+      // Fix 23J: freeze the selections before the asynchronous order request.
+      const requestedAddressId=$('addresses').value;
+      const requestedCartSignature=cartSignature();
+      const result=await window.ShopDropCheckoutConnector.createOrder(items, requestedAddressId);
+      if ($('addresses').value!==requestedAddressId || cartSignature()!==requestedCartSignature)
+        throw Error('Checkout details changed while creating the order. Refresh your bag before continuing.');
       const order=result?.order || result?.data?.order || result;
       const reference=order?.id || result?.order_id || result?.id;
       if (reference && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(String(reference))) {
         pendingOrderId=String(reference);
-        pendingOrderAddressId=$('addresses').value;
-        pendingOrderCartSignature=cartSignature();
+        pendingOrderAddressId=requestedAddressId;
+        pendingOrderCartSignature=requestedCartSignature;
         window.ShopDropReservationCountdown?.remember?.(pendingOrderId);
         if(button) button.textContent='Continue to secure payment';
       }
