@@ -18,8 +18,8 @@
       return {product_id, quantity};
     }).sort((a,b) => a.product_id.localeCompare(b.product_id));
   }
-  function requestFor(items) {
-    const signature = JSON.stringify(items);
+  function requestFor(items, deliveryAddressId) {
+    const signature = JSON.stringify({items, delivery_address_id: deliveryAddressId.toLowerCase()});
     let saved;
     try { saved = JSON.parse(sessionStorage.getItem(KEY) || 'null'); } catch (_) { saved = null; }
     if (saved && saved.signature === signature && saved.request_id) return saved.request_id;
@@ -33,7 +33,7 @@
       throw Error('Select a valid saved delivery address.');
     const clean = canonical(items);
     if (!window.ShopDropSupabaseAdapter) throw Error('Supabase adapter not loaded');
-    const request_id = requestFor(clean);
+    const request_id = requestFor(clean, deliveryAddressId);
     const createCheckoutOrder = window.ShopDropSupabaseAdapter.authenticatedFunctions?.createCheckoutOrder;
     if (typeof createCheckoutOrder !== 'function') throw Error('Authenticated checkout adapter unavailable');
     return createCheckoutOrder({ request_id, items: clean, delivery_address_id: deliveryAddressId });
