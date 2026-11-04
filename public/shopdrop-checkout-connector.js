@@ -27,13 +27,16 @@
     sessionStorage.setItem(KEY, JSON.stringify({signature, request_id}));
     return request_id;
   }
-  async function createOrder(items) {
+  async function createOrder(items, deliveryAddressId) {
+    if (typeof deliveryAddressId !== 'string' ||
+        !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(deliveryAddressId))
+      throw Error('Select a valid saved delivery address.');
     const clean = canonical(items);
     if (!window.ShopDropSupabaseAdapter) throw Error('Supabase adapter not loaded');
     const request_id = requestFor(clean);
     const createCheckoutOrder = window.ShopDropSupabaseAdapter.authenticatedFunctions?.createCheckoutOrder;
     if (typeof createCheckoutOrder !== 'function') throw Error('Authenticated checkout adapter unavailable');
-    return createCheckoutOrder({ request_id, items: clean });
+    return createCheckoutOrder({ request_id, items: clean, delivery_address_id: deliveryAddressId });
   }
   // Only call reset when a checkout is safely completed or deliberately abandoned.
   function reset() { sessionStorage.removeItem(KEY); }

@@ -148,14 +148,8 @@
         const method=window.ShopDropPaymentSelection?.read();
         if (!method) throw Error('Choose a payment method first.');
         const courier=window.ShopDropCourierSelection;
-        // Fix 23A: support one verified selection for EACH seller shipment.
-        // Selection is persisted by courier-quotes; the payment backend independently
-        // checks selected_quote_id and each trusted courier allocation/amount.
-        const selections=courier?.getSelections?.();
-        if (!Array.isArray(selections) || selections.length===0 ||
-            selections.some(s=>s.order_id!==pendingOrderId || !s.fulfilment_group_id || !s.quote_id) ||
-            new Set(selections.map(s=>s.fulfilment_group_id)).size!==selections.length) {
-          throw Error('Select a confirmed courier quote for every seller shipment before continuing.');
+        if (!courier?.isBookingEnabled?.() || !courier?.getSelected?.()) {
+          throw Error('A verified courier quote is required before payment. Courier integration is the next activation step.');
         }
         // The backend creates the inventory reservation during payment-session
         // creation. Do not require a reservation before invoking that backend.
@@ -179,7 +173,7 @@
         return;
       }
       const items=cart.map(x=>({product_id:x.product_id,quantity:Number(x.quantity)}));
-      const result=await window.ShopDropCheckoutConnector.createOrder(items);
+      const result=await window.ShopDropCheckoutConnector.createOrder(items, $('addresses').value);
       const order=result?.order || result?.data?.order || result;
       const reference=order?.id || result?.order_id || result?.id;
       if (reference && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(String(reference))) {
