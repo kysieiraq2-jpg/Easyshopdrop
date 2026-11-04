@@ -218,6 +218,24 @@ Deno.serve(async (req) => {
     );
   }
 
+  // Fix 23E: fail closed before either quotation or selection when the
+  // order has no saved delivery address belonging to its buyer.
+  if (!order.delivery_address_id || !order.buyer_id) {
+    return reply({ ok: false, error: "delivery_address_required" }, 409);
+  }
+  const { data: buyerDelivery, error: buyerDeliveryError } = await admin
+    .from("addresses")
+    .select("id")
+    .eq("id", order.delivery_address_id)
+    .eq("user_id", order.buyer_id)
+    .maybeSingle();
+  if (buyerDeliveryError) {
+    return reply({ ok: false, error: "delivery_address_lookup_failed" }, 500);
+  }
+  if (!buyerDelivery) {
+    return reply({ ok: false, error: "delivery_address_not_authorized" }, 409);
+  }
+
   // Fix 18D: buyer-authorized selection of a previously stored provider quote.
   // The browser supplies only the server-issued quote UUID, never its price.
   if (input.action === "select_quote") {
