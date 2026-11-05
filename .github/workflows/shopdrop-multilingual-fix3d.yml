@@ -1,0 +1,43 @@
+name: ShopDrop Multilingual Fix 3D - Seller Pages
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - .github/workflows/shopdrop-multilingual-fix3d.yml
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+      - name: Add seller language bridge while preserving original pages
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64
+          pages=[Path('public/seller-apply.html'),Path('public/seller.html'),Path('public/account.html')]
+          for p in pages:
+              if not p.is_file():raise SystemExit(f'STOP: missing {p}')
+              text=p.read_text()
+              if text.count('</body>')!=1 or 'shopdrop-seller-language.js' in text:
+                  raise SystemExit(f'STOP: unexpected baseline {p}')
+          target=Path('public/shopdrop-seller-language.js')
+          if target.exists():raise SystemExit('STOP: translation file already exists')
+          target.write_bytes(base64.b64decode('LyogU2hvcCZEcm9wIHNlbGxlciBVSSB0cmFuc2xhdGlvbiBicmlkZ2U7IG5vIGZvcm0vZGF0YS9wYXltZW50IGNoYW5nZXMuICovCigoKSA9PiB7CiAndXNlIHN0cmljdCc7CiBjb25zdCBkaWN0ID0gewogIGFmOnsnU2VsbCBzb21ldGhpbmcg4oCUIEZSRUUnOidWZXJrb29wIGlldHMg4oCUIEdSQVRJUycsJ1NlbGxlciAmIFNlcnZpY2UgUHJvdmlkZXIgQ2VudHJlJzonVmVya29wZXItIGVuIGRpZW5zdmVyc2thZmZlcnNlbnRydW0nLCdNeSBhY2NvdW50JzonTXkgcmVrZW5pbmcnLCdFbWFpbCc6J0UtcG9zJywnUGFzc3dvcmQnOidXYWd3b29yZCcsJ1N1Ym1pdCc6J0RpZW4gaW4nLCdTYXZlJzonU3Rvb3InfSwKICBhcjp7J1NlbGwgc29tZXRoaW5nIOKAlCBGUkVFJzon2KjYuSDYtNmK2KbYp9mLIOKAlCDZhdis2KfZhtin2YsnLCdTZWxsZXIgJiBTZXJ2aWNlIFByb3ZpZGVyIENlbnRyZSc6J9mF2LHZg9iyINin2YTYqNin2KbYuSDZiNmF2YLYr9mFINin2YTYrtiv2YXYqScsJ015IGFjY291bnQnOifYrdiz2KfYqNmKJywnRW1haWwnOifYp9mE2KjYsdmK2K8g2KfZhNil2YTZg9iq2LHZiNmG2YonLCdQYXNzd29yZCc6J9mD2YTZhdipINin2YTZhdix2YjYsScsJ1N1Ym1pdCc6J9il2LHYs9in2YQnLCdTYXZlJzon2K3Zgdi4J30sCiAgZnI6eydTZWxsIHNvbWV0aGluZyDigJQgRlJFRSc6J1ZlbmRyZSB1biBhcnRpY2xlIOKAlCBHUkFUVUlUJywnU2VsbGVyICYgU2VydmljZSBQcm92aWRlciBDZW50cmUnOidFc3BhY2UgdmVuZGV1cnMgZXQgcHJlc3RhdGFpcmVzJywnTXkgYWNjb3VudCc6J01vbiBjb21wdGUnLCdFbWFpbCc6J0UtbWFpbCcsJ1Bhc3N3b3JkJzonTW90IGRlIHBhc3NlJywnU3VibWl0JzonRW52b3llcicsJ1NhdmUnOidFbnJlZ2lzdHJlcid9LAogIGVzOnsnU2VsbCBzb21ldGhpbmcg4oCUIEZSRUUnOidWZW5kZXIgYWxnbyDigJQgR1JBVElTJywnU2VsbGVyICYgU2VydmljZSBQcm92aWRlciBDZW50cmUnOidDZW50cm8gZGUgdmVuZGVkb3JlcyB5IHByb3ZlZWRvcmVzJywnTXkgYWNjb3VudCc6J01pIGN1ZW50YScsJ0VtYWlsJzonQ29ycmVvIGVsZWN0csOzbmljbycsJ1Bhc3N3b3JkJzonQ29udHJhc2XDsWEnLCdTdWJtaXQnOidFbnZpYXInLCdTYXZlJzonR3VhcmRhcid9LAogIHB0OnsnU2VsbCBzb21ldGhpbmcg4oCUIEZSRUUnOidWZW5kZXIgYWxnbyDigJQgR1LDgVRJUycsJ1NlbGxlciAmIFNlcnZpY2UgUHJvdmlkZXIgQ2VudHJlJzonQ2VudHJvIGRlIHZlbmRlZG9yZXMgZSBwcmVzdGFkb3JlcycsJ015IGFjY291bnQnOidBIG1pbmhhIGNvbnRhJywnRW1haWwnOidFLW1haWwnLCdQYXNzd29yZCc6J1BhbGF2cmEtcGFzc2UnLCdTdWJtaXQnOidFbnZpYXInLCdTYXZlJzonR3VhcmRhcid9CiB9OwogY29uc3QgbmFtZXM9e2VuOidFbmdsaXNoJyxhZjonQWZyaWthYW5zJyxhcjon2KfZhNi52LHYqNmK2KknLGZyOidGcmFuw6dhaXMnLGVzOidFc3Bhw7FvbCcscHQ6J1BvcnR1Z3XDqnMnfTsKIGZ1bmN0aW9uIGNob3Nlbigpe3RyeXtjb25zdCB2PWxvY2FsU3RvcmFnZS5nZXRJdGVtKCdzaG9wZHJvcC11aS1sYW5ndWFnZScpO2lmKG5hbWVzW3ZdKXJldHVybiB2O31jYXRjaChfKXt9Y29uc3QgYj0obmF2aWdhdG9yLmxhbmd1YWdlfHwnZW4nKS5zcGxpdCgnLScpWzBdLnRvTG93ZXJDYXNlKCk7cmV0dXJuIG5hbWVzW2JdP2I6J2VuJzt9CiBmdW5jdGlvbiBpbml0KCl7CiAgIGlmKGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdzaG9wZHJvcC1sYW5ndWFnZS1zZWxlY3QnKSlyZXR1cm47CiAgIGNvbnN0IHdyYXA9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnZGl2Jyk7d3JhcC5zdHlsZS5jc3NUZXh0PSdtYXgtd2lkdGg6NjUwcHg7bWFyZ2luOjhweCBhdXRvO3BhZGRpbmc6OHB4IDE0cHg7Zm9udDoxNHB4IEFyaWFsLHNhbnMtc2VyaWYnOwogICBjb25zdCBsYWJlbD1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCdsYWJlbCcpO2xhYmVsLmh0bWxGb3I9J3Nob3Bkcm9wLWxhbmd1YWdlLXNlbGVjdCc7bGFiZWwudGV4dENvbnRlbnQ9J0xhbmd1YWdlOiAnOwogICBjb25zdCBzZWw9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnc2VsZWN0Jyk7c2VsLmlkPSdzaG9wZHJvcC1sYW5ndWFnZS1zZWxlY3QnO3NlbC5zZXRBdHRyaWJ1dGUoJ2FyaWEtbGFiZWwnLCdXZWJzaXRlIGxhbmd1YWdlJyk7c2VsLnN0eWxlLmNzc1RleHQ9J3dpZHRoOmF1dG87bWF4LXdpZHRoOjE4MHB4O3BhZGRpbmc6N3B4O2NvbG9yOiMxNzIwMmE7YmFja2dyb3VuZDp3aGl0ZSc7CiAgIGZvcihjb25zdCBbY29kZSxuYW1lXSBvZiBPYmplY3QuZW50cmllcyhuYW1lcykpe2NvbnN0IG9wdD1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCdvcHRpb24nKTtvcHQudmFsdWU9Y29kZTtvcHQudGV4dENvbnRlbnQ9bmFtZTtzZWwuYXBwZW5kQ2hpbGQob3B0KTt9CiAgIHdyYXAuYXBwZW5kKGxhYmVsLHNlbCk7ZG9jdW1lbnQuYm9keS5pbnNlcnRCZWZvcmUod3JhcCxkb2N1bWVudC5ib2R5LmZpcnN0Q2hpbGQpOwogICBjb25zdCBub2Rlcz1bLi4uZG9jdW1lbnQucXVlcnlTZWxlY3RvckFsbCgnaDEsbGFiZWwsYnV0dG9uJyldLmZpbHRlcihlbD0+IWVsLmNoaWxkcmVuLmxlbmd0aCk7CiAgIGZvcihjb25zdCBlbCBvZiBub2RlcyllbC5kYXRhc2V0LnNob3Bkcm9wT3JpZ2luYWxUZXh0PWVsLnRleHRDb250ZW50LnRyaW0oKTsKICAgZnVuY3Rpb24gYXBwbHkobGFuZyl7ZG9jdW1lbnQuZG9jdW1lbnRFbGVtZW50Lmxhbmc9bGFuZztmb3IoY29uc3QgZWwgb2Ygbm9kZXMpe2NvbnN0IHY9ZWwuZGF0YXNldC5zaG9wZHJvcE9yaWdpbmFsVGV4dDtlbC50ZXh0Q29udGVudD1kaWN0W2xhbmddPy5bdl18fHY7fXNlbC52YWx1ZT1sYW5nO30KICAgc2VsLmFkZEV2ZW50TGlzdGVuZXIoJ2NoYW5nZScsKCk9Pnt0cnl7bG9jYWxTdG9yYWdlLnNldEl0ZW0oJ3Nob3Bkcm9wLXVpLWxhbmd1YWdlJyxzZWwudmFsdWUpfWNhdGNoKF8pe31hcHBseShzZWwudmFsdWUpfSk7CiAgIGFwcGx5KGNob3NlbigpKTsKIH0KIGlmKGRvY3VtZW50LnJlYWR5U3RhdGU9PT0nbG9hZGluZycpZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcignRE9NQ29udGVudExvYWRlZCcsaW5pdCx7b25jZTp0cnVlfSk7ZWxzZSBpbml0KCk7Cn0pKCk7Cg=='))
+          for p in pages:
+              original=p.read_text()
+              updated=original.replace('</body>','<script defer src="shopdrop-seller-language.js"></script></body>')
+              if updated.replace('<script defer src="shopdrop-seller-language.js"></script>','')!=original:
+                  raise SystemExit('STOP: preservation failed')
+              p.write_text(updated)
+          PY
+          git diff --check
+          git add public/seller-apply.html public/seller.html public/account.html public/shopdrop-seller-language.js
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Add multilingual interface to seller and account pages'
+          git push origin HEAD:shopdrop-phase6-integration
