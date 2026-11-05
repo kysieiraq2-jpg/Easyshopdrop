@@ -931,6 +931,21 @@ Deno.serve(
       body.scan_event_code ?? body.scan_code ??
       (normalize(body.event_type) === "scan" ? body.event_code : ""),
     );
+    const scannerMarked =
+      normalize(body.event_type) === "scan" ||
+      normalize(body.event_type) === "courier_scan" ||
+      body.scan_event_code !== undefined ||
+      body.scan_code !== undefined ||
+      body.scan_occurred_at !== undefined ||
+      body.proof_of_delivery_reference !== undefined ||
+      body.pod_reference !== undefined;
+    if (scannerMarked && !scannerCode) {
+      return response({
+        ok: false,
+        error: "scanner_event_code_required",
+        seller_payout_released: false,
+      }, 400);
+    }
     if (scannerCode) {
       const finalScanCodes = new Set([
         "delivered", "delivery_completed", "proof_of_delivery", "pod_confirmed",
