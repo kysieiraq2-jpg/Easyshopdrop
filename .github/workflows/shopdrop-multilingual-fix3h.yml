@@ -1,0 +1,44 @@
+name: ShopDrop Multilingual Fix 3H - Arabic Text Direction
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - .github/workflows/shopdrop-multilingual-fix3h.yml
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+      - name: Append Arabic direction support without changing existing scripts
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64
+          paths=['public/shopdrop-language.js', 'public/shopdrop-account-language.js', 'public/shopdrop-seller-language.js', 'public/shopdrop-buyer-language.js', 'public/shopdrop-info-language.js']
+          marker='Shop&Drop Fix 3H: Arabic text direction'
+          addition=base64.b64decode('Ci8qIFNob3AmRHJvcCBGaXggM0g6IEFyYWJpYyB0ZXh0IGRpcmVjdGlvbiB3aXRob3V0IGNoYW5naW5nIGZvcm0gb3IgcGFnZSBsYXlvdXQuICovCigoKSA9PiB7CiAgJ3VzZSBzdHJpY3QnOwogIGZ1bmN0aW9uIGNob3NlbigpIHsKICAgIHRyeSB7CiAgICAgIGNvbnN0IHNhdmVkPWxvY2FsU3RvcmFnZS5nZXRJdGVtKCdzaG9wZHJvcC11aS1sYW5ndWFnZScpOwogICAgICBpZiAoc2F2ZWQpIHJldHVybiBzYXZlZDsKICAgIH0gY2F0Y2ggKF8pIHt9CiAgICByZXR1cm4gKG5hdmlnYXRvci5sYW5ndWFnZXx8J2VuJykudG9Mb3dlckNhc2UoKS5zcGxpdCgnLScpWzBdOwogIH0KICBmdW5jdGlvbiBhcHBseSgpIHsKICAgIGNvbnN0IGFyYWJpYz1jaG9zZW4oKT09PSdhcic7CiAgICAvLyBQcmVzZXJ2ZSB0aGUgb3ZlcmFsbCBsYXlvdXQsIGlucHV0IGRpcmVjdGlvbiBhbmQgbnVtZXJpYy9jdXJyZW5jeSBmb3JtYXR0aW5nLgogICAgZG9jdW1lbnQucXVlcnlTZWxlY3RvckFsbCgnaDEsaDIsaDMsI21lbnUgYSwjbWVudSBidXR0b24sLnNob3Bkcm9wLW1haW4tbWVudSBhJykuZm9yRWFjaChlbD0+ewogICAgICBpZiAoIWVsLmRhdGFzZXQuc2hvcGRyb3BEaXJlY3Rpb25PcmlnaW5hbCkgewogICAgICAgIGVsLmRhdGFzZXQuc2hvcGRyb3BEaXJlY3Rpb25PcmlnaW5hbD1lbC5nZXRBdHRyaWJ1dGUoJ2RpcicpfHwndW5zZXQnOwogICAgICB9CiAgICAgIGlmIChhcmFiaWMpIHsKICAgICAgICBlbC5zZXRBdHRyaWJ1dGUoJ2RpcicsJ3J0bCcpOwogICAgICAgIGVsLnN0eWxlLnRleHRBbGlnbj0nc3RhcnQnOwogICAgICB9IGVsc2UgewogICAgICAgIGNvbnN0IG9yaWdpbmFsPWVsLmRhdGFzZXQuc2hvcGRyb3BEaXJlY3Rpb25PcmlnaW5hbDsKICAgICAgICBpZihvcmlnaW5hbD09PSd1bnNldCcpZWwucmVtb3ZlQXR0cmlidXRlKCdkaXInKTsKICAgICAgICBlbHNlIGVsLnNldEF0dHJpYnV0ZSgnZGlyJyxvcmlnaW5hbCk7CiAgICAgICAgZWwuc3R5bGUucmVtb3ZlUHJvcGVydHkoJ3RleHQtYWxpZ24nKTsKICAgICAgfQogICAgfSk7CiAgfQogIGZ1bmN0aW9uIGluaXQoKXsKICAgIGFwcGx5KCk7CiAgICBkb2N1bWVudC5hZGRFdmVudExpc3RlbmVyKCdjaGFuZ2UnLGU9PnsKICAgICAgaWYoZS50YXJnZXQgJiYgZS50YXJnZXQubWF0Y2hlcygnc2VsZWN0W2lkKj0ibGFuZ3VhZ2UiXScpKSB7CiAgICAgICAgcXVldWVNaWNyb3Rhc2soYXBwbHkpOwogICAgICB9CiAgICB9KTsKICAgIHdpbmRvdy5hZGRFdmVudExpc3RlbmVyKCdzdG9yYWdlJyxlPT57CiAgICAgIGlmKGUua2V5PT09J3Nob3Bkcm9wLXVpLWxhbmd1YWdlJylhcHBseSgpOwogICAgfSk7CiAgfQogIGlmKGRvY3VtZW50LnJlYWR5U3RhdGU9PT0nbG9hZGluZycpZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcignRE9NQ29udGVudExvYWRlZCcsaW5pdCx7b25jZTp0cnVlfSk7CiAgZWxzZSBpbml0KCk7Cn0pKCk7Cg==').decode('utf-8')
+          for name in paths:
+              p=Path(name)
+              if not p.is_file(): raise SystemExit('STOP: missing '+name)
+              original=p.read_text()
+              if marker in original: raise SystemExit('STOP: already installed '+name)
+              if 'shopdrop-ui-language' not in original: raise SystemExit('STOP: wrong source '+name)
+          for name in paths:
+              p=Path(name)
+              original=p.read_text()
+              updated=original+addition
+              if not updated.startswith(original): raise SystemExit('STOP: preservation failure')
+              p.write_text(updated)
+              print('Preserved and extended:',name)
+          PY
+          git diff --check
+          git add public/shopdrop-language.js public/shopdrop-account-language.js public/shopdrop-seller-language.js public/shopdrop-buyer-language.js public/shopdrop-info-language.js
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Add Arabic text direction safeguards to existing language scripts'
+          git push origin HEAD:shopdrop-phase6-integration
