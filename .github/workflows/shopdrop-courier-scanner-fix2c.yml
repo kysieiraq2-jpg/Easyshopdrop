@@ -1,0 +1,43 @@
+name: ShopDrop Courier Scanner Fix 2C - GitHub Sync
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - .github/workflows/shopdrop-courier-scanner-fix2c.yml
+permissions:
+  contents: write
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+      - name: Preserve and synchronize scanner safeguard
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          p = Path('supabase/functions/courier-tracking-webhook/index.ts')
+          original = p.read_text()
+          expected_sha = 'b487bf637c984edb466671c968fb9d42b7914679'
+          actual_sha = subprocess.check_output(['git','hash-object',str(p)],text=True).strip()
+          if actual_sha != expected_sha:
+              raise SystemExit('STOP: unexpected webhook version; nothing changed')
+          anchor = '    if (scannerCode) {\n      const finalScanCodes'
+          if original.count(anchor) != 1 or 'scanner_event_code_required' in original:
+              raise SystemExit('STOP: unexpected baseline or already fixed')
+          patch = '    const scannerMarked =\n      normalize(body.event_type) === "scan" ||\n      normalize(body.event_type) === "courier_scan" ||\n      body.scan_event_code !== undefined ||\n      body.scan_code !== undefined ||\n      body.scan_occurred_at !== undefined ||\n      body.proof_of_delivery_reference !== undefined ||\n      body.pod_reference !== undefined;\n    if (scannerMarked && !scannerCode) {\n      return response({\n        ok: false,\n        error: "scanner_event_code_required",\n        seller_payout_released: false,\n      }, 400);\n    }\n'
+          updated = original.replace(anchor, patch + anchor)
+          if updated.replace(patch,'') != original:
+              raise SystemExit('STOP: original source preservation failed')
+          p.write_text(updated)
+          print('Original preserved; new line count:',len(updated.splitlines()))
+          PY
+          git diff --check
+          git add supabase/functions/courier-tracking-webhook/index.ts
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Sync courier scanner missing-code safeguard from Supabase'
+          git push origin HEAD:shopdrop-phase6-integration
