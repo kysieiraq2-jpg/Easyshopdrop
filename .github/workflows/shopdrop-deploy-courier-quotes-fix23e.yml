@@ -1,0 +1,46 @@
+name: ShopDrop - Approved Courier Quotes Fix 23E Deploy
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - .github/workflows/shopdrop-deploy-courier-quotes-fix23e.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shopdrop-courier-quotes-fix23e-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out integration branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify approved source and security guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object supabase/functions/courier-quotes/index.ts)" = '6f8ef66dbea47b6201917672245170f6b7e4043f'
+          grep -Fq 'delivery_address_not_authorized' supabase/functions/courier-quotes/index.ts
+          grep -Fq 'delivery_address_lookup_failed' supabase/functions/courier-quotes/index.ts
+          test "$(git branch --show-current)" = 'shopdrop-phase6-integration' || test "$GITHUB_REF" = 'refs/heads/shopdrop-phase6-integration'
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Deploy courier-quotes only with JWT verification
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$PROJECT_REF"
+          supabase functions deploy courier-quotes --project-ref "$PROJECT_REF" --use-api
