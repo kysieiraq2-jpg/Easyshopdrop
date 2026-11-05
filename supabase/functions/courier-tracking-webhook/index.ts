@@ -923,6 +923,46 @@ Deno.serve(
     }
 
     /*
+     * SHOPDROP COURIER SCANNER INTEGRATION — authenticated and matched.
+     * Scan evidence is a candidate only; the existing delivery
+     * verification worker and payout gates remain unchanged.
+     */
+    const scannerCode = normalize(
+      body.scan_event_code ?? body.scan_code ??
+      (normalize(body.event_type) === "scan" ? body.event_code : ""),
+    );
+    if (scannerCode) {
+      const finalScanCodes = new Set([
+        "delivered", "delivery_completed", "proof_of_delivery", "pod_confirmed",
+      ]);
+      const nonFinalScanCodes = new Set([
+        "picked_up", "pickup", "collected", "in_transit", "at_depot",
+        "out_for_delivery", "delivery_attempted", "exception", "returned",
+      ]);
+      const scanTime = Date.parse(text(
+        body.scan_occurred_at ?? body.occurred_at ?? body.event_time,
+      ));
+      const podReference = text(
+        body.proof_of_delivery_reference ?? body.pod_reference,
+      );
+      if (!eventId || !Number.isFinite(scanTime) ||
+          scanTime > Date.now() + 300000 ||
+          (!finalScanCodes.has(scannerCode) && !nonFinalScanCodes.has(scannerCode))) {
+        return response({ok:false,error:"invalid_courier_scan_evidence",
+          seller_payout_released:false},400);
+      }
+      if (finalScanCodes.has(scannerCode) &&
+          (!podReference || status !== "delivered")) {
+        return response({ok:false,error:"scan_delivery_requires_pod_and_delivered_status",
+          seller_payout_released:false},400);
+      }
+      if (nonFinalScanCodes.has(scannerCode) && status === "delivered") {
+        return response({ok:false,error:"non_delivery_scan_cannot_confirm_delivery",
+          seller_payout_released:false},400);
+      }
+    }
+
+    /*
      * ========================================================
      * IDEMPOTENCY
      * ========================================================
