@@ -1,0 +1,43 @@
+name: ShopDrop Multilingual Fix 3I - Form Labels
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - .github/workflows/shopdrop-multilingual-fix3i.yml
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+      - name: Add form-label translations preserving all existing code
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64
+          pages=[Path('public/register.html'),Path('public/seller-apply.html'),Path('public/checkout.html')]
+          for p in pages:
+              if not p.is_file(): raise SystemExit('STOP missing '+str(p))
+              s=p.read_text()
+              if s.count('</body>')!=1 or 'shopdrop-form-language.js' in s:
+                  raise SystemExit('STOP unexpected source '+str(p))
+          target=Path('public/shopdrop-form-language.js')
+          if target.exists(): raise SystemExit('STOP existing script')
+          target.write_bytes(base64.b64decode('LyogU2hvcCZEcm9wIEZpeCAzSTogYWRkaXRpb25hbCBmb3JtIGxhYmVscyBvbmx5LiBObyBpbnB1dCB2YWx1ZXMgb3IgdmFsaWRhdGlvbiBjaGFuZ2VzLiAqLwooKCkgPT4gewogJ3VzZSBzdHJpY3QnOwogY29uc3QgbmFtZXM9WydlbicsJ2FmJywnYXInLCdmcicsJ2VzJywncHQnXTsKIGNvbnN0IHRyYW5zbGF0aW9ucz17CiAgJ01vYmlsZSBudW1iZXIgKGludGVybmF0aW9uYWwgZm9ybWF0KSc6e2FmOidTZWxmb29ubm9tbWVyIChpbnRlcm5hc2lvbmFsZSBmb3JtYWF0KScsYXI6J9ix2YLZhSDYp9mE2YfYp9iq2YEgKNio2KfZhNiq2YbYs9mK2YIg2KfZhNiv2YjZhNmKKScsZnI6J051bcOpcm8gZGUgbW9iaWxlIChmb3JtYXQgaW50ZXJuYXRpb25hbCknLGVzOidOw7ptZXJvIGRlIG3Ds3ZpbCAoZm9ybWF0byBpbnRlcm5hY2lvbmFsKScscHQ6J07Dum1lcm8gZGUgdGVsZW3Ds3ZlbCAoZm9ybWF0byBpbnRlcm5hY2lvbmFsKSd9LAogICdTZWxsZXIgdHlwZSc6e2FmOidWZXJrb3BlcnRpcGUnLGFyOifZhtmI2Lkg2KfZhNio2KfYpti5JyxmcjonVHlwZSBkZSB2ZW5kZXVyJyxlczonVGlwbyBkZSB2ZW5kZWRvcicscHQ6J1RpcG8gZGUgdmVuZGVkb3InfSwKICAnU2VsbGVyIC8gYnVzaW5lc3MgbmFtZSc6e2FmOidWZXJrb3Blci0gLyBiZXNpZ2hlaWRzbmFhbScsYXI6J9in2LPZhSDYp9mE2KjYp9im2LkgLyDYp9mE2YbYtNin2Lcg2KfZhNiq2KzYp9ix2YonLGZyOidOb20gZHUgdmVuZGV1ciAvIGVudHJlcHJpc2UnLGVzOidOb21icmUgZGVsIHZlbmRlZG9yIC8gZW1wcmVzYScscHQ6J05vbWUgZG8gdmVuZGVkb3IgLyBlbXByZXNhJ30sCiAgJ0NvdW50cnknOnthZjonTGFuZCcsYXI6J9in2YTYqNmE2K8nLGZyOidQYXlzJyxlczonUGHDrXMnLHB0OidQYcOtcyd9LAogICdDZWxscGhvbmUnOnthZjonU2VsZm9vbicsYXI6J9in2YTZh9in2KrZgSDYp9mE2YXYrdmF2YjZhCcsZnI6J1TDqWzDqXBob25lIHBvcnRhYmxlJyxlczonVGVsw6lmb25vIG3Ds3ZpbCcscHQ6J1RlbGVtw7N2ZWwnfSwKICAnV2hhdHNBcHAgKG9wdGlvbmFsKSc6e2FmOidXaGF0c0FwcCAob3BzaW9uZWVsKScsYXI6J9mI2KfYqtiz2KfYqCAo2KfYrtiq2YrYp9ix2YopJyxmcjonV2hhdHNBcHAgKGZhY3VsdGF0aWYpJyxlczonV2hhdHNBcHAgKG9wY2lvbmFsKScscHQ6J1doYXRzQXBwIChvcGNpb25hbCknfSwKICAnQ2hvb3NlIGhvdyB5b3Ugd291bGQgbGlrZSB0byBwYXknOnthZjonS2llcyBob2Ugankgd2lsIGJldGFhbCcsYXI6J9in2K7YqtixINi32LHZitmC2Kkg2KfZhNiv2YHYuScsZnI6J0Nob2lzaXNzZXogdm90cmUgbW9kZSBkZSBwYWllbWVudCcsZXM6J0VsaWdlIGPDs21vIGRlc2VhcyBwYWdhcicscHQ6J0VzY29saGEgY29tbyBwcmV0ZW5kZSBwYWdhcid9LAogICdDb3VyaWVyIGNvbXBhbnknOnthZjonS29lcmllcm1hYXRza2FwcHknLGFyOifYtNix2YPYqSDYp9mE2KrZiNi12YrZhCcsZnI6J1RyYW5zcG9ydGV1cicsZXM6J0VtcHJlc2EgZGUgbWVuc2FqZXLDrWEnLHB0OidUcmFuc3BvcnRhZG9yYSd9CiB9OwogY29uc3QgcGxhY2Vob2xkZXJzPXsKICAnQWRkcmVzcyBsYWJlbCc6e2FmOidBZHJlc2JlbmFtaW5nJyxhcjon2KfYs9mFINin2YTYudmG2YjYp9mGJyxmcjonTGliZWxsw6kgZGUgbOKAmWFkcmVzc2UnLGVzOidFdGlxdWV0YSBkZSBkaXJlY2Npw7NuJyxwdDonTm9tZSBkYSBtb3JhZGEnfSwKICAnUmVjaXBpZW50IG5hbWUnOnthZjonT250dmFuZ2VyIHNlIG5hYW0nLGFyOifYp9iz2YUg2KfZhNmF2LPYqtmE2YUnLGZyOidOb20gZHUgZGVzdGluYXRhaXJlJyxlczonTm9tYnJlIGRlbCBkZXN0aW5hdGFyaW8nLHB0OidOb21lIGRvIGRlc3RpbmF0w6FyaW8nfSwKICAnU3RyZWV0IGFkZHJlc3MnOnthZjonU3RyYWF0YWRyZXMnLGFyOifYudmG2YjYp9mGINin2YTYtNin2LHYuScsZnI6J0FkcmVzc2UnLGVzOidEaXJlY2Npw7NuJyxwdDonTW9yYWRhJ30sCiAgJ0NpdHknOnthZjonU3RhZCcsYXI6J9in2YTZhdiv2YrZhtipJyxmcjonVmlsbGUnLGVzOidDaXVkYWQnLHB0OidDaWRhZGUnfSwKICAnU3RhdGUgLyBQcm92aW5jZSAvIFJlZ2lvbic6e2FmOidTdGFhdCAvIFByb3ZpbnNpZSAvIFN0cmVlaycsYXI6J9in2YTZiNmE2KfZitipIC8g2KfZhNmF2K3Yp9mB2LjYqSAvINin2YTZhdmG2LfZgtipJyxmcjonw4l0YXQgLyBQcm92aW5jZSAvIFLDqWdpb24nLGVzOidFc3RhZG8gLyBQcm92aW5jaWEgLyBSZWdpw7NuJyxwdDonRXN0YWRvIC8gUHJvdsOtbmNpYSAvIFJlZ2nDo28nfSwKICAnUG9zdGFsIC8gWklQIGNvZGUnOnthZjonUG9za29kZScsYXI6J9in2YTYsdmF2LIg2KfZhNio2LHZitiv2YonLGZyOidDb2RlIHBvc3RhbCcsZXM6J0PDs2RpZ28gcG9zdGFsJyxwdDonQ8OzZGlnbyBwb3N0YWwnfSwKICAnU2VhcmNoIGNvdXJpZXIgbmFtZSc6e2FmOidTb2VrIGtvZXJpZXJuYWFtJyxhcjon2KfYqNit2Ksg2LnZhiDYtNix2YPYqSDYqtmI2LXZitmEJyxmcjonUmVjaGVyY2hlciB1biB0cmFuc3BvcnRldXInLGVzOidCdXNjYXIgZW1wcmVzYSBkZSBtZW5zYWplcsOtYScscHQ6J1Blc3F1aXNhciB0cmFuc3BvcnRhZG9yYSd9LAogICdNb2JpbGUgbnVtYmVyJzp7YWY6J1NlbGZvb25ub21tZXInLGFyOifYsdmC2YUg2KfZhNmH2KfYqtmBINin2YTZhdit2YXZiNmEJyxmcjonTnVtw6lybyBkZSBtb2JpbGUnLGVzOidOw7ptZXJvIGRlIG3Ds3ZpbCcscHQ6J07Dum1lcm8gZGUgdGVsZW3Ds3ZlbCd9CiB9OwogZnVuY3Rpb24gbGFuZygpewogICB0cnl7Y29uc3Qgdj1sb2NhbFN0b3JhZ2UuZ2V0SXRlbSgnc2hvcGRyb3AtdWktbGFuZ3VhZ2UnKTtpZihuYW1lcy5pbmNsdWRlcyh2KSlyZXR1cm4gdjt9Y2F0Y2goXyl7fQogICBjb25zdCB2PShuYXZpZ2F0b3IubGFuZ3VhZ2V8fCdlbicpLnRvTG93ZXJDYXNlKCkuc3BsaXQoJy0nKVswXTtyZXR1cm4gbmFtZXMuaW5jbHVkZXModik/djonZW4nOwogfQogZnVuY3Rpb24gaW5pdCgpewogICBjb25zdCBsYWJlbHM9Wy4uLmRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoJ2xhYmVsJyldLmZpbHRlcihlPT4hZS5jaGlsZHJlbi5sZW5ndGggJiYgdHJhbnNsYXRpb25zW2UudGV4dENvbnRlbnQudHJpbSgpXSk7CiAgIGNvbnN0IGlucHV0cz1bLi4uZG9jdW1lbnQucXVlcnlTZWxlY3RvckFsbCgnaW5wdXQnKV0uZmlsdGVyKGU9PnBsYWNlaG9sZGVyc1tlLmdldEF0dHJpYnV0ZSgncGxhY2Vob2xkZXInKV0pOwogICBmb3IoY29uc3QgZSBvZiBsYWJlbHMpZS5kYXRhc2V0LnNob3Bkcm9wRm9ybU9yaWdpbmFsPWUudGV4dENvbnRlbnQudHJpbSgpOwogICBmb3IoY29uc3QgZSBvZiBpbnB1dHMpZS5kYXRhc2V0LnNob3Bkcm9wUGxhY2Vob2xkZXJPcmlnaW5hbD1lLmdldEF0dHJpYnV0ZSgncGxhY2Vob2xkZXInKTsKICAgZnVuY3Rpb24gYXBwbHkoY29kZSl7CiAgICAgZm9yKGNvbnN0IGUgb2YgbGFiZWxzKXsKICAgICAgIGNvbnN0IGtleT1lLmRhdGFzZXQuc2hvcGRyb3BGb3JtT3JpZ2luYWw7CiAgICAgICBlLnRleHRDb250ZW50PXRyYW5zbGF0aW9uc1trZXldPy5bY29kZV18fGtleTsKICAgICB9CiAgICAgZm9yKGNvbnN0IGUgb2YgaW5wdXRzKXsKICAgICAgIGNvbnN0IGtleT1lLmRhdGFzZXQuc2hvcGRyb3BQbGFjZWhvbGRlck9yaWdpbmFsOwogICAgICAgZS5zZXRBdHRyaWJ1dGUoJ3BsYWNlaG9sZGVyJyxwbGFjZWhvbGRlcnNba2V5XT8uW2NvZGVdfHxrZXkpOwogICAgIH0KICAgfQogICBkb2N1bWVudC5hZGRFdmVudExpc3RlbmVyKCdjaGFuZ2UnLGV2ZW50PT57CiAgICAgaWYoZXZlbnQudGFyZ2V0Py5tYXRjaGVzKCdzZWxlY3RbaWQqPSJsYW5ndWFnZSJdJykpYXBwbHkoZXZlbnQudGFyZ2V0LnZhbHVlKTsKICAgfSk7CiAgIGFwcGx5KGxhbmcoKSk7CiB9CiBpZihkb2N1bWVudC5yZWFkeVN0YXRlPT09J2xvYWRpbmcnKWRvY3VtZW50LmFkZEV2ZW50TGlzdGVuZXIoJ0RPTUNvbnRlbnRMb2FkZWQnLGluaXQse29uY2U6dHJ1ZX0pO2Vsc2UgaW5pdCgpOwp9KSgpOwo='))
+          for p in pages:
+              old=p.read_text()
+              new=old.replace('</body>','<script defer src="shopdrop-form-language.js"></script></body>')
+              if new.replace('<script defer src="shopdrop-form-language.js"></script>','')!=old:
+                  raise SystemExit('STOP preservation check failed')
+              p.write_text(new)
+          PY
+          git diff --check
+          git add public/register.html public/seller-apply.html public/checkout.html public/shopdrop-form-language.js
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Add multilingual form labels without changing validation or checkout'
+          git push origin HEAD:shopdrop-phase6-integration
