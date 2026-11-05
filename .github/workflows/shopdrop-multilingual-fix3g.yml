@@ -1,0 +1,41 @@
+name: ShopDrop Multilingual Fix 3G - Legal Language Selector
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - .github/workflows/shopdrop-multilingual-fix3g.yml
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+      - name: Add legal page language selector without changing legal text
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64
+          pages=[Path('public/terms.html'),Path('public/privacy.html')]
+          for p in pages:
+              if not p.is_file():raise SystemExit(f'STOP missing {p}')
+              s=p.read_text()
+              if s.count('</body>')!=1 or 'shopdrop-legal-language.js' in s:raise SystemExit(f'STOP unexpected baseline {p}')
+          target=Path('public/shopdrop-legal-language.js')
+          if target.exists():raise SystemExit('STOP existing language script')
+          target.write_bytes(base64.b64decode('LyogU2hvcCZEcm9wIGxlZ2FsLXBhZ2UgbGFuZ3VhZ2Ugc2VsZWN0b3Ig4oCUIGRvZXMgbm90IHRyYW5zbGF0ZSBsZWdhbCB0ZXJtcy4gKi8KKCgpID0+IHsKICAndXNlIHN0cmljdCc7CiAgY29uc3QgbmFtZXM9e2VuOidFbmdsaXNoJyxhZjonQWZyaWthYW5zJyxhcjon2KfZhNi52LHYqNmK2KknLGZyOidGcmFuw6dhaXMnLGVzOidFc3Bhw7FvbCcscHQ6J1BvcnR1Z3XDqnMnfTsKICBjb25zdCBtZXNzYWdlcz17CiAgICBlbjonTGVnYWwgaW5mb3JtYXRpb24gaXMgY3VycmVudGx5IGF2YWlsYWJsZSBpbiBFbmdsaXNoLiBBbiBhcHByb3ZlZCB0cmFuc2xhdGlvbiBpcyBub3QgeWV0IGF2YWlsYWJsZS4nLAogICAgYWY6J1JlZ3NpbmxpZ3RpbmcgaXMgdGFucyBpbiBFbmdlbHMgYmVza2lrYmFhci4g4oCZbiBHb2VkZ2VrZXVyZGUgdmVydGFsaW5nIGlzIG5vZyBuaWUgYmVza2lrYmFhciBuaWUuJywKICAgIGFyOifYp9mE2YXYudmE2YjZhdin2Kog2KfZhNmC2KfZhtmI2YbZitipINmF2KrYp9it2Kkg2K3Yp9mE2YrYp9mLINio2KfZhNmE2LrYqSDYp9mE2KXZhtis2YTZitiy2YrYqS4g2YTYpyDYqtiq2YjZgdixINiq2LHYrNmF2Kkg2YXYudiq2YXYr9ipINio2LnYry4nLAogICAgZnI6J0xlcyBpbmZvcm1hdGlvbnMganVyaWRpcXVlcyBzb250IGFjdHVlbGxlbWVudCBlbiBhbmdsYWlzLiBBdWN1bmUgdHJhZHVjdGlvbiBhcHByb3V2w6llIG7igJllc3QgZW5jb3JlIGRpc3BvbmlibGUuJywKICAgIGVzOidMYSBpbmZvcm1hY2nDs24gbGVnYWwgZXN0w6EgZGlzcG9uaWJsZSBhY3R1YWxtZW50ZSBlbiBpbmdsw6lzLiBBw7puIG5vIGhheSB1bmEgdHJhZHVjY2nDs24gYXByb2JhZGEuJywKICAgIHB0OidBIGluZm9ybWHDp8OjbyBqdXLDrWRpY2EgZXN0w6EgYXR1YWxtZW50ZSBkaXNwb27DrXZlbCBlbSBpbmdsw6pzLiBBaW5kYSBuw6NvIGV4aXN0ZSB1bWEgdHJhZHXDp8OjbyBhcHJvdmFkYS4nCiAgfTsKICBmdW5jdGlvbiBjaG9zZW4oKXsKICAgIHRyeXtjb25zdCB2PWxvY2FsU3RvcmFnZS5nZXRJdGVtKCdzaG9wZHJvcC11aS1sYW5ndWFnZScpO2lmKG5hbWVzW3ZdKXJldHVybiB2O31jYXRjaChfKXt9CiAgICBjb25zdCBiPShuYXZpZ2F0b3IubGFuZ3VhZ2V8fCdlbicpLnRvTG93ZXJDYXNlKCkuc3BsaXQoJy0nKVswXTsKICAgIHJldHVybiBuYW1lc1tiXT9iOidlbic7CiAgfQogIGZ1bmN0aW9uIGluaXQoKXsKICAgIGlmKGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdzaG9wZHJvcC1sZWdhbC1sYW5ndWFnZScpKXJldHVybjsKICAgIGNvbnN0IHdyYXA9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnZGl2Jyk7CiAgICB3cmFwLnN0eWxlLmNzc1RleHQ9J21heC13aWR0aDo5MDBweDttYXJnaW46OHB4IGF1dG87cGFkZGluZzoxMnB4O2ZvbnQ6MTRweCBBcmlhbCxzYW5zLXNlcmlmO2JhY2tncm91bmQ6I2Y3ZjhmYTtjb2xvcjojMTcyMDJhO2JvcmRlci1yYWRpdXM6OHB4JzsKICAgIGNvbnN0IGxhYmVsPWRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ2xhYmVsJyk7CiAgICBsYWJlbC50ZXh0Q29udGVudD0nTGFuZ3VhZ2U6ICc7bGFiZWwuaHRtbEZvcj0nc2hvcGRyb3AtbGVnYWwtbGFuZ3VhZ2UnOwogICAgY29uc3Qgc2VsZWN0PWRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ3NlbGVjdCcpO3NlbGVjdC5pZD0nc2hvcGRyb3AtbGVnYWwtbGFuZ3VhZ2UnOwogICAgc2VsZWN0LnNldEF0dHJpYnV0ZSgnYXJpYS1sYWJlbCcsJ1dlYnNpdGUgbGFuZ3VhZ2UnKTsKICAgIGZvcihjb25zdCBbY29kZSxuYW1lXSBvZiBPYmplY3QuZW50cmllcyhuYW1lcykpewogICAgICBjb25zdCBvcHRpb249ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnb3B0aW9uJyk7b3B0aW9uLnZhbHVlPWNvZGU7b3B0aW9uLnRleHRDb250ZW50PW5hbWU7c2VsZWN0LmFwcGVuZENoaWxkKG9wdGlvbik7CiAgICB9CiAgICBjb25zdCBub3RlPWRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ3AnKTtub3RlLnNldEF0dHJpYnV0ZSgncm9sZScsJ25vdGUnKTsKICAgIHdyYXAuYXBwZW5kKGxhYmVsLHNlbGVjdCxub3RlKTsKICAgIGRvY3VtZW50LmJvZHkuaW5zZXJ0QmVmb3JlKHdyYXAsZG9jdW1lbnQuYm9keS5maXJzdENoaWxkKTsKICAgIGZ1bmN0aW9uIGFwcGx5KGxhbmcpewogICAgICBkb2N1bWVudC5kb2N1bWVudEVsZW1lbnQubGFuZz0nZW4nOyAvLyBMZWdhbCBib2R5IGlzIHN0aWxsIEVuZ2xpc2guCiAgICAgIHNlbGVjdC52YWx1ZT1sYW5nO25vdGUudGV4dENvbnRlbnQ9bWVzc2FnZXNbbGFuZ118fG1lc3NhZ2VzLmVuOwogICAgICBub3RlLmxhbmc9bGFuZztub3RlLmRpcj1sYW5nPT09J2FyJz8ncnRsJzonbHRyJzsKICAgIH0KICAgIHNlbGVjdC5hZGRFdmVudExpc3RlbmVyKCdjaGFuZ2UnLCgpPT57CiAgICAgIHRyeXtsb2NhbFN0b3JhZ2Uuc2V0SXRlbSgnc2hvcGRyb3AtdWktbGFuZ3VhZ2UnLHNlbGVjdC52YWx1ZSk7fWNhdGNoKF8pe30KICAgICAgYXBwbHkoc2VsZWN0LnZhbHVlKTsKICAgIH0pOwogICAgYXBwbHkoY2hvc2VuKCkpOwogIH0KICBpZihkb2N1bWVudC5yZWFkeVN0YXRlPT09J2xvYWRpbmcnKWRvY3VtZW50LmFkZEV2ZW50TGlzdGVuZXIoJ0RPTUNvbnRlbnRMb2FkZWQnLGluaXQse29uY2U6dHJ1ZX0pO2Vsc2UgaW5pdCgpOwp9KSgpOwo='))
+          for p in pages:
+              old=p.read_text()
+              new=old.replace('</body>','<script defer src="shopdrop-legal-language.js"></script></body>')
+              if new.replace('<script defer src="shopdrop-legal-language.js"></script>','')!=old:raise SystemExit('STOP preservation failure')
+              p.write_text(new)
+          PY
+          git diff --check
+          git add public/terms.html public/privacy.html public/shopdrop-legal-language.js
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Add saved language selector to legal pages without changing legal terms'
+          git push origin HEAD:shopdrop-phase6-integration
