@@ -42,3 +42,46 @@ function init(){
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
+
+/* Shop&Drop Fix 3H: Arabic text direction without changing form or page layout. */
+(() => {
+  'use strict';
+  function chosen() {
+    try {
+      const saved=localStorage.getItem('shopdrop-ui-language');
+      if (saved) return saved;
+    } catch (_) {}
+    return (navigator.language||'en').toLowerCase().split('-')[0];
+  }
+  function apply() {
+    const arabic=chosen()==='ar';
+    // Preserve the overall layout, input direction and numeric/currency formatting.
+    document.querySelectorAll('h1,h2,h3,#menu a,#menu button,.shopdrop-main-menu a').forEach(el=>{
+      if (!el.dataset.shopdropDirectionOriginal) {
+        el.dataset.shopdropDirectionOriginal=el.getAttribute('dir')||'unset';
+      }
+      if (arabic) {
+        el.setAttribute('dir','rtl');
+        el.style.textAlign='start';
+      } else {
+        const original=el.dataset.shopdropDirectionOriginal;
+        if(original==='unset')el.removeAttribute('dir');
+        else el.setAttribute('dir',original);
+        el.style.removeProperty('text-align');
+      }
+    });
+  }
+  function init(){
+    apply();
+    document.addEventListener('change',e=>{
+      if(e.target && e.target.matches('select[id*="language"]')) {
+        queueMicrotask(apply);
+      }
+    });
+    window.addEventListener('storage',e=>{
+      if(e.key==='shopdrop-ui-language')apply();
+    });
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
+  else init();
+})();
