@@ -1,0 +1,44 @@
+name: ShopDrop Multilingual Fix 3C - Account Pages
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - .github/workflows/shopdrop-multilingual-fix3c.yml
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+      - name: Add shared account-language script and preserve pages
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64
+          pages = [Path('public/register.html'),Path('public/sign-in.html')]
+          for p in pages:
+              if not p.is_file(): raise SystemExit(f'STOP: missing {p}')
+              text=p.read_text()
+              if text.count('</body>') != 1: raise SystemExit(f'STOP: unexpected body in {p}')
+              if 'shopdrop-account-language.js' in text: raise SystemExit(f'STOP: already installed in {p}')
+          target=Path('public/shopdrop-account-language.js')
+          if target.exists(): raise SystemExit('STOP: shared script already exists')
+          target.write_bytes(base64.b64decode('LyogU2hvcCZEcm9wIG11bHRpbGluZ3VhbCByZWdpc3RyYXRpb24vc2lnbi1pbiBicmlkZ2Ug4oCUIFVJIGxhYmVscyBvbmx5LiAqLwooKCkgPT4gewogICd1c2Ugc3RyaWN0JzsKICBjb25zdCB0cmFuc2xhdGlvbnMgPSB7CiAgICBhZjogeydDcmVhdGUgeW91ciBmcmVlIGFjY291bnQnOidTa2VwIGpvdSBncmF0aXMgcmVrZW5pbmcnLCdTaWduIGluIHRvIFNob3AmRHJvcCc6J01lbGQgYWFuIGJ5IFNob3AmRHJvcCcsJ0VtYWlsJzonRS1wb3MnLCdQYXNzd29yZCc6J1dhZ3dvb3JkJywnQ29uZmlybSBwYXNzd29yZCc6J0JldmVzdGlnIHdhZ3dvb3JkJywnQ3JlYXRlIGFjY291bnQnOidTa2VwIHJla2VuaW5nJywnU2lnbiBpbic6J01lbGQgYWFuJywnRnVsbCBuYW1lJzonVm9sbGUgbmFhbScsJ01vYmlsZSBudW1iZXInOidTZWxmb29ubm9tbWVyJ30sCiAgICBhcjogeydDcmVhdGUgeW91ciBmcmVlIGFjY291bnQnOifYo9mG2LTYpiDYrdiz2KfYqNmDINin2YTZhdis2KfZhtmKJywnU2lnbiBpbiB0byBTaG9wJkRyb3AnOifYqtiz2KzZitmEINin2YTYr9iu2YjZhCDYpdmE2YkgU2hvcCZEcm9wJywnRW1haWwnOifYp9mE2KjYsdmK2K8g2KfZhNil2YTZg9iq2LHZiNmG2YonLCdQYXNzd29yZCc6J9mD2YTZhdipINin2YTZhdix2YjYsScsJ0NvbmZpcm0gcGFzc3dvcmQnOifYqtij2YPZitivINmD2YTZhdipINin2YTZhdix2YjYsScsJ0NyZWF0ZSBhY2NvdW50Jzon2KXZhti02KfYoSDYrdiz2KfYqCcsJ1NpZ24gaW4nOifYqtiz2KzZitmEINin2YTYr9iu2YjZhCcsJ0Z1bGwgbmFtZSc6J9in2YTYp9iz2YUg2KfZhNmD2KfZhdmEJywnTW9iaWxlIG51bWJlcic6J9ix2YLZhSDYp9mE2YfYp9iq2YEg2KfZhNmF2K3ZhdmI2YQnfSwKICAgIGZyOiB7J0NyZWF0ZSB5b3VyIGZyZWUgYWNjb3VudCc6J0Nyw6lleiB2b3RyZSBjb21wdGUgZ3JhdHVpdCcsJ1NpZ24gaW4gdG8gU2hvcCZEcm9wJzonU2UgY29ubmVjdGVyIMOgIFNob3AmRHJvcCcsJ0VtYWlsJzonRS1tYWlsJywnUGFzc3dvcmQnOidNb3QgZGUgcGFzc2UnLCdDb25maXJtIHBhc3N3b3JkJzonQ29uZmlybWVyIGxlIG1vdCBkZSBwYXNzZScsJ0NyZWF0ZSBhY2NvdW50JzonQ3LDqWVyIHVuIGNvbXB0ZScsJ1NpZ24gaW4nOidTZSBjb25uZWN0ZXInLCdGdWxsIG5hbWUnOidOb20gY29tcGxldCcsJ01vYmlsZSBudW1iZXInOidOdW3DqXJvIGRlIG1vYmlsZSd9LAogICAgZXM6IHsnQ3JlYXRlIHlvdXIgZnJlZSBhY2NvdW50JzonQ3JlYSB0dSBjdWVudGEgZ3JhdHVpdGEnLCdTaWduIGluIHRvIFNob3AmRHJvcCc6J0luaWNpYXIgc2VzacOzbiBlbiBTaG9wJkRyb3AnLCdFbWFpbCc6J0NvcnJlbyBlbGVjdHLDs25pY28nLCdQYXNzd29yZCc6J0NvbnRyYXNlw7FhJywnQ29uZmlybSBwYXNzd29yZCc6J0NvbmZpcm1hciBjb250cmFzZcOxYScsJ0NyZWF0ZSBhY2NvdW50JzonQ3JlYXIgY3VlbnRhJywnU2lnbiBpbic6J0luaWNpYXIgc2VzacOzbicsJ0Z1bGwgbmFtZSc6J05vbWJyZSBjb21wbGV0bycsJ01vYmlsZSBudW1iZXInOidOw7ptZXJvIGRlIG3Ds3ZpbCd9LAogICAgcHQ6IHsnQ3JlYXRlIHlvdXIgZnJlZSBhY2NvdW50JzonQ3JpZSBhIHN1YSBjb250YSBncmF0dWl0YScsJ1NpZ24gaW4gdG8gU2hvcCZEcm9wJzonSW5pY2lhciBzZXNzw6NvIG5vIFNob3AmRHJvcCcsJ0VtYWlsJzonRS1tYWlsJywnUGFzc3dvcmQnOidQYWxhdnJhLXBhc3NlJywnQ29uZmlybSBwYXNzd29yZCc6J0NvbmZpcm1hciBwYWxhdnJhLXBhc3NlJywnQ3JlYXRlIGFjY291bnQnOidDcmlhciBjb250YScsJ1NpZ24gaW4nOidJbmljaWFyIHNlc3PDo28nLCdGdWxsIG5hbWUnOidOb21lIGNvbXBsZXRvJywnTW9iaWxlIG51bWJlcic6J07Dum1lcm8gZGUgdGVsZW3Ds3ZlbCd9CiAgfTsKICBjb25zdCBuYW1lcyA9IHtlbjonRW5nbGlzaCcsYWY6J0FmcmlrYWFucycsYXI6J9in2YTYudix2KjZitipJyxmcjonRnJhbsOnYWlzJyxlczonRXNwYcOxb2wnLHB0OidQb3J0dWd1w6pzJ307CiAgY29uc3Qga2V5ID0gJ3Nob3Bkcm9wLXVpLWxhbmd1YWdlJzsKICBmdW5jdGlvbiBzZWxlY3RlZCgpIHsKICAgIHRyeSB7Y29uc3Qgdj1sb2NhbFN0b3JhZ2UuZ2V0SXRlbShrZXkpO2lmKG5hbWVzW3ZdKXJldHVybiB2O31jYXRjaChfKXt9CiAgICBjb25zdCB2PShuYXZpZ2F0b3IubGFuZ3VhZ2V8fCdlbicpLnRvTG93ZXJDYXNlKCkuc3BsaXQoJy0nKVswXTsKICAgIHJldHVybiBuYW1lc1t2XT92Oidlbic7CiAgfQogIGZ1bmN0aW9uIGluaXQoKSB7CiAgICBpZihkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnc2hvcGRyb3AtbGFuZ3VhZ2Utc2VsZWN0JykpcmV0dXJuOwogICAgY29uc3Qgd3JhcHBlcj1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCdkaXYnKTsKICAgIHdyYXBwZXIuc3R5bGUuY3NzVGV4dD0nbWF4LXdpZHRoOjY1MHB4O21hcmdpbjo4cHggYXV0bztwYWRkaW5nOjhweCAxNHB4O2ZvbnQ6MTRweCBBcmlhbCxzYW5zLXNlcmlmJzsKICAgIGNvbnN0IGxhYmVsPWRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ2xhYmVsJyk7CiAgICBsYWJlbC5odG1sRm9yPSdzaG9wZHJvcC1sYW5ndWFnZS1zZWxlY3QnO2xhYmVsLnRleHRDb250ZW50PSdMYW5ndWFnZTogJzsKICAgIGNvbnN0IHNlbGVjdD1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCdzZWxlY3QnKTsKICAgIHNlbGVjdC5pZD0nc2hvcGRyb3AtbGFuZ3VhZ2Utc2VsZWN0JztzZWxlY3Quc2V0QXR0cmlidXRlKCdhcmlhLWxhYmVsJywnV2Vic2l0ZSBsYW5ndWFnZScpOwogICAgc2VsZWN0LnN0eWxlLmNzc1RleHQ9J3dpZHRoOmF1dG87bWF4LXdpZHRoOjE4MHB4O3BhZGRpbmc6N3B4O2NvbG9yOiMxNzIwMmE7YmFja2dyb3VuZDojZmZmJzsKICAgIGZvcihjb25zdCBbY29kZSxuYW1lXSBvZiBPYmplY3QuZW50cmllcyhuYW1lcykpewogICAgICBjb25zdCBvcHQ9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnb3B0aW9uJyk7b3B0LnZhbHVlPWNvZGU7b3B0LnRleHRDb250ZW50PW5hbWU7c2VsZWN0LmFwcGVuZENoaWxkKG9wdCk7CiAgICB9CiAgICB3cmFwcGVyLmFwcGVuZChsYWJlbCxzZWxlY3QpO2RvY3VtZW50LmJvZHkuaW5zZXJ0QmVmb3JlKHdyYXBwZXIsZG9jdW1lbnQuYm9keS5maXJzdENoaWxkKTsKICAgIGNvbnN0IG5vZGVzPVsuLi5kb2N1bWVudC5xdWVyeVNlbGVjdG9yQWxsKCdoMSxsYWJlbCxidXR0b24nKV0uZmlsdGVyKGVsPT5lbC5jaGlsZHJlbi5sZW5ndGg9PT0wKTsKICAgIGZvcihjb25zdCBlbCBvZiBub2RlcyllbC5kYXRhc2V0LnNob3Bkcm9wT3JpZ2luYWxUZXh0PWVsLnRleHRDb250ZW50LnRyaW0oKTsKICAgIGZ1bmN0aW9uIGFwcGx5KGxhbmcpewogICAgICBkb2N1bWVudC5kb2N1bWVudEVsZW1lbnQubGFuZz1sYW5nOwogICAgICBmb3IoY29uc3QgZWwgb2Ygbm9kZXMpewogICAgICAgIGNvbnN0IG9yaWdpbmFsPWVsLmRhdGFzZXQuc2hvcGRyb3BPcmlnaW5hbFRleHQ7CiAgICAgICAgZWwudGV4dENvbnRlbnQ9dHJhbnNsYXRpb25zW2xhbmddPy5bb3JpZ2luYWxdfHxvcmlnaW5hbDsKICAgICAgfQogICAgICBzZWxlY3QudmFsdWU9bGFuZzsKICAgIH0KICAgIHNlbGVjdC5hZGRFdmVudExpc3RlbmVyKCdjaGFuZ2UnLCgpPT57CiAgICAgIHRyeXtsb2NhbFN0b3JhZ2Uuc2V0SXRlbShrZXksc2VsZWN0LnZhbHVlKTt9Y2F0Y2goXyl7fQogICAgICBhcHBseShzZWxlY3QudmFsdWUpOwogICAgfSk7CiAgICBhcHBseShzZWxlY3RlZCgpKTsKICB9CiAgaWYoZG9jdW1lbnQucmVhZHlTdGF0ZT09PSdsb2FkaW5nJylkb2N1bWVudC5hZGRFdmVudExpc3RlbmVyKCdET01Db250ZW50TG9hZGVkJyxpbml0LHtvbmNlOnRydWV9KTsKICBlbHNlIGluaXQoKTsKfSkoKTsK'))
+          for p in pages:
+              old=p.read_text()
+              new=old.replace('</body>','<script defer src="shopdrop-account-language.js"></script></body>')
+              if new.replace('<script defer src="shopdrop-account-language.js"></script>','') != old:
+                  raise SystemExit('STOP: preservation check failed')
+              p.write_text(new)
+              print(p, 'original code preserved')
+          PY
+          git diff --check
+          git add public/register.html public/sign-in.html public/shopdrop-account-language.js
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Add multilingual UI to registration and sign-in pages'
+          git push origin HEAD:shopdrop-phase6-integration
