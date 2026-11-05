@@ -1,6 +1,10 @@
 name: ShopDrop Courier Scanner Fix 2 (source only)
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - .github/workflows/shopdrop-courier-scanner-fix2.yml
 permissions:
   contents: write
 jobs:
@@ -11,25 +15,25 @@ jobs:
         with:
           ref: shopdrop-phase6-integration
           persist-credentials: true
-      - name: Patch existing webhook without removing lines
+      - name: Preserve existing webhook and add scanner validation
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import subprocess
-          p=Path('supabase/functions/courier-tracking-webhook/index.ts')
-          original=p.read_text()
-          expected_blob='05aa9904ca586c90b7348da61b8cbe081d8b9786'
-          actual=subprocess.check_output(['git','hash-object',str(p)],text=True).strip()
+          p = Path('supabase/functions/courier-tracking-webhook/index.ts')
+          original = p.read_text()
+          expected_blob = '05aa9904ca586c90b7348da61b8cbe081d8b9786'
+          actual = subprocess.check_output(['git', 'hash-object', str(p)], text=True).strip()
           if actual != expected_blob:
-              raise SystemExit('STOP: webhook changed since verification; no patch applied')
-          anchor='    /*\n     * ========================================================\n     * IDEMPOTENCY'
-          if original.count(anchor)!=1 or 'SHOPDROP COURIER SCANNER INTEGRATION' in original:
-              raise SystemExit('STOP: unexpected code or already patched')
-          patch='''    /*
+              raise SystemExit('STOP: webhook changed; original preserved')
+          anchor = '    /*\n     * ========================================================\n     * IDEMPOTENCY'
+          if original.count(anchor) != 1 or 'SHOPDROP COURIER SCANNER INTEGRATION' in original:
+              raise SystemExit('STOP: baseline mismatch or already patched')
+          patch = '''    /*
                * SHOPDROP COURIER SCANNER INTEGRATION — authenticated and matched.
-               * Scan evidence is a candidate only; existing delivery worker
-               * and payout eligibility gates remain unchanged.
+               * Scan evidence is a candidate only; the existing delivery
+               * verification worker and payout gates remain unchanged.
                */
               const scannerCode = normalize(
                 body.scan_event_code ?? body.scan_code ??
@@ -67,13 +71,13 @@ jobs:
               }
 
           '''
-          updated=original.replace(anchor,patch+anchor)
-          if updated.replace(patch,'')!=original:
-              raise SystemExit('STOP: original preservation failed')
+          updated = original.replace(anchor, patch + anchor)
+          if updated.replace(patch, '') != original:
+              raise SystemExit('STOP: preservation check failed')
           p.write_text(updated)
-          print(f'Preserved original {len(original.splitlines())} lines; added {len(patch.splitlines())} lines')
+          print(f'Preserved {len(original.splitlines())} lines; added {len(patch.splitlines())} lines')
           PY
           git diff --check
           git add supabase/functions/courier-tracking-webhook/index.ts
-          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Add scanner evidence guard to existing courier tracking webhook'
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Add scanner evidence guard to preserved courier webhook'
           git push origin HEAD:shopdrop-phase6-integration
