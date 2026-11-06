@@ -1,1 +1,113 @@
 
+name: ShopDrop Fix31A Two Payment Guard
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Preserve and patch webhook
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path(
+              "supabase/functions/payment-webhook/index.ts"
+          )
+          source = path.read_text()
+
+          marker = "SHOPDROP-FIX31A-TWO-PAYMENT-GUARD"
+          anchor = "    const paidAt ="
+
+          if marker in source:
+              print("Fix31A already installed")
+              raise SystemExit(0)
+
+          if source.count(anchor) != 1:
+              raise SystemExit(
+                  "Unexpected webhook structure; no changes"
+              )
+
+          guard = '''
+    // SHOPDROP-FIX31A-TWO-PAYMENT-GUARD
+    // Existing legacy checkout remains unchanged.
+    // New two-payment orders fail closed until both
+    // independently verified payment legs are ready.
+    const {
+      data: checkoutLegs,
+      error: checkoutLegsError,
+    } = await supabase
+      .from("shopdrop_checkout_payment_legs")
+      .select("id")
+      .eq("order_id", orderId)
+      .limit(1);
+
+    if (checkoutLegsError) {
+      console.error(
+        VERSION,
+        "two-payment leg lookup failed",
+        checkoutLegsError,
+      );
+      return reply({
+        ok: false,
+        error: "checkout_leg_lookup_failed",
+      }, 500);
+    }
+
+    if ((checkoutLegs ?? []).length > 0) {
+      const {
+        data: bothConfirmed,
+        error: confirmationError,
+      } = await supabase.rpc(
+        "shopdrop_two_payment_confirmed",
+        { p_order_id: orderId },
+      );
+
+      if (confirmationError || bothConfirmed !== true) {
+        return reply({
+          ok: false,
+          error: "two_payment_confirmation_required",
+        }, 409);
+      }
+    }
+
+'''
+          updated = source.replace(
+              anchor, guard + anchor, 1
+          )
+
+          if not updated.startswith(source[:200]):
+              raise SystemExit("Unexpected modification")
+
+          path.write_text(updated)
+          print(
+              "Fix31A installed; original webhook preserved"
+          )
+          PY
+
+      - name: Commit only webhook update
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+          git add supabase/functions/payment-webhook/index.ts
+          if git diff --cached --quiet; then
+            echo "No changes required"
+          else
+            git commit -m "Fix31A guard two-payment webhook"
+            git push origin HEAD:shopdrop-phase6-integration
+          fi
+
