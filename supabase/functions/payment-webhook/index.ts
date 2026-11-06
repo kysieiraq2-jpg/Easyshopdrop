@@ -1719,7 +1719,7 @@ Deno.serve(
       await supabase
         .from("order_items")
         .select(
-          "seller_id",
+          "seller_id,product_id,product_name,quantity",
         )
         .eq(
           "order_id",
@@ -1781,7 +1781,18 @@ Deno.serve(
 
           "Shop&Drop order payment confirmed",
 
-          "Payment has been confirmed for an order containing your item(s). Prepare the applicable parcel for fulfilment.",
+          [
+          `Payment confirmed for order ${orderId}.`,
+          "Your sold items:",
+          ...(sellerRows ?? [])
+            .filter((row: Record<string, unknown>) =>
+              clean(row.seller_id) === sellerId
+            )
+            .map((row: Record<string, unknown>) =>
+              `${String(row.product_name ?? "Product").replace(/[\\r\\n]+/g, " ").slice(0, 120)} | Product: ${clean(row.product_id)} | Quantity: ${String(row.quantity ?? "")}`
+            ),
+          "Prepare the parcel for courier collection. Check Shop&Drop for fulfilment instructions.",
+        ].join("\\n"),
         );
       }
     }
