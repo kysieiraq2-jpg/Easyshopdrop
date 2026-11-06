@@ -1071,7 +1071,11 @@ async function notifyBuyer(
           "email",
 
         p_notification_type:
-          "refund",
+          subject === "Shop&Drop product refund completed"
+            ? "refund_completed"
+            : subject === "Shop&Drop product refund submitted"
+            ? "refund_requested"
+            : "account_notice",
 
         p_subject:
           subject,
