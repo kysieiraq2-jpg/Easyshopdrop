@@ -1,1 +1,99 @@
 
+name: ShopDrop Seller Sold Item Reference Fix
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - .github/workflows/shopdrop-seller-sold-item-reference-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out integration branch
+        uses: actions/checkout@v4
+
+      - name: Verify original payment webhook
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/shopdrop-phase6-integration"
+          test "$(git hash-object supabase/functions/payment-webhook/index.ts)" = "b15673182b473c67a11aaa4760f58e957dd39891"
+
+      - name: Update seller sold-item notification
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("supabase/functions/payment-webhook/index.ts")
+          source = path.read_text()
+
+          old_select = '''        .select(
+                    "seller_id",
+                  )'''
+
+          new_select = '''        .select(
+                    "seller_id,product_id,product_name,quantity",
+                  )'''
+
+          old_message = '"Payment has been confirmed for an order containing your item(s). Prepare the applicable parcel for fulfilment."'
+
+          new_message = '''[
+                    `Payment confirmed for order ${orderId}.`,
+                    "Your sold items:",
+                    ...(sellerRows ?? [])
+                      .filter((row: Record<string, unknown>) =>
+                        clean(row.seller_id) === sellerId
+                      )
+                      .map((row: Record<string, unknown>) =>
+                        `${String(row.product_name ?? "Product").replace(/[\\\\r\\\\n]+/g, " ").slice(0, 120)} | Product: ${clean(row.product_id)} | Quantity: ${String(row.quantity ?? "")}`
+                      ),
+                    "Prepare the parcel for courier collection. Check Shop&Drop for fulfilment instructions.",
+                  ].join("\\\\n")'''
+
+          assert source.count(old_select) == 1, "Seller query not found"
+          assert source.count(old_message) == 1, "Seller message not found"
+
+          updated = source.replace(old_select, new_select)
+          updated = updated.replace(old_message, new_message)
+
+          assert "commit_paid_order_inventory" in updated
+          assert "shopdrop_queue_late_payment_refund" in updated
+
+          path.write_text(updated)
+          print("Seller notification updated safely.")
+          PY
+
+      - name: Commit updated webhook
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add supabase/functions/payment-webhook/index.ts
+          git diff --cached --check
+          git commit -m "Add seller order and product references"
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy payment webhook
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$PROJECT_REF"
+          supabase functions deploy payment-webhook --project-ref "$PROJECT_REF" --use-api --yes
+
