@@ -1211,6 +1211,40 @@ Deno.serve(
     }
 
     /*
+     * FIX 28 — COURIER COLLECTION NOTIFICATION
+     *
+     * Authenticated collection must already be
+     * recorded and the shipment state updated.
+     * This never changes payment or payout state.
+     */
+    if (status === "collected" && shipment.seller_id) {
+      for (const channel of ["in_app", "email"]) {
+        const { error: noticeError } =
+          await db.rpc("enqueue_message", {
+            p_user_id: shipment.seller_id,
+            p_event_key:
+              `courier:${shipment.id}:collected:seller`,
+            p_channel: channel,
+            p_notification_type:
+              "shipment_in_transit",
+            p_subject:
+              "Shop&Drop parcel collected",
+            p_message_body:
+              `The courier has collected your parcel for order ${shipment.order_id}. You can follow its progress in your Shop&Drop account.`,
+          });
+
+        if (noticeError) {
+          console.error(
+            VERSION,
+            "collection_notification_enqueue_failed",
+            channel,
+            noticeError.code,
+          );
+        }
+      }
+    }
+
+    /*
      * ========================================================
      * TERMINAL NON-DELIVERY
      *
