@@ -1,1 +1,94 @@
 
+name: ShopDrop Fix29 Refund Notifications
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - .github/workflows/shopdrop-fix29-refund-notifications.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+
+      - name: Verify approved refund worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/shopdrop-phase6-integration"
+          test "$(git hash-object supabase/functions/refund-worker/index.ts)" = "dbfe38f50796adafd9ba9f84ca1e19641d820e83"
+
+      - name: Correct refund notification types
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("supabase/functions/refund-worker/index.ts")
+          source = path.read_text()
+
+          assert len(source.splitlines()) >= 2300
+          assert '"shopdrop_verify_refund_worker"' in source
+          assert '"Shop&Drop product refund completed"' in source
+          assert '"Shop&Drop product refund submitted"' in source
+
+          old = '''        p_notification_type:
+                    "refund",'''
+
+          new = '''        p_notification_type:
+                    subject === "Shop&Drop product refund completed"
+                      ? "refund_completed"
+                      : subject === "Shop&Drop product refund submitted"
+                      ? "refund_requested"
+                      : "account_notice",'''
+
+          assert source.count(old) == 1, (
+              "Unexpected refund worker source; stopping safely"
+          )
+
+          updated = source.replace(old, new, 1)
+
+          assert '"refund_completed"' in updated
+          assert '"refund_requested"' in updated
+          assert "refund_provider_activation_required" in updated
+          assert "reconciliation_required" in updated
+          assert len(updated) > len(source)
+
+          path.write_text(updated)
+          print("Fix29 refund notification types corrected.")
+          PY
+
+      - name: Commit preserved refund worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add supabase/functions/refund-worker/index.ts
+          git commit -m "Fix29 correct refund notification types"
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy corrected refund worker
+        shell: bash
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$PROJECT_REF"
+          supabase functions deploy refund-worker --project-ref "$PROJECT_REF" --use-api --yes
+
