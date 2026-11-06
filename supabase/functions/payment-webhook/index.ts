@@ -277,6 +277,7 @@ async function enqueue(
   type: string,
   subject: string,
   message: string,
+  channel: "in_app" | "email" = "in_app",
 ) {
   if (!userId) {
     return;
@@ -295,7 +296,7 @@ async function enqueue(
           eventKey,
 
         p_channel:
-          "in_app",
+          channel,
 
         p_notification_type:
           type,
@@ -1792,7 +1793,31 @@ Deno.serve(
               `${String(row.product_name ?? "Product").replace(/[\\r\\n]+/g, " ").slice(0, 120)} | Product: ${clean(row.product_id)} | Quantity: ${String(row.quantity ?? "")}`
             ),
           "Prepare the parcel for courier collection. Check Shop&Drop for fulfilment instructions.",
-        ].join("\\n"),
+        ].join("\n"),
+        );
+
+        await enqueue(
+          sellerId,
+
+          `payment:${payment.id}:paid:seller:${sellerId}:email`,
+
+          "payment_confirmed",
+
+          "Shop&Drop order payment confirmed",
+
+          [
+          `Payment confirmed for order ${orderId}.`,
+          "Your sold items:",
+          ...(sellerRows ?? [])
+            .filter((row: Record<string, unknown>) =>
+              clean(row.seller_id) === sellerId
+            )
+            .map((row: Record<string, unknown>) =>
+              `${String(row.product_name ?? "Product").replace(/[\\r\\n]+/g, " ").slice(0, 120)} | Product: ${clean(row.product_id)} | Quantity: ${String(row.quantity ?? "")}`
+            ),
+          "Prepare the parcel for courier collection. Check Shop&Drop for fulfilment instructions.",
+        ].join("\n"),
+          "email",
         );
       }
     }
