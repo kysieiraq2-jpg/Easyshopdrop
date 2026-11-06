@@ -1,1 +1,131 @@
 
+name: ShopDrop Fix28 Courier Collection Notification
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - .github/workflows/shopdrop-fix28-courier-collection.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+
+      - name: Verify approved courier webhook
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/shopdrop-phase6-integration"
+          test "$(git hash-object supabase/functions/courier-tracking-webhook/index.ts)" = "93dcf382631260cc4f107f6fd7a55edaefd8226c"
+
+      - name: Add collection notification
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path(
+              "supabase/functions/courier-tracking-webhook/index.ts"
+          )
+          source = path.read_text()
+
+          assert len(source.splitlines()) >= 1300
+          assert '"collected"' in source
+          assert '"enqueue_message"' not in source
+
+          marker = '''    /*
+               * ========================================================
+               * TERMINAL NON-DELIVERY'''
+
+          assert source.count(marker) == 1, (
+              "Expected courier tracking block not found"
+          )
+
+          addition = '''    /*
+               * FIX 28 — COURIER COLLECTION NOTIFICATION
+               *
+               * Authenticated collection must already be
+               * recorded and the shipment state updated.
+               * This never changes payment or payout state.
+               */
+              if (status === "collected" && shipment.seller_id) {
+                for (const channel of ["in_app", "email"]) {
+                  const { error: noticeError } =
+                    await db.rpc("enqueue_message", {
+                      p_user_id: shipment.seller_id,
+                      p_event_key:
+                        `courier:${shipment.id}:collected:seller`,
+                      p_channel: channel,
+                      p_notification_type:
+                        "shipment_in_transit",
+                      p_subject:
+                        "Shop&Drop parcel collected",
+                      p_message_body:
+                        `The courier has collected your parcel for order ${shipment.order_id}. You can follow its progress in your Shop&Drop account.`,
+                    });
+
+                  if (noticeError) {
+                    console.error(
+                      VERSION,
+                      "collection_notification_enqueue_failed",
+                      channel,
+                      noticeError.code,
+                    );
+                  }
+                }
+              }
+
+          '''
+
+          updated = source.replace(
+              marker,
+              addition + marker,
+              1
+          )
+
+          assert updated.count('"enqueue_message"') == 1
+          assert updated.count(
+              "collection_notification_enqueue_failed"
+          ) == 1
+          assert "sendDeliveredToGateway" in updated
+          assert "handleNonDelivery" in updated
+          assert len(updated) > len(source)
+
+          path.write_text(updated)
+          print("Fix28 collection notification prepared.")
+          PY
+
+      - name: Commit complete preserved webhook
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add supabase/functions/courier-tracking-webhook/index.ts
+          git commit -m "Fix28 add courier collection notification"
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy courier tracking webhook
+        shell: bash
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$PROJECT_REF"
+          supabase functions deploy courier-tracking-webhook --project-ref "$PROJECT_REF" --use-api --yes
+
