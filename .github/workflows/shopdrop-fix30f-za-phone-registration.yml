@@ -1,1 +1,115 @@
 
+name: ShopDrop Fix30F ZA Phone Registration
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - .github/workflows/shopdrop-fix30f-za-phone-registration.yml
+
+permissions:
+  contents: write
+
+jobs:
+  update-registration:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+
+      - name: Preserve and update registration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          path = Path("public/register.html")
+          source = path.read_text()
+
+          original_sha = subprocess.check_output(
+              ["git", "hash-object", str(path)],
+              text=True
+          ).strip()
+
+          assert original_sha == "ff00c811bc4e418f1ec99fd52a5bb4c6d42a1826", (
+              "Registration file changed. Stopping safely."
+          )
+
+          old_input = (
+              '<label>Mobile number (international format)</label>'
+              '<input id=mobileNumber type=tel required autocomplete=tel '
+              'placeholder="+27123456789" '
+              'pattern="[+][1-9][0-9]{7,14}" '
+              'title="Enter + followed by 8 to 15 digits">'
+          )
+
+          new_input = (
+              '<label>South African mobile number</label>'
+              '<input id=mobileNumber type=tel required autocomplete=tel '
+              'placeholder="0821234567" '
+              'pattern="(0[6-8][0-9]{8}|[+]27[6-8][0-9]{8})" '
+              'title="Enter 0821234567 or +27821234567">'
+          )
+
+          old_validation = r"""  const mobileNumber=document.getElementById('mobileNumber').value.trim();
+            if(!/^\+[1-9][0-9]{7,14}$/.test(mobileNumber))throw Error('Enter a valid international cellphone number, for example +27123456789.');"""
+
+          new_validation = r"""  const enteredMobile=document.getElementById('mobileNumber').value.trim().replace(/[\s()-]/g,'');
+            const mobileNumber=/^0[6-8][0-9]{8}$/.test(enteredMobile)
+              ? '+27'+enteredMobile.slice(1)
+              : enteredMobile;
+            if(!/^\+27[6-8][0-9]{8}$/.test(mobileNumber))
+              throw Error('Enter a valid South African mobile number, for example 0821234567 or +27821234567.');"""
+
+          assert source.count(old_input) == 1, (
+              "Registration input mismatch."
+          )
+          assert source.count(old_validation) == 1, (
+              "Registration validation mismatch."
+          )
+
+          updated = source.replace(old_input, new_input, 1)
+          updated = updated.replace(
+              old_validation, new_validation, 1
+          )
+
+          assert "supabase.auth.signUp" in updated
+          assert "mobile_number:mobileNumber" in updated
+          assert "persistSession:true" in updated
+          assert "shopdrop-account-language.js" in updated
+          assert "shopdrop-form-language.js" in updated
+
+          path.write_text(updated)
+          print("South African phone registration updated.")
+          PY
+
+      - name: Verify phone normalization
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          s = Path("public/register.html").read_text()
+          assert "enteredMobile.slice(1)" in s
+          assert r"^\+27[6-8][0-9]{8}$" in s
+          assert "mobile_number:mobileNumber" in s
+          assert "shopdrop-form-language.js" in s
+          print("Fix30F source checks passed.")
+          PY
+
+      - name: Commit to integration branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/register.html
+          git commit -m "Fix30F South African mobile registration"
+          git push origin HEAD:shopdrop-phase6-integration
+
