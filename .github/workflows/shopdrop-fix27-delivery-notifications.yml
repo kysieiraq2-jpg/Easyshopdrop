@@ -1,1 +1,172 @@
 
+name: ShopDrop Fix27 Delivery Notifications
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - .github/workflows/shopdrop-fix27-delivery-notifications.yml
+
+permissions:
+  contents: write
+
+jobs:
+  preserve-fix-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+
+      - name: Verify protected branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/shopdrop-phase6-integration"
+          test ! -e supabase/functions/delivery-verification-worker/index.ts
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Download existing delivery function
+        shell: bash
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$PROJECT_REF"
+          supabase functions download delivery-verification-worker --project-ref "$PROJECT_REF" --use-api
+          test -s supabase/functions/delivery-verification-worker/index.ts
+
+      - name: Preserve and add delivery notifications
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path(
+              "supabase/functions/delivery-verification-worker/index.ts"
+          )
+          source = path.read_text()
+
+          assert len(source.splitlines()) >= 950
+          assert source.count(
+              '"confirm_shipment_delivery"'
+          ) == 1
+          assert source.count(
+              '"mark_seller_allocation_payout_eligible"'
+          ) == 1
+
+          old = '''  return {
+              delivery:
+                deliveryResult,
+              payout_eligibility:
+                payoutResult,
+            };
+          }'''
+
+          new = '''  // Fix 27: Queue notifications only after
+            // authoritative delivery completion.
+            // Duplicate events use stable event keys.
+            // Notification failures never reverse delivery.
+            const recipients = [
+              {
+                userId: buyerId,
+                type: "delivery_verified",
+                role: "buyer",
+                subject: "Shop&Drop delivery confirmed",
+                message:
+                  `Your order ${shipment.order_id} has been delivered and verified.`,
+              },
+              {
+                userId: shipment.seller_id,
+                type: "delivery_verified",
+                role: "seller",
+                subject: "Shop&Drop delivery verified",
+                message:
+                  `Delivery for order ${shipment.order_id} has been verified. Your seller payout is now eligible for automatic processing, subject to provider and safety checks. Payment completion will be confirmed separately.`,
+              },
+            ];
+
+            for (const recipient of recipients) {
+              if (!recipient.userId) continue;
+
+              for (const channel of ["in_app", "email"]) {
+                const { error: noticeError } =
+                  await db.rpc("enqueue_message", {
+                    p_user_id: recipient.userId,
+                    p_event_key:
+                      `delivery:${shipment.id}:verified:${recipient.role}`,
+                    p_channel: channel,
+                    p_notification_type: recipient.type,
+                    p_subject: recipient.subject,
+                    p_message_body: recipient.message,
+                  });
+
+                if (noticeError) {
+                  console.error(
+                    VERSION,
+                    "delivery_notification_enqueue_failed",
+                    recipient.role,
+                    channel,
+                    noticeError.code,
+                  );
+                }
+              }
+            }
+
+            return {
+              delivery:
+                deliveryResult,
+              payout_eligibility:
+                payoutResult,
+            };
+          }'''
+
+          assert source.count(old) == 1, (
+              "Expected delivery completion block not found"
+          )
+
+          updated = source.replace(old, new, 1)
+
+          assert updated.count(
+              '"confirm_shipment_delivery"'
+          ) == 1
+          assert updated.count(
+              '"mark_seller_allocation_payout_eligible"'
+          ) == 1
+          assert updated.count(
+              '"enqueue_message"'
+          ) == 1
+          assert len(updated) > len(source)
+
+          path.write_text(updated)
+          print("Fix27 delivery notifications prepared.")
+          PY
+
+      - name: Commit complete preserved function
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add supabase/functions/delivery-verification-worker/index.ts
+          git commit -m "Fix27 add verified delivery notifications"
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Deploy corrected delivery function
+        shell: bash
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$PROJECT_REF"
+          supabase functions deploy delivery-verification-worker --project-ref "$PROJECT_REF" --use-api --yes
+
