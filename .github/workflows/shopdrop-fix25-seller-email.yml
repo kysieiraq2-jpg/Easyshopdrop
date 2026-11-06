@@ -1,1 +1,152 @@
 
+name: ShopDrop Fix25 Seller Email
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - .github/workflows/shopdrop-fix25-seller-email.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+
+      - name: Verify approved source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/shopdrop-phase6-integration"
+          test "$(git hash-object supabase/functions/payment-webhook/index.ts)" = "181776e5b98c59fa1a90b20e9f9371da449119b6"
+
+      - name: Add seller email notification
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("supabase/functions/payment-webhook/index.ts")
+          source = path.read_text()
+
+          helper_old = '''  message: string,
+          ) {'''
+
+          helper_new = '''  message: string,
+            channel: "in_app" | "email" = "in_app",
+          ) {'''
+
+          assert source.count(helper_old) == 1
+          source = source.replace(helper_old, helper_new, 1)
+
+          channel_old = '''        p_channel:
+                    "in_app",'''
+
+          channel_new = '''        p_channel:
+                    channel,'''
+
+          assert source.count(channel_old) == 1
+          source = source.replace(channel_old, channel_new, 1)
+
+          start_marker = '''      for (
+                  const sellerId
+                  of sellerIds
+                ) {'''
+
+          end_marker = '''
+                }
+              }
+
+
+              /*
+               * ========================================================
+               * COURIER ALLOCATION STATUS'''
+
+          assert source.count(start_marker) == 1
+          assert source.count(end_marker) == 1
+
+          start = source.index(start_marker)
+          end = source.index(end_marker, start)
+
+          section = source[start:end]
+
+          assert section.count("await enqueue(") == 1
+          assert section.count("Your sold items:") == 1
+
+          call_start = section.index("        await enqueue(")
+          call_end = section.index("        );", call_start) + len("        );")
+
+          original_call = section[call_start:call_end]
+
+          assert original_call.count('].join("\\\\n")') == 1
+
+          corrected_call = original_call.replace(
+              '].join("\\\\n")',
+              '].join("\\n")'
+          )
+
+          email_call = corrected_call.replace(
+              '`payment:${payment.id}:paid:seller:${sellerId}`',
+              '`payment:${payment.id}:paid:seller:${sellerId}:email`'
+          )
+
+          assert email_call != corrected_call
+
+          closing = email_call.rfind("        );")
+          assert closing >= 0
+
+          email_call = (
+              email_call[:closing]
+              + '          "email",\n'
+              + email_call[closing:]
+          )
+
+          updated_section = section.replace(
+              original_call,
+              corrected_call + "\n\n" + email_call,
+              1
+          )
+
+          source = source[:start] + updated_section + source[end:]
+
+          assert source.count("commit_paid_order_inventory") >= 1
+          assert source.count("shopdrop_queue_late_payment_refund") >= 1
+          assert source.count(":paid:seller:${sellerId}:email") == 1
+
+          path.write_text(source)
+          print("Fix25 seller email queue installed.")
+          PY
+
+      - name: Commit corrected webhook
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add supabase/functions/payment-webhook/index.ts
+          git diff --cached --check
+          git commit -m "Fix25 seller email notification"
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy payment webhook
+        shell: bash
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$PROJECT_REF"
+          supabase functions deploy payment-webhook --project-ref "$PROJECT_REF" --use-api --yes
+
