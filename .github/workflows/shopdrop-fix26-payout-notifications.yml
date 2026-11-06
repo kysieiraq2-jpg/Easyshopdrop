@@ -1,1 +1,105 @@
 
+name: ShopDrop Fix26 Payout Notifications
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - .github/workflows/shopdrop-fix26-payout-notifications.yml
+
+permissions:
+  contents: write
+
+jobs:
+  preserve-fix-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+
+      - name: Verify protected branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/shopdrop-phase6-integration"
+          test ! -e supabase/functions/create-payout/index.ts
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Download existing payout function
+        shell: bash
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$PROJECT_REF"
+          supabase functions download create-payout --project-ref "$PROJECT_REF" --use-api
+          test -s supabase/functions/create-payout/index.ts
+
+      - name: Preserve and correct notification types
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("supabase/functions/create-payout/index.ts")
+          source = path.read_text()
+
+          assert len(source.splitlines()) >= 2300
+          assert 'provider_neutral:' in source
+          assert 'courier_money_excluded:' in source
+          assert 'seller_payout' in source
+          assert 'Shop&Drop seller payout completed' in source
+          assert 'Shop&Drop seller payout submitted' in source
+
+          old = '''        p_notification_type:
+                    "seller_payout",'''
+
+          new = '''        p_notification_type:
+                    subject === "Shop&Drop seller payout completed"
+                      ? "payout_completed"
+                      : subject === "Shop&Drop seller payout submitted"
+                      ? "payout_submitted"
+                      : "account_notice",'''
+
+          assert source.count(old) == 1, "Source mismatch; stopping safely"
+
+          updated = source.replace(old, new, 1)
+
+          assert updated.count("payout_completed") >= 1
+          assert updated.count("payout_submitted") >= 1
+          assert len(updated) > len(source)
+
+          path.write_text(updated)
+          print("Payout notification correction prepared.")
+          PY
+
+      - name: Commit complete preserved function
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add supabase/functions/create-payout/index.ts
+          git diff --cached --check
+          git commit -m "Fix26 preserve payout function and notification types"
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Deploy corrected payout function
+        shell: bash
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$PROJECT_REF"
+          supabase functions deploy create-payout --project-ref "$PROJECT_REF" --use-api --yes
+
