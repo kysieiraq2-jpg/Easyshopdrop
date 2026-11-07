@@ -1,1 +1,51 @@
 
+name: ShopDrop Fix32E Webhook POST Test
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - .github/workflows/shopdrop-fix32e-webhook-post-test.yml
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify unauthorized POST rejection
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          URL="https://dtkdvvxpwonywtsgqmdx.supabase.co/functions/v1/two-payment-provider-webhook"
+
+          STATUS=$(curl --silent --show-error \
+            --output response.json \
+            --write-out '%{http_code}' \
+            --max-time 20 \
+            --request POST \
+            --header 'Content-Type: application/json' \
+            --data '{"event":"fake_test","verified":true}' \
+            "$URL")
+
+          echo "HTTP status: $STATUS"
+
+          python3 - <<'PY'
+          import json
+
+          with open("response.json") as f:
+              result = json.load(f)
+
+          assert result.get("code") == "provider_verifier_not_configured"
+          assert result.get("payment_status_changed") is False
+          assert result.get("provider_event_recorded") is False
+          assert result.get("funds_moved") is False
+
+          print("PASS: Unauthorized payment event rejected")
+          PY
+
+          test "$STATUS" = "503"
+
