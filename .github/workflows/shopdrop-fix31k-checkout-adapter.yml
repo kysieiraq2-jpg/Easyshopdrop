@@ -1,1 +1,78 @@
 
+name: ShopDrop Fix31K Checkout Adapter
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - .github/workflows/shopdrop-fix31k-checkout-adapter.yml
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Add authenticated checkout preparation
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("public/supabase-adapter.js")
+          source = path.read_text()
+
+          marker = "prepareTwoPaymentCheckout:"
+          anchor = "    createPaymentSession:"
+
+          if marker in source:
+              print("Fix31K already installed")
+              raise SystemExit(0)
+
+          if source.count(anchor) != 1:
+              raise SystemExit("Unexpected adapter; stopped")
+
+          addition = (
+              "    prepareTwoPaymentCheckout: "
+              "(token, body) => "
+              "invoke('prepare-two-payment-checkout', "
+              "token, body),\n"
+          )
+
+          updated = source.replace(
+              anchor, addition + anchor, 1
+          )
+
+          if updated.count(marker) != 1:
+              raise SystemExit("Verification failed")
+
+          path.write_text(updated)
+          print("Fix31K adapter installed")
+          PY
+
+      - name: Verify adapter
+        shell: bash
+        run: |
+          grep -q 'prepareTwoPaymentCheckout:' public/supabase-adapter.js
+          grep -q 'createPaymentSession:' public/supabase-adapter.js
+          grep -q 'createCheckoutOrder:' public/supabase-adapter.js
+
+      - name: Commit adapter update
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/supabase-adapter.js
+          if ! git diff --cached --quiet; then
+            git commit -m "Fix31K add inactive two-payment preparation adapter"
+            git push origin HEAD:shopdrop-phase6-integration
+          fi
+
