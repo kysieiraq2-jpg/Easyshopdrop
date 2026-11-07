@@ -2,6 +2,11 @@
 name: ShopDrop Fix31E Checkout Coordinator
 
 on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - .github/workflows/shopdrop-fix31e-checkout-coordinator.yml
   workflow_dispatch:
 
 permissions:
@@ -27,7 +32,10 @@ jobs:
           path.parent.mkdir(parents=True, exist_ok=True)
 
           if path.exists():
-              raise SystemExit("Coordinator already exists; refusing overwrite")
+              if "SHOPDROP-FIX31E" in path.read_text():
+                  print("Fix31E already installed")
+                  raise SystemExit(0)
+              raise SystemExit("Existing file protected; refusing overwrite")
 
           lines = [
               "// SHOPDROP-FIX31E",
