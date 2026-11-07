@@ -1,1 +1,106 @@
 
+name: ShopDrop Fix31M Checkout Preparation
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - .github/workflows/shopdrop-fix31m-checkout-preparation.yml
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Install checkout preparation
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("public/shopdrop-checkout-connector.js")
+          source = path.read_text()
+
+          marker = "SHOPDROP-FIX31M"
+          anchor = "  // Only call reset when"
+
+          if marker in source:
+              print("Fix31M already installed")
+              raise SystemExit(0)
+
+          if source.count(anchor) != 1:
+              raise SystemExit("Unexpected connector; stopped")
+
+          addition = "\n".join([
+              "  // SHOPDROP-FIX31M",
+              "  // Authenticated preparation only.",
+              "  // Does not charge cards or finalize orders.",
+              "  async function prepareTwoPayment(paymentId) {",
+              "    if (typeof paymentId !== 'string' ||",
+              "        !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(paymentId)) {",
+              "      throw Error('Invalid payment reference');",
+              "    }",
+              "    const fn = window.ShopDropSupabaseAdapter",
+              "      ?.authenticatedFunctions",
+              "      ?.prepareTwoPaymentCheckout;",
+              "    if (typeof fn !== 'function') {",
+              "      throw Error('Secure checkout unavailable');",
+              "    }",
+              "    return fn({ payment_id: paymentId });",
+              "  }",
+              "",
+          ]) + "\n"
+
+          updated = source.replace(
+              anchor, addition + anchor, 1
+          )
+
+          export_old = (
+              "Object.freeze({createOrder, reset})"
+          )
+          export_new = (
+              "Object.freeze({createOrder, "
+              "prepareTwoPayment, reset})"
+          )
+
+          if updated.count(export_old) != 1:
+              raise SystemExit("Unexpected exports; stopped")
+
+          updated = updated.replace(
+              export_old, export_new, 1
+          )
+
+          path.write_text(updated)
+          print("Fix31M installed")
+          PY
+
+      - name: Verify preserved functions
+        shell: bash
+        run: |
+          grep -q SHOPDROP-FIX31M public/shopdrop-checkout-connector.js
+          grep -q 'createOrder, prepareTwoPayment, reset' public/shopdrop-checkout-connector.js
+          grep -q 'authenticatedFunctions' public/shopdrop-checkout-connector.js
+
+      - name: Commit connector update
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add public/shopdrop-checkout-connector.js
+
+          if ! git diff --cached --quiet; then
+            git commit -m "Fix31M add inactive checkout preparation"
+            git push origin HEAD:shopdrop-phase6-integration
+          fi
+
