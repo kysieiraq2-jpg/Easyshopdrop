@@ -38,7 +38,24 @@
     if (typeof createCheckoutOrder !== 'function') throw Error('Authenticated checkout adapter unavailable');
     return createCheckoutOrder({ request_id, items: clean, delivery_address_id: deliveryAddressId });
   }
+  // SHOPDROP-FIX31M
+  // Authenticated preparation only.
+  // Does not charge cards or finalize orders.
+  async function prepareTwoPayment(paymentId) {
+    if (typeof paymentId !== 'string' ||
+        !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(paymentId)) {
+      throw Error('Invalid payment reference');
+    }
+    const fn = window.ShopDropSupabaseAdapter
+      ?.authenticatedFunctions
+      ?.prepareTwoPaymentCheckout;
+    if (typeof fn !== 'function') {
+      throw Error('Secure checkout unavailable');
+    }
+    return fn({ payment_id: paymentId });
+  }
+
   // Only call reset when a checkout is safely completed or deliberately abandoned.
   function reset() { sessionStorage.removeItem(KEY); }
-  window.ShopDropCheckoutConnector = Object.freeze({createOrder, reset});
+  window.ShopDropCheckoutConnector = Object.freeze({createOrder, prepareTwoPayment, reset});
 })();
