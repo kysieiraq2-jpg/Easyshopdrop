@@ -53,6 +53,7 @@
     cancellations: (token, body) => invoke('cancellations', token, body),
     courierQuotes: (token, body) => invoke('courier-quotes', token, body),
     createListingReference: (token, body) => invoke('create-listing-reference', token, body),
+    prepareTwoPaymentCheckout: (token, body) => invoke('prepare-two-payment-checkout', token, body),
     createPaymentSession: (token, body) => invoke('create-payment-session', token, body),
     createDispatchCheckout: (token, body) => invoke('create-dispatch-checkout', token, body),
     disputeEvidence: (token, body) => invoke('dispute-evidence', token, body),
