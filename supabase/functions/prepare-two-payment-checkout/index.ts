@@ -27,7 +27,7 @@ Deno.serve(async (req: Request) => {
   try { payload = await req.json(); } catch { return json({ ok: false, error: "invalid_json" }, 400); }
   const paymentId = payload?.payment_id;
   if (typeof paymentId !== "string" ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(paymentId)) {
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(paymentId)) {
     return json({ ok: false, error: "invalid_payment_id" }, 400);
   }
 
@@ -59,4 +59,3 @@ Deno.serve(async (req: Request) => {
   }
   return json({ ...data, mode: "preparation_only", live_payments_enabled: false });
 });
-
