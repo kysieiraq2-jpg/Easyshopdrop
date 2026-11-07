@@ -10,7 +10,6 @@ permissions:
 jobs:
   install:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout integration branch
         uses: actions/checkout@v4
@@ -18,112 +17,95 @@ jobs:
           ref: shopdrop-phase6-integration
           persist-credentials: true
 
-      - name: Add provider-neutral coordinator
+      - name: Install coordinator
         shell: bash
         run: |
-          mkdir -p supabase/functions/_shared
+          python3 - <<'PY'
+          from pathlib import Path
 
-          cat > supabase/functions/_shared/shopdrop-two-payment-coordinator.ts <<'EOF'
-// SHOPDROP-FIX31E
-// Provider-neutral checkout calculations.
-// No card charges or payouts occur here.
+          path = Path("supabase/functions/_shared/shopdrop-two-payment-coordinator.ts")
+          path.parent.mkdir(parents=True, exist_ok=True)
 
-export type PaymentLegType =
-  | "courier_direct"
-  | "marketplace";
+          if path.exists():
+              raise SystemExit("Coordinator already exists; refusing overwrite")
 
-export interface CheckoutAmounts {
-  product_amount: number;
-  courier_amount: number;
-  shopdrop_commission: number;
-  seller_payout_amount: number;
-  total_paid: number;
-  currency: string;
-}
+          lines = [
+              "// SHOPDROP-FIX31E",
+              "// Provider-neutral calculations only; no live payments.",
+              "",
+              "export interface CheckoutAmounts {",
+              "  product_amount: number;",
+              "  courier_amount: number;",
+              "  shopdrop_commission: number;",
+              "  seller_payout_amount: number;",
+              "  total_paid: number;",
+              "  currency: string;",
+              "}",
+              "",
+              "export interface PaymentLeg {",
+              '  payment_type: "courier_direct" | "marketplace";',
+              '  destination_type: "courier_provider" | "marketplace_provider";',
+              "  amount: number;",
+              '  currency: "ZAR";',
+              "}",
+              "",
+              "function cents(n: number): number {",
+              "  if (!Number.isFinite(n) || n < 0 ||",
+              "      Math.abs(n * 100 - Math.round(n * 100)) > 0.000001) {",
+              '    throw new Error("invalid_amount");',
+              "  }",
+              "  return Math.round(n * 100);",
+              "}",
+              "",
+              "export function prepareCheckoutLegs(",
+              "  p: CheckoutAmounts,",
+              "): PaymentLeg[] {",
+              '  if (p.currency !== "ZAR") throw new Error("currency_not_supported");',
+              "  const product = cents(p.product_amount);",
+              "  const courier = cents(p.courier_amount);",
+              "  const fee = cents(p.shopdrop_commission);",
+              "  if (cents(p.seller_payout_amount) !== product) {",
+              '    throw new Error("seller_amount_mismatch");',
+              "  }",
+              "  if (cents(p.total_paid) !== product + courier + fee) {",
+              '    throw new Error("checkout_total_mismatch");',
+              "  }",
+              "  if (product + fee <= 0) {",
+              '    throw new Error("empty_marketplace_payment");',
+              "  }",
+              "  const legs: PaymentLeg[] = [{",
+              '    payment_type: "marketplace",',
+              '    destination_type: "marketplace_provider",',
+              "    amount: (product + fee) / 100,",
+              '    currency: "ZAR",',
+              "  }];",
+              "  if (courier > 0) legs.push({",
+              '    payment_type: "courier_direct",',
+              '    destination_type: "courier_provider",',
+              "    amount: courier / 100,",
+              '    currency: "ZAR",',
+              "  });",
+              "  return legs;",
+              "}",
+          ]
 
-export interface PaymentLeg {
-  payment_type: PaymentLegType;
-  destination_type: string;
-  amount: number;
-  currency: string;
-}
+          path.write_text("\n".join(lines) + "\n")
+          print("Fix31E coordinator created")
+          PY
 
-function toCents(value: number): number {
-  if (
-    !Number.isFinite(value) ||
-    value < 0 ||
-    Math.abs(value * 100 - Math.round(value * 100)) > 0.000001
-  ) {
-    throw new Error("invalid_amount");
-  }
-
-  return Math.round(value * 100);
-}
-
-export function prepareCheckoutLegs(
-  payment: CheckoutAmounts,
-): PaymentLeg[] {
-  if (payment.currency !== "ZAR") {
-    throw new Error("unsupported_currency");
-  }
-
-  const product = toCents(payment.product_amount);
-  const courier = toCents(payment.courier_amount);
-  const commission = toCents(payment.shopdrop_commission);
-  const seller = toCents(payment.seller_payout_amount);
-  const total = toCents(payment.total_paid);
-
-  if (seller !== product) {
-    throw new Error("seller_amount_mismatch");
-  }
-
-  if (total !== product + courier + commission) {
-    throw new Error("checkout_total_mismatch");
-  }
-
-  if (product + commission <= 0) {
-    throw new Error("empty_marketplace_payment");
-  }
-
-  const legs: PaymentLeg[] = [
-    {
-      payment_type: "marketplace",
-      destination_type: "marketplace_provider",
-      amount: (product + commission) / 100,
-      currency: "ZAR",
-    },
-  ];
-
-  if (courier > 0) {
-    legs.push({
-      payment_type: "courier_direct",
-      destination_type: "courier_provider",
-      amount: courier / 100,
-      currency: "ZAR",
-    });
-  }
-
-  return legs;
-}
-EOF
-
-      - name: Verify coordinator
+      - name: Verify new file
         shell: bash
         run: |
           test -s supabase/functions/_shared/shopdrop-two-payment-coordinator.ts
-          grep -q 'SHOPDROP-FIX31E' supabase/functions/_shared/shopdrop-two-payment-coordinator.ts
-          echo "Fix31E coordinator file verified"
+          grep -q SHOPDROP-FIX31E supabase/functions/_shared/shopdrop-two-payment-coordinator.ts
 
-      - name: Commit new file only
+      - name: Commit coordinator
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
           git add supabase/functions/_shared/shopdrop-two-payment-coordinator.ts
-
           if ! git diff --cached --quiet; then
-            git commit -m "Fix31E add inactive two-payment coordinator"
+            git commit -m "Fix31E install inactive checkout coordinator"
             git push origin HEAD:shopdrop-phase6-integration
           fi
-
