@@ -63,6 +63,12 @@ a{color:#0f766e}
 </section>
 
 <section class="panel">
+<h2>My Submitted Dispatch Offers</h2>
+<p class="muted">Review your submitted transport offers, customer acceptance, booking status and payment status. Only your own offers are available through the secure backend.</p>
+<div id="shopdrop-dispatch-provider-offer-history"></div>
+</section>
+
+<section class="panel">
 <h2>My Assigned Dispatch Jobs</h2>
 <p class="muted">For authorized transport providers only. Enter the assigned booking reference to retrieve collection and delivery instructions after confirmed payment.</p>
 <div id="shopdrop-provider-dispatch-job"></div>
@@ -156,7 +162,7 @@ if(error||!user){
   pinOutput.textContent='';
   const bookingId=bookingInput.value.trim();
 
-  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookingId)){
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookingId)){
    pinMessage.textContent='Enter a valid booking ID from your confirmation.';
    return;
   }
@@ -231,6 +237,7 @@ if(error||!user){
 <script type="module" src="./shopdrop-private-contact.js"></script>
 <script src="./shopdrop-dispatch-provider-job.js"></script>
 <script src="./shopdrop-dispatch-provider-offers.js"></script>
+<script src="./shopdrop-dispatch-provider-offer-history.js"></script>
 
 <section id="v26AccountExtension">
 <!-- V26_ACCOUNT_EXTENSION -->
