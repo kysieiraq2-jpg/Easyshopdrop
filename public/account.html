@@ -120,7 +120,7 @@ const orders=document.getElementById('orders');
 // Standard UUID validation for both booking types.
 // Correct format: 8-4-4-4-12 hexadecimal characters.
 const validBookingId = value =>
- /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+ /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 
 const {data:{user},error}=await supabase.auth.getUser();
 
@@ -241,6 +241,7 @@ if(error||!user){
 <script src="v26-bridge.js"></script>
 <script type="module" src="./shopdrop-private-contact.js"></script>
 <script defer src="./shopdrop-paid-booking-contacts.js"></script>
+<script defer src="./shopdrop-service-schedule-ui.js"></script>
 <script src="./shopdrop-dispatch-provider-job.js"></script>
 <script src="./shopdrop-dispatch-provider-offers.js"></script>
 <script src="./shopdrop-dispatch-provider-offer-history.js"></script>
