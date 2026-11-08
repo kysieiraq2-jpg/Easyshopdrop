@@ -58,11 +58,37 @@ button{background:#0f766e;color:#fff;border:0}
 <input id="pickup" placeholder="City / district / area">
 </div>
 
+<div class="grid">
+<input id="pickupAddress" placeholder="Exact collection street address">
+<input id="pickupSite" placeholder="Collection site / building name (optional)">
+</div>
+<div class="grid">
+<input id="pickupLat" type="number" step="any" min="-90" max="90" placeholder="Collection GPS latitude (optional)">
+<input id="pickupLon" type="number" step="any" min="-180" max="180" placeholder="Collection GPS longitude (optional)">
+</div>
+<div class="grid">
+<input id="pickupContact" placeholder="Collection contact name (optional)">
+<input id="pickupMobile" type="tel" placeholder="Collection mobile e.g. +27821234567">
+</div>
+
 <h3>Delivery destination</h3>
 <div class="grid">
 <select id="dropoffCountry"></select>
 <input id="dropoffRegion" placeholder="Province / state / region">
 <input id="dropoff" placeholder="City / district / area">
+</div>
+
+<div class="grid">
+<input id="dropoffAddress" placeholder="Exact delivery street address">
+<input id="dropoffSite" placeholder="Delivery site / building name (optional)">
+</div>
+<div class="grid">
+<input id="dropoffLat" type="number" step="any" min="-90" max="90" placeholder="Delivery GPS latitude (optional)">
+<input id="dropoffLon" type="number" step="any" min="-180" max="180" placeholder="Delivery GPS longitude (optional)">
+</div>
+<div class="grid">
+<input id="dropoffContact" placeholder="Delivery contact name (optional)">
+<input id="dropoffMobile" type="tel" placeholder="Delivery mobile e.g. +27821234567">
 </div>
 
 <textarea id="load" placeholder="Load description — what must be transported?"></textarea>
@@ -83,7 +109,7 @@ button{background:#0f766e;color:#fff;border:0}
 <textarea id="requirements" placeholder="Special requirements, access restrictions, loading/unloading assistance (optional)"></textarea>
 
 <button id="preview">Preview dispatch request</button>
-<p id="msg" class="muted"></p>
+<p id="msg" class="muted" role="status" aria-live="polite"></p>
 </section>
 
 <section class="panel">
@@ -104,13 +130,11 @@ button{background:#0f766e;color:#fff;border:0}
 <p>Important events are linked to the same transaction references and can trigger in-site, email, WhatsApp Business or SMS notifications according to verified preferences and provider availability. Routine transactions are automated; Admin handles exceptions.</p>
 <p class="muted">Exact pickup and delivery addresses, GPS coordinates, appointment times and necessary contact numbers must be supplied privately to the authorized transport provider when required for fulfilment. These details must not be displayed publicly.</p>
 </section>
-
 </main>
 
 <script src="./common.js"></script>
 <script src="./v26-consolidated.js"></script>
 <script src="./geo.js"></script>
-
 <script>
 pickupCountry.innerHTML=ShopDropGeo.countryOptions('ZA');
 dropoffCountry.innerHTML=ShopDropGeo.countryOptions('ZA');
@@ -127,9 +151,11 @@ preview.onclick=()=>{
    '<br>Collection: '+ShopDrop.esc(pickupCountry.value)+
    ' / '+ShopDrop.esc(pickupRegion.value)+
    ' / '+ShopDrop.esc(pickup.value)+
+   '<br>Collection address: '+ShopDrop.esc(pickupAddress.value)+
    '<br>Destination: '+ShopDrop.esc(dropoffCountry.value)+
    ' / '+ShopDrop.esc(dropoffRegion.value)+
    ' / '+ShopDrop.esc(dropoff.value)+
+   '<br>Delivery address: '+ShopDrop.esc(dropoffAddress.value)+
    '<br>Route: '+ShopDrop.esc(routeType.value)+
    '<br>Load: '+ShopDrop.esc(load.value)+
    (weight.value?'<br>Approx. weight: '+ShopDrop.esc(weight.value)+' kg':'')+
@@ -143,7 +169,6 @@ preview.onclick=()=>{
 </script>
 
 <script src="v26-bridge.js"></script>
-
 <section id="v26DispatchExtension">
 <!-- V26_DISPATCH_EXTENSION -->
 <h2>Dispatch Tracking</h2>
@@ -168,26 +193,52 @@ preview.onclick=()=>{
 </section>
 
 <script src="./supabase-adapter.js"></script>
-
 <script>
-// Fix 22T: Existing dispatch submission preserved.
-(function () {
+(function(){
  const submit=document.getElementById('preview');
  const status=document.getElementById('msg');
  if(!submit||!status)return;
 
+ const field=id=>document.getElementById(id).value.trim();
+ const validPhone=value=>!value||/^\+[1-9][0-9]{1,14}$/.test(value);
+ const validCoordinates=(lat,lon)=>
+  (!lat&&!lon)||
+  (!!lat&&!!lon&&
+   Number.isFinite(Number(lat))&&
+   Number.isFinite(Number(lon))&&
+   Number(lat)>=-90&&Number(lat)<=90&&
+   Number(lon)>=-180&&Number(lon)<=180);
+
  submit.textContent='Submit dispatch request';
 
  submit.onclick=async function(){
-  const required=[vehicle,pickup,dropoff,load];
+  const required=[vehicle,pickup,dropoff,load,pickupAddress,dropoffAddress];
 
   if(required.some(el=>!el.value.trim())){
-   status.textContent='Enter vehicle type, collection, destination and load details.';
+   status.textContent='Enter vehicle, collection and destination areas, exact addresses and load details.';
    return;
   }
 
-  if(date.value&&new Date(date.value).getTime()<=Date.now()){
-   status.textContent='Choose a future collection date and time.';
+  if(!pickupCountry.value||!dropoffCountry.value){
+   status.textContent='Select collection and delivery countries.';
+   return;
+  }
+
+  if(date.value&&(!Number.isFinite(new Date(date.value).getTime())||
+    new Date(date.value).getTime()<=Date.now())){
+   status.textContent='Choose a valid future collection date and time.';
+   return;
+  }
+
+  if(!validCoordinates(field('pickupLat'),field('pickupLon'))||
+     !validCoordinates(field('dropoffLat'),field('dropoffLon'))){
+   status.textContent='Enter valid GPS latitude and longitude pairs.';
+   return;
+  }
+
+  if(!validPhone(field('pickupMobile'))||
+     !validPhone(field('dropoffMobile'))){
+   status.textContent='Mobile numbers must use international format, e.g. +27821234567.';
    return;
   }
 
@@ -210,14 +261,88 @@ preview.onclick=()=>{
    ].filter(Boolean).join(' | ')
   };
 
+  const details={
+   pickup_province:field('pickupRegion'),
+   pickup_town:field('pickup'),
+   pickup_address:field('pickupAddress'),
+   pickup_site_name:field('pickupSite'),
+   pickup_gps_lat:field('pickupLat'),
+   pickup_gps_lon:field('pickupLon'),
+   pickup_contact_name:field('pickupContact'),
+   pickup_contact_mobile:field('pickupMobile'),
+   dropoff_province:field('dropoffRegion'),
+   dropoff_town:field('dropoff'),
+   dropoff_address:field('dropoffAddress'),
+   dropoff_site_name:field('dropoffSite'),
+   dropoff_gps_lat:field('dropoffLat'),
+   dropoff_gps_lon:field('dropoffLon'),
+   dropoff_contact_name:field('dropoffContact'),
+   dropoff_contact_mobile:field('dropoffMobile')
+  };
+
   submit.disabled=true;
   status.textContent='Submitting securely…';
 
+  let requestId=null;
+
   try{
-   const id=await window.ShopDropSupabaseAdapter.createDispatchRequest(payload);
-   status.textContent='Dispatch request submitted. Request ID: '+id+'. Provider matching and payment are not yet active.';
+   const adapter=window.ShopDropSupabaseAdapter;
+   if(!adapter?.createDispatchRequest){
+    throw new Error('Secure dispatch request service unavailable.');
+   }
+
+   requestId=await adapter.createDispatchRequest(payload);
+
+   if(typeof requestId!=='string'||
+      !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(requestId)){
+    throw new Error('Invalid dispatch request reference returned.');
+   }
+
+   status.textContent='Request created. Saving exact locations securely…';
+
+   const client=await import('https://esm.sh/@supabase/supabase-js@2')
+    .then(({createClient})=>createClient(
+      'https://dtkdvvxpwonywtsgqmdx.supabase.co',
+      'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q',
+      {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}
+    ));
+
+   const {data:sessionData,error:sessionError}=await client.auth.getSession();
+   if(sessionError||!sessionData?.session?.access_token){
+    throw new Error('Your session is unavailable.');
+   }
+
+   const {data:verified,error:authError}=
+    await client.auth.getUser(sessionData.session.access_token);
+
+   if(authError||!verified?.user?.id){
+    throw new Error('Your session has expired.');
+   }
+
+   const {data:saved,error:saveError}=await client.rpc(
+    'shopdrop_update_dispatch_location_details',
+    {p_request_id:requestId,p_details:details}
+   );
+
+   if(saveError||saved!==true){
+    throw new Error(saveError?.message||'Location details could not be saved.');
+   }
+
+   status.textContent=
+    'Dispatch request and location details saved. Request ID: '+
+    requestId+
+    '. Provider matching and payment are not yet active.';
+
   }catch(err){
-   status.textContent=err&&err.message?err.message:'Submission failed. Please try again.';
+   if(requestId){
+    status.textContent=
+     'Dispatch request '+requestId+
+     ' was created, but the location update was not confirmed: '+
+     (err?.message||'Unknown error')+
+     '. Do not submit another request yet; contact Shop&Drop administration with this reference.';
+   }else{
+    status.textContent=err?.message||'Submission failed. Please try again.';
+   }
   }finally{
    submit.disabled=false;
   }
