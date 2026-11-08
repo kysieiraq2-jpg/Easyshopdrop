@@ -86,4 +86,3 @@ COMMENT ON FUNCTION
 public.shopdrop_guard_dispatch_release_hold()
 IS
 'Blocks dispatch release advancement when an active payout hold exists. Does not move funds.';
-
