@@ -117,6 +117,11 @@ const supabase=createClient(
 const who=document.getElementById('who');
 const orders=document.getElementById('orders');
 
+// Standard UUID validation for both booking types.
+// Correct format: 8-4-4-4-12 hexadecimal characters.
+const validBookingId = value =>
+ /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+
 const {data:{user},error}=await supabase.auth.getUser();
 
 if(error||!user){
@@ -162,7 +167,7 @@ if(error||!user){
   pinOutput.textContent='';
   const bookingId=bookingInput.value.trim();
 
-  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookingId)){
+  if(!validBookingId(bookingId)){
    pinMessage.textContent='Enter a valid booking ID from your confirmation.';
    return;
   }
@@ -200,7 +205,7 @@ if(error||!user){
   dispatchOutput.textContent='';
   const bookingId=dispatchInput.value.trim();
 
-  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookingId)){
+  if(!validBookingId(bookingId)){
    dispatchMessage.textContent='Enter a valid dispatch booking ID.';
    return;
   }
