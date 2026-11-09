@@ -355,3 +355,73 @@ preview.onclick=()=>{
 <script defer src="shopdrop-info-language.js"></script>
 </body>
 </html>
+
+<script>
+/*
+ SHOPDROP_SA_DISPATCH_PHONE_FIX_V1
+ South Africa launch: normalize collection and delivery
+ mobile numbers to +27 before existing submission.
+ Preserve existing dispatch, GPS and booking logic.
+*/
+(function(){
+  const ids=['pickupMobile','dropoffMobile'];
+
+  function normalizeMobile(value){
+    const raw=String(value||'').trim();
+
+    // Existing optional mobile fields remain optional.
+    if(!raw)return '';
+
+    let digits=raw.replace(/[\s().-]/g,'');
+
+    if(digits.startsWith('+27')){
+      digits='0'+digits.slice(3);
+    }else if(digits.startsWith('27')){
+      digits='0'+digits.slice(2);
+    }else if(/^[6-8][0-9]{8}$/.test(digits)){
+      digits='0'+digits;
+    }
+
+    if(!/^0[6-8][0-9]{8}$/.test(digits)){
+      return null;
+    }
+
+    return '+27'+digits.slice(1);
+  }
+
+  document.addEventListener('click',function(event){
+    const button=event.target.closest('#preview');
+    if(!button)return;
+
+    for(const id of ids){
+      const input=document.getElementById(id);
+      if(!input)continue;
+
+      const normalized=normalizeMobile(input.value);
+
+      if(normalized===null){
+        event.preventDefault();
+        event.stopImmediatePropagation();
+
+        const status=document.getElementById('msg');
+        if(status){
+          status.textContent=
+            'Enter a valid South African cellphone number, e.g. 0821234567 or +27821234567.';
+        }
+
+        input.focus();
+        return;
+      }
+
+      input.value=normalized;
+    }
+  },true);
+
+  for(const id of ids){
+    const input=document.getElementById(id);
+    if(input){
+      input.placeholder='0821234567 or +27821234567';
+    }
+  }
+})();
+</script>
