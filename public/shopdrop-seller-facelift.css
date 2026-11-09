@@ -1,1 +1,164 @@
 
+/*
+ Shop&Drop Seller Centre Professional Facelift V1
+ Appearance only. No functional JavaScript changes.
+*/
+
+body:has(.wrap #shopdropSellerAliasPanel){
+  background:#f5f7fa;
+  color:#17202a;
+  font-family:Arial,system-ui,sans-serif;
+  line-height:1.5;
+}
+
+.wrap:has(#shopdropSellerAliasPanel){
+  max-width:1050px;
+  margin:0 auto;
+  padding:24px 16px 48px;
+}
+
+.wrap:has(#shopdropSellerAliasPanel) > h1{
+  font-size:clamp(28px,5vw,38px);
+  line-height:1.2;
+  margin:18px 0 20px;
+}
+
+.wrap:has(#shopdropSellerAliasPanel) .box{
+  background:#fff;
+  border:1px solid #e2e8f0;
+  border-radius:18px;
+  padding:clamp(20px,4vw,32px);
+  margin:0 0 22px;
+  box-shadow:0 8px 24px rgba(20,31,44,.06);
+  min-width:0;
+}
+
+.wrap:has(#shopdropSellerAliasPanel) .box h2{
+  font-size:clamp(21px,3.5vw,27px);
+  line-height:1.3;
+  margin:0 0 18px;
+}
+
+.wrap:has(#shopdropSellerAliasPanel) input:not([type="checkbox"]):not([type="file"]),
+.wrap:has(#shopdropSellerAliasPanel) select,
+.wrap:has(#shopdropSellerAliasPanel) textarea{
+  display:block;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  min-height:50px;
+  padding:12px 14px;
+  margin:7px 0 14px;
+  border:1px solid #cbd5e1;
+  border-radius:10px;
+  background:#fff;
+  color:#17202a;
+  font:inherit;
+  font-size:16px;
+  box-sizing:border-box;
+}
+
+.wrap:has(#shopdropSellerAliasPanel) .field input,
+.wrap:has(#shopdropSellerAliasPanel) .field select{
+  margin:0;
+}
+
+.wrap:has(#shopdropSellerAliasPanel) input:focus,
+.wrap:has(#shopdropSellerAliasPanel) select:focus,
+.wrap:has(#shopdropSellerAliasPanel) textarea:focus{
+  outline:2px solid #0f766e;
+  outline-offset:1px;
+  border-color:#0f766e;
+}
+
+.wrap:has(#shopdropSellerAliasPanel) input[type="file"]{
+  display:block;
+  max-width:100%;
+  padding:12px;
+  border:1px solid #cbd5e1;
+  border-radius:10px;
+  background:#fff;
+  box-sizing:border-box;
+}
+
+.wrap:has(#shopdropSellerAliasPanel) .btn{
+  min-height:48px;
+  padding:12px 18px;
+  border-radius:10px;
+  font:inherit;
+  font-weight:600;
+  cursor:pointer;
+}
+
+.wrap:has(#shopdropSellerAliasPanel) .btn.primary{
+  background:#0f766e;
+  color:#fff;
+  border-color:#0f766e;
+}
+
+.wrap:has(#shopdropSellerAliasPanel) .btn.primary:hover{
+  background:#115e59;
+}
+
+.wrap:has(#shopdropSellerAliasPanel) .message{
+  padding:14px;
+  margin:12px 0;
+  border-radius:10px;
+  line-height:1.5;
+}
+
+.wrap:has(#shopdropSellerAliasPanel) .field{
+  min-width:0;
+  gap:7px;
+}
+
+.wrap:has(#shopdropSellerAliasPanel) .field > span{
+  font-size:15px;
+  font-weight:600;
+  color:#334155;
+}
+
+.wrap:has(#shopdropSellerAliasPanel) .location-grid,
+.wrap:has(#shopdropSellerAliasPanel) .pricing-row{
+  gap:12px;
+  margin:12px 0 18px;
+}
+
+.wrap:has(#shopdropSellerAliasPanel) .stat{
+  border:1px solid #e2e8f0;
+  border-radius:14px;
+  padding:18px;
+  background:#fff;
+}
+
+.wrap:has(#shopdropSellerAliasPanel) .helper{
+  color:#64748b;
+  line-height:1.6;
+}
+
+@media(max-width:650px){
+  .wrap:has(#shopdropSellerAliasPanel){
+    padding:20px 14px 36px;
+  }
+
+  .wrap:has(#shopdropSellerAliasPanel) .box{
+    padding:20px 16px;
+  }
+
+  .wrap:has(#shopdropSellerAliasPanel) .location-grid{
+    grid-template-columns:minmax(0,1fr);
+  }
+
+  .wrap:has(#shopdropSellerAliasPanel) .pricing-row{
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  }
+
+  .wrap:has(#shopdropSellerAliasPanel) .grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+
+  .wrap:has(#shopdropSellerAliasPanel) .box > .btn.primary{
+    width:100%;
+  }
+}
+
