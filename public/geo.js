@@ -7,3 +7,56 @@ ShopDropGeo.dialOptions=(selected='+27')=>ShopDropGeo.dialEntries().map(c=>`<opt
 ShopDropGeo.dialLabelForCountry=(code)=>{const c=ShopDropGeo.dialEntries().find(x=>x.code===code);return c?c.label:''};
 ShopDropGeo.extractDial=(value)=>{const m=String(value||'').match(/(\+\d+)\s*$/);return m?m[1]:''};
 ShopDropGeo.currencyForCountry=(code)=>ShopDropGeo.countries.find(c=>c.code===code)?.currency||'USD';
+
+/* SHOPDROP_SA_LAUNCH_GEO_LOCK_V1
+   South Africa launch restriction.
+   International data and original functions remain preserved.
+   Set launchSouthAfricaOnly=false for future expansion.
+*/
+ShopDropGeo.launchSouthAfricaOnly = true;
+
+ShopDropGeo.allCountryOptions = ShopDropGeo.countryOptions;
+ShopDropGeo.allCurrencyOptions = ShopDropGeo.currencyOptions;
+ShopDropGeo.allDialEntries = ShopDropGeo.dialEntries;
+ShopDropGeo.allDialOptions = ShopDropGeo.dialOptions;
+ShopDropGeo.allCurrencyForCountry = ShopDropGeo.currencyForCountry;
+
+ShopDropGeo.countryOptions = function(selected='ZA'){
+  if(!this.launchSouthAfricaOnly){
+    return this.allCountryOptions(selected);
+  }
+  return '<option value="ZA" selected>South Africa (ZA)</option>';
+};
+
+ShopDropGeo.currencyOptions = function(selected='ZAR'){
+  if(!this.launchSouthAfricaOnly){
+    return this.allCurrencyOptions(selected);
+  }
+  return '<option value="ZAR" selected>ZAR</option>';
+};
+
+ShopDropGeo.dialEntries = function(){
+  if(!this.launchSouthAfricaOnly){
+    return this.allDialEntries();
+  }
+  return [{
+    code:'ZA',
+    name:'South Africa',
+    dial:'+27',
+    label:'South Africa (ZA) +27'
+  }];
+};
+
+ShopDropGeo.dialOptions = function(selected='+27'){
+  if(!this.launchSouthAfricaOnly){
+    return this.allDialOptions(selected);
+  }
+  return '<option value="+27" selected>ZA +27</option>';
+};
+
+ShopDropGeo.currencyForCountry = function(code){
+  if(!this.launchSouthAfricaOnly){
+    return this.allCurrencyForCountry(code);
+  }
+  return 'ZAR';
+};
