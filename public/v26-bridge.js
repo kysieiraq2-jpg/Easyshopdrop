@@ -30,12 +30,17 @@
 
   Cosmetic display correction.
   Preserve all original bridge functionality.
-  Run after homepage layout has arranged its cards.
+  Temporarily disabled to restore homepage layout.
   Do not rename dispatch identifiers or links.
   Prevent duplicate wording substitutions.
  */
  (function(){
    "use strict";
+
+   // TEMPORARY SAFETY FIX:
+   // Disable cosmetic text replacement.
+   // All original bridge functionality above remains active.
+   return;
 
    const preferred =
      "Despatching / Dispatching & Transport";
@@ -131,12 +136,6 @@
    }
 
    function afterLayout(){
-     /*
-      Wait until the browser's next animation frame.
-      This allows the homepage DOMContentLoaded
-      layout handler to locate and move its cards
-      using their original heading text first.
-     */
      window.requestAnimationFrame(start);
    }
 
