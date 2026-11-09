@@ -4,9 +4,8 @@
    Does NOT alter hrefs, event handlers, listing logic, taxonomy, finance or backend behaviour.
    Homepage four-card presentation fix: each marketplace option is a separate tile.
 
-   BROWSE/BAG ALIGNMENT FIX:
-   Keep both bottom header buttons equal in width and aligned
-   with the Sign In / Account and Menu buttons above.
+   V26_26_HEIGHT_ONLY:
+   Preserve existing widths. Match bottom button heights to top buttons.
 */
 (function () {
   function norm(s){
@@ -69,8 +68,7 @@
 
     if(how && intro && intro!==how){
       // V26_11_INTRO_CONSOLIDATION_CORRECTED:
-      // Keep the original Shop&Drop introduction wording/content intact,
-      // but place that content inside the broader How Shop&Drop Works area.
+      // Keep original introduction content intact.
       const introWrap=document.createElement("div");
       introWrap.className="v26-shopdrop-introduction";
       while(intro.firstChild){
@@ -82,7 +80,6 @@
 
     // Four independent marketplace tiles.
     // Preserve existing headings, descriptions, links and event handlers.
-    // Dispatch first; two columns remain controlled by existing CSS.
     const available=[dispatch,service,shop,sell].filter(Boolean);
 
     if(available.length){
@@ -107,8 +104,6 @@
       available.forEach(card=>{
         grid.appendChild(card);
 
-        // V26_11_EXISTING_LINK_TILE_CLICK:
-        // Reuse existing href; never invent/replace link targets.
         const existing=card.matches("a[href]")
           ?card
           :card.querySelector("a[href]");
@@ -154,11 +149,10 @@
     }
 
     // V26_11_CONTACT_PRESENTATION:
-    // Presentation only; preserve existing contact hrefs/config.
+    // Preserve existing contact hrefs and configuration.
     if(contact){
       contact.classList.add("v26-contact-admin");
 
-      // Remove development-only explanatory text from visible homepage.
       [...contact.querySelectorAll("p,small")].forEach(el=>{
         const tx=norm(el.textContent);
 
@@ -242,14 +236,14 @@
     document.documentElement.dataset.shopdropHomepageLayout="v26-13";
 
     // V26_25_BROWSE_BAG_EQUAL_WIDTH:
-    // CSS-only correction. Preserve original header HTML and links.
-    // Align bottom Browse/Bag row with top Sign In/Menu row.
+    // Preserve the previously approved width alignment.
     if(
       document.querySelector(".shopdrop-browse-bag-row") &&
       !document.getElementById("shopdropBrowseBagAlignmentFix")
     ){
       const style=document.createElement("style");
       style.id="shopdropBrowseBagAlignmentFix";
+
       style.textContent=`
         .shopdrop-header-actions{
           display:grid!important;
@@ -287,19 +281,37 @@
           justify-content:center!important;
           width:100%!important;
           min-width:0!important;
-          min-height:58px!important;
           justify-self:stretch!important;
           text-align:center!important;
+          white-space:normal!important;
+        }
+
+        /* V26_26_HEIGHT_ONLY:
+           Match the top row height without changing widths. */
+        .shopdrop-browse-bag-row .shopdrop-header-bag,
+        .shopdrop-browse-bag-row .shopdrop-header-browse{
+          height:64px!important;
+          min-height:64px!important;
+          max-height:64px!important;
+          padding:4px!important;
+          box-sizing:border-box!important;
         }
 
         .shopdrop-browse-bag-row .shopdrop-header-browse{
-          white-space:normal!important;
+          gap:2px!important;
         }
 
-        .shopdrop-browse-bag-row .shopdrop-header-bag{
-          white-space:normal!important;
+        .shopdrop-header-browse strong{
+          font-size:12px!important;
+          line-height:1.15!important;
+        }
+
+        .shopdrop-header-browse small{
+          font-size:10px!important;
+          line-height:1.15!important;
         }
       `;
+
       document.head.appendChild(style);
     }
   });
