@@ -33,7 +33,7 @@ function respond(
 
 function validUuid(value: unknown): value is string {
   return typeof value === "string" &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
       value,
     );
 }
@@ -166,4 +166,3 @@ Deno.serve(async (request) => {
     payment_url: null,
   });
 });
-
