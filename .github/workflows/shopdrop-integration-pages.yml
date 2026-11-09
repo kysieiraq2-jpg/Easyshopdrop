@@ -1,1 +1,68 @@
 
+name: ShopDrop Integrated Website Deployment
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - 'public/**'
+      - '.github/workflows/shopdrop-integration-pages.yml'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Publish integrated ShopDrop website
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: false
+
+      - name: Verify correct branch and website files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test "${GITHUB_REF_NAME}" = \
+            "shopdrop-phase6-integration"
+
+          test -f public/index.html
+          test -f public/account.html
+          test -f public/checkout.html
+          test -f public/register.html
+          test -f public/sign-in.html
+          test -f public/dispatching.html
+          test -f public/services.html
+          test -f public/supabase-adapter.js
+
+          echo "Integration website files verified."
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload integrated website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy integrated website
+        id: deployment
+        uses: actions/deploy-pages@v4
+
