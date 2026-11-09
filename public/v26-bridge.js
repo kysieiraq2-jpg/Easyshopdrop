@@ -26,12 +26,13 @@
  };
 
  /*
-  SHOPDROP_DESPATCH_DISPLAY_ONLY_V1
+  SHOPDROP_DESPATCH_DISPLAY_ONLY_V2
 
-  Customer-facing spelling only.
-  Technical dispatch identifiers remain unchanged.
-  No changes to links, attributes, forms, API calls,
-  Supabase, payment or courier functionality.
+  Cosmetic display correction.
+  Preserve all original bridge functionality.
+  Run after homepage layout has arranged its cards.
+  Do not rename dispatch identifiers or links.
+  Prevent duplicate wording substitutions.
  */
  (function(){
    "use strict";
@@ -54,15 +55,12 @@
      const before=node.nodeValue;
      if(!before)return;
 
-     const after=before
-       .replace(
-         /Dispatching\s*&\s*Transport/g,
-         preferred
-       )
-       .replace(
-         /Dispatch\s*&\s*Transport/g,
-         preferred
-       );
+     const after=before.replace(
+       /(Despatching\s*\/\s*)?Dispatching\s*&\s*Transport|Dispatch\s*&\s*Transport/g,
+       function(match,existingPrefix){
+         return existingPrefix ? match : preferred;
+       }
+     );
 
      if(after!==before){
        node.nodeValue=after;
@@ -109,6 +107,8 @@
    }
 
    function start(){
+     if(!document.body)return;
+
      scan(document.body);
 
      const observer=new MutationObserver(records=>{
@@ -130,11 +130,23 @@
      });
    }
 
+   function afterLayout(){
+     /*
+      Wait until the browser's next animation frame.
+      This allows the homepage DOMContentLoaded
+      layout handler to locate and move its cards
+      using their original heading text first.
+     */
+     window.requestAnimationFrame(start);
+   }
+
    if(document.readyState==="loading"){
      document.addEventListener(
-       "DOMContentLoaded",start,{once:true}
+       "DOMContentLoaded",
+       afterLayout,
+       {once:true}
      );
    }else{
-     start();
+     afterLayout();
    }
  })();
