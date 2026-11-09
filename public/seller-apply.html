@@ -1,7 +1,294 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sell on Shop&Drop</title><style>*{box-sizing:border-box}body{font:16px Arial;background:#f3f5f8;color:#17202a;margin:0}main{max-width:650px;margin:4vh auto;background:#fff;padding:28px;border-radius:12px}input,select,button{width:100%;padding:12px;margin:7px 0;border-radius:7px;border:1px solid #cbd5e1}button{background:#0f766e;color:#fff;border:0;font-weight:700}.note{background:#ecfdf5;padding:14px;border-radius:8px}.message{padding:12px;border-radius:8px;background:#fff7ed}a{color:#0f766e}@media(max-width:700px){main{margin:0;border-radius:0;padding:22px}}.dial-help{font-size:13px;color:#64748b;margin:-2px 0 5px}</style></head><body><main><a href="./index.html">← Shop&Drop</a><h1>Sell something — FREE</h1><div class=note>No company or website required. List for free. Shop&Drop earns a configured marketplace service fee only when a successful transaction is completed. Rates are designed to remain transparent and may use progressive tiers for higher-value transactions.</div><p><a href="./sign-in.html">Sign in</a> or <a href="./register.html">create your free Shop&Drop account</a> first, then apply as a seller. The same account can also be used to buy. Seller details are kept private from public product listings.</p><form id=form><label>Seller type</label><select id=type><option value=individual>Private individual</option><option value=home_business>Home business / maker</option><option value=second_hand>Second-hand seller</option><option value=business>Business / company</option></select><label>Seller / business name</label><input id=store required minlength=2 placeholder="Your name or business name"><label>Country</label><select id=country required></select><label>Cellphone</label><input id=dialSearch autocomplete="off" placeholder="Search country — e.g. Spain, ES or +34" aria-label="Search cellphone country code"><div class="dial-help">Type a country name, country code or dialing code, then tap the dialing-code list below.</div><div style="display:grid;grid-template-columns:minmax(115px,38%) 1fr;gap:6px"><select id=dial required aria-label="Cellphone country code"></select><input id=phone required inputmode=tel placeholder="Mobile number"></div><label>WhatsApp (optional)</label><input id=whatsappDialSearch autocomplete="off" placeholder="Search country — e.g. Spain, ES or +34" aria-label="Search WhatsApp country code"><div class="dial-help">Type a country name, country code or dialing code, then tap the dialing-code list below.</div><div style="display:grid;grid-template-columns:minmax(115px,38%) 1fr;gap:6px"><select id=whatsappDial aria-label="WhatsApp country code"></select><input id=whatsapp inputmode=tel placeholder="WhatsApp number"></div><button>Submit seller application</button></form><p id=message class=message hidden></p></main><script src="./common.js"></script>
-<script src="./v26-consolidated.js"></script><script src="./geo.js"></script><script>country.innerHTML=ShopDropGeo.countryOptions('ZA');
-const fullDialHTML=ShopDropGeo.dialOptions('+27');dial.innerHTML=fullDialHTML;whatsappDial.innerHTML=fullDialHTML;
-const dialEntries=ShopDropGeo.countries.filter(c=>ShopDropGeo.dialCodes[c.code]).map(c=>({code:c.code,name:c.name,dial:ShopDropGeo.dialCodes[c.code]}));
-function filterNativeDial(input,select){const q=input.value.trim().toLowerCase();const current=select.value||'+27';if(!q){select.innerHTML=ShopDropGeo.dialOptions(current);return;}const matches=dialEntries.filter(c=>c.name.toLowerCase().includes(q)||c.code.toLowerCase()===q||c.dial.includes(q));select.innerHTML=matches.map(c=>`<option value="${c.dial}">${c.code} ${c.dial}</option>`).join('');if(matches.length===1)select.value=matches[0].dial;}
-dialSearch.oninput=()=>filterNativeDial(dialSearch,dial);whatsappDialSearch.oninput=()=>filterNativeDial(whatsappDialSearch,whatsappDial);
-function syncDial(){const d=ShopDropGeo.dialCodes[country.value]||'';if(d){dialSearch.value='';whatsappDialSearch.value='';dial.innerHTML=ShopDropGeo.dialOptions(d);whatsappDial.innerHTML=ShopDropGeo.dialOptions(d);dial.value=d;whatsappDial.value=d}}country.onchange=syncDial;syncDial();form.onsubmit=async e=>{e.preventDefault();if(!form.reportValidity())return;if(!country.value){ShopDrop.msg(message,'Choose your country.','error');return}if(ShopDrop.isStatic){ShopDrop.msg(message,'Preview mode: the form layout is working. Seller applications require the Shop&Drop backend and will not be submitted from GitHub Pages.');return}try{await ShopDrop.api('/api/sellers/apply',{method:'POST',body:JSON.stringify({sellerType:type.value,storeName:store.value.trim(),countryCode:country.value,phone:(dial.value.trim()+phone.value.trim()),whatsapp:whatsapp.value.trim()?(whatsappDial.value+whatsapp.value.trim()):''})});ShopDrop.msg(message,'Application received. Your seller details will remain private on public product listings.')}catch(e){ShopDrop.msg(message,e.message,'error')}};</script><script src="v26-bridge.js"></script><script defer src="shopdrop-seller-language.js"></script><script defer src="shopdrop-form-language.js"></script></body></html>
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sell on Shop&Drop</title>
+<style>
+*{box-sizing:border-box}
+body{font:16px Arial;background:#f3f5f8;color:#17202a;margin:0}
+main{max-width:650px;margin:4vh auto;background:#fff;padding:28px;border-radius:12px}
+input,select,button{width:100%;padding:12px;margin:7px 0;border-radius:7px;border:1px solid #cbd5e1}
+button{background:#0f766e;color:#fff;border:0;font-weight:700}
+.note{background:#ecfdf5;padding:14px;border-radius:8px}
+.message{padding:12px;border-radius:8px;background:#fff7ed}
+a{color:#0f766e}
+@media(max-width:700px){
+ main{margin:0;border-radius:0;padding:22px}
+}
+.dial-help{font-size:13px;color:#64748b;margin:-2px 0 5px}
+</style>
+</head>
+<body>
+<main>
+<a href="./index.html">← Shop&Drop</a>
+<h1>Sell something — FREE</h1>
+
+<div class="note">
+No company or website required. List for free. Shop&Drop earns a configured marketplace service fee only when a successful transaction is completed. Rates are designed to remain transparent and may use progressive tiers for higher-value transactions.
+</div>
+
+<p>
+<a href="./sign-in.html">Sign in</a> or
+<a href="./register.html">create your free Shop&Drop account</a>
+first, then apply as a seller. The same account can also be used to buy. Seller details are kept private from public product listings.
+</p>
+
+<form id="form">
+<label for="type">Seller type</label>
+<select id="type">
+<option value="individual">Private individual</option>
+<option value="home_business">Home business / maker</option>
+<option value="second_hand">Second-hand seller</option>
+<option value="business">Business / company</option>
+</select>
+
+<label for="store">Seller / business name</label>
+<input id="store" required minlength="2" placeholder="Your name or business name">
+
+<label for="country">Country</label>
+<select id="country" required></select>
+
+<label for="phone">Cellphone</label>
+<div id="cellDialSearchGroup">
+<input id="dialSearch" autocomplete="off"
+ placeholder="Search country — e.g. Spain, ES or +34"
+ aria-label="Search cellphone country code">
+<div class="dial-help">
+Type a country name, country code or dialing code, then tap the dialing-code list below.
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(115px,38%) 1fr;gap:6px">
+<select id="dial" required aria-label="Cellphone country code"></select>
+<input id="phone" required type="tel" inputmode="tel"
+ placeholder="Mobile number">
+</div>
+
+<label for="whatsapp">WhatsApp (optional)</label>
+<div id="whatsappDialSearchGroup">
+<input id="whatsappDialSearch" autocomplete="off"
+ placeholder="Search country — e.g. Spain, ES or +34"
+ aria-label="Search WhatsApp country code">
+<div class="dial-help">
+Type a country name, country code or dialing code, then tap the dialing-code list below.
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(115px,38%) 1fr;gap:6px">
+<select id="whatsappDial" aria-label="WhatsApp country code"></select>
+<input id="whatsapp" type="tel" inputmode="tel"
+ placeholder="WhatsApp number">
+</div>
+
+<button type="submit">Submit seller application</button>
+</form>
+
+<p id="message" class="message" hidden></p>
+</main>
+
+<script src="./common.js"></script>
+<script src="./v26-consolidated.js"></script>
+<script src="./geo.js"></script>
+
+<script>
+/*
+ SHOPDROP_SA_SELLER_LAUNCH_V2
+ Preserve international capabilities for future launch.
+ Restrict customer-facing country and dial selections to ZA.
+ Preserve existing seller application endpoint and payload.
+*/
+
+const form=document.getElementById('form');
+const country=document.getElementById('country');
+const dial=document.getElementById('dial');
+const whatsappDial=document.getElementById('whatsappDial');
+const dialSearch=document.getElementById('dialSearch');
+const whatsappDialSearch=document.getElementById('whatsappDialSearch');
+const phone=document.getElementById('phone');
+const whatsapp=document.getElementById('whatsapp');
+const type=document.getElementById('type');
+const store=document.getElementById('store');
+const message=document.getElementById('message');
+
+const saLaunch=ShopDropGeo.launchSouthAfricaOnly===true;
+
+country.innerHTML=ShopDropGeo.countryOptions('ZA');
+dial.innerHTML=ShopDropGeo.dialOptions('+27');
+whatsappDial.innerHTML=ShopDropGeo.dialOptions('+27');
+
+const dialEntries=saLaunch
+ ?ShopDropGeo.dialEntries()
+ :ShopDropGeo.countries
+   .filter(c=>ShopDropGeo.dialCodes[c.code])
+   .map(c=>({
+     code:c.code,
+     name:c.name,
+     dial:ShopDropGeo.dialCodes[c.code]
+   }));
+
+function filterNativeDial(input,select){
+ const q=input.value.trim().toLowerCase();
+ const current=select.value||'+27';
+
+ if(!q){
+   select.innerHTML=ShopDropGeo.dialOptions(current);
+   return;
+ }
+
+ const matches=dialEntries.filter(c=>
+   c.name.toLowerCase().includes(q)||
+   c.code.toLowerCase()===q||
+   c.dial.includes(q)
+ );
+
+ select.innerHTML=matches.map(c=>
+   `<option value="${c.dial}">${c.code} ${c.dial}</option>`
+ ).join('');
+
+ if(matches.length===1){
+   select.value=matches[0].dial;
+ }
+}
+
+dialSearch.oninput=()=>filterNativeDial(dialSearch,dial);
+whatsappDialSearch.oninput=()=>filterNativeDial(
+ whatsappDialSearch,whatsappDial
+);
+
+function syncDial(){
+ const d=saLaunch
+   ?'+27'
+   :(ShopDropGeo.dialCodes[country.value]||'');
+
+ if(d){
+   dialSearch.value='';
+   whatsappDialSearch.value='';
+   dial.innerHTML=ShopDropGeo.dialOptions(d);
+   whatsappDial.innerHTML=ShopDropGeo.dialOptions(d);
+   dial.value=d;
+   whatsappDial.value=d;
+ }
+}
+
+if(saLaunch){
+ country.value='ZA';
+ country.disabled=true;
+ dial.value='+27';
+ whatsappDial.value='+27';
+ dial.disabled=true;
+ whatsappDial.disabled=true;
+
+ document.getElementById('cellDialSearchGroup').hidden=true;
+ document.getElementById('whatsappDialSearchGroup').hidden=true;
+
+ phone.placeholder='0821234567';
+ whatsapp.placeholder='0821234567';
+}
+
+country.onchange=syncDial;
+syncDial();
+
+function normalizePhone(value,code){
+ const raw=String(value||'').trim().replace(/[\s().-]/g,'');
+
+ if(!saLaunch){
+   return code+raw;
+ }
+
+ let digits=raw;
+
+ if(digits.startsWith('+27')){
+   digits='0'+digits.slice(3);
+ }else if(digits.startsWith('27')){
+   digits='0'+digits.slice(2);
+ }else if(/^[6-8][0-9]{8}$/.test(digits)){
+   digits='0'+digits;
+ }
+
+ if(!/^0[6-8][0-9]{8}$/.test(digits)){
+   return null;
+ }
+
+ return '+27'+digits.slice(1);
+}
+
+form.onsubmit=async e=>{
+ e.preventDefault();
+
+ if(!form.reportValidity())return;
+
+ const countryCode=saLaunch?'ZA':country.value;
+ const dialCode=saLaunch?'+27':dial.value;
+ const whatsappCode=saLaunch?'+27':whatsappDial.value;
+
+ if(!countryCode){
+   ShopDrop.msg(message,'Choose your country.','error');
+   return;
+ }
+
+ const normalizedPhone=normalizePhone(phone.value,dialCode);
+
+ if(!normalizedPhone){
+   ShopDrop.msg(
+     message,
+     'Enter a valid South African cellphone number, e.g. 0821234567.',
+     'error'
+   );
+   return;
+ }
+
+ let normalizedWhatsApp='';
+
+ if(whatsapp.value.trim()){
+   normalizedWhatsApp=normalizePhone(
+     whatsapp.value,
+     whatsappCode
+   );
+
+   if(!normalizedWhatsApp){
+     ShopDrop.msg(
+       message,
+       'Enter a valid South African WhatsApp number or leave it blank.',
+       'error'
+     );
+     return;
+   }
+ }
+
+ if(ShopDrop.isStatic){
+   ShopDrop.msg(
+     message,
+     'Preview mode: the form layout is working. Seller applications require the Shop&Drop backend and will not be submitted from GitHub Pages.'
+   );
+   return;
+ }
+
+ try{
+   await ShopDrop.api('/api/sellers/apply',{
+     method:'POST',
+     body:JSON.stringify({
+       sellerType:type.value,
+       storeName:store.value.trim(),
+       countryCode:countryCode,
+       phone:normalizedPhone,
+       whatsapp:normalizedWhatsApp
+     })
+   });
+
+   ShopDrop.msg(
+     message,
+     'Application received. Your seller details will remain private on public product listings.'
+   );
+ }catch(e){
+   ShopDrop.msg(message,e.message,'error');
+ }
+};
+</script>
+
+<script src="v26-bridge.js"></script>
+<script defer src="shopdrop-seller-language.js"></script>
+<script defer src="shopdrop-form-language.js"></script>
+</body>
+</html>
