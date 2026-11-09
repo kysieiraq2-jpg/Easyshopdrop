@@ -1,6 +1,9 @@
+
 /* Shop&Drop V26-13 homepage layout + controlled menu containment repair.
    Reorders/groups EXISTING homepage sections.
-   Does NOT alter hrefs, event handlers, listing logic, taxonomy, finance or backend behaviour. */
+   Does NOT alter hrefs, event handlers, listing logic, taxonomy, finance or backend behaviour.
+   Homepage four-card presentation fix: each marketplace option is a separate tile.
+*/
 (function () {
   function norm(s){return String(s||"").replace(/\s+/g," ").trim().toLowerCase();}
   function headingElement(text){
@@ -10,7 +13,7 @@
   function sectionForHeading(text){
     const h=headingElement(text);
     if(!h)return null;
-    return h.closest("section,article,.card,.panel,.v26-section,.v26-card") || h.parentElement;
+    return h.closest("a.v264Card,section,article,.card,.panel,.v26-section,.v26-card") || h.parentElement;
   }
   function firstExisting(labels){
     for(const label of labels){const s=sectionForHeading(label);if(s)return s;}
@@ -47,8 +50,10 @@
       intro.hidden=true;
     }
 
-    // One user-friendly action block; existing cards/links are moved, not rewritten.
-    const available=[shop,service,dispatch,sell].filter(Boolean);
+    // Four independent marketplace tiles.
+    // Preserve existing headings, descriptions, links and event handlers.
+    // Dispatch first; two columns remain controlled by existing CSS.
+    const available=[dispatch,service,shop,sell].filter(Boolean);
     if(available.length){
       let action=document.getElementById("v26HomeActionBlock");
       if(!action){
@@ -83,7 +88,6 @@
     if(categories) anchor=moveAfter(categories,anchor||contact||how);
     if(featured) anchor=moveAfter(featured,anchor||categories);
 
-    
     // V26_11_CONTACT_PRESENTATION — presentation only; preserve existing contact hrefs/config.
     if(contact){
       contact.classList.add("v26-contact-admin");
@@ -102,7 +106,6 @@
 
       if(wa){
         wa.classList.add("v26-contact-link","v26-whatsapp-link");
-        // Familiar WhatsApp-style speech-bubble/phone mark; no external asset/dependency.
         if(!wa.querySelector(".v26-whatsapp-mark")){
           const mark=document.createElement("span");
           mark.className="v26-whatsapp-mark";
@@ -128,9 +131,7 @@
       if(complaint) complaint.classList.add("v26-contact-link","v26-complaint-link");
     }
 
-    
     // V26_21: header is now stable static markup; no DOM re-parenting is permitted here.
-
     document.documentElement.dataset.shopdropHomepageLayout="v26-13";
   });
 })();
