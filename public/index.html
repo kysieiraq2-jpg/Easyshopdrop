@@ -4,7 +4,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Shop&Drop — Buy & Sell Worldwide</title>
+<title>Shop&Drop — Buy & Sell</title>
 <style>
 *{box-sizing:border-box}
 body{margin:0;font:16px Arial,sans-serif;background:#f4f6f8;color:#17202a}
@@ -78,8 +78,6 @@ footer{padding:30px;text-align:center;color:#64748b}
 }
 </style>
 <link rel="stylesheet" href="v26-professional.css">
-
-<!-- Browse All Advertisements header addition -->
 <style id="shopdrop-browse-bag-style">
 .shopdrop-browse-bag-row{
  display:grid;
@@ -137,7 +135,6 @@ footer{padding:30px;text-align:center;color:#64748b}
     <div class="shopdrop-header-search">
       <input class="search" id="search" type="search" placeholder="Search products" aria-label="Search products">
       <button class="btn searchbtn" id="searchButton" type="button">Search</button>
-
     </div>
     <div class="shopdrop-header-actions">
       <div class="shopdrop-header-secondary">
@@ -169,8 +166,6 @@ footer{padding:30px;text-align:center;color:#64748b}
       </div>
         <a class="btn light navbtn shopdrop-header-account" href="./sign-in.html">Sign In / Account</a>
       </div>
-
-      <!-- Browse block on left; Bag block on right -->
       <div class="shopdrop-browse-bag-row">
         <a class="btn shopdrop-header-browse" href="./categories.html">
           <strong>BROWSE ALL ADVERTISEMENTS</strong>
@@ -178,7 +173,6 @@ footer{padding:30px;text-align:center;color:#64748b}
         </a>
         <a class="btn light navbtn shopdrop-header-bag" href="./checkout.html">Bag</a>
       </div>
-
     </div>
   </div>
 </header>
@@ -190,7 +184,7 @@ footer{padding:30px;text-align:center;color:#64748b}
   <section class="v264Hero">
     <h1>Shop&Drop</h1>
     <p><strong>Buy • Sell • Find Services • Get It Moved</strong></p>
-    <p>A worldwide marketplace for private individuals, home-based makers, craftspeople,
+    <p>A marketplace for private individuals, home-based makers, craftspeople,
        second-hand sellers, businesses and service providers. Registration and listing are FREE.</p>
   </section>
   <section class="v264EntranceGrid" aria-label="Marketplace areas">
@@ -230,7 +224,7 @@ footer{padding:30px;text-align:center;color:#64748b}
 <p><b>1. List for FREE</b> — sell a product or offer a clearly priced service.</p>
 <p><b>2. Customer buys or books</b> — checkout, payment, notifications and tracking stay inside Shop&Drop.</p>
 <p><b>3. Complete the transaction</b> — seller/provider fulfils it, Shop&Drop applies the clearly disclosed marketplace service fee, and payout follows the completion rules.</p>
-<p><b>Sell locally. Sell internationally. Shop simply.</b></p>
+<p><b>Buy. Sell. Shop simply.</b></p>
 <p class="muted">Shop&Drop is designed for ordinary people as well as businesses. Direct contact and sensitive payout details stay private. Sellers see their target proceeds, Shop&Drop marketplace service fee and final customer price before a listing goes live. Fee rules remain configurable and transparent.</p>
 </section>
 </main>
@@ -358,13 +352,12 @@ loadProducts(false);
 <p><a href="feedback.html">Complaints & Suggestions</a></p>
 <footer><a href="terms.html">Terms</a> · <a href="privacy.html">Privacy</a> · <a href="returns-policy.html">Returns Policy</a> · <a href="seller-provider-rules.html">Seller & Provider Rules</a> · <a href="restricted-listings.html">Restricted Listings</a></footer>
 </section>
-
 <script id="shopdrop-contact-config">
 // V26.9 PUBLIC CONTACT PLACEHOLDERS — keep these links in the live homepage.
 // Insert the official values later; do not remove the Email/WhatsApp UI.
 window.ShopDropPublicContact = Object.freeze({
  supportEmail: "",
- whatsappBusinessNumber: "", // E.164 digits only when supplied, e.g. 27...
+ whatsappBusinessNumber: "",
  whatsappMessage: "Hello Shop&Drop Admin, I have an enquiry."
 });
 (function configureShopDropContactLinks(){
