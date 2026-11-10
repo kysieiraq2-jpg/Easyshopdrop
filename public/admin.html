@@ -7,10 +7,10 @@
 <title>Shop&Drop Admin Control Centre</title>
 <style>
 /*
- SHOPDROP_ADMIN_CENTRE_SAFE_V2
+ SHOPDROP_ADMIN_CENTRE_SAFE_V3
  Existing administration sections and links preserved.
  Authenticated Supabase administrator verification.
- Read-only live dashboard statistics.
+ Read-only live dashboard statistics and applications.
  Legacy /api/admin management calls remain disabled.
 */
 *{box-sizing:border-box}
@@ -269,15 +269,21 @@ administrator API is connected.
 <section class="box">
 <h2>Seller &amp; Service-Provider Applications</h2>
 
-<div id="sellers" class="pending">
-Seller and provider applications
-will appear here after secure
-administrator data access is
-connected and verified.
-
-Approval and suspension actions
-are not currently enabled.
+<div id="sellers" class="pending"
+ role="status" aria-live="polite">
+Waiting for administrator verification.
 </div>
+
+<p class="muted">
+Read-only application review.
+Approval and suspension actions
+remain disabled.
+</p>
+
+<button id="refreshApplications"
+ type="button">
+ Refresh applications
+</button>
 </section>
 
 <section class="box">
@@ -381,10 +387,11 @@ provider integrations are verified.
 
 <script type="module">
 /*
- SHOPDROP_ADMIN_AUTH_GUARD_V2
+ SHOPDROP_ADMIN_AUTH_GUARD_V3
 
  Existing Supabase administrator check preserved.
- Read-only dashboard statistics added.
+ Read-only dashboard statistics preserved.
+ Read-only seller applications added.
  No financial or marketplace writes.
 */
 
@@ -420,6 +427,12 @@ const refresh=document.getElementById(
 );
 const statsStatus=document.getElementById(
  'statsStatus'
+);
+const applicationPanel=document.getElementById(
+ 'sellers'
+);
+const applicationRefresh=document.getElementById(
+ 'refreshApplications'
 );
 
 let adminVerified=false;
@@ -502,6 +515,108 @@ async function loadStatistics(){
  }
 }
 
+function applicationText(value){
+ return String(value??'—');
+}
+
+function renderApplications(items){
+ applicationPanel.replaceChildren();
+ applicationPanel.classList.remove('pending');
+
+ if(items.length===0){
+  applicationPanel.textContent=
+   'No applications received yet.';
+  return;
+ }
+
+ const list=document.createElement('div');
+
+ for(const item of items){
+  const article=document.createElement('div');
+  article.className='box';
+
+  const name=document.createElement('strong');
+  name.textContent=applicationText(
+   item.applicant_name
+  );
+  article.appendChild(name);
+
+  for(const [label,value] of [
+   ['Type',item.applicant_type],
+   ['Status',item.status],
+   [
+    'Submitted',
+    item.submitted_at
+     ?new Date(
+       item.submitted_at
+      ).toLocaleString('en-ZA')
+     :'—'
+   ]
+  ]){
+   const line=document.createElement('p');
+   line.textContent=
+    label+': '+applicationText(value);
+   article.appendChild(line);
+  }
+
+  list.appendChild(article);
+ }
+
+ applicationPanel.appendChild(list);
+}
+
+async function loadApplications(){
+ if(!adminVerified)return;
+
+ applicationRefresh.disabled=true;
+ applicationPanel.textContent=
+  'Loading applications...';
+
+ try{
+  const {data,error}=await supabase.rpc(
+   'shopdrop_admin_list_applications'
+  );
+
+  if(error)throw error;
+
+  if(!Array.isArray(data)){
+   throw Error('Invalid application response.');
+  }
+
+  renderApplications(data);
+
+ }catch(error){
+  applicationPanel.classList.add('pending');
+  applicationPanel.textContent=
+   'Applications could not be loaded. '+
+   'Please try Refresh applications.';
+ }finally{
+  applicationRefresh.disabled=false;
+ }
+}
+
+async function confirmAdminSession(){
+ const {data,error}=
+  await supabase.auth.getUser();
+
+ if(error||!data?.user){
+  deny('Administrator session expired.');
+  return false;
+ }
+
+ const {data:allowed,error:roleError}=
+  await supabase.rpc(
+   'shopdrop_is_active_admin'
+  );
+
+ if(roleError||allowed!==true){
+  deny('Administrator access no longer authorised.');
+  return false;
+ }
+
+ return true;
+}
+
 async function verifyAdmin(){
  try{
   const {data,error}=
@@ -518,7 +633,9 @@ async function verifyAdmin(){
    );
 
   if(roleError||allowed!==true){
-   deny('Administrator access not authorised or verification unavailable.');
+   deny(
+    'Administrator access not authorised or verification unavailable.'
+   );
    return;
   }
 
@@ -531,32 +648,36 @@ async function verifyAdmin(){
   content.hidden=false;
 
   await loadStatistics();
+  await loadApplications();
 
  }catch(error){
-  deny('Administrator verification could not be completed.');
+  deny(
+   'Administrator verification could not be completed.'
+  );
  }
 }
 
 refresh.addEventListener('click',async()=>{
- if(!adminVerified)return;
-
- const {data,error}=await supabase.auth.getUser();
-
- if(error||!data?.user){
-  deny('Administrator session expired.');
-  return;
+ try{
+  if(!adminVerified)return;
+  if(!await confirmAdminSession())return;
+  await loadStatistics();
+ }catch(error){
+  deny('Administrator verification unavailable.');
  }
-
- const {data:allowed,error:roleError}=
-  await supabase.rpc('shopdrop_is_active_admin');
-
- if(roleError||allowed!==true){
-  deny('Administrator access no longer authorised.');
-  return;
- }
-
- await loadStatistics();
 });
+
+applicationRefresh.addEventListener(
+ 'click',async()=>{
+  try{
+   if(!adminVerified)return;
+   if(!await confirmAdminSession())return;
+   await loadApplications();
+  }catch(error){
+   deny('Administrator verification unavailable.');
+  }
+ }
+);
 
 signOut.addEventListener('click',async()=>{
  signOut.disabled=true;
@@ -571,7 +692,8 @@ signOut.addEventListener('click',async()=>{
   window.location.replace('./index.html');
  }catch(error){
   status.hidden=false;
-  status.textContent='Sign out failed. Please try again.';
+  status.textContent=
+   'Sign out failed. Please try again.';
   signOut.disabled=false;
  }
 });
