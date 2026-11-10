@@ -6,13 +6,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Shop&Drop Admin Control Centre</title>
 <style>
-/*
- SHOPDROP_ADMIN_CENTRE_SAFE_V3
- Existing administration sections and links preserved.
- Authenticated Supabase administrator verification.
- Read-only live dashboard statistics and applications.
- Legacy /api/admin management calls remain disabled.
-*/
+/* SHOPDROP_ADMIN_CENTRE_SAFE_V4 */
 *{box-sizing:border-box}
 body{
  margin:0;
@@ -37,9 +31,7 @@ h2{font-size:clamp(20px,4vw,25px)}
 }
 .grid{
  display:grid;
- grid-template-columns:repeat(
-  auto-fit,minmax(160px,1fr)
- );
+ grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
  gap:12px;
 }
 .stat{
@@ -115,15 +107,10 @@ a{color:#0f766e}
 <body>
 
 <main class="wrap">
-
-<a href="./index.html">
- ← Shop&amp;Drop
-</a>
-
+<a href="./index.html">← Shop&amp;Drop</a>
 <h1>Admin Control Centre</h1>
 
-<div id="accessMessage" role="status"
- aria-live="polite">
+<div id="accessMessage" role="status" aria-live="polite">
  Verifying administrator access...
 </div>
 
@@ -131,211 +118,167 @@ a{color:#0f766e}
 
 <section class="box notice">
 <h2>Administrator Access</h2>
-
-<p id="adminWelcome">
-Administrator verification completed.
-</p>
-
+<p id="adminWelcome">Administrator verification completed.</p>
 <p>
 This control centre is available for
 authorised Shop&amp;Drop administrators.
 </p>
-
 <p>
-Live financial operations, seller
-approvals, category changes and
-other sensitive management actions
-remain subject to secure backend
-integration and authorisation.
+Live financial operations, seller approvals,
+category changes and other sensitive
+management actions remain subject to
+secure backend integration and authorisation.
 </p>
-
-<button type="button" id="adminSignOut">
- Sign out
-</button>
+<button type="button" id="adminSignOut">Sign out</button>
 </section>
 
 <section class="box">
 <h2>Administrator Portals</h2>
-
 <p class="muted">
-The existing administration pages
-are retained. Individual portals
-must be verified and secured
-before live management operations
-are enabled.
+The existing administration pages are retained.
+Individual portals must be verified and secured
+before live management operations are enabled.
 </p>
-
 <a class="portal" href="./operations.html">
  Order, Delivery &amp; Financial Operations
 </a>
-
 <a class="portal" href="./admin-tracking.html">
  Transaction Tracking
 </a>
-
 <a class="portal" href="./marketing.html">
  Marketing &amp; Promotion
 </a>
-
 <a class="portal" href="./admin-marketplace.html">
  Marketplace, Inventory &amp; Services
 </a>
-
 <p class="pending">
-These linked pages are not yet
-certified for live administrator
-operations. Some may still use
-older backend routes.
+These linked pages are not yet certified
+for live administrator operations.
+Some may still use older backend routes.
 </p>
 </section>
 
 <section class="box">
 <h2>Marketplace Overview</h2>
-
 <div id="stats" class="grid">
 <div class="stat">
 Registered Users
 <p><strong id="statUsers">—</strong></p>
 </div>
-
 <div class="stat">
 Approved Sellers
 <p><strong id="statSellers">—</strong></p>
 </div>
-
 <div class="stat">
 Products
 <p><strong id="statProducts">—</strong></p>
 </div>
-
 <div class="stat">
 Orders
 <p><strong id="statOrders">—</strong></p>
 </div>
 </div>
-
-<p id="statsStatus" class="muted"
- role="status" aria-live="polite">
+<p id="statsStatus" class="muted" role="status" aria-live="polite">
  Waiting for administrator verification.
 </p>
-
-<button id="refreshStats" type="button">
- Refresh statistics
-</button>
-
+<button id="refreshStats" type="button">Refresh statistics</button>
 <p class="muted">
-Figures are retrieved from the
-protected Supabase administrator
-dashboard function.
-
-Approved Sellers counts approved
-seller applications. Products counts
-product records. Orders counts order
-records. These figures are not
-financial settlement totals.
+Figures are retrieved from the protected Supabase
+administrator dashboard function.
+Approved Sellers counts approved seller applications.
+Products counts product records.
+Orders counts order records.
+These figures are not financial settlement totals.
 </p>
 </section>
 
 <section class="box">
 <h2>Categories &amp; Subcategories</h2>
-
 <p>
-Create and manage marketplace
-categories without changing
-website code.
+Review categories currently used by product
+and service listings. Category creation and
+editing remain disabled.
 </p>
 
 <label for="catName">Category name</label>
-<input id="catName"
- placeholder="Category name" disabled>
+<input id="catName" placeholder="Category name" disabled>
 
 <label for="parent">Parent category</label>
 <select id="parent" disabled>
 <option value="">Main category</option>
 </select>
 
-<button id="addCategoryButton"
- type="button" disabled>
+<button id="addCategoryButton" type="button" disabled>
  Add category
 </button>
 
-<div id="cats" class="pending">
-Category management is temporarily
-unavailable until the secure
-administrator API is connected.
+<div id="cats" class="pending" role="status" aria-live="polite">
+ Waiting for administrator verification.
 </div>
+
+<p class="muted">
+This is a read-only overview of categories in use.
+It is not the complete website category catalogue.
+</p>
+<button id="refreshCategories" type="button">
+ Refresh categories
+</button>
 </section>
 
 <section class="box">
 <h2>Seller &amp; Service-Provider Applications</h2>
-
-<div id="sellers" class="pending"
- role="status" aria-live="polite">
-Waiting for administrator verification.
+<div id="sellers" class="pending" role="status" aria-live="polite">
+ Waiting for administrator verification.
 </div>
-
 <p class="muted">
 Read-only application review.
-Approval and suspension actions
-remain disabled.
+Approval and suspension actions remain disabled.
 </p>
-
-<button id="refreshApplications"
- type="button">
+<button id="refreshApplications" type="button">
  Refresh applications
 </button>
 </section>
 
 <section class="box">
 <h2>Products, Services &amp; Specials</h2>
-
 <div id="products" class="pending">
 Product and service management,
 including special prices,
-requires the authorised
-backend connection.
+requires the authorised backend connection.
 
-No product or pricing changes
-can be made from this page yet.
+No product or pricing changes can be made
+from this page yet.
 </div>
 </section>
 
 <section class="box">
 <h2>Buyer &amp; Seller Feedback</h2>
-
 <div id="feedback" class="pending">
-Feedback records will appear
-when the protected administrator
-data connection is available.
+Feedback records will appear when the protected
+administrator data connection is available.
 </div>
 </section>
 
 <section class="box">
 <h2>Marketing &amp; Social Media</h2>
-
 <p>
 Prepared for future authorised
 social-platform integrations.
 </p>
-
 <p>
-API credentials must remain
-securely stored on the server,
-never in public website code.
+API credentials must remain securely stored
+on the server, never in public website code.
 </p>
 </section>
 
 <section class="box" id="v26WebsiteChangeRequest">
 <!-- V26_LIVE_WEBSITE_CHANGE_REQUEST -->
-
 <h2>Website Change Management</h2>
-
 <p>
 <a href="./admin-change-request.html">
  Create / Review Website Change Request
 </a>
 </p>
-
 <p class="muted">
 Actual change submission and approval
 must be protected by administrator
@@ -345,36 +288,22 @@ authentication and backend permissions.
 
 <section class="box" id="v262AdminControls">
 <!-- V26_2_ADMIN_CONTROLS -->
-
 <h2>Financial &amp; Fulfilment Controls</h2>
-
 <p>
-<a href="./financial-statement.html">
- Reconciliation
-</a>
+<a href="./financial-statement.html">Reconciliation</a>
 ·
-<a href="./payment-disputes.html">
- Chargebacks
-</a>
+<a href="./payment-disputes.html">Chargebacks</a>
 ·
-<a href="./inventory-reservations.html">
- Inventory Reservations
-</a>
+<a href="./inventory-reservations.html">Inventory Reservations</a>
 ·
-<a href="./fulfilment-deadlines.html">
- Deadlines &amp; Exceptions
-</a>
+<a href="./fulfilment-deadlines.html">Deadlines &amp; Exceptions</a>
 ·
-<a href="./dispute-evidence.html">
- Dispute Evidence
-</a>
+<a href="./dispute-evidence.html">Dispute Evidence</a>
 </p>
-
 <p class="pending">
-Financial and fulfilment actions
-must not be performed until their
-backend authorisation and
-provider integrations are verified.
+Financial and fulfilment actions must not
+be performed until their backend authorisation
+and provider integrations are verified.
 </p>
 </section>
 
@@ -387,11 +316,11 @@ provider integrations are verified.
 
 <script type="module">
 /*
- SHOPDROP_ADMIN_AUTH_GUARD_V3
-
+ SHOPDROP_ADMIN_AUTH_GUARD_V4
  Existing Supabase administrator check preserved.
- Read-only dashboard statistics preserved.
- Read-only seller applications added.
+ Read-only statistics preserved.
+ Read-only applications preserved.
+ Read-only category overview added.
  No financial or marketplace writes.
 */
 
@@ -410,30 +339,16 @@ const supabase=createClient(
  }
 );
 
-const content=document.getElementById(
- 'adminContent'
-);
-const status=document.getElementById(
- 'accessMessage'
-);
-const welcome=document.getElementById(
- 'adminWelcome'
-);
-const signOut=document.getElementById(
- 'adminSignOut'
-);
-const refresh=document.getElementById(
- 'refreshStats'
-);
-const statsStatus=document.getElementById(
- 'statsStatus'
-);
-const applicationPanel=document.getElementById(
- 'sellers'
-);
-const applicationRefresh=document.getElementById(
- 'refreshApplications'
-);
+const content=document.getElementById('adminContent');
+const status=document.getElementById('accessMessage');
+const welcome=document.getElementById('adminWelcome');
+const signOut=document.getElementById('adminSignOut');
+const refresh=document.getElementById('refreshStats');
+const statsStatus=document.getElementById('statsStatus');
+const applicationPanel=document.getElementById('sellers');
+const applicationRefresh=document.getElementById('refreshApplications');
+const categoryPanel=document.getElementById('cats');
+const categoryRefresh=document.getElementById('refreshCategories');
 
 let adminVerified=false;
 
@@ -467,23 +382,15 @@ async function loadStatistics(){
   const {data,error}=await supabase.rpc(
    'shopdrop_admin_dashboard_counts'
   );
-
   if(error)throw error;
 
   if(!data||typeof data!=='object'){
    throw Error('Invalid dashboard response.');
   }
 
-  const keys=[
-   'users',
-   'approved_sellers',
-   'products',
-   'orders'
-  ];
-
+  const keys=['users','approved_sellers','products','orders'];
   if(keys.some(key=>
-   !Number.isSafeInteger(data[key])||
-   data[key]<0
+   !Number.isSafeInteger(data[key])||data[key]<0
   )){
    throw Error('Incomplete dashboard statistics.');
   }
@@ -493,23 +400,14 @@ async function loadStatistics(){
   setStat('statProducts',data.products);
   setStat('statOrders',data.orders);
 
-  statsStatus.textContent=
-   'Live statistics loaded successfully.';
-
+  statsStatus.textContent='Live statistics loaded successfully.';
  }catch(error){
-  [
-   'statUsers',
-   'statSellers',
-   'statProducts',
-   'statOrders'
-  ].forEach(id=>{
-   document.getElementById(id).textContent=
-    'Unavailable';
-  });
-
+  ['statUsers','statSellers','statProducts','statOrders']
+   .forEach(id=>{
+    document.getElementById(id).textContent='Unavailable';
+   });
   statsStatus.textContent=
-   'Unable to load live statistics. '+
-   'Please try Refresh statistics.';
+   'Unable to load live statistics. Please try Refresh statistics.';
  }finally{
   refresh.disabled=false;
  }
@@ -524,8 +422,7 @@ function renderApplications(items){
  applicationPanel.classList.remove('pending');
 
  if(items.length===0){
-  applicationPanel.textContent=
-   'No applications received yet.';
+  applicationPanel.textContent='No applications received yet.';
   return;
  }
 
@@ -536,9 +433,7 @@ function renderApplications(items){
   article.className='box';
 
   const name=document.createElement('strong');
-  name.textContent=applicationText(
-   item.applicant_name
-  );
+  name.textContent=applicationText(item.applicant_name);
   article.appendChild(name);
 
   for(const [label,value] of [
@@ -547,57 +442,102 @@ function renderApplications(items){
    [
     'Submitted',
     item.submitted_at
-     ?new Date(
-       item.submitted_at
-      ).toLocaleString('en-ZA')
+     ?new Date(item.submitted_at).toLocaleString('en-ZA')
      :'—'
    ]
   ]){
    const line=document.createElement('p');
-   line.textContent=
-    label+': '+applicationText(value);
+   line.textContent=label+': '+applicationText(value);
    article.appendChild(line);
   }
-
   list.appendChild(article);
  }
-
  applicationPanel.appendChild(list);
 }
 
 async function loadApplications(){
  if(!adminVerified)return;
-
  applicationRefresh.disabled=true;
- applicationPanel.textContent=
-  'Loading applications...';
+ applicationPanel.textContent='Loading applications...';
 
  try{
   const {data,error}=await supabase.rpc(
    'shopdrop_admin_list_applications'
   );
-
   if(error)throw error;
-
   if(!Array.isArray(data)){
    throw Error('Invalid application response.');
   }
-
   renderApplications(data);
-
  }catch(error){
   applicationPanel.classList.add('pending');
   applicationPanel.textContent=
-   'Applications could not be loaded. '+
-   'Please try Refresh applications.';
+   'Applications could not be loaded. Please try Refresh applications.';
  }finally{
   applicationRefresh.disabled=false;
  }
 }
 
+function renderCategories(items){
+ categoryPanel.replaceChildren();
+ categoryPanel.classList.remove('pending');
+
+ if(items.length===0){
+  categoryPanel.textContent=
+   'No categories are currently used by product or service listings.';
+  return;
+ }
+
+ const list=document.createElement('div');
+
+ for(const item of items){
+  const article=document.createElement('div');
+  article.className='box';
+
+  const heading=document.createElement('strong');
+  heading.textContent=String(item.category??'—');
+  article.appendChild(heading);
+
+  for(const [label,value] of [
+   ['Marketplace',item.source_type],
+   ['Subcategory',item.subcategory||'None'],
+   ['Listings',item.listing_count]
+  ]){
+   const line=document.createElement('p');
+   line.textContent=label+': '+String(value??'—');
+   article.appendChild(line);
+  }
+  list.appendChild(article);
+ }
+ categoryPanel.appendChild(list);
+}
+
+async function loadCategories(){
+ if(!adminVerified)return;
+
+ categoryRefresh.disabled=true;
+ categoryPanel.textContent='Loading category overview...';
+
+ try{
+  const {data,error}=await supabase.rpc(
+   'shopdrop_admin_category_overview'
+  );
+  if(error)throw error;
+  if(!Array.isArray(data)){
+   throw Error('Invalid category response.');
+  }
+  renderCategories(data);
+ }catch(error){
+  categoryPanel.classList.add('pending');
+  categoryPanel.textContent=
+   'Category overview could not be loaded. Please try Refresh categories.';
+ }finally{
+  categoryRefresh.disabled=false;
+ }
+}
+
 async function confirmAdminSession(){
- const {data,error}=
-  await supabase.auth.getUser();
+ const {data,error}=await supabase.auth.getUser();
 
  if(error||!data?.user){
   deny('Administrator session expired.');
@@ -605,22 +545,18 @@ async function confirmAdminSession(){
  }
 
  const {data:allowed,error:roleError}=
-  await supabase.rpc(
-   'shopdrop_is_active_admin'
-  );
+  await supabase.rpc('shopdrop_is_active_admin');
 
  if(roleError||allowed!==true){
   deny('Administrator access no longer authorised.');
   return false;
  }
-
  return true;
 }
 
 async function verifyAdmin(){
  try{
-  const {data,error}=
-   await supabase.auth.getUser();
+  const {data,error}=await supabase.auth.getUser();
 
   if(error||!data?.user){
    deny('Administrator sign-in required.');
@@ -628,9 +564,7 @@ async function verifyAdmin(){
   }
 
   const {data:allowed,error:roleError}=
-   await supabase.rpc(
-    'shopdrop_is_active_admin'
-   );
+   await supabase.rpc('shopdrop_is_active_admin');
 
   if(roleError||allowed!==true){
    deny(
@@ -640,7 +574,6 @@ async function verifyAdmin(){
   }
 
   adminVerified=true;
-
   welcome.textContent=
    'Administrator identity and active status verified.';
 
@@ -649,11 +582,10 @@ async function verifyAdmin(){
 
   await loadStatistics();
   await loadApplications();
+  await loadCategories();
 
  }catch(error){
-  deny(
-   'Administrator verification could not be completed.'
-  );
+  deny('Administrator verification could not be completed.');
  }
 }
 
@@ -667,17 +599,25 @@ refresh.addEventListener('click',async()=>{
  }
 });
 
-applicationRefresh.addEventListener(
- 'click',async()=>{
-  try{
-   if(!adminVerified)return;
-   if(!await confirmAdminSession())return;
-   await loadApplications();
-  }catch(error){
-   deny('Administrator verification unavailable.');
-  }
+applicationRefresh.addEventListener('click',async()=>{
+ try{
+  if(!adminVerified)return;
+  if(!await confirmAdminSession())return;
+  await loadApplications();
+ }catch(error){
+  deny('Administrator verification unavailable.');
  }
-);
+});
+
+categoryRefresh.addEventListener('click',async()=>{
+ try{
+  if(!adminVerified)return;
+  if(!await confirmAdminSession())return;
+  await loadCategories();
+ }catch(error){
+  deny('Administrator verification unavailable.');
+ }
+});
 
 signOut.addEventListener('click',async()=>{
  signOut.disabled=true;
@@ -688,12 +628,10 @@ signOut.addEventListener('click',async()=>{
 
   adminVerified=false;
   content.hidden=true;
-
   window.location.replace('./index.html');
  }catch(error){
   status.hidden=false;
-  status.textContent=
-   'Sign out failed. Please try again.';
+  status.textContent='Sign out failed. Please try again.';
   signOut.disabled=false;
  }
 });
