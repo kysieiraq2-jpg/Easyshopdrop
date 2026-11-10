@@ -33,9 +33,36 @@ select,input,button{max-width:100%;box-sizing:border-box}
 #shopdropPublicProductResults .card{min-height:140px}
 #shopdropPublicProductResults h3{margin:0 0 8px}
 #shopdropPublicProductResults strong{display:block;margin-top:10px;color:#0f766e;font-size:20px}
+
+/* Product photographs — additive browsing enhancement */
+.shopdrop-product-image{
+ display:block;
+ width:100%;
+ height:190px;
+ object-fit:contain;
+ background:#f1f5f9;
+ border-radius:8px;
+ margin-bottom:12px;
+}
+.shopdrop-product-image-placeholder{
+ display:flex;
+ width:100%;
+ height:190px;
+ align-items:center;
+ justify-content:center;
+ text-align:center;
+ background:#f1f5f9;
+ border-radius:8px;
+ margin-bottom:12px;
+ color:#64748b;
+ font-size:14px;
+ padding:12px;
+}
 @media(max-width:650px){
 .search{display:block}
 .search input,.search button{width:100%;margin:4px 0}
+.shopdrop-product-image,
+.shopdrop-product-image-placeholder{height:175px}
 }
 </style>
 </head>
@@ -93,6 +120,11 @@ const SHOPDROP_PUBLIC_PRODUCTS_ENDPOINT =
 const SHOPDROP_PUBLIC_PRODUCTS_KEY =
  'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';
 
+const SHOPDROP_PUBLIC_IMAGES_ENDPOINT =
+ 'https://dtkdvvxpwonywtsgqmdx.supabase.co/rest/v1/listing_images';
+const SHOPDROP_PUBLIC_STORAGE_URL =
+ 'https://dtkdvvxpwonywtsgqmdx.supabase.co/storage/v1/object/public/';
+
 const browseResults=document.getElementById('shopdropPublicProductResults');
 const browseMore=document.getElementById('shopdropLoadMore');
 const browseMessage=document.getElementById('msg');
@@ -118,10 +150,87 @@ function browsePrice(value,currency){
  }
 }
 
-function browseCard(p){
+// Build public image URLs from trusted storage metadata.
+// Never display private collection addresses.
+function browseImageUrl(image){
+ if(!image||image.storage_bucket!=='listing-images')return null;
+ const path=String(image.storage_path||'');
+ if(!path||path.startsWith('/')||path.split('/').includes('..'))return null;
+ return SHOPDROP_PUBLIC_STORAGE_URL+
+  encodeURIComponent(image.storage_bucket)+'/'+
+  path.split('/').map(encodeURIComponent).join('/');
+}
+
+// Retrieve the primary image for products on the current page.
+// Image failure does not prevent the product listing from appearing.
+async function browseProductImages(products){
+ const images=new Map();
+ const ids=products.map(p=>p.id).filter(id=>
+  /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(String(id))
+ );
+ if(!ids.length)return images;
+
+ const params=new URLSearchParams({
+  select:'product_id,storage_bucket,storage_path,is_primary,image_position',
+  product_id:'in.('+ids.join(',')+')',
+  order:'image_position.asc'
+ });
+
+ try{
+  const response=await fetch(
+   SHOPDROP_PUBLIC_IMAGES_ENDPOINT+'?'+params.toString(),
+   {headers:{
+    apikey:SHOPDROP_PUBLIC_PRODUCTS_KEY,
+    Accept:'application/json'
+   }}
+  );
+  if(!response.ok)return images;
+
+  const rows=await response.json();
+  if(!Array.isArray(rows))return images;
+
+  for(const image of rows){
+   const url=browseImageUrl(image);
+   if(!url)continue;
+   const existing=images.get(image.product_id);
+   if(!existing||(!existing.is_primary&&image.is_primary)){
+    images.set(image.product_id,{
+     url,
+     is_primary:image.is_primary===true
+    });
+   }
+  }
+ }catch(error){
+  console.warn('Product photographs unavailable:',error);
+ }
+ return images;
+}
+
+function browseCard(p,imageInfo){
  const card=document.createElement('a');
  card.className='card';
  card.href='./product.html?id='+encodeURIComponent(p.id);
+
+ // Display the primary photograph before the product title.
+ const placeholder=document.createElement('div');
+ placeholder.className='shopdrop-product-image-placeholder';
+ placeholder.textContent='Photograph unavailable';
+
+ if(imageInfo?.url){
+  const image=document.createElement('img');
+  image.className='shopdrop-product-image';
+  image.alt='Photograph of '+(p.title||'product');
+  image.loading='lazy';
+  image.decoding='async';
+  image.referrerPolicy='no-referrer';
+  image.onerror=()=>{
+   if(image.isConnected)image.replaceWith(placeholder);
+  };
+  image.src=imageInfo.url;
+  card.appendChild(image);
+ }else{
+  card.appendChild(placeholder);
+ }
 
  const heading=document.createElement('h3');
  heading.textContent=p.title||'Product';
@@ -196,7 +305,14 @@ async function browsePublicProducts(filters={},append=false){
   if(request!==browseRequest)return;
   if(!Array.isArray(rows))throw Error('Invalid catalogue response.');
 
-  rows.forEach(p=>browseResults.appendChild(browseCard(p)));
+  const images=await browseProductImages(rows);
+  if(request!==browseRequest)return;
+
+  rows.forEach(p=>{
+   browseResults.appendChild(
+    browseCard(p,images.get(p.id))
+   );
+  });
   browseOffset+=rows.length;
 
   browseMessage.textContent=
