@@ -1,5 +1,460 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shop&Drop Admin</title><style>body{font:16px Arial;background:#f3f5f8;margin:0;color:#17202a}.wrap{max-width:1100px;margin:auto;padding:22px}.box{background:#fff;border-radius:10px;padding:18px;margin:14px 0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}.stat{background:#eef2ff;padding:16px;border-radius:8px}.portal{display:block;padding:14px;margin:10px 0;border:1px solid #cbd5e1;border-radius:9px;text-decoration:none;color:#17202a;background:#f8fafc;font-weight:700}input,select,button{padding:9px;margin:4px;border:1px solid #cbd5e1;border-radius:6px}button{cursor:pointer}</style></head><body><div class=wrap><a href="./index.html">← Shop&Drop</a><h1>Admin Control Centre</h1><div id="previewNotice" class="box" style="background:#eef2ff" hidden><b>Admin preview mode:</b> the administration layout can be reviewed here. Live orders, payments, sellers, deliveries and administrative actions require authenticated access to the Shop&Drop backend.</div><div class="box"><h2>Administrator portals</h2><a class="portal" href="./operations.html">Order, delivery & financial operations</a><a class="portal" href="./admin-tracking.html">Transaction tracking</a><a class="portal" href="./marketing.html">Marketing & promotion</a><a class="portal" href="./admin-marketplace.html">Marketplace, inventory & services</a><p>These controls require administrator authentication on the live backend. Sensitive card data is never displayed here.</p></div><div id=stats class=grid></div><div class=box><h2>Categories & subcategories</h2><p>Create categories without changing website code.</p><input id=catName placeholder="Category name"><select id=parent><option value="">Main category</option></select><button onclick=addCat()>Add category</button><div id=cats></div></div><div class=box><h2>Seller & service-provider applications</h2><div id=sellers></div></div><div class=box><h2>Products, services & specials</h2><div id=products></div></div><div class=box><h2>Buyer & seller feedback</h2><div id=feedback></div></div><div class=box><h2>Marketing & social media</h2><p>Prepared for future authorized social-platform integrations. API credentials must be stored securely on the server, never in public code.</p></div></div><script>const esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;');async function api(p,o={}){let r=await fetch(p,{headers:{'Content-Type':'application/json'},...o}),d=await r.json();if(!r.ok)throw Error(d.error||'Request failed');return d}async function load(){if(location.hostname.endsWith('github.io')){previewNotice.hidden=false;stats.innerHTML='<div class=stat>Live admin statistics<br><b>Backend required</b></div>';cats.innerHTML='<p>Category management requires the live backend.</p>';sellers.innerHTML='<p>Seller & service-provider applications require the live backend.</p>';products.innerHTML='<p>Product approvals require the live backend.</p>';feedback.innerHTML='<p>Feedback records require the live backend.</p>';return}try{let a=await api('/api/admin/summary');stats.innerHTML=`<div class=stat>Users<br><b>${a.users}</b></div><div class=stat>Approved sellers<br><b>${a.sellers}</b></div><div class=stat>Products<br><b>${a.products}</b></div><div class=stat>Orders<br><b>${a.orders}</b></div>`;let c=await api('/api/categories');cats.innerHTML=c.categories.map(x=>`<p>${esc(x.category)} (${x.product_count})</p>`).join('');parent.innerHTML='<option value="">Main category</option>'+c.categories.filter(x=>!x.parent_id).map(x=>`<option value="${x.id}">${esc(x.category)}</option>`).join('');let s=await api('/api/admin/sellers');sellers.innerHTML=s.sellers.map(x=>`<p><b>${esc(x.store_name)}</b> — ${esc(x.email)} — ${x.status} <button onclick="setSeller('${x.id}','approved')">Approve</button> <button onclick="setSeller('${x.id}','suspended')">Suspend</button></p>`).join('');let p=await api('/api/admin/products');products.innerHTML=p.products.map(x=>`<p>${esc(x.name)} — ${x.status} <button onclick="special('${x.id}')">Set special</button></p>`).join('');let f=await api('/api/admin/feedback');feedback.innerHTML=f.feedback.map(x=>`<p>${x.audience} · ${'★'.repeat(x.rating)} · ${esc(x.topic)} — ${esc(x.comments)}</p>`).join('')||'No feedback yet.'}catch(e){alert(e.message)}}async function addCat(){try{await api('/api/admin/categories',{method:'POST',body:JSON.stringify({name:catName.value,parentId:parent.value||null})});catName.value='';load()}catch(e){alert(e.message)}}async function setSeller(id,status){await api('/api/admin/sellers/'+id,{method:'POST',body:JSON.stringify({status})});load()}async function special(id){let price=prompt('Special price in cents (example R99.99 = 9999)');if(price===null)return;await api('/api/admin/products/'+id+'/special',{method:'POST',body:JSON.stringify({isSpecial:true,specialPriceCents:Number(price)})});alert('Special saved')}load()</script><script src="v26-bridge.js"></script><section id="v26WebsiteChangeRequest"><!-- V26_LIVE_WEBSITE_CHANGE_REQUEST --><h2>Website Change Management</h2><p><a href="admin-change-request.html">Create / Review Website Change Request</a></p></section>
-<section id="v262AdminControls"><!-- V26_2_ADMIN_CONTROLS --><h2>Financial & Fulfilment Controls</h2><p><a href="financial-statement.html">Reconciliation</a> · <a href="payment-disputes.html">Chargebacks</a> · <a href="inventory-reservations.html">Inventory Reservations</a> · <a href="fulfilment-deadlines.html">Deadlines & Exceptions</a> · <a href="dispute-evidence.html">Dispute Evidence</a></p></section>
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shop&Drop Admin Control Centre</title>
+<style>
+/*
+ SHOPDROP_ADMIN_CENTRE_SAFE_V1
+ Preserves existing administration sections and links.
+ Supabase authenticated administrator verification.
+ Legacy /api/admin calls disabled until connected.
+ No financial or management operations activated.
+*/
+*{box-sizing:border-box}
+body{
+ margin:0;
+ font:16px Arial,system-ui,sans-serif;
+ background:#f3f5f8;
+ color:#17202a;
+ line-height:1.6;
+}
+.wrap{
+ max-width:1100px;
+ margin:auto;
+ padding:22px 16px 45px;
+}
+h1{font-size:clamp(28px,5vw,38px)}
+h2{font-size:clamp(20px,4vw,25px)}
+.box{
+ background:#fff;
+ border:1px solid #e2e8f0;
+ border-radius:14px;
+ padding:20px;
+ margin:16px 0;
+}
+.grid{
+ display:grid;
+ grid-template-columns:repeat(
+  auto-fit,minmax(160px,1fr)
+ );
+ gap:12px;
+}
+.stat{
+ background:#eef2ff;
+ padding:16px;
+ border-radius:10px;
+}
+.portal{
+ display:block;
+ padding:15px;
+ margin:10px 0;
+ border:1px solid #cbd5e1;
+ border-radius:10px;
+ text-decoration:none;
+ color:#17202a;
+ background:#f8fafc;
+ font-weight:700;
+}
+.portal:hover{
+ background:#eef6f5;
+ border-color:#0f766e;
+}
+input,select,button{
+ padding:11px;
+ margin:5px 0;
+ border:1px solid #cbd5e1;
+ border-radius:8px;
+ font:inherit;
+ max-width:100%;
+}
+button{
+ background:#0f766e;
+ color:#fff;
+ border:0;
+ cursor:pointer;
+}
+button:disabled{
+ background:#94a3b8;
+ cursor:not-allowed;
+}
+.notice{
+ background:#eef2ff;
+ border:1px solid #c7d2fe;
+ border-radius:10px;
+ padding:16px;
+}
+.pending{
+ background:#fff7ed;
+ border:1px solid #fed7aa;
+ border-radius:10px;
+ padding:15px;
+}
+.muted{color:#64748b}
+a{color:#0f766e}
+#adminContent[hidden]{display:none!important}
+#accessMessage{
+ background:#fff;
+ border-radius:12px;
+ padding:20px;
+ margin:20px 0;
+}
+@media(max-width:600px){
+ .wrap{padding:18px 14px 35px}
+ .box{padding:18px 15px}
+}
+</style>
+</head>
+<body>
+
+<main class="wrap">
+
+<a href="./index.html">
+ ← Shop&amp;Drop
+</a>
+
+<h1>Admin Control Centre</h1>
+
+<div id="accessMessage" role="status"
+ aria-live="polite">
+ Verifying administrator access...
+</div>
+
+<div id="adminContent" hidden>
+
+<section class="box notice">
+<h2>Administrator Access</h2>
+
+<p id="adminWelcome">
+Administrator verification completed.
+</p>
+
+<p>
+This control centre is available for
+authorised Shop&amp;Drop administrators.
+</p>
+
+<p>
+Live financial operations, seller
+approvals, category changes and
+other sensitive management actions
+remain subject to secure backend
+integration and authorisation.
+</p>
+
+<button type="button" id="adminSignOut">
+ Sign out
+</button>
+</section>
+
+<section class="box">
+<h2>Administrator Portals</h2>
+
+<p class="muted">
+The existing administration pages
+are retained. Individual portals
+must be verified and secured
+before live management operations
+are enabled.
+</p>
+
+<a class="portal" href="./operations.html">
+ Order, Delivery &amp; Financial Operations
+</a>
+
+<a class="portal" href="./admin-tracking.html">
+ Transaction Tracking
+</a>
+
+<a class="portal" href="./marketing.html">
+ Marketing &amp; Promotion
+</a>
+
+<a class="portal" href="./admin-marketplace.html">
+ Marketplace, Inventory &amp; Services
+</a>
+
+<p class="pending">
+These linked pages are not yet
+certified for live administrator
+operations. Some may still use
+older backend routes.
+</p>
+</section>
+
+<section class="box">
+<h2>Marketplace Overview</h2>
+
+<div id="stats" class="grid">
+<div class="stat">
+Registered Users
+<p><strong>Pending secure data connection</strong></p>
+</div>
+
+<div class="stat">
+Approved Sellers
+<p><strong>Pending secure data connection</strong></p>
+</div>
+
+<div class="stat">
+Products
+<p><strong>Pending secure data connection</strong></p>
+</div>
+
+<div class="stat">
+Orders
+<p><strong>Pending secure data connection</strong></p>
+</div>
+</div>
+
+<p class="muted">
+No live figures are displayed until
+they can be retrieved and verified
+through an authorised backend.
+</p>
+</section>
+
+<section class="box">
+<h2>Categories &amp; Subcategories</h2>
+
+<p>
+Create and manage marketplace
+categories without changing
+website code.
+</p>
+
+<label for="catName">Category name</label>
+<input id="catName"
+ placeholder="Category name" disabled>
+
+<label for="parent">Parent category</label>
+<select id="parent" disabled>
+<option value="">Main category</option>
+</select>
+
+<button id="addCategoryButton"
+ type="button" disabled>
+ Add category
+</button>
+
+<div id="cats" class="pending">
+Category management is temporarily
+unavailable until the secure
+administrator API is connected.
+</div>
+</section>
+
+<section class="box">
+<h2>Seller &amp; Service-Provider Applications</h2>
+
+<div id="sellers" class="pending">
+Seller and provider applications
+will appear here after secure
+administrator data access is
+connected and verified.
+
+Approval and suspension actions
+are not currently enabled.
+</div>
+</section>
+
+<section class="box">
+<h2>Products, Services &amp; Specials</h2>
+
+<div id="products" class="pending">
+Product and service management,
+including special prices,
+requires the authorised
+backend connection.
+
+No product or pricing changes
+can be made from this page yet.
+</div>
+</section>
+
+<section class="box">
+<h2>Buyer &amp; Seller Feedback</h2>
+
+<div id="feedback" class="pending">
+Feedback records will appear
+when the protected administrator
+data connection is available.
+</div>
+</section>
+
+<section class="box">
+<h2>Marketing &amp; Social Media</h2>
+
+<p>
+Prepared for future authorised
+social-platform integrations.
+</p>
+
+<p>
+API credentials must remain
+securely stored on the server,
+never in public website code.
+</p>
+</section>
+
+<section class="box" id="v26WebsiteChangeRequest">
+<!-- V26_LIVE_WEBSITE_CHANGE_REQUEST -->
+
+<h2>Website Change Management</h2>
+
+<p>
+<a href="./admin-change-request.html">
+ Create / Review Website Change Request
+</a>
+</p>
+
+<p class="muted">
+Actual change submission and approval
+must be protected by administrator
+authentication and backend permissions.
+</p>
+</section>
+
+<section class="box" id="v262AdminControls">
+<!-- V26_2_ADMIN_CONTROLS -->
+
+<h2>Financial &amp; Fulfilment Controls</h2>
+
+<p>
+<a href="./financial-statement.html">
+ Reconciliation
+</a>
+·
+<a href="./payment-disputes.html">
+ Chargebacks
+</a>
+·
+<a href="./inventory-reservations.html">
+ Inventory Reservations
+</a>
+·
+<a href="./fulfilment-deadlines.html">
+ Deadlines &amp; Exceptions
+</a>
+·
+<a href="./dispute-evidence.html">
+ Dispute Evidence
+</a>
+</p>
+
+<p class="pending">
+Financial and fulfilment actions
+must not be performed until their
+backend authorisation and
+provider integrations are verified.
+</p>
+</section>
+
+</div>
+</main>
+
+<script src="v26-bridge.js"></script>
 <script src="v26-consolidated.js"></script>
 <script src="v26-admin-runtime.js"></script>
-</body></html>
+
+<script type="module">
+/*
+ SHOPDROP_ADMIN_AUTH_GUARD_V1
+
+ Uses existing Supabase Auth session.
+ Uses existing shopdrop_is_active_admin RPC.
+ Does not expose administrator records.
+ Does not modify database or transaction data.
+*/
+
+import {createClient} from
+'https://esm.sh/@supabase/supabase-js@2';
+
+const supabase=createClient(
+ 'https://dtkdvvxpwonywtsgqmdx.supabase.co',
+ 'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q',
+ {
+  auth:{
+   persistSession:true,
+   autoRefreshToken:true,
+   detectSessionInUrl:true
+  }
+ }
+);
+
+const content=document.getElementById(
+ 'adminContent'
+);
+const status=document.getElementById(
+ 'accessMessage'
+);
+const welcome=document.getElementById(
+ 'adminWelcome'
+);
+const signOut=document.getElementById(
+ 'adminSignOut'
+);
+
+function deny(message){
+ content.hidden=true;
+ status.hidden=false;
+ status.textContent=message;
+
+ const link=document.createElement('a');
+ link.href='./admin-login.html';
+ link.textContent=' Open Administrator Sign In';
+ status.appendChild(document.createElement('p'))
+       .appendChild(link);
+}
+
+async function verifyAdmin(){
+ try{
+  const {data,error}=
+   await supabase.auth.getUser();
+
+  if(error||!data?.user){
+   deny('Administrator sign-in required.');
+   return;
+  }
+
+  const {data:allowed,error:roleError}=
+   await supabase.rpc(
+    'shopdrop_is_active_admin'
+   );
+
+  if(roleError||allowed!==true){
+   deny('Administrator access not authorised or verification unavailable.');
+   return;
+  }
+
+  welcome.textContent=
+   'Administrator identity and active status verified.';
+
+  status.hidden=true;
+  content.hidden=false;
+
+ }catch(error){
+  deny('Administrator verification could not be completed.');
+ }
+}
+
+signOut.addEventListener('click',async()=>{
+ signOut.disabled=true;
+
+ try{
+  await supabase.auth.signOut();
+  window.location.replace('./index.html');
+ }catch(error){
+  status.hidden=false;
+  status.textContent='Sign out failed. Please try again.';
+  signOut.disabled=false;
+ }
+});
+
+verifyAdmin();
+</script>
+
+</body>
+</html>
