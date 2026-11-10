@@ -124,40 +124,51 @@ This control centre is available for
 authorised Shop&amp;Drop administrators.
 </p>
 <p>
-Live financial operations, seller approvals,
-category changes and other sensitive
-management actions remain subject to
-secure backend integration and authorisation.
+The marketplace operates automatically.
+Administrators monitor operations, investigate
+complaints and handle exceptional problems.
+Routine registrations, listings, orders,
+deliveries and payouts are not processed
+manually through this dashboard.
 </p>
 <button type="button" id="adminSignOut">Sign out</button>
 </section>
 
 <section class="box">
 <h2>Administrator Portals</h2>
+
 <a class="portal" href="./admin-review-cases.html">
  Complaints &amp; Exceptional Investigations
 </a>
+
 <p class="muted">
-The existing administration pages are retained.
-Individual portals must be verified and secured
-before live management operations are enabled.
+Protected administrator reporting and
+exception-management pages.
+These pages do not replace the automated
+marketplace processing system.
 </p>
+
 <a class="portal" href="./operations.html">
  Order, Delivery &amp; Financial Operations
 </a>
+
 <a class="portal" href="./admin-tracking.html">
  Transaction Tracking
 </a>
+
 <a class="portal" href="./marketing.html">
  Marketing &amp; Promotion
 </a>
+
 <a class="portal" href="./admin-marketplace.html">
  Marketplace, Inventory &amp; Services
 </a>
-<p class="pending">
-These linked pages are not yet certified
-for live administrator operations.
-Some may still use older backend routes.
+
+<p class="muted">
+Live reports are connected to protected
+Supabase functions. Administrator browser
+testing and financial-provider integration
+remain separate verification requirements.
 </p>
 </section>
 
@@ -234,8 +245,10 @@ It is not the complete website category catalogue.
  Waiting for administrator verification.
 </div>
 <p class="muted">
-Read-only application review.
-Approval and suspension actions remain disabled.
+Application status monitoring only.
+Routine application processing must be
+automated by the backend.
+Administrators investigate exceptional cases.
 </p>
 <button id="refreshApplications" type="button">
  Refresh applications
@@ -244,31 +257,60 @@ Approval and suspension actions remain disabled.
 
 <section class="box">
 <h2>Products, Services &amp; Specials</h2>
-<div id="products" class="pending">
-Product and service management,
-including special prices,
-requires the authorised backend connection.
-
-No product or pricing changes can be made
-from this page yet.
+<div id="products">
+<p>
+Monitor product and service listings,
+categories and exceptional moderation cases.
+Sellers and service providers manage their
+own listings and prices through the marketplace.
+</p>
+<a class="portal" href="./admin-marketplace.html">
+ Open Marketplace &amp; Services Overview
+</a>
+<p class="muted">
+This is an oversight page, not a manual
+product approval or pricing system.
+Automatic listing eligibility and publication
+are being verified separately.
+</p>
 </div>
 </section>
 
 <section class="box">
 <h2>Buyer &amp; Seller Feedback</h2>
-<div id="feedback" class="pending">
-Feedback records will appear when the protected
-administrator data connection is available.
+<div id="feedback">
+<p>
+Buyer and seller feedback is handled through
+the Shop&amp;Drop feedback system.
+Administrators investigate reported feedback
+and exceptional complaints.
+</p>
+<a class="portal" href="./admin-review-cases.html">
+ Open Exceptional Case Reviews
+</a>
+<a class="portal" href="./payment-disputes.html">
+ Open Payment Disputes
+</a>
+<p class="muted">
+The exception review queue uses protected
+Supabase reporting. An actual complaint
+requires an authorised browser test.
+</p>
 </div>
 </section>
 
 <section class="box">
 <h2>Marketing &amp; Social Media</h2>
 <p>
-Prepared for future authorised
-social-platform integrations.
+Marketing planning and promotion overview
+are available to administrators.
 </p>
-<p>
+<a class="portal" href="./marketing.html">
+ Open Marketing &amp; Promotion
+</a>
+<p class="muted">
+External social-media publishing requires
+separate authorised provider integrations.
 API credentials must remain securely stored
 on the server, never in public website code.
 </p>
@@ -304,9 +346,13 @@ authentication and backend permissions.
 <a href="./dispute-evidence.html">Dispute Evidence</a>
 </p>
 <p class="pending">
-Financial and fulfilment actions must not
-be performed until their backend authorisation
-and provider integrations are verified.
+Financial reports and exception monitoring
+are available through protected administrator
+pages. Live payment-provider settlement and
+money movement must not be enabled until
+provider integration and verification are complete.
+Routine financial processing remains automated,
+not administrator-operated.
 </p>
 </section>
 
@@ -323,7 +369,7 @@ and provider integrations are verified.
  Existing Supabase administrator check preserved.
  Read-only statistics preserved.
  Read-only applications preserved.
- Read-only category overview added.
+ Read-only category overview preserved.
  No financial or marketplace writes.
 */
 
