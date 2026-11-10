@@ -7,71 +7,30 @@
 <title>Dispute Evidence | Shop&amp;Drop Admin</title>
 <style>
 *{box-sizing:border-box}
-body{
- margin:0;
- background:#f3f5f8;
- color:#17202a;
- font:16px Arial,sans-serif;
- line-height:1.5;
-}
-main{
- max-width:1100px;
- margin:auto;
- padding:20px 14px 40px;
-}
+body{margin:0;background:#f3f5f8;color:#17202a;font:16px Arial,sans-serif;line-height:1.5}
+main{max-width:1100px;margin:auto;padding:20px 14px 40px}
 h1{font-size:clamp(25px,5vw,36px)}
 h2{font-size:21px}
 a{color:#0f766e}
-.panel{
- background:#fff;
- border:1px solid #e2e8f0;
- border-radius:12px;
- padding:18px;
- margin:16px 0;
-}
-.notice{
- background:#eef2ff;
- padding:14px;
- border-radius:9px;
-}
-.warning{
- background:#fff7ed;
- padding:14px;
- border-radius:9px;
-}
+.panel{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;margin:16px 0}
+.notice{background:#eef2ff;padding:14px;border-radius:9px}
+.warning{background:#fff7ed;padding:14px;border-radius:9px}
 .muted{color:#64748b}
-button{
- background:#0f766e;
- color:#fff;
- border:0;
- border-radius:8px;
- padding:12px 18px;
- font:inherit;
- cursor:pointer;
-}
+label{display:block;font-weight:600;margin-top:14px}
+input,select,textarea{display:block;width:100%;padding:12px;margin-top:6px;border:1px solid #cbd5e1;border-radius:8px;font:inherit}
+textarea{min-height:90px}
+button{background:#0f766e;color:white;border:0;border-radius:8px;padding:12px 18px;margin-top:14px;font:inherit;cursor:pointer}
 button:disabled{opacity:.6}
 .tablewrap{overflow-x:auto}
-table{
- width:100%;
- border-collapse:collapse;
- font-size:14px;
-}
-th,td{
- text-align:left;
- padding:11px;
- border-bottom:1px solid #e2e8f0;
- vertical-align:top;
- overflow-wrap:anywhere;
-}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:11px;border-bottom:1px solid #e2e8f0;overflow-wrap:anywhere;vertical-align:top}
 th{background:#f8fafc}
 #protected[hidden]{display:none}
 </style>
 </head>
 <body>
 <main>
-
 <a href="./admin.html">← Admin Control Centre</a>
-
 <h1>Dispute &amp; Return Evidence</h1>
 
 <div id="access" class="notice" role="status">
@@ -81,28 +40,61 @@ Verifying administrator access...
 <div id="protected" hidden>
 
 <p class="warning">
-<strong>Read-only evidence review.</strong>
-This page displays existing evidence records.
-File uploads and dispute decisions remain
-unavailable until their protected backend
-workflows have been verified.
+<strong>Protected evidence management.</strong>
+Evidence uploads are linked to existing dispute
+records. Files are stored in a private Supabase
+Storage bucket and registered against the
+relevant dispute.
 </p>
 
+<section class="panel">
+<h2>Upload Dispute Evidence</h2>
+
+<form id="uploadForm">
+
+<label for="disputeId">Dispute ID</label>
+<input id="disputeId" type="text"
+ placeholder="Existing dispute UUID" required>
+
+<label for="evidenceType">Evidence type</label>
+<select id="evidenceType" required>
+<option value="">Select evidence type</option>
+<option value="buyer_item_photos">Buyer item photos</option>
+<option value="original_listing_photos">Original listing photos</option>
+<option value="delivery_evidence">Delivery evidence</option>
+<option value="return_photos">Return photos</option>
+<option value="courier_tracking">Courier/tracking evidence</option>
+<option value="other">Other</option>
+</select>
+
+<label for="evidenceFile">Evidence file</label>
+<input id="evidenceFile" type="file"
+ accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
+ required>
+
+<p class="muted">
+Accepted: JPEG, PNG, WebP or PDF. Maximum 20 MB per file.
+</p>
+
+<label for="description">Description</label>
+<textarea id="description" maxlength="2000"
+ placeholder="Describe the evidence"></textarea>
+
+<button id="uploadButton" type="submit">
+Upload Evidence
+</button>
+
+</form>
+
+<p id="uploadMessage" role="status" aria-live="polite"></p>
+</section>
+
+<section class="panel">
+<h2>Existing Dispute Evidence</h2>
 <button id="refresh" type="button">
 Refresh evidence records
 </button>
-
-<p id="message" role="status" aria-live="polite"></p>
-
-<section class="panel">
-<h2>Dispute Evidence Records</h2>
-
-<p class="muted">
-Evidence records are linked to their dispute
-references. Private storage paths and
-uploaded file contents are not exposed
-through this report.
-</p>
+<p id="reportMessage" role="status" aria-live="polite"></p>
 
 <div class="tablewrap">
 <table>
@@ -110,51 +102,29 @@ through this report.
 <tr>
 <th>Evidence ID</th>
 <th>Dispute ID</th>
-<th>Evidence Type</th>
+<th>Type</th>
 <th>Description</th>
 <th>File Type</th>
-<th>File Size</th>
+<th>Size</th>
 <th>Submitted</th>
 </tr>
 </thead>
-
 <tbody id="evidenceRows">
-<tr>
-<td colspan="7">
-Waiting for administrator verification.
-</td>
-</tr>
+<tr><td colspan="7">Waiting for records.</td></tr>
 </tbody>
 </table>
 </div>
 </section>
 
 <section class="panel">
-<h2>Evidence Requirements</h2>
-
+<h2>Evidence &amp; Delivery Records</h2>
 <p>
-Dispute evidence may include buyer item
-photographs, original listing photographs,
-courier tracking records, delivery confirmation,
-return photographs and other relevant material.
+<a href="./proof-of-delivery.html">Proof of Delivery</a>
 </p>
-
-<p>
-Evidence must remain linked to the correct
-transaction or dispute and must be available
-only to authorised parties.
-</p>
-
 <p class="muted">
-Production evidence uploads require protected
-Supabase Storage permissions, validated file
-types, timestamps and audit history.
-</p>
-
-<p>
-<a href="./proof-of-delivery.html">
-Proof of Delivery
-</a>
+Evidence must remain private and linked to the
+correct dispute. Uploading evidence does not
+automatically resolve a dispute or release funds.
 </p>
 </section>
 
@@ -162,7 +132,6 @@ Proof of Delivery
 </main>
 
 <script type="module">
-
 import {createClient} from
 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -170,202 +139,212 @@ const supabase=createClient(
 'https://dtkdvvxpwonywtsgqmdx.supabase.co',
 'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q',
 {
- auth:{
-  persistSession:true,
-  autoRefreshToken:true,
-  detectSessionInUrl:true
- }
+auth:{
+persistSession:true,
+autoRefreshToken:true,
+detectSessionInUrl:true
+}
 }
 );
 
 const access=document.getElementById('access');
 const protectedArea=document.getElementById('protected');
-const message=document.getElementById('message');
+const form=document.getElementById('uploadForm');
+const uploadButton=document.getElementById('uploadButton');
+const uploadMessage=document.getElementById('uploadMessage');
 const refresh=document.getElementById('refresh');
+const reportMessage=document.getElementById('reportMessage');
 const rows=document.getElementById('evidenceRows');
 
 function deny(reason){
-
- protectedArea.hidden=true;
- access.hidden=false;
- access.replaceChildren();
-
- access.append(document.createTextNode(reason+' '));
-
- const link=document.createElement('a');
- link.href='./admin-login.html';
- link.textContent='Administrator Sign In';
- access.append(link);
+protectedArea.hidden=true;
+access.hidden=false;
+access.replaceChildren();
+access.append(document.createTextNode(reason+' '));
+const link=document.createElement('a');
+link.href='./admin-login.html';
+link.textContent='Administrator Sign In';
+access.append(link);
 }
 
 async function checkAdmin(){
+const {data:userData,error:userError}=
+await supabase.auth.getUser();
 
- const {data:userData,error:userError}=
- await supabase.auth.getUser();
+if(userError||!userData?.user){
+deny('Administrator sign-in required.');
+return null;
+}
 
- if(userError||!userData?.user){
-  deny('Administrator sign-in required.');
-  return false;
- }
+const {data:allowed,error:adminError}=
+await supabase.rpc('shopdrop_is_active_admin');
 
- const {data:allowed,error:adminError}=
- await supabase.rpc('shopdrop_is_active_admin');
+if(adminError||allowed!==true){
+deny('Administrator access denied or unavailable.');
+return null;
+}
 
- if(adminError||allowed!==true){
-  deny('Administrator access denied or unavailable.');
-  return false;
- }
+access.hidden=true;
+protectedArea.hidden=false;
+return userData.user;
+}
 
- access.hidden=true;
- protectedArea.hidden=false;
- return true;
+function validUuid(value){
+return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
 function dateText(value){
-
- if(!value)return '—';
-
- const date=new Date(value);
-
- return Number.isNaN(date.getTime())
- ?'—':date.toLocaleString('en-ZA');
+if(!value)return '—';
+const d=new Date(value);
+return Number.isNaN(d.getTime())?'—':d.toLocaleString('en-ZA');
 }
 
-function display(value){
-
- return value===null||
- value===undefined||
- value===''
- ?'—':String(value);
-}
-
-function addCell(row,value){
-
- const cell=document.createElement('td');
- cell.textContent=display(value);
- row.appendChild(cell);
-}
-
-function fileSize(value){
-
- if(value===null||value===undefined){
-  return '—';
- }
-
- const bytes=Number(value);
-
- if(!Number.isFinite(bytes)||bytes<0){
-  return '—';
- }
-
- if(bytes<1024){
-  return bytes+' B';
- }
-
- if(bytes<1048576){
-  return (bytes/1024).toFixed(1)+' KB';
- }
-
- return (bytes/1048576).toFixed(1)+' MB';
+function addCell(tr,value){
+const td=document.createElement('td');
+td.textContent=String(value??'—');
+tr.appendChild(td);
 }
 
 function render(records){
+rows.replaceChildren();
 
- rows.replaceChildren();
+if(!records.length){
+const tr=document.createElement('tr');
+const td=document.createElement('td');
+td.colSpan=7;
+td.textContent='No evidence records available.';
+tr.appendChild(td);
+rows.appendChild(tr);
+return;
+}
 
- if(records.length===0){
-
-  const tr=document.createElement('tr');
-  const td=document.createElement('td');
-
-  td.colSpan=7;
-  td.textContent='No evidence records available.';
-
-  tr.appendChild(td);
-  rows.appendChild(tr);
-  return;
- }
-
- for(const record of records){
-
-  const tr=document.createElement('tr');
-
-  addCell(tr,record.evidence_id);
-  addCell(tr,record.dispute_id);
-  addCell(tr,record.evidence_type);
-  addCell(tr,record.description);
-  addCell(tr,record.mime_type);
-  addCell(tr,fileSize(record.file_size_bytes));
-  addCell(tr,dateText(record.created_at));
-
-  rows.appendChild(tr);
- }
+for(const r of records){
+const tr=document.createElement('tr');
+addCell(tr,r.evidence_id);
+addCell(tr,r.dispute_id);
+addCell(tr,r.evidence_type);
+addCell(tr,r.description);
+addCell(tr,r.mime_type);
+addCell(tr,r.file_size_bytes===null?'—':r.file_size_bytes+' bytes');
+addCell(tr,dateText(r.created_at));
+rows.appendChild(tr);
+}
 }
 
 async function loadEvidence(){
+refresh.disabled=true;
+reportMessage.textContent='Loading evidence records...';
 
- refresh.disabled=true;
- message.textContent='Loading dispute evidence...';
-
- try{
-
-  const {data,error}=await supabase.rpc(
-   'shopdrop_admin_dispute_evidence_overview'
-  );
-
-  if(error)throw error;
-
-  if(!Array.isArray(data)){
-   throw Error('Invalid evidence response.');
-  }
-
-  render(data);
-
-  message.textContent=
-   'Dispute evidence records loaded successfully. Read-only.';
-
- }catch(error){
-
-  rows.replaceChildren();
-
-  const tr=document.createElement('tr');
-  const td=document.createElement('td');
-
-  td.colSpan=7;
-  td.textContent=
-   'Evidence records unavailable. Please refresh.';
-
-  tr.appendChild(td);
-  rows.appendChild(tr);
-
-  message.textContent=
-   'Unable to load dispute evidence records.';
-
- }finally{
-  refresh.disabled=false;
- }
+try{
+const {data,error}=await supabase.rpc(
+'shopdrop_admin_dispute_evidence_overview'
+);
+if(error)throw error;
+if(!Array.isArray(data))throw Error('Invalid response');
+render(data);
+reportMessage.textContent='Evidence records loaded.';
+}catch(error){
+reportMessage.textContent='Evidence records unavailable.';
+}finally{
+refresh.disabled=false;
+}
 }
 
+form.addEventListener('submit',async event=>{
+event.preventDefault();
+if(uploadButton.disabled)return;
+uploadButton.disabled=true;
+uploadMessage.textContent='Checking upload...';
+
+try{
+const user=await checkAdmin();
+if(!user)throw Error('Administrator verification required.');
+
+const disputeId=document.getElementById('disputeId').value.trim().toLowerCase();
+const evidenceType=document.getElementById('evidenceType').value;
+const description=document.getElementById('description').value.trim();
+const file=document.getElementById('evidenceFile').files[0];
+
+if(!validUuid(disputeId))throw Error('Enter a valid dispute ID.');
+if(!file)throw Error('Choose an evidence file.');
+
+const allowed=['image/jpeg','image/png','image/webp','application/pdf'];
+if(!allowed.includes(file.type)){
+throw Error('Unsupported evidence file type.');
+}
+if(file.size<1||file.size>20971520){
+throw Error('Evidence file must be between 1 byte and 20 MB.');
+}
+if(!evidenceType)throw Error('Select an evidence type.');
+
+const {data:permitted,error:permissionError}=
+await supabase.rpc('shopdrop_can_upload_dispute_evidence',{
+p_dispute_id:disputeId
+});
+
+if(permissionError||permitted!==true){
+throw Error('Dispute not found or upload access denied.');
+}
+
+const extension={
+'image/jpeg':'jpg',
+'image/png':'png',
+'image/webp':'webp',
+'application/pdf':'pdf'
+}[file.type];
+
+const randomId=crypto.randomUUID();
+const path=disputeId+'/'+user.id+'/'+randomId+'.'+extension;
+
+uploadMessage.textContent='Uploading private evidence file...';
+
+const {error:uploadError}=await supabase.storage
+.from('dispute-evidence')
+.upload(path,file,{
+contentType:file.type,
+upsert:false
+});
+
+if(uploadError)throw uploadError;
+
+uploadMessage.textContent='Registering evidence...';
+
+const {data:registered,error:registerError}=
+await supabase.rpc('shopdrop_register_dispute_evidence',{
+p_dispute_id:disputeId,
+p_storage_path:path,
+p_evidence_type:evidenceType,
+p_description:description||null,
+p_original_filename:file.name
+});
+
+if(registerError)throw registerError;
+if(registered?.registered!==true){
+throw Error('Evidence registration could not be confirmed.');
+}
+
+uploadMessage.textContent=
+'Evidence uploaded and registered successfully. Evidence ID: '+
+registered.evidence_id;
+
+form.reset();
+await loadEvidence();
+
+}catch(error){
+uploadMessage.textContent=
+error?.message||'Evidence upload failed.';
+}finally{
+uploadButton.disabled=false;
+}
+});
+
 refresh.addEventListener('click',async()=>{
-
- refresh.disabled=true;
-
- try{
-
-  if(await checkAdmin()){
-   await loadEvidence();
-  }
-
- }finally{
-  refresh.disabled=false;
- }
-
+if(await checkAdmin())await loadEvidence();
 });
 
 if(await checkAdmin()){
- await loadEvidence();
+await loadEvidence();
 }
-
 </script>
 </body>
 </html>
