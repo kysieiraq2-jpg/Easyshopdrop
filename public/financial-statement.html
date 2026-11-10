@@ -1,6 +1,373 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Financial Statement & Reconciliation | Shop&Drop</title></head><body><main><h1>Financial Statement & Reconciliation</h1>
-<p>Transaction-level reconciliation for Shop&Drop orders and bookings.</p>
-<table><thead><tr><th>Reference</th><th>Customer payment</th><th>Sale/service amount</th><th>Shop&Drop service fee</th><th>Courier</th><th>Processing</th><th>Refund/adjustment</th><th>Seller/provider proceeds</th><th>Payout</th><th>Settlement</th></tr></thead><tbody id="financialRows"><tr><td colspan="10">Sign in to load statement records.</td></tr></tbody></table>
-<p>Financial values must come from trusted server ledger/payment records; the browser does not calculate authoritative commission or settlement.</p><a href="account.html">My Account</a>
-</main><script src="common.js"></script>
-<script src="v26-consolidated.js"></script><script src="v26-bridge.js"></script></body></html>
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Financial Statement | Shop&amp;Drop Admin</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;
+ background:#f3f5f8;
+ color:#17202a;
+ font:16px Arial,sans-serif;
+ line-height:1.5;
+}
+main{
+ max-width:1150px;
+ margin:auto;
+ padding:20px 14px 40px;
+}
+h1{font-size:clamp(25px,5vw,36px)}
+a{color:#0f766e}
+.panel{
+ background:white;
+ border:1px solid #e2e8f0;
+ border-radius:12px;
+ padding:18px;
+ margin:16px 0;
+}
+.notice{
+ background:#eef2ff;
+ padding:14px;
+ border-radius:9px;
+}
+.warning{
+ background:#fff7ed;
+ padding:14px;
+ border-radius:9px;
+}
+.muted{color:#64748b}
+button{
+ background:#0f766e;
+ color:white;
+ border:0;
+ border-radius:8px;
+ padding:12px 18px;
+ font:inherit;
+ cursor:pointer;
+}
+button:disabled{opacity:.6}
+.tablewrap{overflow-x:auto}
+table{
+ width:100%;
+ border-collapse:collapse;
+ font-size:13px;
+}
+th,td{
+ text-align:left;
+ padding:10px;
+ border-bottom:1px solid #e2e8f0;
+ vertical-align:top;
+ overflow-wrap:anywhere;
+}
+th{background:#f8fafc}
+#protected[hidden]{display:none}
+</style>
+</head>
+<body>
+<main>
+
+<a href="./admin.html">← Admin Control Centre</a>
+
+<h1>Financial Statement &amp; Reconciliation</h1>
+
+<div id="access" class="notice" role="status">
+Verifying administrator access...
+</div>
+
+<div id="protected" hidden>
+
+<p class="warning">
+<strong>Read-only financial reporting.</strong>
+Amounts shown are recorded in the Shop&amp;Drop
+database. They are not independently verified
+bank settlements. No payments, refunds or
+payouts can be initiated here.
+</p>
+
+<button id="refresh" type="button">
+Refresh financial records
+</button>
+
+<p id="message" role="status" aria-live="polite"></p>
+
+<section class="panel">
+<h2>Recorded Financial Transactions</h2>
+
+<p class="muted">
+Payment, allocation, refund and seller-payout
+records are displayed separately to avoid
+double-counting the same transaction.
+A dash indicates information not supplied
+by this reporting function.
+</p>
+
+<div class="tablewrap">
+<table>
+<thead>
+<tr>
+<th>Reference</th>
+<th>Customer payment</th>
+<th>Sale/service amount</th>
+<th>Shop&amp;Drop service fee</th>
+<th>Courier</th>
+<th>Processing</th>
+<th>Refund/adjustment</th>
+<th>Seller/provider proceeds</th>
+<th>Payout</th>
+<th>Settlement</th>
+</tr>
+</thead>
+
+<tbody id="financialRows">
+<tr>
+<td colspan="10">Waiting for administrator verification.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section class="panel">
+<h2>Reconciliation Information</h2>
+
+<p>
+<strong>Payment handling:</strong>
+Shop&amp;Drop uses provider-held marketplace
+allocations. The seller's proceeds are not
+paid out from Shop&amp;Drop's own bank account.
+</p>
+
+<p>
+<strong>Seller payout:</strong>
+Payout eligibility requires the applicable
+verified fulfilment or delivery confirmation.
+</p>
+
+<p>
+<strong>Commission:</strong>
+The existing buyer-paid commission rules
+remain unchanged. This page does not
+recalculate or modify them.
+</p>
+
+<p class="muted">
+Final bank reconciliation requires the
+selected payment provider's authoritative
+settlement and allocation records.
+</p>
+</section>
+
+</div>
+</main>
+
+<script type="module">
+
+import {createClient} from
+'https://esm.sh/@supabase/supabase-js@2';
+
+const supabase=createClient(
+'https://dtkdvvxpwonywtsgqmdx.supabase.co',
+'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q',
+{
+ auth:{
+  persistSession:true,
+  autoRefreshToken:true,
+  detectSessionInUrl:true
+ }
+}
+);
+
+const access=document.getElementById('access');
+const protectedArea=document.getElementById('protected');
+const message=document.getElementById('message');
+const refresh=document.getElementById('refresh');
+const rows=document.getElementById('financialRows');
+
+function deny(reason){
+ protectedArea.hidden=true;
+ access.hidden=false;
+ access.replaceChildren();
+
+ access.append(document.createTextNode(reason+' '));
+
+ const link=document.createElement('a');
+ link.href='./admin-login.html';
+ link.textContent='Administrator Sign In';
+ access.append(link);
+}
+
+async function checkAdmin(){
+
+ const {data:userData,error:userError}=
+ await supabase.auth.getUser();
+
+ if(userError||!userData?.user){
+  deny('Administrator sign-in required.');
+  return false;
+ }
+
+ const {data:allowed,error:adminError}=
+ await supabase.rpc('shopdrop_is_active_admin');
+
+ if(adminError||allowed!==true){
+  deny('Administrator access denied or unavailable.');
+  return false;
+ }
+
+ access.hidden=true;
+ protectedArea.hidden=false;
+ return true;
+}
+
+function money(value,currency){
+
+ if(value===null||value===undefined){
+  return '—';
+ }
+
+ const amount=Number(value);
+
+ if(!Number.isFinite(amount)){
+  return '—';
+ }
+
+ return (currency||'Currency unspecified')+' '+
+ amount.toLocaleString('en-ZA',{
+  minimumFractionDigits:2,
+  maximumFractionDigits:2
+ });
+}
+
+function display(value){
+ return value===null||value===undefined||value===''
+ ?'—':String(value);
+}
+
+function addCell(tr,value){
+ const td=document.createElement('td');
+ td.textContent=display(value);
+ tr.appendChild(td);
+}
+
+function render(records){
+
+ rows.replaceChildren();
+
+ if(records.length===0){
+  const tr=document.createElement('tr');
+  const td=document.createElement('td');
+  td.colSpan=10;
+  td.textContent='No financial records available.';
+  tr.appendChild(td);
+  rows.appendChild(tr);
+  return;
+ }
+
+ for(const record of records){
+
+  const tr=document.createElement('tr');
+  const type=record.record_type;
+  const amount=money(
+   record.amount,
+   record.currency
+  );
+
+  const reference=
+   type+' / '+display(record.record_id);
+
+  const customerPayment=
+   type==='payment'?amount:'—';
+
+  const refund=
+   type==='refund'?amount:'—';
+
+  const payout=
+   type==='seller_payout'?amount:'—';
+
+  const allocation=
+   type==='allocation'?amount:'—';
+
+  const status=
+   display(record.record_status);
+
+  addCell(tr,reference);
+  addCell(tr,customerPayment);
+  addCell(tr,allocation);
+  addCell(tr,'—');
+  addCell(tr,'—');
+  addCell(tr,'—');
+  addCell(tr,refund);
+  addCell(tr,'—');
+  addCell(tr,payout);
+  addCell(tr,status);
+
+  rows.appendChild(tr);
+ }
+}
+
+async function loadFinancial(){
+
+ refresh.disabled=true;
+ message.textContent='Loading financial records...';
+
+ try{
+
+  const {data,error}=await supabase.rpc(
+   'shopdrop_admin_financial_overview'
+  );
+
+  if(error)throw error;
+
+  if(!Array.isArray(data)){
+   throw Error('Invalid financial response.');
+  }
+
+  render(data);
+
+  message.textContent=
+   'Financial records loaded successfully. Read-only.';
+
+ }catch(error){
+
+  rows.replaceChildren();
+
+  const tr=document.createElement('tr');
+  const td=document.createElement('td');
+  td.colSpan=10;
+  td.textContent=
+   'Financial records unavailable. Please refresh.';
+  tr.appendChild(td);
+  rows.appendChild(tr);
+
+  message.textContent=
+   'Unable to load financial records.';
+
+ }finally{
+  refresh.disabled=false;
+ }
+}
+
+refresh.addEventListener('click',async()=>{
+
+ refresh.disabled=true;
+
+ try{
+  if(await checkAdmin()){
+   await loadFinancial();
+  }
+ }finally{
+  refresh.disabled=false;
+ }
+
+});
+
+if(await checkAdmin()){
+ await loadFinancial();
+}
+
+</script>
+</body>
+</html>
