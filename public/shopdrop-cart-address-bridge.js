@@ -1,4 +1,5 @@
-// Phase 6C A75: authenticated cart/address bridge; no payment or order creation.
+
+ // Phase 6C A75: authenticated cart/address bridge; no payment or order creation.
 (function () {
   'use strict';
   const URL = 'https://dtkdvvxpwonywtsgqmdx.supabase.co';
@@ -29,11 +30,12 @@
       cart = c.data || [];
       // A152: display approved product names and trusted catalogue prices.
       // This is informational; the server must independently calculate checkout totals.
+      // Listing reference added for permanent item identification.
       const productIds = [...new Set(cart.map(row => row.product_id))];
       let productMap = new Map();
       if (productIds.length) {
         const {data: products, error: productError} = await db.from('products')
-          .select('id,title,price,currency,quantity,listing_status')
+          .select('id,title,price,currency,quantity,listing_status,listing_reference')
           .in('id', productIds);
         if (productError) throw productError;
         productMap = new Map((products || []).map(product => [product.id, product]));
@@ -79,6 +81,16 @@
         }
         if (!available) line += ' — unavailable or insufficient stock';
         div.append(document.createTextNode(line + ' '));
+
+        // Permanent listing reference shown beneath each bag item.
+        // Never substitute a different reference or expose seller IDs.
+        if (product?.listing_reference) {
+          const referenceLine=document.createElement('div');
+          referenceLine.className='muted';
+          referenceLine.textContent='Item reference: '+product.listing_reference;
+          div.append(referenceLine);
+        }
+
         const sellerAlias = aliasMap.get(item.product_id);
         if (sellerAlias) {
           const sellerLine = document.createElement('div');
