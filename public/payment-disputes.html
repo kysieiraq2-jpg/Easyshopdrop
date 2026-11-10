@@ -65,6 +65,15 @@ th,td{
 }
 th{background:#f8fafc}
 #protected[hidden]{display:none}
+.evidence-link{
+ display:inline-block;
+ padding:8px 11px;
+ background:#0f766e;
+ color:#fff;
+ border-radius:7px;
+ text-decoration:none;
+ white-space:nowrap;
+}
 </style>
 </head>
 <body>
@@ -81,11 +90,13 @@ Verifying administrator access...
 <div id="protected" hidden>
 
 <p class="warning">
-<strong>Read-only dispute monitoring.</strong>
+<strong>Dispute monitoring and evidence management.</strong>
 This page displays existing dispute and
-refund records. Chargeback responses,
-refund execution and payment-provider
-decisions are not available from this page.
+refund records and provides access to the
+protected evidence-upload page.
+Chargeback responses, refund execution
+and payment-provider decisions are not
+available from this page.
 </p>
 
 <button id="refresh" type="button">
@@ -113,12 +124,13 @@ confirm the payment provider's decision.
 <th>Status</th>
 <th>Created</th>
 <th>Updated</th>
+<th>Evidence</th>
 </tr>
 </thead>
 
 <tbody id="disputeRows">
 <tr>
-<td colspan="5">
+<td colspan="6">
 Waiting for administrator verification.
 </td>
 </tr>
@@ -256,6 +268,31 @@ function addCell(row,value){
  row.appendChild(cell);
 }
 
+function addEvidenceCell(row,record){
+
+ const cell=document.createElement('td');
+
+ if(record.case_type==='dispute'&&record.case_id){
+
+  const link=document.createElement('a');
+  link.className='evidence-link';
+
+  link.href='./dispute-evidence.html?dispute_id='+
+  encodeURIComponent(record.case_id);
+
+  link.textContent='Upload Evidence';
+
+  cell.appendChild(link);
+
+ }else{
+
+  cell.textContent='—';
+
+ }
+
+ row.appendChild(cell);
+}
+
 function render(records){
 
  rows.replaceChildren();
@@ -270,7 +307,7 @@ function render(records){
   const tr=document.createElement('tr');
   const td=document.createElement('td');
 
-  td.colSpan=5;
+  td.colSpan=6;
   td.textContent='No dispute or refund records available.';
 
   tr.appendChild(td);
@@ -287,6 +324,7 @@ function render(records){
   addCell(tr,record.case_status);
   addCell(tr,dateText(record.created_at));
   addCell(tr,dateText(record.updated_at));
+  addEvidenceCell(tr,record);
 
   rows.appendChild(tr);
  }
@@ -312,7 +350,7 @@ async function loadDisputes(){
   render(data);
 
   message.textContent=
-   'Dispute and refund records loaded. Read-only.';
+   'Dispute and refund records loaded.';
 
  }catch(error){
 
@@ -321,7 +359,7 @@ async function loadDisputes(){
   const tr=document.createElement('tr');
   const td=document.createElement('td');
 
-  td.colSpan=5;
+  td.colSpan=6;
   td.textContent=
    'Dispute records unavailable. Please refresh.';
 
