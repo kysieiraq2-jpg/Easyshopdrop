@@ -1,6 +1,349 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Inventory Reservations | Shop&Drop</title></head><body><main><h1>Inventory Reservations</h1>
-<p>Reserved stock is temporarily unavailable to competing checkout attempts while payment is pending.</p>
-<table><thead><tr><th>Listing</th><th>Order</th><th>Quantity</th><th>Status</th><th>Expires</th></tr></thead><tbody><tr><td colspan="5">Reservation records are available after secure Shop&Drop backend connection and sign-in.</td></tr></tbody></table>
-<p>Reserved → Payment Pending → Committed on verified payment, or Expired/Released if payment is not completed within the configured window.</p>
-</main><script src="common.js"></script>
-<script src="v26-consolidated.js"></script><script src="v26-bridge.js"></script></body></html>
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Inventory Reservations | Shop&amp;Drop Admin</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;
+ background:#f3f5f8;
+ color:#17202a;
+ font:16px Arial,sans-serif;
+ line-height:1.5;
+}
+main{
+ max-width:1100px;
+ margin:auto;
+ padding:20px 14px 40px;
+}
+h1{font-size:clamp(25px,5vw,36px)}
+h2{font-size:21px}
+a{color:#0f766e}
+.panel{
+ background:#fff;
+ border:1px solid #e2e8f0;
+ border-radius:12px;
+ padding:18px;
+ margin:16px 0;
+}
+.notice{
+ background:#eef2ff;
+ padding:14px;
+ border-radius:9px;
+}
+.warning{
+ background:#fff7ed;
+ padding:14px;
+ border-radius:9px;
+}
+.muted{color:#64748b}
+button{
+ background:#0f766e;
+ color:#fff;
+ border:0;
+ border-radius:8px;
+ padding:12px 18px;
+ font:inherit;
+ cursor:pointer;
+}
+button:disabled{opacity:.6}
+.tablewrap{overflow-x:auto}
+table{
+ width:100%;
+ border-collapse:collapse;
+ font-size:14px;
+}
+th,td{
+ text-align:left;
+ padding:11px;
+ border-bottom:1px solid #e2e8f0;
+ vertical-align:top;
+ overflow-wrap:anywhere;
+}
+th{background:#f8fafc}
+#protected[hidden]{display:none}
+</style>
+</head>
+<body>
+<main>
+
+<a href="./admin.html">← Admin Control Centre</a>
+
+<h1>Inventory Reservations</h1>
+
+<div id="access" class="notice" role="status">
+Verifying administrator access...
+</div>
+
+<div id="protected" hidden>
+
+<p class="warning">
+<strong>Read-only reservation monitoring.</strong>
+This page displays existing inventory reservations.
+It cannot create, commit, extend, expire or release
+reservations, and cannot change product stock.
+</p>
+
+<button id="refresh" type="button">
+Refresh reservations
+</button>
+
+<p id="message" role="status" aria-live="polite"></p>
+
+<section class="panel">
+<h2>Inventory Reservation Records</h2>
+
+<p class="muted">
+Recent reservations with their listing references,
+order references, quantities, statuses and
+reservation timestamps.
+</p>
+
+<div class="tablewrap">
+<table>
+<thead>
+<tr>
+<th>Listing</th>
+<th>Order</th>
+<th>Quantity</th>
+<th>Status</th>
+<th>Expires</th>
+<th>Reserved</th>
+<th>Committed</th>
+<th>Released</th>
+</tr>
+</thead>
+
+<tbody id="reservationRows">
+<tr>
+<td colspan="8">
+Waiting for administrator verification.
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section class="panel">
+<h2>Reservation Protection Rules</h2>
+
+<p>
+<strong>Reservation hold:</strong>
+Shop&amp;Drop reserves available stock for
+30 minutes while payment is pending.
+</p>
+
+<p>
+<strong>Successful payment:</strong>
+An authoritative payment confirmation
+commits the reservation.
+</p>
+
+<p>
+<strong>Failed or expired payment:</strong>
+The backend releases the reservation
+according to its existing safeguards.
+</p>
+
+<p class="muted">
+This administrator page does not control
+reservation processing. Late payments,
+duplicate payment notifications and
+inventory reconciliation remain handled
+by the protected backend.
+</p>
+</section>
+
+</div>
+</main>
+
+<script type="module">
+
+import {createClient} from
+'https://esm.sh/@supabase/supabase-js@2';
+
+const supabase=createClient(
+'https://dtkdvvxpwonywtsgqmdx.supabase.co',
+'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q',
+{
+ auth:{
+  persistSession:true,
+  autoRefreshToken:true,
+  detectSessionInUrl:true
+ }
+}
+);
+
+const access=document.getElementById('access');
+const protectedArea=document.getElementById('protected');
+const message=document.getElementById('message');
+const refresh=document.getElementById('refresh');
+const rows=document.getElementById('reservationRows');
+
+function deny(reason){
+
+ protectedArea.hidden=true;
+ access.hidden=false;
+ access.replaceChildren();
+
+ access.append(document.createTextNode(reason+' '));
+
+ const link=document.createElement('a');
+ link.href='./admin-login.html';
+ link.textContent='Administrator Sign In';
+ access.append(link);
+}
+
+async function checkAdmin(){
+
+ const {data:userData,error:userError}=
+ await supabase.auth.getUser();
+
+ if(userError||!userData?.user){
+  deny('Administrator sign-in required.');
+  return false;
+ }
+
+ const {data:allowed,error:adminError}=
+ await supabase.rpc('shopdrop_is_active_admin');
+
+ if(adminError||allowed!==true){
+  deny('Administrator access denied or unavailable.');
+  return false;
+ }
+
+ access.hidden=true;
+ protectedArea.hidden=false;
+ return true;
+}
+
+function dateText(value){
+
+ if(!value)return '—';
+
+ const date=new Date(value);
+
+ return Number.isNaN(date.getTime())
+ ?'—':date.toLocaleString('en-ZA');
+}
+
+function display(value){
+
+ return value===null||
+ value===undefined||
+ value===''
+ ?'—':String(value);
+}
+
+function addCell(row,value){
+
+ const cell=document.createElement('td');
+ cell.textContent=display(value);
+ row.appendChild(cell);
+}
+
+function render(records){
+
+ rows.replaceChildren();
+
+ if(records.length===0){
+
+  const tr=document.createElement('tr');
+  const td=document.createElement('td');
+
+  td.colSpan=8;
+  td.textContent='No reservation records available.';
+
+  tr.appendChild(td);
+  rows.appendChild(tr);
+  return;
+ }
+
+ for(const record of records){
+
+  const tr=document.createElement('tr');
+
+  addCell(tr,record.product_id);
+  addCell(tr,record.order_id);
+  addCell(tr,record.quantity);
+  addCell(tr,record.reservation_status);
+  addCell(tr,dateText(record.expires_at));
+  addCell(tr,dateText(record.reserved_at));
+  addCell(tr,dateText(record.committed_at));
+  addCell(tr,dateText(record.released_at));
+
+  rows.appendChild(tr);
+ }
+}
+
+async function loadReservations(){
+
+ refresh.disabled=true;
+ message.textContent='Loading inventory reservations...';
+
+ try{
+
+  const {data,error}=await supabase.rpc(
+   'shopdrop_admin_inventory_reservation_overview'
+  );
+
+  if(error)throw error;
+
+  if(!Array.isArray(data)){
+   throw Error('Invalid reservation response.');
+  }
+
+  render(data);
+
+  message.textContent=
+   'Inventory reservations loaded successfully. Read-only.';
+
+ }catch(error){
+
+  rows.replaceChildren();
+
+  const tr=document.createElement('tr');
+  const td=document.createElement('td');
+
+  td.colSpan=8;
+  td.textContent=
+   'Reservation records unavailable. Please refresh.';
+
+  tr.appendChild(td);
+  rows.appendChild(tr);
+
+  message.textContent=
+   'Unable to load reservation records.';
+
+ }finally{
+  refresh.disabled=false;
+ }
+}
+
+refresh.addEventListener('click',async()=>{
+
+ refresh.disabled=true;
+
+ try{
+
+  if(await checkAdmin()){
+   await loadReservations();
+  }
+
+ }finally{
+  refresh.disabled=false;
+ }
+
+});
+
+if(await checkAdmin()){
+ await loadReservations();
+}
+
+</script>
+</body>
+</html>
