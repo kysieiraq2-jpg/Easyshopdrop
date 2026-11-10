@@ -1,1 +1,293 @@
 
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shop&Drop | Administrator Case Reviews</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f3f5f8;color:#17202a;font:16px Arial,sans-serif;line-height:1.5}
+main{max-width:1050px;margin:auto;padding:20px 14px}
+a{color:#0f766e}
+.panel{background:#fff;border:1px solid #dce3e9;border-radius:12px;padding:16px;margin:14px 0}
+button{background:#0f766e;color:white;border:0;border-radius:7px;padding:10px 14px;margin:4px;cursor:pointer}
+button:disabled{opacity:.6}
+textarea{display:block;width:100%;min-height:85px;padding:10px;font:inherit;border:1px solid #ccd5df;border-radius:7px}
+.muted{color:#526272}
+.error{color:#a12323}
+#protected[hidden]{display:none}
+</style>
+</head>
+<body>
+<main>
+<a href="./admin.html">← Administrator Control Centre</a>
+<h1>Complaints &amp; Exceptional Case Reviews</h1>
+<p>
+For complaints and exceptional investigations only.
+Shop&Drop registration, listings, checkout, payments,
+dispatch, delivery, refunds and payouts remain automated.
+This page cannot approve listings or release money.
+</p>
+
+<div id="access" role="status">
+Checking administrator access...
+</div>
+
+<section id="protected" hidden>
+<button id="refresh" type="button">Refresh cases</button>
+<p id="message" role="status" aria-live="polite"></p>
+
+<h2>Exception Review Queue</h2>
+<div id="reviews"></div>
+
+<h2>Orders, Disputes, Refunds &amp; Dispatch Cases</h2>
+<div id="cases"></div>
+</section>
+</main>
+
+<script type="module">
+import {createClient} from
+'https://esm.sh/@supabase/supabase-js@2';
+
+const supabase=createClient(
+'https://dtkdvvxpwonywtsgqmdx.supabase.co',
+'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q',
+{
+auth:{
+persistSession:true,
+autoRefreshToken:true,
+detectSessionInUrl:true
+}
+}
+);
+
+const $=id=>document.getElementById(id);
+
+function node(tag,text){
+const e=document.createElement(tag);
+if(text!==undefined)e.textContent=String(text??'—');
+return e;
+}
+
+function deny(message){
+$('protected').hidden=true;
+$('access').replaceChildren(
+node('span',message+' ')
+);
+const a=node('a','Administrator sign in');
+a.href='./admin-login.html';
+$('access').append(a);
+}
+
+async function authorized(){
+const {data,error}=await supabase.auth.getUser();
+
+if(error||!data?.user){
+deny('Sign-in required.');
+return false;
+}
+
+const check=await supabase.rpc(
+'shopdrop_is_active_admin'
+);
+
+if(check.error||check.data!==true){
+deny('Administrator access denied.');
+return false;
+}
+
+$('access').textContent='Administrator access confirmed.';
+$('protected').hidden=false;
+return true;
+}
+
+async function updateReview(
+record,status,note,feedback,buttons
+){
+if(note.length<10||note.length>2000){
+feedback.textContent=
+'Provide a note of 10–2000 characters.';
+return;
+}
+
+if(!await authorized())return;
+
+if(!confirm(
+'Update this exceptional review to '+status+'?'
+))return;
+
+buttons.forEach(b=>b.disabled=true);
+feedback.textContent='Saving...';
+
+const {data,error}=await supabase.rpc(
+'shopdrop_admin_update_review',{
+p_review_id:record.review_id,
+p_status:status,
+p_note:note
+}
+);
+
+if(error||data?.audited!==true){
+feedback.textContent=
+'Could not save: '+
+(error?.message||'Unexpected response');
+buttons.forEach(b=>b.disabled=false);
+return;
+}
+
+feedback.textContent='Saved and audited.';
+await load();
+}
+
+function renderReviews(rows){
+const root=$('reviews');
+root.replaceChildren();
+
+if(!rows.length){
+root.textContent='No exceptional reviews queued.';
+return;
+}
+
+for(const record of rows){
+const card=node('article');
+card.className='panel';
+
+card.append(
+node('h3',
+(record.review_type||'Review')+
+' — '+(record.review_status||'Unknown')
+),
+node('p','Reference: '+record.review_id),
+node('p','Reason: '+(record.review_reason||'—')),
+node('p','Priority: '+(record.priority||'—'))
+);
+
+const current=String(
+record.review_status||''
+).toLowerCase();
+
+if(['pending','in_review'].includes(current)){
+const note=node('textarea');
+note.placeholder=
+'Investigation note (minimum 10 characters)';
+note.maxLength=2000;
+note.setAttribute(
+'aria-label','Investigation note'
+);
+card.append(note);
+
+const status=node('p');
+status.setAttribute('role','status');
+const buttons=[];
+
+for(const next of ['pending','in_review']){
+if(next===current)continue;
+
+const b=node(
+'button',
+next==='in_review'
+?'Start investigation'
+:'Return to pending'
+);
+
+b.type='button';
+
+b.onclick=()=>updateReview(
+record,next,note.value.trim(),
+status,buttons
+);
+
+buttons.push(b);
+card.append(b);
+}
+
+card.append(status);
+}
+
+root.append(card);
+}
+}
+
+function renderCases(rows){
+const root=$('cases');
+root.replaceChildren();
+
+if(!rows.length){
+root.textContent='No cases found.';
+return;
+}
+
+for(const record of rows){
+const card=node('article');
+card.className='panel';
+
+card.append(
+node('strong',
+(record.case_type||'Case')+
+' — '+(record.case_status||'—')
+),
+node('p','Reference: '+record.case_id),
+node('p',
+'Created: '+
+(record.created_at
+?new Date(record.created_at)
+.toLocaleString('en-ZA')
+:'—')
+)
+);
+
+root.append(card);
+}
+}
+
+async function load(){
+const refresh=$('refresh');
+refresh.disabled=true;
+$('message').textContent='Loading...';
+
+try{
+const [reviews,cases]=await Promise.all([
+supabase.rpc(
+'shopdrop_admin_review_queue_readonly'
+),
+supabase.rpc(
+'shopdrop_admin_case_overview'
+)
+]);
+
+if(reviews.error)throw reviews.error;
+if(cases.error)throw cases.error;
+
+if(
+!Array.isArray(reviews.data)||
+!Array.isArray(cases.data)
+){
+throw Error('Unexpected response');
+}
+
+renderReviews(reviews.data);
+renderCases(cases.data);
+
+$('message').textContent=
+'Exceptional cases loaded.';
+
+}catch(error){
+$('message').textContent=
+'Unable to load: '+
+(error?.message||'Unknown error');
+$('message').className='error';
+}finally{
+refresh.disabled=false;
+}
+}
+
+$('refresh').onclick=async()=>{
+if(await authorized())await load();
+};
+
+if(await authorized())await load();
+</script>
+</body>
+</html>
+
