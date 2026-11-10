@@ -107,10 +107,11 @@ Refresh evidence records
 <th>File Type</th>
 <th>Size</th>
 <th>Submitted</th>
+<th>Evidence File</th>
 </tr>
 </thead>
 <tbody id="evidenceRows">
-<tr><td colspan="7">Waiting for records.</td></tr>
+<tr><td colspan="8">Waiting for records.</td></tr>
 </tbody>
 </table>
 </div>
@@ -190,7 +191,7 @@ return userData.user;
 }
 
 function validUuid(value){
-return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
 function dateText(value){
@@ -205,13 +206,59 @@ td.textContent=String(value??'—');
 tr.appendChild(td);
 }
 
+async function openEvidence(evidenceId,button){
+button.disabled=true;
+reportMessage.textContent='Retrieving private evidence...';
+
+try{
+const user=await checkAdmin();
+if(!user)throw Error('Administrator access required.');
+
+const {data:path,error:pathError}=await supabase.rpc(
+'shopdrop_admin_evidence_file_path',{
+p_evidence_id:evidenceId
+});
+
+if(pathError||!path){
+throw Error('Evidence file unavailable.');
+}
+
+const {data:blob,error:downloadError}=
+await supabase.storage
+.from('dispute-evidence')
+.download(path);
+
+if(downloadError||!blob){
+throw Error('Private evidence download failed.');
+}
+
+const url=URL.createObjectURL(blob);
+const link=document.createElement('a');
+link.href=url;
+link.download='shopdrop-evidence-'+evidenceId;
+document.body.appendChild(link);
+link.click();
+link.remove();
+
+setTimeout(()=>URL.revokeObjectURL(url),60000);
+
+reportMessage.textContent='Evidence download requested.';
+
+}catch(error){
+reportMessage.textContent=
+error?.message||'Unable to open evidence.';
+}finally{
+button.disabled=false;
+}
+}
+
 function render(records){
 rows.replaceChildren();
 
 if(!records.length){
 const tr=document.createElement('tr');
 const td=document.createElement('td');
-td.colSpan=7;
+td.colSpan=8;
 td.textContent='No evidence records available.';
 tr.appendChild(td);
 rows.appendChild(tr);
@@ -227,6 +274,17 @@ addCell(tr,r.description);
 addCell(tr,r.mime_type);
 addCell(tr,r.file_size_bytes===null?'—':r.file_size_bytes+' bytes');
 addCell(tr,dateText(r.created_at));
+
+const fileCell=document.createElement('td');
+const openButton=document.createElement('button');
+openButton.type='button';
+openButton.textContent='Open Evidence';
+openButton.addEventListener('click',()=>{
+openEvidence(r.evidence_id,openButton);
+});
+fileCell.appendChild(openButton);
+tr.appendChild(fileCell);
+
 rows.appendChild(tr);
 }
 }
@@ -247,6 +305,28 @@ reportMessage.textContent='Evidence records loaded.';
 reportMessage.textContent='Evidence records unavailable.';
 }finally{
 refresh.disabled=false;
+}
+}
+
+async function cleanupFailedRegistration(path){
+try{
+const {data:allowed,error:checkError}=
+await supabase.rpc('shopdrop_evidence_cleanup_allowed',{
+p_path:path
+});
+
+if(checkError||allowed!==true){
+return false;
+}
+
+const {error:cleanupError}=await supabase.storage
+.from('dispute-evidence')
+.remove([path]);
+
+return !cleanupError;
+
+}catch(error){
+return false;
 }
 }
 
@@ -318,9 +398,19 @@ p_description:description||null,
 p_original_filename:file.name
 });
 
-if(registerError)throw registerError;
-if(registered?.registered!==true){
-throw Error('Evidence registration could not be confirmed.');
+if(registerError||registered?.registered!==true){
+
+const cleaned=await cleanupFailedRegistration(path);
+
+if(cleaned){
+throw Error(
+'Evidence registration failed. Unregistered upload was cleaned up. Please retry.'
+);
+}
+
+throw Error(
+'Evidence registration was not confirmed. The private file may remain in Storage for administrator review.'
+);
 }
 
 uploadMessage.textContent=
