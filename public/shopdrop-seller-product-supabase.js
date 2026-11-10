@@ -1,3 +1,4 @@
+
 /* Shop&Drop Phase6C A123 — additive product submission bridge.
    Seller target price remains the seller's full proceeds; fees are added at checkout.
    Supabase RLS is authoritative. Other seller/service handlers remain unchanged. */
@@ -18,6 +19,39 @@
     if(!value(id)||!Number.isFinite(n)||n<=0)throw Error('Enter a valid '+label+'.');
     return n;
   }
+
+  // Check existing protected seller verification.
+  // Never depend on a nonexistent profiles.role column.
+  async function verifySeller(sb,userId){
+    const {data,error}=await sb
+      .from('seller_verification_status')
+      .select('identity_verified,account_verified,payout_verified,suspended_at')
+      .eq('seller_id',userId)
+      .maybeSingle();
+
+    if(error){
+      throw Error('Seller verification could not be checked: '+error.message);
+    }
+
+    if(!data){
+      throw Error('Seller verification is not yet available for this account.');
+    }
+
+    if(data.suspended_at){
+      throw Error('This seller account is suspended.');
+    }
+
+    if(
+      data.identity_verified!==true||
+      data.account_verified!==true||
+      data.payout_verified!==true
+    ){
+      throw Error('Seller identity, account or payout verification is incomplete.');
+    }
+
+    return true;
+  }
+
   // Optional private collection address; no address details are published on the listing.
   async function preparePickupAddresses(sb,userId){
     if(el('shopdropPickupAddress'))return;
@@ -51,6 +85,7 @@
     wrapper.append(label,select,hint);
     anchor.closest('label')?.after(wrapper) || anchor.parentElement?.after(wrapper);
   }
+
   async function initPickupAddress(){
     try{
       const sb=await client();
@@ -58,8 +93,10 @@
       if(user)await preparePickupAddresses(sb,user.id);
     }catch(e){console.warn('ShopDrop pickup address selector:',e);}
   }
+
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initPickupAddress,{once:true});
   else initPickupAddress();
+
   async function submitProduct(){
     const status=el('productStatus');
     status.hidden=false;
@@ -69,8 +106,9 @@
       const sb=await client();
       const {data:{user},error:authError}=await sb.auth.getUser();
       if(authError||!user)throw Error('Sign in to your seller account first.');
-      const {data:profile,error:profileError}=await sb.from('profiles').select('role').eq('id',user.id).single();
-      if(profileError||profile?.role!=='seller')throw Error('An approved seller account is required to list products.');
+
+      await verifySeller(sb,user.id);
+
       const title=value('n'),category=value('mainCategory'),subcategory=value('c');
       const categoryName=el('mainCategory')?.selectedOptions?.[0]?.textContent?.trim();
       const subcategoryName=el('c')?.selectedOptions?.[0]?.dataset?.name || el('c')?.selectedOptions?.[0]?.textContent?.trim();
@@ -103,10 +141,17 @@
       }
       const {data,error}=await sb.from('products').insert(payload).select('id,listing_reference,listing_status').single();
       if(error)throw Error('Listing could not be saved: '+error.message);
-      status.textContent='Product submitted for approval. Reference: '+(data.listing_reference||data.id)+'. Seller asking price preserved.';
+
+      status.textContent=
+        'Product saved. Reference: '+
+        (data.listing_reference||data.id)+
+        '. Status: '+data.listing_status+
+        '. Seller asking price preserved.';
+
     }catch(e){status.textContent=e?.message||'Unable to submit product.';}
     finally{if(button)button.disabled=false;}
   }
+
   // This overrides only product submission, leaving services, photos, category and profile UI intact.
   window.add=submitProduct;
 })();
