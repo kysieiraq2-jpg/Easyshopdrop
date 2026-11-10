@@ -7,11 +7,11 @@
 <title>Shop&Drop Admin Control Centre</title>
 <style>
 /*
- SHOPDROP_ADMIN_CENTRE_SAFE_V1
- Preserves existing administration sections and links.
- Supabase authenticated administrator verification.
- Legacy /api/admin calls disabled until connected.
- No financial or management operations activated.
+ SHOPDROP_ADMIN_CENTRE_SAFE_V2
+ Existing administration sections and links preserved.
+ Authenticated Supabase administrator verification.
+ Read-only live dashboard statistics.
+ Legacy /api/admin management calls remain disabled.
 */
 *{box-sizing:border-box}
 body{
@@ -46,6 +46,11 @@ h2{font-size:clamp(20px,4vw,25px)}
  background:#eef2ff;
  padding:16px;
  border-radius:10px;
+}
+.stat strong{
+ display:block;
+ font-size:25px;
+ overflow-wrap:anywhere;
 }
 .portal{
  display:block;
@@ -190,29 +195,44 @@ older backend routes.
 <div id="stats" class="grid">
 <div class="stat">
 Registered Users
-<p><strong>Pending secure data connection</strong></p>
+<p><strong id="statUsers">—</strong></p>
 </div>
 
 <div class="stat">
 Approved Sellers
-<p><strong>Pending secure data connection</strong></p>
+<p><strong id="statSellers">—</strong></p>
 </div>
 
 <div class="stat">
 Products
-<p><strong>Pending secure data connection</strong></p>
+<p><strong id="statProducts">—</strong></p>
 </div>
 
 <div class="stat">
 Orders
-<p><strong>Pending secure data connection</strong></p>
+<p><strong id="statOrders">—</strong></p>
 </div>
 </div>
 
+<p id="statsStatus" class="muted"
+ role="status" aria-live="polite">
+ Waiting for administrator verification.
+</p>
+
+<button id="refreshStats" type="button">
+ Refresh statistics
+</button>
+
 <p class="muted">
-No live figures are displayed until
-they can be retrieved and verified
-through an authorised backend.
+Figures are retrieved from the
+protected Supabase administrator
+dashboard function.
+
+Approved Sellers counts approved
+seller applications. Products counts
+product records. Orders counts order
+records. These figures are not
+financial settlement totals.
 </p>
 </section>
 
@@ -361,12 +381,11 @@ provider integrations are verified.
 
 <script type="module">
 /*
- SHOPDROP_ADMIN_AUTH_GUARD_V1
+ SHOPDROP_ADMIN_AUTH_GUARD_V2
 
- Uses existing Supabase Auth session.
- Uses existing shopdrop_is_active_admin RPC.
- Does not expose administrator records.
- Does not modify database or transaction data.
+ Existing Supabase administrator check preserved.
+ Read-only dashboard statistics added.
+ No financial or marketplace writes.
 */
 
 import {createClient} from
@@ -396,8 +415,17 @@ const welcome=document.getElementById(
 const signOut=document.getElementById(
  'adminSignOut'
 );
+const refresh=document.getElementById(
+ 'refreshStats'
+);
+const statsStatus=document.getElementById(
+ 'statsStatus'
+);
+
+let adminVerified=false;
 
 function deny(message){
+ adminVerified=false;
  content.hidden=true;
  status.hidden=false;
  status.textContent=message;
@@ -407,6 +435,71 @@ function deny(message){
  link.textContent=' Open Administrator Sign In';
  status.appendChild(document.createElement('p'))
        .appendChild(link);
+}
+
+function setStat(id,value){
+ document.getElementById(id).textContent=
+  Number.isSafeInteger(value)&&value>=0
+   ?value.toLocaleString('en-ZA')
+   :'Unavailable';
+}
+
+async function loadStatistics(){
+ if(!adminVerified)return;
+
+ refresh.disabled=true;
+ statsStatus.textContent='Loading live statistics...';
+
+ try{
+  const {data,error}=await supabase.rpc(
+   'shopdrop_admin_dashboard_counts'
+  );
+
+  if(error)throw error;
+
+  if(!data||typeof data!=='object'){
+   throw Error('Invalid dashboard response.');
+  }
+
+  const keys=[
+   'users',
+   'approved_sellers',
+   'products',
+   'orders'
+  ];
+
+  if(keys.some(key=>
+   !Number.isSafeInteger(data[key])||
+   data[key]<0
+  )){
+   throw Error('Incomplete dashboard statistics.');
+  }
+
+  setStat('statUsers',data.users);
+  setStat('statSellers',data.approved_sellers);
+  setStat('statProducts',data.products);
+  setStat('statOrders',data.orders);
+
+  statsStatus.textContent=
+   'Live statistics loaded successfully.';
+
+ }catch(error){
+  [
+   'statUsers',
+   'statSellers',
+   'statProducts',
+   'statOrders'
+  ].forEach(id=>{
+   document.getElementById(id).textContent=
+    'Unavailable';
+  });
+
+  statsStatus.textContent=
+   'Unable to load live statistics. '+
+   'Please try Refresh statistics.';
+ }finally{
+  refresh.disabled=false;
+ }
 }
 
 async function verifyAdmin(){
@@ -429,22 +522,52 @@ async function verifyAdmin(){
    return;
   }
 
+  adminVerified=true;
+
   welcome.textContent=
    'Administrator identity and active status verified.';
 
   status.hidden=true;
   content.hidden=false;
 
+  await loadStatistics();
+
  }catch(error){
   deny('Administrator verification could not be completed.');
  }
 }
 
+refresh.addEventListener('click',async()=>{
+ if(!adminVerified)return;
+
+ const {data,error}=await supabase.auth.getUser();
+
+ if(error||!data?.user){
+  deny('Administrator session expired.');
+  return;
+ }
+
+ const {data:allowed,error:roleError}=
+  await supabase.rpc('shopdrop_is_active_admin');
+
+ if(roleError||allowed!==true){
+  deny('Administrator access no longer authorised.');
+  return;
+ }
+
+ await loadStatistics();
+});
+
 signOut.addEventListener('click',async()=>{
  signOut.disabled=true;
 
  try{
-  await supabase.auth.signOut();
+  const {error}=await supabase.auth.signOut();
+  if(error)throw error;
+
+  adminVerified=false;
+  content.hidden=true;
+
   window.location.replace('./index.html');
  }catch(error){
   status.hidden=false;
