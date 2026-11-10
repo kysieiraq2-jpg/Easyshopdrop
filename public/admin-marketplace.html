@@ -1,3 +1,278 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Marketplace Architecture | Shop&Drop Admin</title><style>body{font:16px Arial;background:#f3f5f8;color:#17202a;margin:0}.wrap{max-width:1050px;margin:auto;padding:18px}.box{background:#fff;padding:18px;border-radius:10px;margin:12px 0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}.card{border:1px solid #dbe3ea;padding:14px;border-radius:9px}.muted{color:#64748b}</style></head><body><main class=wrap><a href="./admin.html">← Admin Control Centre</a><h1>Marketplace & Services Control</h1><div class=box style="background:#eef2ff"><b>Administrator preview:</b> V24.1 prepares the automated catalogue, inventory, multi-seller fulfilment, notifications, configurable marketplace service-fee rules, disputes/risk exceptions, partner catalogues and once-off Services marketplace. Live records require the authenticated backend.</div><div class=grid><div class=card><b>Catalogue & Inventory</b><p>Products, seller IDs/SKUs, stock, categories/subcategories and specials.</p></div><div class=card><b>Multi-seller Orders</b><p>One buyer checkout can split into seller fulfilment groups, shipments and payouts.</p></div><div class=card><b>Notifications</b><p>In-app, email, SMS and WhatsApp-ready seller/customer notification queues.</p></div><div class=card><b>Services</b><p>Clearly priced equipment hire, cleaning, pest control, performers and event vehicles.</p></div><div class=card><b>Dispatching & Transport</b><p>Dedicated transport requests, provider offers, job status and payout controls.</p></div><div class=card><b>Partner Catalogues</b><p>Authorized manual/CSV/API/feed imports linked to the correct seller/provider.</p></div><div class=card><b>Category Requests</b><p>Review customer/provider suggestions for missing product or service categories.</p></div><div class=card><b>Marketplace Service Fee Rules</b><p>Configurable product/service marketplace service-fee tiers. Final rates are set after unit-economics testing, not hard-coded permanently.</p></div><div class=card><b>Returns & Disputes</b><p>Transaction-linked cases, evidence, return tracking and payout holds until qualifying disputes are resolved.</p></div><div class=card><b>Exception Queue</b><p>Routine transactions are automated. Admin attention is reserved for risk flags, failed payouts, unusual disputes and provider failures.</p></div></div><div class=box><h2>Privacy & transaction rule</h2><p>Provider/seller direct contact and banking details remain private. Shop&Drop mediates the transaction, tracks fulfilment and applies the configured marketplace service fee before provider payout. Shop&Drop owns no seller inventory and assumes no warehouse or routine office fulfilment staff.</p></div><section class="card"><h2>Transaction orchestration</h2><p><b>LI listing → SD order → ST seller transaction → SH shipment → provider payment/tracking/payout references.</b></p><p>Normal transactions are automated. Admin reviews exceptions: failed payments/payouts, unresolved disputes, courier exceptions, suspicious account changes and compliance flags.</p><p>Shop&Drop never stores raw card/CVV data and never exposes seller payout details to buyers.</p></section></main><script src="v26-bridge.js"></script><script src="v26-consolidated.js"></script>
-<script src="v26-admin-runtime.js"></script>
-</body></html>
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Marketplace Management | Shop&amp;Drop Admin</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f3f5f8;color:#17202a;font:16px Arial,sans-serif;line-height:1.5}
+main{max-width:1100px;margin:auto;padding:20px 14px 40px}
+h1{font-size:clamp(26px,5vw,36px)}
+h2{font-size:21px}
+a{color:#0f766e}
+.panel{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;margin:16px 0}
+.notice{background:#eef2ff;border-radius:9px;padding:13px}
+.warning{background:#fff7ed;border-radius:9px;padding:13px}
+.muted{color:#64748b}
+button{background:#0f766e;color:white;border:0;border-radius:8px;padding:12px 18px;font:inherit;cursor:pointer}
+button:disabled{opacity:.6}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:11px;border-bottom:1px solid #e2e8f0;overflow-wrap:anywhere;vertical-align:top}
+th{background:#f8fafc}
+#protected[hidden]{display:none}
+</style>
+</head>
+<body>
+<main>
+<a href="./admin.html">← Admin Control Centre</a>
+<h1>Marketplace, Inventory &amp; Services</h1>
+
+<div id="access" class="notice" role="status">
+Verifying administrator access...
+</div>
+
+<div id="protected" hidden>
+<p class="warning">
+<strong>Administrator marketplace overview.</strong>
+Products, services, categories and moderation records are retrieved from the protected Supabase backend.
+Listing approval, rejection and suspension controls remain disabled on this page until the full browser workflow is verified.
+</p>
+
+<button id="refresh" type="button">Refresh marketplace</button>
+<p id="message" role="status" aria-live="polite"></p>
+
+<section class="panel">
+<h2>Product &amp; Service Listings</h2>
+<p class="muted">Latest 100 listings, including their recorded approval statuses.</p>
+<div id="listings" class="tablewrap">Waiting for records.</div>
+</section>
+
+<section class="panel">
+<h2>Categories &amp; Subcategories</h2>
+<p class="muted">Categories currently used by products and services.</p>
+<div id="categories" class="tablewrap">Waiting for records.</div>
+</section>
+
+<section class="panel">
+<h2>Listing Moderation Queue</h2>
+<p class="muted">Cases awaiting administrator review or further investigation.</p>
+<div id="moderation" class="tablewrap">Waiting for records.</div>
+</section>
+
+<section class="panel">
+<h2>Seller &amp; Service-Provider Applications</h2>
+<p class="muted">Applications and their current statuses.</p>
+<div id="applications" class="tablewrap">Waiting for records.</div>
+</section>
+
+<section class="panel">
+<h2>Marketplace Safeguards</h2>
+<p class="muted">
+Shop&amp;Drop launches in South Africa with ZAR listings.
+Product and service approvals use different public listing statuses.
+Seller identity, account and payout verification must be completed before protected approval.
+Private seller contact and banking information are not displayed here.
+</p>
+</section>
+</div>
+</main>
+
+<script type="module">
+import {createClient} from
+'https://esm.sh/@supabase/supabase-js@2';
+
+const supabase=createClient(
+'https://dtkdvvxpwonywtsgqmdx.supabase.co',
+'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q',
+{
+auth:{
+persistSession:true,
+autoRefreshToken:true,
+detectSessionInUrl:true
+}
+}
+);
+
+const access=document.getElementById('access');
+const protectedArea=document.getElementById('protected');
+const message=document.getElementById('message');
+const refresh=document.getElementById('refresh');
+
+function deny(reason){
+protectedArea.hidden=true;
+access.hidden=false;
+access.replaceChildren();
+access.append(document.createTextNode(reason+' '));
+
+const link=document.createElement('a');
+link.href='./admin-login.html';
+link.textContent='Administrator Sign In';
+access.append(link);
+}
+
+async function checkAdmin(){
+const {data:userData,error:userError}=
+await supabase.auth.getUser();
+
+if(userError||!userData?.user){
+deny('Administrator sign-in required.');
+return false;
+}
+
+const {data:allowed,error:adminError}=
+await supabase.rpc('shopdrop_is_active_admin');
+
+if(adminError||allowed!==true){
+deny('Administrator access denied or unavailable.');
+return false;
+}
+
+access.hidden=true;
+protectedArea.hidden=false;
+return true;
+}
+
+function dateText(value){
+if(!value)return '—';
+const date=new Date(value);
+return Number.isNaN(date.getTime())
+?'—':date.toLocaleString('en-ZA');
+}
+
+function renderTable(target,headers,rows){
+const container=document.getElementById(target);
+container.replaceChildren();
+
+if(!Array.isArray(rows)||rows.length===0){
+container.textContent='No records available.';
+return;
+}
+
+const table=document.createElement('table');
+const head=document.createElement('thead');
+const headerRow=document.createElement('tr');
+
+for(const heading of headers){
+const th=document.createElement('th');
+th.textContent=heading;
+headerRow.appendChild(th);
+}
+head.appendChild(headerRow);
+table.appendChild(head);
+
+const body=document.createElement('tbody');
+
+for(const values of rows){
+const tr=document.createElement('tr');
+
+for(const value of values){
+const td=document.createElement('td');
+td.textContent=String(value??'—');
+tr.appendChild(td);
+}
+
+body.appendChild(tr);
+}
+table.appendChild(body);
+container.appendChild(table);
+}
+
+async function loadMarketplace(){
+refresh.disabled=true;
+message.textContent='Loading marketplace records...';
+
+const reports=[
+{
+rpc:'shopdrop_admin_listing_overview',
+target:'listings',
+headers:['Type','Listing ID','Title','Category','Status','Country','Created'],
+map:r=>[
+r.listing_type,
+r.listing_id,
+r.title,
+r.category,
+r.listing_status,
+r.country_code,
+dateText(r.created_at)
+]
+},
+{
+rpc:'shopdrop_admin_category_overview',
+target:'categories',
+headers:['Marketplace','Category','Subcategory','Listings'],
+map:r=>[
+r.source_type,
+r.category,
+r.subcategory,
+r.listing_count
+]
+},
+{
+rpc:'shopdrop_admin_moderation_queue_readonly',
+target:'moderation',
+headers:['Type','Listing ID','Reason','Status','Priority','Created'],
+map:r=>[
+r.entity_type,
+r.entity_id,
+r.reason,
+r.status,
+r.priority,
+dateText(r.created_at)
+]
+},
+{
+rpc:'shopdrop_admin_list_applications',
+target:'applications',
+headers:['Applicant','Type','Status','Submitted'],
+map:r=>[
+r.applicant_name,
+r.applicant_type,
+r.status,
+dateText(r.submitted_at)
+]
+}
+];
+
+let failures=0;
+
+for(const report of reports){
+try{
+const {data,error}=await supabase.rpc(report.rpc);
+if(error)throw error;
+if(!Array.isArray(data)){
+throw Error('Unexpected report response');
+}
+renderTable(report.target,report.headers,data.map(report.map));
+}catch(error){
+failures++;
+document.getElementById(report.target).textContent=
+'Report unavailable. Please try Refresh marketplace.';
+}
+}
+
+message.textContent=failures
+?failures+' marketplace report(s) unavailable.'
+:'Marketplace records loaded successfully. Read-only.';
+refresh.disabled=false;
+}
+
+refresh.addEventListener('click',async()=>{
+refresh.disabled=true;
+try{
+if(await checkAdmin()){
+await loadMarketplace();
+}
+}finally{
+refresh.disabled=false;
+}
+});
+
+if(await checkAdmin()){
+await loadMarketplace();
+}
+</script>
+</body>
+</html>
