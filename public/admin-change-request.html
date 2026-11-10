@@ -1,2 +1,361 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Website Change Request | Shop&Drop Admin</title></head><body><main><h1>Website Change Request</h1><p>Admin-only workflow for converting approved complaints/suggestions or internal requirements into controlled website changes.</p><form data-shopdrop-form="admin-change-request"><input required placeholder="Change request reference"><input required placeholder="Title"><select required><option value="">Priority</option><option>Low</option><option>Normal</option><option>High</option><option>Urgent</option></select><textarea required placeholder="Requested change"></textarea><textarea placeholder="Reason / source complaint reference"></textarea><button type="submit">Create Website Change Request</button></form></main><script src="common.js"></script>
-<script src="v26-consolidated.js"></script><script src="v26-bridge.js"></script></body></html>
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Website Change Requests | Shop&amp;Drop Admin</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;
+ background:#f3f5f8;
+ color:#17202a;
+ font:16px Arial,sans-serif;
+ line-height:1.5;
+}
+main{
+ max-width:800px;
+ margin:auto;
+ padding:20px 14px 40px;
+}
+h1{font-size:clamp(25px,5vw,36px)}
+a{color:#0f766e}
+.panel{
+ background:#fff;
+ border:1px solid #e2e8f0;
+ border-radius:12px;
+ padding:20px;
+ margin:16px 0;
+}
+.notice{
+ background:#eef2ff;
+ padding:14px;
+ border-radius:9px;
+}
+.warning{
+ background:#fff7ed;
+ padding:14px;
+ border-radius:9px;
+}
+label{
+ display:block;
+ font-weight:600;
+ margin-top:15px;
+}
+input,select,textarea{
+ display:block;
+ width:100%;
+ padding:12px;
+ margin-top:6px;
+ border:1px solid #cbd5e1;
+ border-radius:8px;
+ font:inherit;
+}
+textarea{min-height:110px}
+button{
+ background:#0f766e;
+ color:white;
+ border:0;
+ border-radius:8px;
+ padding:12px 18px;
+ margin-top:18px;
+ font:inherit;
+ cursor:pointer;
+}
+button:disabled{opacity:.6}
+.message{
+ padding:12px;
+ border-radius:8px;
+ margin-top:15px;
+ background:#eef2ff;
+}
+.success{
+ background:#ecfdf5;
+ color:#065f46;
+}
+.error{
+ background:#fef2f2;
+ color:#991b1b;
+}
+#protected[hidden]{display:none}
+</style>
+</head>
+<body>
+<main>
+
+<a href="./admin.html">← Admin Control Centre</a>
+
+<h1>Website Change Requests</h1>
+
+<div id="access" class="notice" role="status">
+Verifying administrator access...
+</div>
+
+<div id="protected" hidden>
+
+<p class="warning">
+<strong>Protected administrator workflow.</strong>
+Submitting a request records a proposed website
+change for review. It does not automatically
+change website files, deploy code or publish
+anything to the live website.
+</p>
+
+<section class="panel">
+<h2>Create Website Change Request</h2>
+
+<form id="changeRequestForm">
+
+<label for="reference">
+Change request reference
+</label>
+<input
+ id="reference"
+ name="reference"
+ maxlength="80"
+ pattern="[A-Za-z0-9_-]+"
+ placeholder="CR-001"
+ required
+>
+
+<label for="title">
+Title
+</label>
+<input
+ id="title"
+ name="title"
+ minlength="5"
+ maxlength="200"
+ placeholder="Short description of the change"
+ required
+>
+
+<label for="priority">
+Priority
+</label>
+<select id="priority" name="priority" required>
+<option value="">Select priority</option>
+<option value="low">Low</option>
+<option value="normal">Normal</option>
+<option value="high">High</option>
+<option value="urgent">Urgent</option>
+</select>
+
+<label for="requestedChange">
+Requested change
+</label>
+<textarea
+ id="requestedChange"
+ name="requestedChange"
+ minlength="20"
+ maxlength="5000"
+ placeholder="Describe the requested website change"
+ required
+></textarea>
+
+<label for="reason">
+Reason or source complaint reference
+</label>
+<textarea
+ id="reason"
+ name="reason"
+ maxlength="2000"
+ placeholder="Optional explanation or related reference"
+></textarea>
+
+<button id="submitButton" type="submit">
+Submit Change Request
+</button>
+
+</form>
+
+<div
+ id="result"
+ class="message"
+ role="status"
+ aria-live="polite"
+ hidden
+></div>
+
+</section>
+
+<section class="panel">
+<h2>Change Management Rules</h2>
+
+<p>
+All website changes must be reviewed before
+implementation. Existing marketplace,
+payment, registration and fulfilment functions
+must be preserved.
+</p>
+
+<p>
+Only approved changes should be implemented
+on the designated integration branch.
+</p>
+
+<p>
+The protected main branch and original
+website archive must remain unchanged.
+</p>
+</section>
+
+</div>
+</main>
+
+<script type="module">
+
+import {createClient} from
+'https://esm.sh/@supabase/supabase-js@2';
+
+const supabase=createClient(
+'https://dtkdvvxpwonywtsgqmdx.supabase.co',
+'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q',
+{
+ auth:{
+  persistSession:true,
+  autoRefreshToken:true,
+  detectSessionInUrl:true
+ }
+}
+);
+
+const access=document.getElementById('access');
+const protectedArea=document.getElementById('protected');
+const form=document.getElementById('changeRequestForm');
+const submitButton=document.getElementById('submitButton');
+const result=document.getElementById('result');
+
+function deny(reason){
+
+ protectedArea.hidden=true;
+ access.hidden=false;
+ access.replaceChildren();
+
+ access.append(document.createTextNode(reason+' '));
+
+ const link=document.createElement('a');
+ link.href='./admin-login.html';
+ link.textContent='Administrator Sign In';
+ access.append(link);
+}
+
+async function checkAdmin(){
+
+ const {data:userData,error:userError}=
+ await supabase.auth.getUser();
+
+ if(userError||!userData?.user){
+  deny('Administrator sign-in required.');
+  return false;
+ }
+
+ const {data:allowed,error:adminError}=
+ await supabase.rpc('shopdrop_is_active_admin');
+
+ if(adminError||allowed!==true){
+  deny('Administrator access denied or unavailable.');
+  return false;
+ }
+
+ access.hidden=true;
+ protectedArea.hidden=false;
+ return true;
+}
+
+function showResult(text,kind){
+
+ result.textContent=text;
+ result.className='message '+kind;
+ result.hidden=false;
+}
+
+form.addEventListener('submit',async event=>{
+
+ event.preventDefault();
+
+ if(submitButton.disabled)return;
+
+ submitButton.disabled=true;
+ result.hidden=true;
+
+ try{
+
+  if(!await checkAdmin()){
+   throw Error('Administrator verification required.');
+  }
+
+  const reference=
+   document.getElementById('reference')
+   .value.trim().toUpperCase();
+
+  const title=
+   document.getElementById('title')
+   .value.trim();
+
+  const priority=
+   document.getElementById('priority')
+   .value;
+
+  const requestedChange=
+   document.getElementById('requestedChange')
+   .value.trim();
+
+  const reason=
+   document.getElementById('reason')
+   .value.trim();
+
+  if(
+   reference.length<4||
+   title.length<5||
+   requestedChange.length<20
+  ){
+   throw Error('Complete all required fields.');
+  }
+
+  const {data,error}=await supabase.rpc(
+   'shopdrop_admin_create_website_change_request',
+   {
+    p_reference:reference,
+    p_title:title,
+    p_priority:priority,
+    p_requested_change:requestedChange,
+    p_reason:reason||null
+   }
+  );
+
+  if(error)throw error;
+
+  if(!data||data.status!=='submitted'){
+   throw Error('Unexpected submission response.');
+  }
+
+  showResult(
+   'Website change request submitted successfully. Reference: '+
+   data.reference,
+   'success'
+  );
+
+  form.reset();
+
+ }catch(error){
+
+  showResult(
+   error?.message||
+   'Unable to submit website change request.',
+   'error'
+  );
+
+ }finally{
+  submitButton.disabled=false;
+ }
+});
+
+if(await checkAdmin()){
+ document.getElementById('priority').value='normal';
+}
+
+</script>
+</body>
+</html>
