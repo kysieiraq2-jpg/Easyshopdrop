@@ -56,6 +56,8 @@ relevant dispute.
 <input id="disputeId" type="text"
  placeholder="Existing dispute UUID" required>
 
+<p id="selectedDispute" class="muted"></p>
+
 <label for="evidenceType">Evidence type</label>
 <select id="evidenceType" required>
 <option value="">Select evidence type</option>
@@ -156,6 +158,8 @@ const uploadMessage=document.getElementById('uploadMessage');
 const refresh=document.getElementById('refresh');
 const reportMessage=document.getElementById('reportMessage');
 const rows=document.getElementById('evidenceRows');
+const disputeInput=document.getElementById('disputeId');
+const selectedDispute=document.getElementById('selectedDispute');
 
 function deny(reason){
 protectedArea.hidden=true;
@@ -192,6 +196,33 @@ return userData.user;
 
 function validUuid(value){
 return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
+
+async function loadSelectedDispute(){
+const params=new URLSearchParams(window.location.search);
+const id=(params.get('dispute_id')||'').trim().toLowerCase();
+
+if(!id)return;
+
+if(!validUuid(id)){
+selectedDispute.textContent='Invalid dispute reference in link.';
+return;
+}
+
+const {data:permitted,error}=await supabase.rpc(
+'shopdrop_can_upload_dispute_evidence',{
+p_dispute_id:id
+});
+
+if(error||permitted!==true){
+selectedDispute.textContent=
+'Selected dispute not found or access denied.';
+return;
+}
+
+disputeInput.value=id;
+selectedDispute.textContent=
+'Selected dispute loaded automatically: '+id;
 }
 
 function dateText(value){
@@ -340,7 +371,7 @@ try{
 const user=await checkAdmin();
 if(!user)throw Error('Administrator verification required.');
 
-const disputeId=document.getElementById('disputeId').value.trim().toLowerCase();
+const disputeId=disputeInput.value.trim().toLowerCase();
 const evidenceType=document.getElementById('evidenceType').value;
 const description=document.getElementById('description').value.trim();
 const file=document.getElementById('evidenceFile').files[0];
@@ -433,6 +464,7 @@ if(await checkAdmin())await loadEvidence();
 });
 
 if(await checkAdmin()){
+await loadSelectedDispute();
 await loadEvidence();
 }
 </script>
