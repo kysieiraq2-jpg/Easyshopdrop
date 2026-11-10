@@ -1,6 +1,354 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fulfilment Deadlines & Exceptions | Shop&Drop</title></head><body><main><h1>Fulfilment Deadlines & Exceptions</h1>
-<p>Operational deadlines feed the existing Admin exception process.</p>
-<ul><li>Product: payment confirmed → seller acknowledgement/preparation deadline → courier handover deadline.</li><li>Service: booking confirmed → provider travel/arrival deadline → no-show exception if not verified.</li><li>Dispatch: booking confirmed → departure/start deadline → overdue exception if not started.</li></ul>
-<table><thead><tr><th>Reference</th><th>Milestone</th><th>Due</th><th>Status</th><th>Exception</th></tr></thead><tbody><tr><td colspan="5">Live deadlines load from the protected backend.</td></tr></tbody></table>
-</main><script src="common.js"></script>
-<script src="v26-consolidated.js"></script><script src="v26-bridge.js"></script></body></html>
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fulfilment Deadlines | Shop&amp;Drop Admin</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;
+ background:#f3f5f8;
+ color:#17202a;
+ font:16px Arial,sans-serif;
+ line-height:1.5;
+}
+main{
+ max-width:1100px;
+ margin:auto;
+ padding:20px 14px 40px;
+}
+h1{font-size:clamp(25px,5vw,36px)}
+h2{font-size:21px}
+a{color:#0f766e}
+.panel{
+ background:#fff;
+ border:1px solid #e2e8f0;
+ border-radius:12px;
+ padding:18px;
+ margin:16px 0;
+}
+.notice{
+ background:#eef2ff;
+ padding:14px;
+ border-radius:9px;
+}
+.warning{
+ background:#fff7ed;
+ padding:14px;
+ border-radius:9px;
+}
+.muted{color:#64748b}
+button{
+ background:#0f766e;
+ color:#fff;
+ border:0;
+ border-radius:8px;
+ padding:12px 18px;
+ font:inherit;
+ cursor:pointer;
+}
+button:disabled{opacity:.6}
+.tablewrap{overflow-x:auto}
+table{
+ width:100%;
+ border-collapse:collapse;
+ font-size:14px;
+}
+th,td{
+ text-align:left;
+ padding:11px;
+ border-bottom:1px solid #e2e8f0;
+ vertical-align:top;
+ overflow-wrap:anywhere;
+}
+th{background:#f8fafc}
+#protected[hidden]{display:none}
+</style>
+</head>
+<body>
+<main>
+
+<a href="./admin.html">← Admin Control Centre</a>
+
+<h1>Fulfilment Deadlines &amp; Exceptions</h1>
+
+<div id="access" class="notice" role="status">
+Verifying administrator access...
+</div>
+
+<div id="protected" hidden>
+
+<p class="warning">
+<strong>Read-only fulfilment monitoring.</strong>
+This page displays existing booking and shipment
+records. It does not change deadlines, create
+courier bookings, verify delivery or release
+seller payments.
+</p>
+
+<button id="refresh" type="button">
+Refresh fulfilment records
+</button>
+
+<p id="message" role="status" aria-live="polite"></p>
+
+<section class="panel">
+<h2>Fulfilment &amp; Booking Records</h2>
+
+<p class="muted">
+Recent service bookings, dispatch bookings
+and shipments with their recorded statuses.
+Detailed deadline calculations require
+verified backend milestone data.
+</p>
+
+<div class="tablewrap">
+<table>
+<thead>
+<tr>
+<th>Reference</th>
+<th>Type</th>
+<th>Status</th>
+<th>Payment Status</th>
+<th>Created</th>
+<th>Updated</th>
+</tr>
+</thead>
+
+<tbody id="fulfilmentRows">
+<tr>
+<td colspan="6">
+Waiting for administrator verification.
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section class="panel">
+<h2>Existing Fulfilment Requirements</h2>
+
+<p>
+<strong>Products:</strong>
+Payment confirmation, seller preparation,
+courier handover, transit and verified delivery.
+</p>
+
+<p>
+<strong>Services:</strong>
+Booking confirmation, provider travel,
+arrival verification and completion.
+</p>
+
+<p>
+<strong>Dispatch:</strong>
+Booking confirmation, provider departure,
+transport progress and verified arrival.
+</p>
+
+<p class="muted">
+Overdue warnings and exception decisions
+must be based on authoritative deadlines
+and event timestamps. This page does not
+invent deadlines or automatically mark
+any transaction as overdue.
+</p>
+</section>
+
+<section class="panel">
+<h2>Related Administrator Reports</h2>
+<p><a href="./operations.html">Operations Overview</a></p>
+<p><a href="./admin-tracking.html">Transaction Tracking</a></p>
+<p><a href="./inventory-reservations.html">Inventory Reservations</a></p>
+</section>
+
+</div>
+</main>
+
+<script type="module">
+
+import {createClient} from
+'https://esm.sh/@supabase/supabase-js@2';
+
+const supabase=createClient(
+'https://dtkdvvxpwonywtsgqmdx.supabase.co',
+'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q',
+{
+ auth:{
+  persistSession:true,
+  autoRefreshToken:true,
+  detectSessionInUrl:true
+ }
+}
+);
+
+const access=document.getElementById('access');
+const protectedArea=document.getElementById('protected');
+const message=document.getElementById('message');
+const refresh=document.getElementById('refresh');
+const rows=document.getElementById('fulfilmentRows');
+
+function deny(reason){
+
+ protectedArea.hidden=true;
+ access.hidden=false;
+ access.replaceChildren();
+
+ access.append(document.createTextNode(reason+' '));
+
+ const link=document.createElement('a');
+ link.href='./admin-login.html';
+ link.textContent='Administrator Sign In';
+ access.append(link);
+}
+
+async function checkAdmin(){
+
+ const {data:userData,error:userError}=
+ await supabase.auth.getUser();
+
+ if(userError||!userData?.user){
+  deny('Administrator sign-in required.');
+  return false;
+ }
+
+ const {data:allowed,error:adminError}=
+ await supabase.rpc('shopdrop_is_active_admin');
+
+ if(adminError||allowed!==true){
+  deny('Administrator access denied or unavailable.');
+  return false;
+ }
+
+ access.hidden=true;
+ protectedArea.hidden=false;
+ return true;
+}
+
+function dateText(value){
+
+ if(!value)return '—';
+
+ const date=new Date(value);
+
+ return Number.isNaN(date.getTime())
+ ?'—':date.toLocaleString('en-ZA');
+}
+
+function display(value){
+
+ return value===null||
+ value===undefined||
+ value===''
+ ?'—':String(value);
+}
+
+function addCell(row,value){
+
+ const cell=document.createElement('td');
+ cell.textContent=display(value);
+ row.appendChild(cell);
+}
+
+function render(records){
+
+ rows.replaceChildren();
+
+ if(records.length===0){
+
+  const tr=document.createElement('tr');
+  const td=document.createElement('td');
+
+  td.colSpan=6;
+  td.textContent='No fulfilment records available.';
+
+  tr.appendChild(td);
+  rows.appendChild(tr);
+  return;
+ }
+
+ for(const record of records){
+
+  const tr=document.createElement('tr');
+
+  addCell(tr,record.record_id);
+  addCell(tr,record.record_type);
+  addCell(tr,record.record_status);
+  addCell(tr,record.payment_status);
+  addCell(tr,dateText(record.created_at));
+  addCell(tr,dateText(record.updated_at));
+
+  rows.appendChild(tr);
+ }
+}
+
+async function loadFulfilment(){
+
+ refresh.disabled=true;
+ message.textContent='Loading fulfilment records...';
+
+ try{
+
+  const {data,error}=await supabase.rpc(
+   'shopdrop_admin_fulfilment_overview'
+  );
+
+  if(error)throw error;
+
+  if(!Array.isArray(data)){
+   throw Error('Invalid fulfilment response.');
+  }
+
+  render(data);
+
+  message.textContent=
+   'Fulfilment records loaded successfully. Read-only.';
+
+ }catch(error){
+
+  rows.replaceChildren();
+
+  const tr=document.createElement('tr');
+  const td=document.createElement('td');
+
+  td.colSpan=6;
+  td.textContent=
+   'Fulfilment records unavailable. Please refresh.';
+
+  tr.appendChild(td);
+  rows.appendChild(tr);
+
+  message.textContent=
+   'Unable to load fulfilment records.';
+
+ }finally{
+  refresh.disabled=false;
+ }
+}
+
+refresh.addEventListener('click',async()=>{
+
+ refresh.disabled=true;
+
+ try{
+
+  if(await checkAdmin()){
+   await loadFulfilment();
+  }
+
+ }finally{
+  refresh.disabled=false;
+ }
+
+});
+
+if(await checkAdmin()){
+ await loadFulfilment();
+}
+
+</script>
+</body>
+</html>
