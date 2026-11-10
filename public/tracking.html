@@ -1,11 +1,734 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Track My Order | Shop&Drop</title><style>*{box-sizing:border-box}body{margin:0;font:16px Arial;background:#f4f6f8;color:#17202a}.wrap{max-width:850px;margin:auto;padding:22px}.card{background:#fff;padding:22px;border-radius:14px;margin:16px 0}.notice{background:#eef2ff;padding:15px;border-radius:10px}input,button{font:inherit;padding:12px;border-radius:8px;border:1px solid #cbd5e1}input{width:100%;margin:8px 0}button{background:#0f766e;color:#fff;border:0}.steps{display:grid;gap:9px;margin-top:18px}.step{padding:12px;border-left:5px solid #cbd5e1;background:#f8fafc}.muted{color:#64748b}</style></head><body><main class=wrap><a href="./index.html">← Shop&Drop</a><h1>Track My Order</h1><p class="muted">Your <b>Shop&Drop Order Number</b> identifies your overall order. If an order contains items from more than one seller, each parcel can have its own courier tracking reference.</p><div class=notice><b>Transaction tracking:</b> follow your Shop&Drop order from payment confirmation through seller preparation, courier handover, delivery and completion.</div><section class=card><label for=orderRef><b>Shop&Drop Order Number</b></label><input id=orderRef placeholder="e.g. SD-2026-00001234"><button id=track>Track order</button><p id=message role=status></p></section><section class=card><h2>Order journey</h2><p class=muted>When live tracking is connected, completed stages will be marked, the current stage highlighted, and future stages shown as upcoming. Latest date/time and courier tracking will appear where available.</p><div class=steps><div class=step>1. Order placed</div><div class=step>2. Payment confirmed</div><div class=step>3. Seller notified / preparing order</div><div class=step>4. Courier selected / booked</div><div class=step>5. Handed to courier</div><div class=step>6. In transit</div><div class=step>7. Delivered</div><div class=step>8. Buyer may confirm received or report a problem</div><div class=step>9. Completion confirmed automatically after the protection period if no qualifying dispute is open</div><div class=step>10. Order completed</div></div><p class=muted>Only information appropriate to your account is shown. Seller banking details and customer card data are never exposed. Multi-seller orders show each parcel separately under the same Shop&Drop order.</p></section></main><script src="./common.js"></script>
-<script src="./v26-consolidated.js"></script><script>track.onclick=async()=>{const id=orderRef.value.trim();if(!id){message.textContent='Please enter your Shop&Drop Order Number.';orderRef.focus();return}if(ShopDrop.isStatic){message.textContent=`Tracking preview: live status for order “${id}” will be available after the Shop&Drop backend and courier integrations are connected.`;return}try{const d=await ShopDrop.api('/api/orders/'+encodeURIComponent(id));message.textContent='Order status: '+(d.order?.status||'available in your account')}catch(e){message.textContent=e.message}}</script><script src="v26-bridge.js"></script>
-<section id="v263TrackingResilience">
-  <!-- V26_3_TRACKING_RESILIENCE_UI -->
-  <h2>Tracking Source & Status</h2>
-  <p>Tracking priority: Courier webhook/API → scheduled courier polling if updates are stale/unavailable → verified manual fallback if the carrier API is unavailable.</p>
-  <table><thead><tr><th>Time</th><th>Status</th><th>Location</th><th>Source</th><th>Carrier reference</th></tr></thead><tbody id="v263TrackingEvents"><tr><td colspan="5">Enter or open a Shop&Drop shipment to view its tracking timeline.</td></tr></tbody></table>
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Track My Order | Shop&Drop</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font:16px Arial,sans-serif;background:#f4f6f8;color:#17202a;line-height:1.5}
+.wrap{max-width:980px;margin:auto;padding:18px}
+.card{background:#fff;padding:20px;border-radius:14px;margin:16px 0;border:1px solid #e2e8f0}
+.notice{background:#eef2ff;padding:15px;border-radius:10px}
+input,button{font:inherit;padding:12px;border-radius:8px;border:1px solid #cbd5e1}
+input{width:100%;margin:8px 0}
+button{background:#0f766e;color:#fff;border:0;cursor:pointer}
+button:disabled{opacity:.6;cursor:wait}
+a{color:#0f766e}
+.muted{color:#64748b}
+.steps{display:grid;gap:9px;margin-top:18px}
+.step{padding:12px;border-left:5px solid #cbd5e1;background:#f8fafc}
+.step.done{border-left-color:#16a34a;background:#f0fdf4}
+.step.current{border-left-color:#0f766e;background:#ccfbf1;font-weight:bold}
+.step.upcoming{color:#64748b}
+.seller{border:1px solid #cbd5e1;border-radius:12px;padding:15px;margin:14px 0}
+.seller h3{margin:0 0 10px}
+.parcel{background:#f8fafc;padding:14px;border-radius:10px;margin:10px 0}
+.parcel p{margin:7px 0;overflow-wrap:anywhere}
+.item{padding:9px 0;border-bottom:1px solid #e2e8f0}
+.status{padding:10px;background:#f1f5f9;border-radius:8px;margin:10px 0}
+.verified{background:#dcfce7}
+.warning{background:#fff7ed}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:10px;border-bottom:1px solid #e2e8f0;vertical-align:top;overflow-wrap:anywhere}
+.table-wrap{overflow-x:auto}
+.hidden{display:none!important}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+#message{overflow-wrap:anywhere}
+@media(max-width:650px){
+.wrap{padding:12px}
+.card{padding:15px}
+table{font-size:12px}
+th,td{padding:7px}
+}
+</style>
+</head>
+<body>
+<main class="wrap">
+<a href="./index.html">← Shop&Drop</a>
+<h1>Track My Order</h1>
+
+<p class="muted">
+Your <b>Shop&Drop Order Number</b> identifies your complete order.
+If you buy from more than one seller, each seller's shipment
+can have its own courier tracking number.
+</p>
+
+<div class="notice">
+<b>Transaction tracking:</b>
+Follow your order from payment confirmation through seller preparation,
+courier collection, transport, delivery and verification.
+</div>
+
+<section class="card">
+<label for="orderRef">
+<b>Shop&Drop Order Number</b>
+</label>
+<input id="orderRef"
+placeholder="Enter your Shop&Drop order reference"
+autocomplete="off">
+<button id="track" type="button">Track order</button>
+<p id="message" role="status" aria-live="polite"></p>
+<p class="muted">
+Sign in to view your own orders.
+Courier tracking numbers appear automatically when supplied.
+</p>
 </section>
 
-<section class="v263PodLink"><p><a href="proof-of-delivery.html">Proof of Delivery</a></p></section>
-<script defer src="shopdrop-buyer-language.js"></script></body></html>
+<section class="card hidden" id="orderSummary">
+<h2>Order information</h2>
+<div id="orderInformation"></div>
+</section>
+
+<section class="card" id="journeyPanel">
+<h2>Order journey</h2>
+<p class="muted" id="journeyNotice">
+Completed stages will be marked when confirmed by Shop&Drop records.
+Future stages remain upcoming.
+</p>
+<div id="journeySteps" class="steps"></div>
+</section>
+
+<section class="card hidden" id="sellerPanel">
+<h2>Items and courier shipments</h2>
+<p class="muted">
+Items are grouped by the seller's public Shop&Drop name.
+Seller contact and banking details are private.
+</p>
+<div id="sellerSections"></div>
+</section>
+
+<section class="card" id="v263TrackingResilience">
+<h2>Tracking Source &amp; Status</h2>
+<p class="muted">
+Tracking updates are supplied by recorded courier events and
+Shop&Drop shipment records. If a courier has not supplied a
+new scan, the last verified update remains visible.
+</p>
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>Time</th>
+<th>Status</th>
+<th>Location</th>
+<th>Source</th>
+<th>Carrier reference</th>
+</tr>
+</thead>
+<tbody id="v263TrackingEvents">
+<tr>
+<td colspan="5">
+Enter your Shop&Drop order number to view tracking history.
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section class="card">
+<h2>Delivery and Proof of Delivery</h2>
+<p>
+A courier's reported delivery does not automatically mean that
+Shop&Drop has verified delivery.
+</p>
+<p>
+Delivery verification may involve courier evidence,
+the authorised scanner process and the buyer's six-digit PIN.
+</p>
+<div id="deliverySummary" role="status">
+Delivery information will appear after loading your order.
+</div>
+<div class="actions">
+<a href="./proof-of-delivery.html">
+Proof of Delivery information
+</a>
+<a href="./report-listing.html">
+Report a problem
+</a>
+</div>
+</section>
+
+<p class="muted">
+Only information authorised for your account is displayed.
+Shop&Drop does not expose private seller contact details,
+banking information or buyer payment-card details.
+</p>
+</main>
+
+<script src="./common.js"></script>
+<script src="./v26-consolidated.js"></script>
+<script>
+(function(){
+'use strict';
+
+const ENDPOINT='https://dtkdvvxpwonywtsgqmdx.supabase.co';
+const KEY='sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';
+
+const $=id=>document.getElementById(id);
+const input=$('orderRef');
+const button=$('track');
+const message=$('message');
+
+let clientPromise=null;
+let requestNumber=0;
+
+const stages=[
+ 'Order placed',
+ 'Payment confirmed',
+ 'Seller notified / preparing order',
+ 'Courier selected / booked',
+ 'Handed to courier',
+ 'In transit',
+ 'Delivered — courier reported',
+ 'Buyer confirmation / problem reporting',
+ 'Delivery verification and completion safeguards',
+ 'Order completed'
+];
+
+function node(tag,text,className){
+ const el=document.createElement(tag);
+ if(text!==undefined&&text!==null){
+  el.textContent=String(text);
+ }
+ if(className)el.className=className;
+ return el;
+}
+
+function dateText(value){
+ if(!value)return 'Not yet recorded';
+ const d=new Date(value);
+ return Number.isNaN(d.getTime())
+  ?'Date unavailable'
+  :d.toLocaleString('en-ZA',{
+   dateStyle:'medium',
+   timeStyle:'short'
+  });
+}
+
+function valueText(value){
+ return value===null||value===undefined||value===''
+  ?'Not yet available'
+  :String(value);
+}
+
+function appendLine(parent,label,value){
+ const p=node('p');
+ const strong=node('strong',label+': ');
+ p.append(strong,document.createTextNode(valueText(value)));
+ parent.append(p);
+}
+
+function show(id,visible){
+ $(id).classList.toggle('hidden',!visible);
+}
+
+function renderStages(currentStage){
+ const container=$('journeySteps');
+ container.replaceChildren();
+
+ stages.forEach((name,index)=>{
+  const number=index+1;
+  const state=currentStage>0&&number<currentStage
+   ?'done'
+   :number===currentStage?'current':'upcoming';
+
+  const step=node(
+   'div',
+   number+'. '+name,
+   'step '+state
+  );
+
+  container.append(step);
+ });
+}
+
+function eventStage(event){
+ const n=Number(event?.stage_number);
+ return Number.isInteger(n)&&n>=1&&n<=10?n:0;
+}
+
+function normalized(value){
+ return String(value||'').trim().toLowerCase();
+}
+
+function isPaid(value){
+ return [
+  'paid','completed','succeeded','successful',
+  'confirmed','captured'
+ ].includes(normalized(value));
+}
+
+function hasDeliveryVerification(shipment,confirmations){
+ if(shipment?.delivery_verified_at)return true;
+ return confirmations.some(c=>
+  c.shipment_id===shipment?.id&&
+  Boolean(c.confirmed_at)
+ );
+}
+
+function calculateStage(data){
+ const events=Array.isArray(data.tracking_events)
+  ?data.tracking_events:[];
+ const shipments=Array.isArray(data.shipments)
+  ?data.shipments:[];
+ const confirmations=Array.isArray(data.delivery_confirmations)
+  ?data.delivery_confirmations:[];
+
+ let stage=1;
+
+ if(isPaid(data.payment_status))stage=2;
+
+ for(const event of events){
+  stage=Math.max(stage,eventStage(event));
+ }
+
+ if(shipments.some(s=>s.tracking_number))stage=Math.max(stage,4);
+ if(shipments.some(s=>s.dispatched_at))stage=Math.max(stage,5);
+
+ const courierUpdates=Array.isArray(data.courier_updates)
+  ?data.courier_updates:[];
+
+ if(courierUpdates.some(e=>[
+  'in_transit','in transit','out_for_delivery',
+  'out for delivery'
+ ].includes(normalized(e.status)))){
+  stage=Math.max(stage,6);
+ }
+
+ if(shipments.some(s=>s.delivered_at)||
+    courierUpdates.some(e=>normalized(e.status)==='delivered')){
+  stage=Math.max(stage,7);
+ }
+
+ if(shipments.length&&shipments.every(s=>
+  hasDeliveryVerification(s,confirmations)
+ )){
+  stage=Math.max(stage,9);
+ }
+
+ if(['completed','complete'].includes(
+  normalized(data.order_status)
+  )){
+  stage=10;
+ }
+
+ // Do not infer delivery verification from courier scans.
+ // Do not infer completion from elapsed time.
+ return Math.min(10,stage);
+}
+
+async function getClient(){
+ if(!clientPromise){
+  clientPromise=import(
+   'https://esm.sh/@supabase/supabase-js@2'
+  ).then(({createClient})=>createClient(ENDPOINT,KEY,{
+   auth:{
+    persistSession:true,
+    autoRefreshToken:true,
+    detectSessionInUrl:true
+   }
+  })).catch(error=>{
+   clientPromise=null;
+   throw error;
+  });
+ }
+ return clientPromise;
+}
+
+async function getSnapshot(reference){
+ const client=await getClient();
+ const {data:userResult,error:authError}=
+  await client.auth.getUser();
+
+ if(authError||!userResult?.user?.id){
+  throw Error('Please sign in to track your order.');
+ }
+
+ const {data,error}=await client.rpc(
+  'shopdrop_buyer_tracking_snapshot',
+  {p_order_reference:reference}
+ );
+
+ if(error)throw Error(
+  error.message||'Unable to retrieve order tracking.'
+ );
+
+ if(!data)throw Error(
+  'No order was found for this reference in your account.'
+ );
+
+ return data;
+}
+
+function renderSummary(data){
+ const box=$('orderInformation');
+ box.replaceChildren();
+
+ appendLine(box,'Shop&Drop order',data.order_reference||data.order_id);
+ appendLine(box,'Order date',dateText(data.created_at));
+ appendLine(box,'Order status',data.order_status);
+ appendLine(box,'Payment status',data.payment_status);
+ appendLine(box,'Fulfilment status',data.fulfilment_status);
+
+ show('orderSummary',true);
+}
+
+function sellerName(value){
+ return typeof value==='string'&&value.trim()
+  ?value.trim()
+  :'Shop&Drop seller';
+}
+
+function renderSellers(data){
+ const target=$('sellerSections');
+ target.replaceChildren();
+
+ const items=Array.isArray(data.items)?data.items:[];
+ const shipments=Array.isArray(data.shipments)
+  ?data.shipments:[];
+
+ const groups=new Map();
+
+ // The public alias is used for display only.
+ // Different sellers can choose similar names, so this
+ // is not used for payment or shipment ownership.
+ for(const item of items){
+  const name=sellerName(item.seller_alias);
+  if(!groups.has(name)){
+   groups.set(name,{items:[],shipments:[]});
+  }
+  groups.get(name).items.push(item);
+ }
+
+ for(const shipment of shipments){
+  const name=sellerName(shipment.seller_alias);
+  if(!groups.has(name)){
+   groups.set(name,{items:[],shipments:[]});
+  }
+  groups.get(name).shipments.push(shipment);
+ }
+
+ if(!groups.size){
+  target.textContent='No shipment details have been recorded yet.';
+  show('sellerPanel',true);
+  return;
+ }
+
+ let sellerNumber=0;
+
+ for(const [name,group] of groups){
+  sellerNumber++;
+  const section=node('section',null,'seller');
+
+  section.append(
+   node('h3','Seller '+sellerNumber+': '+name)
+  );
+
+  if(group.items.length){
+   const heading=node('h4','Purchased items');
+   section.append(heading);
+
+   for(const item of group.items){
+    const div=node('div',null,'item');
+    appendLine(div,'Product',item.product_name);
+    appendLine(div,'Item reference',item.listing_reference);
+    appendLine(div,'Quantity',item.quantity);
+    section.append(div);
+   }
+  }
+
+  if(group.shipments.length){
+   section.append(node('h4','Courier shipments'));
+
+   for(const shipment of group.shipments){
+    const parcel=node('div',null,'parcel');
+
+    appendLine(parcel,'Shipment reference',
+     shipment.shipment_reference);
+    appendLine(parcel,'Courier',shipment.courier_name);
+    appendLine(parcel,'Courier tracking number',
+     shipment.tracking_number);
+    appendLine(parcel,'Shipment status',
+     shipment.shipment_status);
+    appendLine(parcel,'Delivery status',
+     shipment.delivery_status);
+    appendLine(parcel,'Dispatched',
+     dateText(shipment.dispatched_at));
+
+    if(shipment.tracking_url){
+     try{
+      const url=new URL(shipment.tracking_url);
+      if(url.protocol==='https:'){
+       const link=node('a','Open courier tracking');
+       link.href=url.href;
+       link.target='_blank';
+       link.rel='noopener noreferrer';
+       parcel.append(link);
+      }
+     }catch(_){}
+    }
+
+    const confirmed=hasDeliveryVerification(
+     shipment,
+     Array.isArray(data.delivery_confirmations)
+      ?data.delivery_confirmations:[]
+    );
+
+    parcel.append(node(
+     'div',
+     confirmed
+      ?'Delivery verification recorded'
+      :shipment.delivered_at
+       ?'Courier delivery reported — verification pending'
+       :'Delivery not yet verified',
+     'status '+(confirmed?'verified':'warning')
+    ));
+
+    section.append(parcel);
+   }
+  }else{
+   section.append(node(
+    'p',
+    'Courier booking and tracking details will appear when available.',
+    'muted'
+   ));
+  }
+
+  target.append(section);
+ }
+
+ show('sellerPanel',true);
+}
+
+function renderEvents(data){
+ const tbody=$('v263TrackingEvents');
+ tbody.replaceChildren();
+
+ const rows=[];
+
+ for(const event of data.tracking_events||[]){
+  rows.push({
+   time:event.event_time,
+   status:event.description||event.status,
+   location:event.location,
+   source:'Shop&Drop order event',
+   reference:'—'
+  });
+ }
+
+ for(const event of data.courier_updates||[]){
+  rows.push({
+   time:event.event_time,
+   status:event.description||event.status,
+   location:event.location,
+   source:'Courier tracking',
+   reference:event.tracking_number
+  });
+ }
+
+ rows.sort((a,b)=>
+  new Date(b.time||0)-new Date(a.time||0)
+ );
+
+ if(!rows.length){
+  const tr=node('tr');
+  const td=node('td','No tracking events recorded yet.');
+  td.colSpan=5;
+  tr.append(td);
+  tbody.append(tr);
+  return;
+ }
+
+ for(const event of rows){
+  const tr=node('tr');
+  for(const value of [
+   dateText(event.time),
+   valueText(event.status),
+   valueText(event.location),
+   event.source,
+   valueText(event.reference)
+  ]){
+   tr.append(node('td',value));
+  }
+  tbody.append(tr);
+ }
+}
+
+function renderDelivery(data){
+ const target=$('deliverySummary');
+ target.replaceChildren();
+
+ const shipments=Array.isArray(data.shipments)
+  ?data.shipments:[];
+ const confirmations=Array.isArray(data.delivery_confirmations)
+  ?data.delivery_confirmations:[];
+
+ if(!shipments.length){
+  target.append(node(
+   'p',
+   'No courier shipment has been recorded yet.',
+   'muted'
+  ));
+  return;
+ }
+
+ for(const shipment of shipments){
+  const div=node('div',null,'status');
+
+  appendLine(
+   div,
+   'Shipment',
+   shipment.shipment_reference||shipment.id
+  );
+
+  const confirmed=hasDeliveryVerification(
+   shipment,confirmations
+  );
+
+  appendLine(
+   div,
+   'Verification',
+   confirmed
+    ?'Verified delivery recorded'
+    :shipment.delivered_at
+     ?'Courier reported delivery; verification pending'
+     :'Not yet verified'
+  );
+
+  if(shipment.delivery_verified_at){
+   appendLine(
+    div,
+    'Verified at',
+    dateText(shipment.delivery_verified_at)
+   );
+  }
+
+  const related=confirmations.filter(c=>
+   c.shipment_id===shipment.id
+  );
+
+  for(const confirmation of related){
+   appendLine(
+    div,
+    'Confirmation method',
+    confirmation.confirmation_method
+   );
+   appendLine(
+    div,
+    'Confirmation time',
+    dateText(confirmation.confirmed_at)
+   );
+  }
+
+  target.append(div);
+ }
+}
+
+function resetView(){
+ show('orderSummary',false);
+ show('sellerPanel',false);
+ renderStages(0);
+
+ $('journeyNotice').textContent=
+  'Completed stages will be marked when confirmed by Shop&Drop records.';
+
+ $('deliverySummary').textContent=
+  'Delivery information will appear after loading your order.';
+
+ const tbody=$('v263TrackingEvents');
+ tbody.replaceChildren();
+
+ const tr=node('tr');
+ const td=node('td','Enter an order reference to view tracking history.');
+ td.colSpan=5;
+ tr.append(td);
+ tbody.append(tr);
+}
+
+async function trackOrder(){
+ const reference=input.value.trim();
+
+ if(!reference){
+  message.textContent='Please enter your Shop&Drop Order Number.';
+  input.focus();
+  return;
+ }
+
+ const request=++requestNumber;
+ button.disabled=true;
+ message.textContent='Loading your order tracking…';
+ resetView();
+
+ try{
+  const data=await getSnapshot(reference);
+
+  if(request!==requestNumber)return;
+
+  renderSummary(data);
+  renderSellers(data);
+  renderEvents(data);
+  renderDelivery(data);
+
+  const stage=calculateStage(data);
+  renderStages(stage);
+
+  $('journeyNotice').textContent=
+   'Order progress is based on recorded events. '+
+   'Individual parcels may be at different stages.';
+
+  message.textContent=
+   'Tracking information loaded. '+
+   'Refresh the order to check for newer courier updates.';
+
+ }catch(error){
+  if(request===requestNumber){
+   message.textContent=
+    error?.message||'Tracking information unavailable.';
+  }
+ }finally{
+  if(request===requestNumber){
+   button.disabled=false;
+  }
+ }
+}
+
+button.addEventListener('click',trackOrder);
+
+input.addEventListener('keydown',event=>{
+ if(event.key==='Enter'){
+  event.preventDefault();
+  trackOrder();
+ }
+});
+
+const supplied=new URLSearchParams(location.search);
+const reference=supplied.get('order')||
+ supplied.get('orderRef')||
+ supplied.get('ref')||'';
+
+resetView();
+
+if(reference){
+ input.value=reference;
+ trackOrder();
+}
+
+})();
+</script>
+
+<script src="./v26-bridge.js"></script>
+
+<section class="v263PodLink hidden">
+<p>
+<a href="./proof-of-delivery.html">
+Proof of Delivery
+</a>
+</p>
+</section>
+
+<script defer src="./shopdrop-buyer-language.js"></script>
+</body>
+</html>
