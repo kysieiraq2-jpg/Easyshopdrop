@@ -1,6 +1,215 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Payout Statement | Shop&Drop</title></head><body><main><h1>Payout Statement</h1>
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Payout Statement | Shop&amp;Drop</title>
+<style>
+body{font-family:Arial,sans-serif;margin:0;background:#f3f5f8;color:#17202a;line-height:1.5}
+header{background:#101827;color:white;padding:18px}
+header a{color:white;margin-right:18px}
+main{max-width:1050px;margin:24px auto;padding:0 16px 40px}
+.panel{background:white;padding:20px;border-radius:12px;margin:16px 0}
+.muted{color:#64748b}
+button{background:#0f766e;color:white;border:0;border-radius:7px;padding:10px 16px;cursor:pointer}
+button:disabled{opacity:.6;cursor:wait}
+.table-wrap{width:100%;overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:720px}
+th,td{padding:12px;text-align:left;border-bottom:1px solid #e2e8f0;vertical-align:top}
+th{background:#f1f5f9}
+small{display:block;color:#64748b}
+a{color:#0f766e}
+</style>
+</head>
+<body>
+<header>
+<a href="index.html">Shop&amp;Drop</a>
+<a href="account.html">My Account</a>
+</header>
+<main>
+<h1>Payout Statement</h1>
 <p>Seller/provider proceeds and payout status.</p>
-<table><thead><tr><th>SD-POT</th><th>Order/Booking</th><th>Proceeds</th><th>Status</th><th>Reason/Hold</th><th>Paid/Adjusted</th></tr></thead><tbody><tr><td colspan="6">Sign in to load payout records.</td></tr></tbody></table>
-<p>Status: Pending → Eligible → Held due to dispute (if applicable) → Processing → Paid / Adjusted-Refunded.</p>
-</main><script src="common.js"></script>
-<script src="v26-consolidated.js"></script><script src="v26-bridge.js"></script></body></html>
+<section class="panel">
+<p id="payoutMessage" role="status" aria-live="polite">Sign in to load payout records.</p>
+<button id="refreshPayouts" type="button" hidden>Refresh payouts</button>
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th scope="col">SD-POT</th>
+<th scope="col">Order/Booking</th>
+<th scope="col">Proceeds</th>
+<th scope="col">Status</th>
+<th scope="col">Reason/Hold</th>
+<th scope="col">Paid/Adjusted</th>
+</tr>
+</thead>
+<tbody id="payoutRows">
+<tr><td colspan="6">Sign in to load payout records.</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+<p class="muted">Status: Pending → Eligible → Held due to dispute (if applicable) → Processing → Paid / Adjusted-Refunded.</p>
+<p class="muted">The status shown is the recorded Shop&amp;Drop status, not an independent bank confirmation. Funds are released only through the approved provider after the applicable delivery or arrival verification.</p>
+<p><a href="account.html">Return to My Account</a></p>
+</main>
+<script src="common.js"></script>
+<script src="v26-consolidated.js"></script>
+<script src="v26-bridge.js"></script>
+<script type="module">
+import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
+
+// Browser uses only the publishable key; RLS controls account access.
+// This page never executes payout, hold, approval or refund operations.
+const supabase=createClient(
+ 'https://dtkdvvxpwonywtsgqmdx.supabase.co',
+ 'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q',
+ {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}
+);
+const message=document.getElementById('payoutMessage');
+const rows=document.getElementById('payoutRows');
+const refresh=document.getElementById('refreshPayouts');
+const uuid=/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+
+function formatDate(value){
+ if(!value)return 'Not recorded';
+ const date=new Date(value);
+ return Number.isNaN(date.getTime())?'Date unavailable':date.toLocaleString('en-ZA');
+}
+function money(value){
+ if(value===null||value===undefined||!Number.isFinite(Number(value)))return 'Not recorded';
+ return new Intl.NumberFormat('en-ZA',{style:'currency',currency:'ZAR'}).format(Number(value));
+}
+function label(value,fallback='Not recorded'){
+ return value===null||value===undefined||value===''?fallback:String(value).replace(/_/g,' ');
+}
+function clearRows(text){
+ rows.replaceChildren();
+ const tr=document.createElement('tr');
+ const td=document.createElement('td');
+ td.colSpan=6;
+ td.textContent=text;
+ tr.append(td);
+ rows.append(tr);
+}
+function cell(tr,value){
+ const td=document.createElement('td');
+ td.textContent=String(value);
+ tr.append(td);
+ return td;
+}
+function latestHoldMap(holds,key){
+ const map=new Map();
+ for(const hold of (holds||[])){
+  if(!map.has(hold[key]))map.set(hold[key],hold);
+ }
+ return map;
+}
+
+async function loadPayouts(userId){
+ refresh.disabled=true;
+ message.textContent='Loading your payout statement…';
+ clearRows('Loading…');
+ try{
+  // Individual ownership checks plus existing Supabase RLS.
+  const [sellerResult,providerResult]=await Promise.all([
+   supabase.from('seller_payouts')
+    .select('id,order_id,seller_id,payout_reference,payout_amount,payout_status,eligible_at,paid_at,created_at')
+    .eq('seller_id',userId).order('created_at',{ascending:false}).limit(50),
+   supabase.from('service_provider_payouts')
+    .select('id,booking_id,provider_id,payout_reference,payout_amount,payout_status,eligible_at,paid_at,created_at')
+    .eq('provider_id',userId).order('created_at',{ascending:false}).limit(50)
+  ]);
+  const errors=[];
+  if(sellerResult.error)errors.push('Seller payouts');
+  if(providerResult.error)errors.push('Service-provider payouts');
+  const sellers=sellerResult.error?[]:(sellerResult.data||[]);
+  const providers=providerResult.error?[]:(providerResult.data||[]);
+
+  const [sellerHolds,providerHolds]=await Promise.all([
+   sellers.length?supabase.from('seller_payout_holds')
+    .select('seller_payout_id,reason,status,held_at,released_at')
+    .eq('seller_id',userId).in('seller_payout_id',sellers.map(r=>r.id))
+    .order('held_at',{ascending:false}).limit(100):Promise.resolve({data:[],error:null}),
+   providers.length?supabase.from('service_provider_payout_holds')
+    .select('service_provider_payout_id,reason,status,held_at,released_at')
+    .eq('provider_id',userId).in('service_provider_payout_id',providers.map(r=>r.id))
+    .order('held_at',{ascending:false}).limit(100):Promise.resolve({data:[],error:null})
+  ]);
+  if(sellerHolds.error)errors.push('Seller hold details');
+  if(providerHolds.error)errors.push('Provider hold details');
+  const sellerHoldMap=latestHoldMap(sellerHolds.data,'seller_payout_id');
+  const providerHoldMap=latestHoldMap(providerHolds.data,'service_provider_payout_id');
+
+  const combined=[
+   ...sellers.map(row=>({kind:'Seller',row,hold:sellerHoldMap.get(row.id),holdError:!!sellerHolds.error})),
+   ...providers.map(row=>({kind:'Service provider',row,hold:providerHoldMap.get(row.id),holdError:!!providerHolds.error}))
+  ].sort((a,b)=>new Date(b.row.created_at||0)-new Date(a.row.created_at||0));
+
+  rows.replaceChildren();
+  for(const entry of combined){
+   const p=entry.row;
+   const tr=document.createElement('tr');
+   const reference=cell(tr,label(p.payout_reference,p.id));
+   const small=document.createElement('small');
+   small.textContent=entry.kind+' · '+formatDate(p.created_at);
+   reference.append(small);
+
+   const orderCell=cell(tr,'');
+   if(entry.kind==='Seller'&&uuid.test(String(p.order_id||''))){
+    const a=document.createElement('a');
+    a.href='./order.html?id='+encodeURIComponent(p.order_id);
+    a.textContent=p.order_id;
+    orderCell.append(a);
+   }else{
+    orderCell.textContent=label(p.booking_id||p.order_id);
+   }
+   cell(tr,money(p.payout_amount));
+   const statusCell=cell(tr,label(p.payout_status,'Pending'));
+   if(p.eligible_at){
+    const eligible=document.createElement('small');
+    eligible.textContent='Eligible at: '+formatDate(p.eligible_at);
+    statusCell.append(eligible);
+   }
+   const holdText=entry.holdError?'Hold details temporarily unavailable':entry.hold
+    ?label(entry.hold.status)+' — '+label(entry.hold.reason,'Reason not recorded')
+    :'No hold shown';
+   const holdCell=cell(tr,holdText);
+   if(entry.hold?.released_at){
+    const released=document.createElement('small');
+    released.textContent='Released: '+formatDate(entry.hold.released_at);
+    holdCell.append(released);
+   }
+   cell(tr,p.paid_at?'Recorded paid: '+formatDate(p.paid_at):'No payment date recorded');
+   rows.append(tr);
+  }
+  if(!combined.length)clearRows(errors.length?'Payout records could not all be loaded.':'No payout records yet.');
+  message.textContent=errors.length
+   ?'Some sections are temporarily unavailable: '+errors.join(', ')+'. Please refresh.'
+   :combined.length+' payout record(s) displayed. Only your own records are available.';
+ }catch{
+  message.textContent='Unable to load your payout statement right now. Please retry.';
+  clearRows('Payout history unavailable.');
+ }finally{
+  refresh.disabled=false;
+ }
+}
+
+const {data:{user},error}=await supabase.auth.getUser();
+if(error||!user){
+ message.textContent='Sign in to view your own payout statement.';
+ clearRows('Not signed in.');
+ const link=document.createElement('a');
+ link.href='./sign-in.html';
+ link.textContent='Sign in';
+ message.append(document.createTextNode(' '),link);
+}else{
+ refresh.hidden=false;
+ refresh.addEventListener('click',()=>loadPayouts(user.id));
+ await loadPayouts(user.id);
+}
+</script>
+</body>
+</html>
