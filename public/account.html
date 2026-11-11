@@ -77,7 +77,7 @@ a{color:#0f766e}
 
 <section class="panel">
 <h2>Notifications</h2>
-<p id="notifications">Live in-site notifications will be shown here after sign-in for your payments, seller preparation, courier updates, delivery and disputes. Seller payout notices are shown only to the relevant seller/provider account.</p>
+<div id="notifications" role="status" aria-live="polite">Sign in to view your notifications.</div>
 </section>
 
 <section class="panel">
@@ -116,6 +116,87 @@ const supabase=createClient(
 
 const who=document.getElementById('who');
 const orders=document.getElementById('orders');
+const notifications=document.getElementById('notifications');
+
+async function loadMyNotifications(userId){
+ notifications.textContent='Loading your notifications…';
+ try{
+  // Existing Supabase RLS restricts both tables to their owners.
+  // Read only: leave message queues and delivery workers untouched.
+  const [general,service]=await Promise.all([
+   supabase.from('notifications')
+    .select('id,notification_type,title,message,is_read,created_at')
+    .eq('user_id',userId)
+    .order('created_at',{ascending:false})
+    .limit(30),
+   supabase.from('service_notifications')
+    .select('id,notification_type,title,message,is_read,created_at')
+    .eq('user_id',userId)
+    .order('created_at',{ascending:false})
+    .limit(30)
+  ]);
+
+  if(general.error||service.error)throw new Error('Notification read failed');
+
+  const entries=[
+   ...(general.data||[]),
+   ...(service.data||[])
+  ].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,50);
+
+  notifications.replaceChildren();
+
+  const refresh=document.createElement('button');
+  refresh.type='button';
+  refresh.textContent='Refresh notifications';
+  refresh.addEventListener('click',()=>loadMyNotifications(userId));
+  notifications.append(refresh);
+
+  if(entries.length===0){
+   const empty=document.createElement('p');
+   empty.className='muted';
+   empty.textContent='No notifications yet.';
+   notifications.append(empty);
+   return;
+  }
+
+  for(const item of entries){
+   const article=document.createElement('div');
+   article.className='item';
+
+   const title=document.createElement('strong');
+   title.textContent=item.title||'Shop&Drop notification';
+   article.append(title);
+
+   if(item.is_read===false){
+    const unread=document.createElement('span');
+    unread.className='muted';
+    unread.textContent=' · Unread';
+    article.append(unread);
+   }
+
+   const message=document.createElement('p');
+   message.textContent=item.message||'';
+   article.append(message);
+
+   if(item.created_at){
+    const stamp=document.createElement('small');
+    stamp.className='muted';
+    const date=new Date(item.created_at);
+    stamp.textContent=Number.isNaN(date.getTime())?'':date.toLocaleString('en-ZA');
+    article.append(stamp);
+   }
+
+   notifications.append(article);
+  }
+ }catch{
+  notifications.textContent='Unable to load notifications right now.';
+  const retry=document.createElement('button');
+  retry.type='button';
+  retry.textContent='Retry';
+  retry.addEventListener('click',()=>loadMyNotifications(userId));
+  notifications.append(retry);
+ }
+}
 
 // Standard UUID validation for both booking types.
 // Correct format: 8-4-4-4-12 hexadecimal characters.
@@ -127,6 +208,7 @@ const {data:{user},error}=await supabase.auth.getUser();
 if(error||!user){
  who.innerHTML='<strong>Not signed in</strong><p><a href="./sign-in.html">Sign in</a> or <a href="./register.html">create an account</a>.</p>';
  orders.textContent='Sign in to view your orders when order history integration is complete.';
+ notifications.textContent='Sign in to view your notifications.';
 }else{
  const name=user.user_metadata?.full_name || user.email || 'Account';
  who.replaceChildren();
@@ -235,6 +317,7 @@ if(error||!user){
  });
 
  orders.textContent='Order history connection is pending. No orders are displayed until verified against Supabase.';
+ await loadMyNotifications(user.id);
 }
 </script>
 
