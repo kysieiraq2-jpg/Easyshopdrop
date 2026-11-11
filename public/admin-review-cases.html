@@ -209,6 +209,82 @@ root.append(card);
 }
 }
 
+/*
+ SHOPDROP FIX 5
+ Read-only customer submission details.
+ Uses existing administrator-only Supabase RPC.
+ Does not modify payments, refunds or payouts.
+*/
+async function showSubmissionDetails(record,container,button){
+if(!await authorized())return;
+
+button.disabled=true;
+container.replaceChildren(
+node('p','Loading submission details...')
+);
+
+try{
+const {data,error}=await supabase.rpc(
+'shopdrop_admin_submission_detail',{
+p_case_id:record.case_id
+}
+);
+
+if(error)throw error;
+if(!data||typeof data!=='object'){
+throw Error('Unexpected submission response');
+}
+
+container.replaceChildren();
+
+const details=[
+['Submission reference',data.reference],
+['Submission type',data.case_type],
+['Status',data.status],
+['Category',data.category],
+['Subject',data.subject],
+['Reason',data.reason],
+['Message / Description',data.message],
+['Transaction reference',data.transaction_reference],
+['Created',data.created_at
+ ?new Date(data.created_at).toLocaleString('en-ZA')
+ :'—']
+];
+
+for(const [label,value] of details){
+const paragraph=node('p');
+const heading=node('strong',label+': ');
+paragraph.append(
+heading,
+node('span',value||'—')
+);
+container.append(paragraph);
+}
+
+const notice=node(
+'p',
+'This is a read-only customer submission. '+
+'Reviewing it does not release money, '+
+'approve a refund or automatically hold a payout.'
+);
+notice.className='muted';
+container.append(notice);
+
+button.textContent='Hide submission details';
+
+}catch(error){
+container.replaceChildren(
+node('p',
+'Unable to load submission: '+
+(error?.message||'Unknown error')
+)
+);
+button.textContent='Retry submission details';
+}finally{
+button.disabled=false;
+}
+}
+
 function renderCases(rows){
 const root=$('cases');
 root.replaceChildren();
@@ -236,6 +312,41 @@ node('p',
 :'—')
 )
 );
+
+/*
+ FIX 5: Add details only for customer submissions.
+ All original case categories remain unchanged.
+*/
+if([
+'customer_feedback',
+'customer_dispute_submission'
+].includes(record.case_type)){
+
+const button=node(
+'button',
+'View submission details'
+);
+button.type='button';
+
+const details=node('div');
+details.hidden=true;
+
+button.onclick=async()=>{
+if(!details.hidden){
+details.hidden=true;
+details.replaceChildren();
+button.textContent='View submission details';
+return;
+}
+
+details.hidden=false;
+await showSubmissionDetails(
+record,details,button
+);
+};
+
+card.append(button,details);
+}
 
 root.append(card);
 }
@@ -290,4 +401,3 @@ if(await authorized())await load();
 </script>
 </body>
 </html>
-
