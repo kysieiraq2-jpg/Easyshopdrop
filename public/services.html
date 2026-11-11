@@ -358,5 +358,75 @@ search('');
 </section>
 
 <script defer src="shopdrop-info-language.js"></script>
+
+<!-- SHOPDROP FIX 7: Additive category suggestion integration -->
+<script src="./supabase-adapter.js"></script>
+<script>
+(function(){
+ 'use strict';
+
+ const button=document.getElementById('request');
+ const category=document.getElementById('cat');
+ const description=document.getElementById('desc');
+ const status=document.getElementById('reqmsg');
+
+ if(!button||!category||!description||!status)return;
+
+ button.onclick=async function(){
+  if(button.disabled)return;
+
+  const requestedName=category.value.trim();
+  const details=description.value.trim();
+
+  if(!requestedName){
+   status.textContent=
+    'Enter the category or service you want Shop&Drop to add.';
+   category.focus();
+   return;
+  }
+
+  button.disabled=true;
+  status.textContent='Submitting suggestion...';
+
+  try{
+   const submit=
+    window.ShopDropSupabaseAdapter
+     ?.authenticatedFunctions
+     ?.feedback;
+
+   if(typeof submit!=='function'){
+    throw new Error('Secure suggestion service unavailable.');
+   }
+
+   const result=await submit({
+    feedback_type:'suggestion',
+    category:'Category Request',
+    subject:('New category request: '+requestedName).slice(0,200),
+    message:
+     'Requested category: '+requestedName+
+     '\nDescription: '+(details||'Not provided')
+   });
+
+   if(!result?.ok||!result.reference){
+    throw new Error('Suggestion confirmation was not received.');
+   }
+
+   status.textContent=
+    'Suggestion submitted successfully. Reference: '+
+    result.reference;
+
+   category.value='';
+   description.value='';
+
+  }catch(error){
+   status.textContent=
+    error?.message||'Unable to submit suggestion.';
+  }finally{
+   button.disabled=false;
+  }
+ };
+})();
+</script>
+
 </body>
 </html>
