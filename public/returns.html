@@ -296,48 +296,94 @@
 <script src="./common.js"></script>
 <script src="./v26-consolidated.js"></script>
 
+<!-- FIX 4: Reuse existing authenticated Supabase adapter -->
+<script src="./supabase-adapter.js"></script>
+
 <script>
 /*
- Original Shop&Drop dispute submission functionality.
- Endpoint, payload, validation and response messages preserved.
+ SHOPDROP FIX 4
+ Preserve existing returns page and evidence links.
+ Connect dispute submission through existing Supabase adapter.
+ Do not initiate payouts, refunds or payout holds here.
 */
 document.getElementById('open').onclick=async()=>{
  const orderId=document.getElementById('orderId');
  const reason=document.getElementById('reason');
  const description=document.getElementById('description');
+ const evidence=document.getElementById('evidence');
  const msg=document.getElementById('msg');
+ const button=document.getElementById('open');
 
- if(!orderId.value.trim()){
+ if(button.disabled)return;
+
+ const orderReference=orderId.value.trim();
+ const details=description.value.trim();
+
+ if(!orderReference){
   msg.textContent='Enter the Shop&Drop order number.';
+  orderId.focus();
   return;
  }
 
- if(reason.value==='other'&&!description.value.trim()){
-  msg.textContent='Please describe the problem when you choose Other.';
+ if(!details){
+  msg.textContent='Please describe the problem.';
   description.focus();
   return;
  }
 
- if(ShopDrop.isStatic){
+ /*
+  Evidence uploads remain handled by the existing
+  protected dispute-evidence page. Do not silently
+  discard files selected on this form.
+ */
+ if(evidence.files.length){
   msg.textContent=
-   'Dispute workflow preview is ready. Live submission requires the authenticated backend.';
+   'Please use Upload / View Dispute & Return Evidence '+
+   'to submit your photographs. Then return here '+
+   'and open your dispute.';
   return;
  }
 
+ button.disabled=true;
+ msg.textContent='Submitting dispute...';
+
  try{
-  await ShopDrop.api('/api/disputes',{
-   method:'POST',
-   body:JSON.stringify({
-    orderId:orderId.value.trim(),
-    reason:reason.value,
-    description:description.value
-   })
+  const submitDispute=
+   window.ShopDropSupabaseAdapter
+    ?.authenticatedFunctions
+    ?.disputes;
+
+  if(typeof submitDispute!=='function'){
+   throw new Error(
+    'Secure dispute connection unavailable.'
+   );
+  }
+
+  const result=await submitDispute({
+   transaction_reference:orderReference,
+   reason:reason.value,
+   description:details
   });
 
+  if(!result?.ok||!result.dispute_reference){
+   throw new Error(
+    'Dispute confirmation was not received.'
+   );
+  }
+
   msg.textContent=
-   'Dispute opened. Seller payout is held while the case is reviewed.';
- }catch(e){
-  msg.textContent=e.message;
+   'Dispute submitted for review. Reference: '+
+   result.dispute_reference;
+
+  orderId.value='';
+  description.value='';
+
+ }catch(error){
+  msg.textContent=
+   error?.message||
+   'Could not submit dispute. Please try again.';
+ }finally{
+  button.disabled=false;
  }
 };
 </script>
