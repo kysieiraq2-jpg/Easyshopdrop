@@ -1,2 +1,371 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Order details | Shop&Drop</title><style>body{font-family:Arial,sans-serif;margin:0;background:#f3f5f8;color:#17202a}header{background:#101827;color:white;padding:18px}header a{color:white;margin-right:20px}main{max-width:980px;margin:25px auto;padding:0 16px}.panel{background:white;padding:22px;border-radius:12px;margin:15px 0}button,input,select{padding:10px;margin:5px;border-radius:6px;border:1px solid #cbd5e1}button{cursor:pointer;background:#0f766e;color:white}.muted{color:#64748b}.item{border-bottom:1px solid #eee;padding:12px 0}a{color:#0f766e}</style></head><body><header><a href="./index.html">Shop&Drop</a><a href="./checkout.html">Checkout</a><a href="./account.html">My Account</a></header><main><h1>Order details</h1><section class="panel" id="summary">Loading…</section><section class="panel"><h2>Items</h2><div id="items"></div></section></main><script src="./common.js"></script>
-<script src="./v26-consolidated.js"></script><script>const {api,esc,money}=ShopDrop;const id=new URLSearchParams(location.search).get('id');async function load(){if(ShopDrop.isStatic){summary.innerHTML='<b>Preview mode</b><p>Live order status, payment, shipment and tracking information require the Shop&Drop backend.</p>';items.textContent='Order items will be shown here when an order is selected for a real Shop&Drop order.';return}try{if(!id)throw Error('Choose an order from My Account.');const d=await api('/api/orders/'+encodeURIComponent(id)),o=d.order;summary.innerHTML=`<p>Order: ${esc(o.id)}</p><p>Status: ${esc(o.status)}</p><p>Payment: ${esc(o.payment_status||'unpaid')}</p><p>Shipment: ${esc(o.shipment_status||'not created')}</p><p>Tracking: ${esc(o.tracking_number||'Not available')}</p><h3>Total: ${money(o.total_cents)}</h3>`;items.innerHTML=d.items.map(x=>`<div class="item">${esc(x.name)} × ${x.quantity} — ${money(x.unit_price_cents*x.quantity)}</div>`).join('')}catch(e){summary.textContent=e.message}}load();</script><script src="v26-bridge.js"></script></body></html>
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Order details | Shop&Drop</title>
+<style>
+body{font-family:Arial,sans-serif;margin:0;background:#f3f5f8;color:#17202a}
+header{background:#101827;color:white;padding:18px}
+header a{color:white;margin-right:20px}
+main{max-width:980px;margin:25px auto;padding:0 16px}
+.panel{background:white;padding:22px;border-radius:12px;margin:15px 0}
+button,input,select{padding:10px;margin:5px;border-radius:6px;border:1px solid #cbd5e1}
+button{cursor:pointer;background:#0f766e;color:white}
+button:disabled{opacity:.6;cursor:wait}
+.muted{color:#64748b}
+.item{border-bottom:1px solid #eee;padding:12px 0}
+a{color:#0f766e}
+</style>
+</head>
+<body>
+<header>
+<a href="./index.html">Shop&Drop</a>
+<a href="./checkout.html">Checkout</a>
+<a href="./account.html">My Account</a>
+</header>
+
+<main>
+<h1>Order details</h1>
+
+<section class="panel">
+<label for="orderLookup">Order ID or reference</label>
+<input id="orderLookup" type="text" autocomplete="off"
+ placeholder="Enter your order reference"
+ style="width:min(100%,370px)">
+<button id="findOrder" type="button">Find order</button>
+<button id="refreshOrder" type="button">Refresh</button>
+</section>
+
+<section class="panel" id="summary" aria-live="polite">
+Sign in to view your order.
+</section>
+
+<section class="panel">
+<h2>Items</h2>
+<div id="items"></div>
+</section>
+
+<section class="panel">
+<h2>Payment information</h2>
+<div id="paymentDetails"></div>
+</section>
+
+<section class="panel">
+<h2>Shipment and tracking</h2>
+<div id="shipmentDetails"></div>
+</section>
+
+<section class="panel">
+<h2>Help with this order</h2>
+<p>Report a delivery problem, incorrect item, damage or another concern through the Shop&Drop support system.</p>
+<p>
+<a href="./returns.html">Returns & Disputes</a> ·
+<a href="./feedback.html">Complaints & Suggestions</a>
+</p>
+</section>
+</main>
+
+<script src="./common.js"></script>
+<script src="./v26-consolidated.js"></script>
+<script src="v26-bridge.js"></script>
+
+<script type="module">
+import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
+
+const supabase=createClient(
+ 'https://dtkdvvxpwonywtsgqmdx.supabase.co',
+ 'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q',
+ {auth:{
+  persistSession:true,
+  autoRefreshToken:true,
+  detectSessionInUrl:true
+ }}
+);
+
+const summary=document.getElementById('summary');
+const items=document.getElementById('items');
+const payments=document.getElementById('paymentDetails');
+const shipments=document.getElementById('shipmentDetails');
+const input=document.getElementById('orderLookup');
+const findButton=document.getElementById('findOrder');
+const refreshButton=document.getElementById('refreshOrder');
+
+const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function formatMoney(value,currency='ZAR'){
+ if(value===null||value===undefined||
+    !Number.isFinite(Number(value))){
+  return 'Not available';
+ }
+ try{
+  return new Intl.NumberFormat('en-ZA',{
+   style:'currency',
+   currency:String(currency||'ZAR').toUpperCase()
+  }).format(Number(value));
+ }catch{
+  return String(currency)+' '+Number(value).toFixed(2);
+ }
+}
+
+function formatDate(value){
+ if(!value)return 'Not recorded';
+ const d=new Date(value);
+ return Number.isNaN(d.getTime())
+  ?'Date unavailable'
+  :d.toLocaleString('en-ZA');
+}
+
+function formatStatus(value){
+ return String(value||'Pending').replace(/_/g,' ');
+}
+
+function addLine(parent,label,value){
+ const p=document.createElement('p');
+ const strong=document.createElement('strong');
+ strong.textContent=label+': ';
+ p.append(strong,document.createTextNode(String(value??'Not available')));
+ parent.append(p);
+}
+
+function clearDetails(){
+ items.replaceChildren();
+ payments.replaceChildren();
+ shipments.replaceChildren();
+}
+
+function showUnavailable(container,message){
+ const p=document.createElement('p');
+ p.className='muted';
+ p.textContent=message;
+ container.append(p);
+}
+
+async function loadOrder(reference){
+ clearDetails();
+
+ const {data:{user},error:authError}=await supabase.auth.getUser();
+
+ if(authError||!user){
+  summary.replaceChildren();
+  addLine(summary,'Account','Not signed in');
+
+  const link=document.createElement('a');
+  link.href='./sign-in.html';
+  link.textContent='Sign in to view your orders';
+  summary.append(link);
+  return;
+ }
+
+ const value=String(reference||'').trim();
+
+ if(!value||value.length>100){
+  summary.textContent='Enter a valid order ID or reference.';
+  return;
+ }
+
+ findButton.disabled=true;
+ refreshButton.disabled=true;
+ summary.textContent='Checking your order…';
+
+ try{
+  // RLS restricts records to the buyer and seller.
+  // No service-role credentials or admin access are used.
+  let query=supabase
+   .from('orders')
+   .select(
+    'id,buyer_id,seller_id,order_reference,order_status,'+
+    'payment_status,fulfilment_status,product_total,'+
+    'currency,created_at'
+   )
+   .or('buyer_id.eq.'+user.id+',seller_id.eq.'+user.id);
+
+  query=uuidPattern.test(value)
+   ?query.eq('id',value)
+   :query.eq('order_reference',value);
+
+  const {data:order,error:orderError}=await query.maybeSingle();
+
+  if(orderError)throw orderError;
+
+  if(!order){
+   summary.textContent='Order not found or not available to your account.';
+   return;
+  }
+
+  input.value=order.order_reference||order.id;
+  summary.replaceChildren();
+
+  const heading=document.createElement('h2');
+  heading.textContent=order.order_reference||order.id;
+  summary.append(heading);
+
+  addLine(
+   summary,'Account role',
+   order.buyer_id===user.id?'Buyer':'Seller'
+  );
+  addLine(summary,'Order status',formatStatus(order.order_status));
+  addLine(summary,'Payment status',formatStatus(order.payment_status));
+  addLine(summary,'Fulfilment',formatStatus(order.fulfilment_status));
+  addLine(summary,'Item total',formatMoney(order.product_total,order.currency));
+  addLine(summary,'Created',formatDate(order.created_at));
+
+  // Read-only queries; existing Supabase policies enforce ownership.
+  const results=await Promise.all([
+   supabase.from('order_items')
+    .select('product_name,quantity,unit_price,line_total')
+    .eq('order_id',order.id)
+    .limit(100),
+
+   supabase.from('payments')
+    .select(
+     'payment_reference,payment_status,total_paid,'+
+     'product_amount,courier_amount,shopdrop_commission,'+
+     'seller_payout_amount,currency,paid_at,created_at'
+    )
+    .eq('order_id',order.id)
+    .order('created_at',{ascending:false})
+    .limit(20),
+
+   supabase.from('shipments')
+    .select(
+     'shipment_reference,courier_name,tracking_number,'+
+     'tracking_url,shipment_status,delivery_status,'+
+     'dispatched_at,delivered_at,delivery_verified_at'
+    )
+    .eq('order_id',order.id)
+    .order('created_at',{ascending:false})
+    .limit(20)
+  ]);
+
+  const itemResult=results[0];
+  const paymentResult=results[1];
+  const shipmentResult=results[2];
+
+  if(itemResult.error){
+   showUnavailable(items,'Item details are temporarily unavailable.');
+  }else if(!(itemResult.data||[]).length){
+   showUnavailable(items,'No item details recorded.');
+  }else{
+   for(const row of itemResult.data){
+    const div=document.createElement('div');
+    div.className='item';
+    addLine(div,'Item',row.product_name||'Product');
+    addLine(div,'Quantity',row.quantity);
+    addLine(div,'Unit price',formatMoney(row.unit_price,order.currency));
+    addLine(div,'Line total',formatMoney(row.line_total,order.currency));
+    items.append(div);
+   }
+  }
+
+  if(paymentResult.error){
+   showUnavailable(payments,'Payment information is temporarily unavailable.');
+  }else if(!(paymentResult.data||[]).length){
+   showUnavailable(payments,'No confirmed payment record available.');
+  }else{
+   for(const payment of paymentResult.data){
+    const div=document.createElement('div');
+    div.className='item';
+
+    addLine(div,'Payment reference',payment.payment_reference);
+    addLine(div,'Status',formatStatus(payment.payment_status));
+
+    if(order.buyer_id===user.id){
+     addLine(
+      div,'Buyer payment total',
+      formatMoney(payment.total_paid,payment.currency||order.currency)
+     );
+     addLine(
+      div,'Courier charge',
+      formatMoney(payment.courier_amount,payment.currency||order.currency)
+     );
+     addLine(
+      div,'Shop&Drop commission',
+      formatMoney(payment.shopdrop_commission,payment.currency||order.currency)
+     );
+    }else{
+     addLine(
+      div,'Seller proceeds',
+      formatMoney(payment.seller_payout_amount,payment.currency||order.currency)
+     );
+    }
+
+    addLine(div,'Paid at',formatDate(payment.paid_at));
+    payments.append(div);
+   }
+  }
+
+  if(shipmentResult.error){
+   showUnavailable(shipments,'Shipment information is temporarily unavailable.');
+  }else if(!(shipmentResult.data||[]).length){
+   showUnavailable(shipments,'No shipment has been recorded yet.');
+  }else{
+   for(const shipment of shipmentResult.data){
+    const div=document.createElement('div');
+    div.className='item';
+
+    addLine(div,'Shipment reference',shipment.shipment_reference);
+    addLine(div,'Courier',shipment.courier_name);
+    addLine(div,'Tracking number',shipment.tracking_number);
+    addLine(div,'Shipment status',formatStatus(shipment.shipment_status));
+    addLine(div,'Delivery status',formatStatus(shipment.delivery_status));
+    addLine(div,'Dispatched',formatDate(shipment.dispatched_at));
+    addLine(div,'Delivered',formatDate(shipment.delivered_at));
+    addLine(div,'Delivery verified',formatDate(shipment.delivery_verified_at));
+
+    // Only verified HTTPS tracking links may become clickable.
+    if(shipment.tracking_url){
+     try{
+      const url=new URL(shipment.tracking_url);
+      if(url.protocol==='https:'){
+       const link=document.createElement('a');
+       link.href=url.href;
+       link.target='_blank';
+       link.rel='noopener noreferrer';
+       link.textContent='Open courier tracking';
+       div.append(link);
+      }
+     }catch{}
+    }
+
+    shipments.append(div);
+   }
+  }
+
+ }catch{
+  summary.textContent='Unable to load the order details right now.';
+ }finally{
+  findButton.disabled=false;
+  refreshButton.disabled=false;
+ }
+}
+
+findButton.addEventListener('click',()=>{
+ loadOrder(input.value);
+});
+
+refreshButton.addEventListener('click',()=>{
+ loadOrder(input.value);
+});
+
+input.addEventListener('keydown',event=>{
+ if(event.key==='Enter'){
+  event.preventDefault();
+  loadOrder(input.value);
+ }
+});
+
+const initialReference=new URLSearchParams(location.search).get('id');
+if(initialReference){
+ input.value=initialReference;
+ await loadOrder(initialReference);
+}else{
+ const {data:{user}}=await supabase.auth.getUser();
+ summary.textContent=user
+  ?'Enter your order reference to view its details.'
+  :'Sign in to view your order details.';
+}
+</script>
+</body>
+</html>
