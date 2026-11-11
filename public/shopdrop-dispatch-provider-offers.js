@@ -1,7 +1,8 @@
 
-// Shop&Drop — Dispatch provider offers.
-// South Africa launch; international architecture preserved.
-// No payment collection or private customer disclosure.
+ // Shop&Drop — Dispatch provider offers.
+ // South Africa first; international architecture preserved.
+ // Vehicle base location and operating coverage integration.
+ // No payment collection, payouts or private contact disclosure.
 
 (function () {
   'use strict';
@@ -102,14 +103,67 @@
       );
     }
 
+    const baseTown = String(input.baseTown || '').trim();
+    const baseProvince = String(input.baseProvince || '').trim();
+    const coverageMode = String(input.coverageMode || '').trim();
+
+    const areas = String(input.coveredAreas || '')
+      .split(',')
+      .map(x => x.trim())
+      .filter(Boolean);
+
+    if (
+      baseTown.length < 2 ||
+      baseTown.length > 120 ||
+      baseProvince.length < 2 ||
+      baseProvince.length > 120
+    ) {
+      throw new Error(
+        'Enter the vehicle base town and province.'
+      );
+    }
+
+    if (
+      !['local', 'selected', 'nationwide']
+        .includes(coverageMode)
+    ) {
+      throw new Error(
+        'Choose where the vehicle can operate.'
+      );
+    }
+
+    if (
+      coverageMode === 'selected' &&
+      areas.length === 0
+    ) {
+      throw new Error(
+        'Enter the towns or provinces you cover.'
+      );
+    }
+
+    if (
+      areas.length > 30 ||
+      areas.some(x => x.length < 2 || x.length > 120)
+    ) {
+      throw new Error(
+        'Enter up to 30 valid service areas.'
+      );
+    }
+
+    // Existing dispatch submission remains authoritative.
+    // New backend wrapper checks coverage before creating the offer.
     const { data, error } = await client.rpc(
-      'shopdrop_submit_dispatch_offer',
+      'shopdrop_submit_dispatch_located_offer',
       {
         p_request_id: input.requestId,
         p_vehicle_description: description,
         p_provider_amount: amount,
         p_currency: currency,
-        p_valid_until: null
+        p_base_town: baseTown,
+        p_base_province: baseProvince,
+        p_coverage_mode: coverageMode,
+        p_covered_areas:
+          coverageMode === 'nationwide' ? [] : areas
       }
     );
 
@@ -162,8 +216,11 @@
       card.className = 'panel';
 
       card.append(
-        el('h3', 'Dispatch ' +
-          (job.request_reference || job.request_id))
+        el(
+          'h3',
+          'Dispatch ' +
+          (job.request_reference || job.request_id)
+        )
       );
 
       detail(card, 'Vehicle required', job.vehicle_type);
@@ -213,10 +270,107 @@
 
       currencyLabel.append(currency);
 
+      // Vehicle location is the operating base.
+      // Exact private street addresses are not requested here.
+      const baseTownLabel = el(
+        'label',
+        'Vehicle based in — town'
+      );
+
+      const baseTown = el('input');
+      baseTown.type = 'text';
+      baseTown.maxLength = 120;
+      baseTown.required = true;
+      baseTown.placeholder = 'e.g. Pretoria';
+
+      baseTownLabel.append(baseTown);
+
+      const baseProvinceLabel = el(
+        'label',
+        'Vehicle based in — province'
+      );
+
+      const baseProvince = el('select');
+      baseProvince.required = true;
+
+      const provinces = [
+        '',
+        'Eastern Cape',
+        'Free State',
+        'Gauteng',
+        'KwaZulu-Natal',
+        'Limpopo',
+        'Mpumalanga',
+        'North West',
+        'Northern Cape',
+        'Western Cape'
+      ];
+
+      for (const name of provinces) {
+        const option = el(
+          'option',
+          name || 'Choose province'
+        );
+
+        option.value = name;
+        baseProvince.append(option);
+      }
+
+      baseProvinceLabel.append(baseProvince);
+
+      const coverageLabel = el(
+        'label',
+        'Where can this vehicle operate?'
+      );
+
+      const coverageMode = el('select');
+
+      for (const [value, name] of [
+        ['local', 'Base town and surrounding areas'],
+        ['selected', 'Selected towns or provinces'],
+        ['nationwide', 'Anywhere in South Africa']
+      ]) {
+        const option = el('option', name);
+        option.value = value;
+        coverageMode.append(option);
+      }
+
+      coverageLabel.append(coverageMode);
+
+      const areasLabel = el(
+        'label',
+        'Additional towns or provinces (comma-separated)'
+      );
+
+      const areas = el('input');
+      areas.type = 'text';
+      areas.placeholder = 'e.g. Centurion, Midrand';
+      areas.maxLength = 1500;
+
+      areasLabel.append(areas);
+
+      const help = el(
+        'p',
+        'Only public town/province information is shown. ' +
+        'Use local for your base town, or add surrounding towns. ' +
+        'Nationwide providers may quote travel costs in their offer.'
+      );
+
+      help.className = 'muted';
+
+      coverageMode.addEventListener(
+        'change',
+        () => {
+          areasLabel.hidden =
+            coverageMode.value === 'nationwide';
+        }
+      );
+
       const button = el(
         'button',
         'Submit transport offer'
       );
+
       button.type = 'button';
 
       const status = el('p');
@@ -225,14 +379,20 @@
 
       button.addEventListener('click', async () => {
         button.disabled = true;
-        status.textContent = 'Submitting offer securely…';
+
+        status.textContent =
+          'Submitting offer securely…';
 
         try {
           const offerId = await submitOffer({
             requestId: job.request_id,
             description: description.value,
             amount: price.value,
-            currency: currency.value
+            currency: currency.value,
+            baseTown: baseTown.value,
+            baseProvince: baseProvince.value,
+            coverageMode: coverageMode.value,
+            coveredAreas: areas.value
           });
 
           status.textContent =
@@ -241,6 +401,7 @@
             '. Awaiting customer acceptance.';
 
           button.textContent = 'Offer submitted';
+
         } catch (error) {
           status.textContent =
             error?.message ||
@@ -254,6 +415,11 @@
         descriptionLabel,
         priceLabel,
         currencyLabel,
+        baseTownLabel,
+        baseProvinceLabel,
+        coverageLabel,
+        areasLabel,
+        help,
         button,
         status
       );
@@ -303,7 +469,6 @@
     );
 
     panel.append(refresh, results);
-
     load(results);
   }
 
@@ -323,4 +488,3 @@
       submitOffer
     });
 })();
-
