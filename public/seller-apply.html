@@ -11,6 +11,7 @@ body{font:16px Arial;background:#f3f5f8;color:#17202a;margin:0}
 main{max-width:650px;margin:4vh auto;background:#fff;padding:28px;border-radius:12px}
 input,select,button{width:100%;padding:12px;margin:7px 0;border-radius:7px;border:1px solid #cbd5e1}
 button{background:#0f766e;color:#fff;border:0;font-weight:700}
+button:disabled{opacity:.6;cursor:wait}
 .note{background:#ecfdf5;padding:14px;border-radius:8px}
 .message{padding:12px;border-radius:8px;background:#fff7ed}
 a{color:#0f766e}
@@ -97,7 +98,8 @@ Type a country name, country code or dialing code, then tap the dialing-code lis
  SHOPDROP_SA_SELLER_LAUNCH_V2
  Preserve international capabilities for future launch.
  Restrict customer-facing country and dial selections to ZA.
- Preserve existing seller application endpoint and payload.
+ Connect applications to existing authenticated Supabase records.
+ Preserve automatic backend verification and approval controls.
 */
 
 const form=document.getElementById('form');
@@ -111,6 +113,39 @@ const whatsapp=document.getElementById('whatsapp');
 const type=document.getElementById('type');
 const store=document.getElementById('store');
 const message=document.getElementById('message');
+
+// Match the existing Shop&Drop Supabase Auth configuration.
+// Existing backend verification and seller application RLS remain in control.
+const canonicalSellerTypes=Object.freeze({
+ individual:'individual',
+ home_business:'seller',
+ second_hand:'seller',
+ business:'business'
+});
+
+let sellerClientPromise=null;
+
+function sellerClient(){
+ if(!sellerClientPromise){
+  sellerClientPromise=import('https://esm.sh/@supabase/supabase-js@2')
+   .then(({createClient})=>createClient(
+    'https://dtkdvvxpwonywtsgqmdx.supabase.co',
+    'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q',
+    {
+     auth:{
+      persistSession:true,
+      autoRefreshToken:true,
+      detectSessionInUrl:true
+     }
+    }
+   ))
+   .catch(error=>{
+    sellerClientPromise=null;
+    throw error;
+   });
+ }
+ return sellerClientPromise;
+}
 
 const saLaunch=ShopDropGeo.launchSouthAfricaOnly===true;
 
@@ -153,6 +188,7 @@ function filterNativeDial(input,select){
 }
 
 dialSearch.oninput=()=>filterNativeDial(dialSearch,dial);
+
 whatsappDialSearch.oninput=()=>filterNativeDial(
  whatsappDialSearch,whatsappDial
 );
@@ -257,32 +293,126 @@ form.onsubmit=async e=>{
    }
  }
 
- if(ShopDrop.isStatic){
-   ShopDrop.msg(
-     message,
-     'Preview mode: the form layout is working. Seller applications require the Shop&Drop backend and will not be submitted from GitHub Pages.'
-   );
-   return;
- }
+ // GitHub Pages is expected. Submit through authenticated Supabase.
+ const submitButton=form.querySelector('button[type="submit"]');
+
+ if(submitButton.disabled)return;
+
+ submitButton.disabled=true;
+ ShopDrop.msg(message,'Checking your seller application…');
 
  try{
-   await ShopDrop.api('/api/sellers/apply',{
-     method:'POST',
-     body:JSON.stringify({
-       sellerType:type.value,
-       storeName:store.value.trim(),
-       countryCode:countryCode,
-       phone:normalizedPhone,
-       whatsapp:normalizedWhatsApp
-     })
-   });
+   const db=await sellerClient();
 
+   const {data:{user},error:authError}=await db.auth.getUser();
+
+   if(authError||!user){
+     ShopDrop.msg(
+       message,
+       'Please sign in to your Shop&Drop account first, then return to this form.',
+       'error'
+     );
+     return;
+   }
+
+   const applicantType=canonicalSellerTypes[type.value];
+
+   if(!applicantType){
+     throw new Error('Select a valid seller type.');
+   }
+
+   // Home businesses and second-hand sellers use the existing general
+   // "seller" eligibility classification. All four UI choices remain.
+   // Never create a duplicate ordinary seller application knowingly.
+   const sellerTypes=['seller','individual','business'];
+
+   const {data:previous,error:readError}=await db
+     .from('seller_applications')
+     .select('id,application_status,submitted_at')
+     .eq('user_id',user.id)
+     .in('applicant_type',sellerTypes)
+     .order('submitted_at',{ascending:false})
+     .limit(1);
+
+   if(readError){
+     throw new Error(
+       'Unable to check your existing application. Please retry.'
+     );
+   }
+
+   if(previous?.length){
+     const state=String(
+       previous[0].application_status||'pending'
+     ).toLowerCase();
+
+     if(state==='approved'){
+       ShopDrop.msg(
+         message,
+         'Your seller application is already approved. You can continue using your Seller & Service Provider Centre.'
+       );
+     }else if(state==='pending'){
+       ShopDrop.msg(
+         message,
+         'Your seller application is already received and is awaiting automatic account, identity and payout verification.'
+       );
+     }else{
+       ShopDrop.msg(
+         message,
+         'Your existing seller application is marked '+state+'. Use the Complaints & Suggestions page if you need an exceptional review.'
+       );
+     }
+
+     return;
+   }
+
+   // Database default is "pending". Backend verification triggers decide
+   // eligibility. Neither the customer nor the administrator is required
+   // to approve ordinary seller applications manually.
+   const {error:insertError}=await db
+     .from('seller_applications')
+     .insert({
+       user_id:user.id,
+       applicant_type:applicantType,
+       seller_name:store.value.trim(),
+       country_code:countryCode,
+       mobile_number:normalizedPhone,
+       whatsapp_number:normalizedWhatsApp||null
+     });
+
+   if(insertError){
+     throw new Error(
+       'The seller application could not be submitted. Please try again.'
+     );
+   }
+
+   const {data:latest,error:statusError}=await db
+     .from('seller_applications')
+     .select('application_status,submitted_at')
+     .eq('user_id',user.id)
+     .in('applicant_type',sellerTypes)
+     .order('submitted_at',{ascending:false})
+     .limit(1);
+
+   if(!statusError&&latest?.[0]?.application_status==='approved'){
+     ShopDrop.msg(
+       message,
+       'Application received and automatically approved after the required verification checks. Your seller contact details remain private.'
+     );
+   }else{
+     ShopDrop.msg(
+       message,
+       'Application received. Shop&Drop checks your eligibility automatically. The application may remain pending until identity, account and payout verification are complete. Your seller contact details remain private.'
+     );
+   }
+
+ }catch(error){
    ShopDrop.msg(
      message,
-     'Application received. Your seller details will remain private on public product listings.'
+     error?.message||'Seller application unavailable. Please retry.',
+     'error'
    );
- }catch(e){
-   ShopDrop.msg(message,e.message,'error');
+ }finally{
+   submitButton.disabled=false;
  }
 };
 </script>
