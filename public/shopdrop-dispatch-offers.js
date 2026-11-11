@@ -1,7 +1,9 @@
 
-// Shop&Drop — Dispatch customer offers integration.
-// Additive only. No live payments or payouts.
-// Provider identity and contact details remain private.
+ // Shop&Drop — Dispatch customer offers integration.
+ // Additive location and coverage improvement.
+ // Existing dispatch, booking and checkout logic preserved.
+ // No live payments or payouts.
+ // Provider identity and private contact details remain hidden.
 
 (function () {
   'use strict';
@@ -72,7 +74,48 @@
       );
     }
 
-    return Array.isArray(data) ? data : [];
+    const requests = Array.isArray(data) ? data : [];
+
+    // Retrieve only the vehicle location details associated
+    // with this customer's own dispatch requests.
+    // No private provider addresses are exposed.
+
+    const {
+      data: locations,
+      error: locationError
+    } = await client.rpc(
+      'shopdrop_get_my_dispatch_offer_locations',
+      { p_request_id: requestId }
+    );
+
+    if (
+      locationError ||
+      !Array.isArray(locations)
+    ) {
+      throw new Error(
+        'Vehicle locations are temporarily unavailable. Please try again.'
+      );
+    }
+
+    const byOffer = new Map(
+      locations.map(row => [
+        row.offer_id,
+        row
+      ])
+    );
+
+    return requests.map(request => ({
+      ...request,
+      offers: (
+        Array.isArray(request.offers)
+          ? request.offers
+          : []
+      ).map(offer => ({
+        ...offer,
+        vehicleLocation:
+          byOffer.get(offer.offer_id) || null
+      }))
+    }));
   }
 
   async function acceptOffer(offerId) {
@@ -97,8 +140,10 @@
     const adapter =
       window.ShopDropSupabaseAdapter;
 
-    if (!adapter?.authenticatedFunctions
-      ?.createDispatchCheckout) {
+    if (
+      !adapter?.authenticatedFunctions
+        ?.createDispatchCheckout
+    ) {
       throw new Error(
         'Secure dispatch checkout is unavailable.'
       );
@@ -148,8 +193,10 @@
         createElement(
           'h3',
           'Dispatch request: ' +
-          (request.request_reference ||
-            request.request_id)
+          (
+            request.request_reference ||
+            request.request_id
+          )
         )
       );
 
@@ -199,6 +246,93 @@
           )
         );
 
+        // Show the vehicle's publicly declared
+        // operating base and service coverage.
+
+        const loc = offer.vehicleLocation;
+
+        const hasLocation = Boolean(
+          loc &&
+          loc.vehicle_base_town &&
+          loc.vehicle_base_province &&
+          [
+            'local',
+            'selected',
+            'nationwide'
+          ].includes(
+            loc.vehicle_coverage_mode
+          )
+        );
+
+        const locationHeading = createElement(
+          'p',
+          hasLocation
+            ? 'Vehicle based in: ' +
+              loc.vehicle_base_town +
+              ', ' +
+              loc.vehicle_base_province
+            : 'Vehicle base location not available'
+        );
+
+        card.append(locationHeading);
+
+        if (hasLocation) {
+          const coverageLabels = {
+            local:
+              'Base town and listed surrounding areas',
+            selected:
+              'Selected towns or provinces',
+            nationwide:
+              'Anywhere in South Africa'
+          };
+
+          card.append(
+            createElement(
+              'p',
+              'Operating area: ' +
+              coverageLabels[
+                loc.vehicle_coverage_mode
+              ]
+            )
+          );
+
+          if (
+            loc.vehicle_coverage_mode !==
+              'nationwide' &&
+            Array.isArray(
+              loc.vehicle_covered_areas
+            ) &&
+            loc.vehicle_covered_areas.length
+          ) {
+            card.append(
+              createElement(
+                'p',
+                'Additional areas: ' +
+                loc.vehicle_covered_areas
+                  .join(', ')
+              )
+            );
+          }
+
+          card.append(
+            createElement(
+              'p',
+              'Confirm any travel or vehicle ' +
+              'repositioning charges in the ' +
+              'offered total before booking.'
+            )
+          );
+        } else {
+          card.append(
+            createElement(
+              'p',
+              'This offer cannot be accepted ' +
+              'until its vehicle location and ' +
+              'service coverage are recorded.'
+            )
+          );
+        }
+
         const button = createElement(
           'button',
           'Accept offer and prepare checkout'
@@ -206,9 +340,21 @@
 
         button.type = 'button';
 
+        // Prevent accepting an offer that does
+        // not yet contain verified location fields.
+        button.disabled = !hasLocation;
+
         const status = createElement('p');
-        status.setAttribute('role', 'status');
-        status.setAttribute('aria-live', 'polite');
+
+        status.setAttribute(
+          'role',
+          'status'
+        );
+
+        status.setAttribute(
+          'aria-live',
+          'polite'
+        );
 
         button.addEventListener(
           'click',
@@ -220,13 +366,17 @@
                 'Accepting dispatch offer…';
 
               const bookingId =
-                await acceptOffer(offer.offer_id);
+                await acceptOffer(
+                  offer.offer_id
+                );
 
               status.textContent =
                 'Preparing secure checkout…';
 
               const checkout =
-                await prepareCheckout(bookingId);
+                await prepareCheckout(
+                  bookingId
+                );
 
               status.textContent =
                 'Booking reference: ' +
@@ -241,6 +391,7 @@
 
               button.textContent =
                 'Offer accepted';
+
             } catch (error) {
               status.textContent =
                 error?.message ||
@@ -251,7 +402,11 @@
           }
         );
 
-        card.append(button, status);
+        card.append(
+          button,
+          status
+        );
+
         section.append(card);
       });
 
@@ -268,8 +423,13 @@
     );
 
     try {
-      const requests = await getMyOffers();
-      renderOffers(container, requests);
+      const requests =
+        await getMyOffers();
+
+      renderOffers(
+        container,
+        requests
+      );
     } catch (error) {
       container.replaceChildren(
         createElement(
@@ -296,14 +456,18 @@
 
     refresh.type = 'button';
 
-    const results = createElement('div');
+    const results =
+      createElement('div');
 
     refresh.addEventListener(
       'click',
       () => loadOffers(results)
     );
 
-    container.append(refresh, results);
+    container.append(
+      refresh,
+      results
+    );
 
     loadOffers(results);
   }
@@ -318,10 +482,10 @@
     initialize();
   }
 
-  window.ShopDropDispatchOffers = Object.freeze({
-    getMyOffers,
-    acceptOffer,
-    prepareCheckout
-  });
+  window.ShopDropDispatchOffers =
+    Object.freeze({
+      getMyOffers,
+      acceptOffer,
+      prepareCheckout
+    });
 })();
-
