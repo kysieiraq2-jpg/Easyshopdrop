@@ -174,7 +174,7 @@
 
 <form
   class="shopdrop-feedback-form"
-  data-shopdrop-form="feedback"
+  id="shopdropFeedbackForm"
 >
 
 <div class="shopdrop-feedback-field">
@@ -253,6 +253,108 @@
 <script src="common.js"></script>
 <script src="v26-consolidated.js"></script>
 <script src="v26-bridge.js"></script>
+
+<!-- SHOPDROP FIX 3: Reuse existing Supabase adapter -->
+<script src="supabase-adapter.js"></script>
+
+<script>
+/*
+ SHOPDROP FIX 3
+ Authenticated complaints and suggestions.
+
+ Existing page styling preserved.
+ Existing Supabase adapter reused.
+ No changes to payments, refunds or payouts.
+*/
+(function(){
+  'use strict';
+
+  const form = document.getElementById(
+    'shopdropFeedbackForm'
+  );
+
+  if (!form) return;
+
+  const status = document.createElement('p');
+  status.id = 'shopdropFeedbackStatus';
+  status.setAttribute('role','status');
+  status.setAttribute('aria-live','polite');
+  form.appendChild(status);
+
+  const value = id =>
+    document.getElementById(id).value.trim();
+
+  form.addEventListener('submit', async function(event){
+    event.preventDefault();
+
+    const button = form.querySelector(
+      'button[type="submit"]'
+    );
+
+    if (button.disabled) return;
+
+    const feedback_type =
+      value('feedbackType').toLowerCase();
+
+    const category = value('feedbackCategory');
+    const subject = value('feedbackSubject');
+    const message = value('feedbackDetails');
+
+    if (!feedback_type || !subject || !message) {
+      status.textContent =
+        'Please complete all required fields.';
+      return;
+    }
+
+    button.disabled = true;
+    status.textContent = 'Submitting...';
+
+    try {
+      const submitFeedback =
+        window.ShopDropSupabaseAdapter
+          ?.authenticatedFunctions
+          ?.feedback;
+
+      if (typeof submitFeedback !== 'function') {
+        throw new Error(
+          'Secure feedback connection unavailable.'
+        );
+      }
+
+      const result = await submitFeedback({
+        feedback_type: feedback_type,
+        category: category,
+        subject: subject,
+        message: message,
+        reply_email: value('feedbackEmail'),
+        reply_whatsapp: value('feedbackWhatsApp')
+      });
+
+      if (!result?.ok || !result.reference) {
+        throw new Error(
+          'Feedback confirmation was not received.'
+        );
+      }
+
+      status.textContent =
+        'Submitted successfully. Reference: ' +
+        result.reference;
+
+      form.reset();
+
+    } catch (error) {
+      status.textContent =
+        error?.message ||
+        'Submission failed. Please try again.';
+
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+})();
+</script>
+
 <script defer src="shopdrop-info-language.js"></script>
 
 </body>
