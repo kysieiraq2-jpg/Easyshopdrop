@@ -116,6 +116,119 @@ const supabase=createClient(
 
 const who=document.getElementById('who');
 const orders=document.getElementById('orders');
+
+function displayOrderDate(value){
+ const date=new Date(value);
+ return Number.isNaN(date.getTime()) ? 'Date unavailable' : date.toLocaleString('en-ZA');
+}
+
+function displayItemTotal(value,currency){
+ if(value===null||value===undefined||!Number.isFinite(Number(value)))return 'Amount unavailable';
+ const code=String(currency||'ZAR').toUpperCase();
+ try{
+  return new Intl.NumberFormat('en-ZA',{style:'currency',currency:code}).format(Number(value));
+ }catch{
+  return code+' '+Number(value).toFixed(2);
+ }
+}
+
+async function loadMyOrders(userId){
+ orders.textContent='Loading your orders…';
+ try{
+  // RLS protects buyer and seller records. Filtering by user also limits the query.
+  const {data:orderRows,error:orderError}=await supabase
+   .from('orders')
+   .select('id,buyer_id,seller_id,order_reference,order_status,payment_status,fulfilment_status,product_total,currency,created_at')
+   .or('buyer_id.eq.'+userId+',seller_id.eq.'+userId)
+   .order('created_at',{ascending:false})
+   .limit(40);
+
+  if(orderError)throw orderError;
+
+  const records=orderRows||[];
+  const itemsByOrder=new Map();
+
+  if(records.length){
+   const {data:itemRows,error:itemError}=await supabase
+    .from('order_items')
+    .select('order_id,product_name,quantity,line_total')
+    .in('order_id',records.map(o=>o.id));
+
+   if(itemError)throw itemError;
+   for(const item of (itemRows||[])){
+    if(!itemsByOrder.has(item.order_id))itemsByOrder.set(item.order_id,[]);
+    itemsByOrder.get(item.order_id).push(item);
+   }
+  }
+
+  orders.replaceChildren();
+
+  const refresh=document.createElement('button');
+  refresh.type='button';
+  refresh.textContent='Refresh orders';
+  refresh.addEventListener('click',()=>loadMyOrders(userId));
+  orders.append(refresh);
+
+  if(!records.length){
+   const empty=document.createElement('p');
+   empty.className='muted';
+   empty.textContent='No orders yet.';
+   orders.append(empty);
+   return;
+  }
+
+  for(const order of records){
+   const section=document.createElement('div');
+   section.className='item';
+
+   const heading=document.createElement('strong');
+   const type=order.buyer_id===userId?'Purchase':'Sale';
+   heading.textContent=type+' — '+(order.order_reference||order.id);
+   section.append(heading);
+
+   const details=document.createElement('p');
+   details.textContent='Order: '+String(order.order_status||'Pending').replace(/_/g,' ')+
+    ' · Payment: '+String(order.payment_status||'Pending').replace(/_/g,' ')+
+    ' · Fulfilment: '+String(order.fulfilment_status||'Not started').replace(/_/g,' ');
+   section.append(details);
+
+   const amount=document.createElement('p');
+   amount.textContent='Item total: '+displayItemTotal(order.product_total,order.currency);
+   section.append(amount);
+
+   const orderItems=itemsByOrder.get(order.id)||[];
+   if(orderItems.length){
+    const list=document.createElement('ul');
+    for(const item of orderItems){
+     const li=document.createElement('li');
+     li.textContent=(item.product_name||'Item')+
+      ' × '+String(item.quantity??'?')+
+      ' — '+displayItemTotal(item.line_total,order.currency);
+     list.append(li);
+    }
+    section.append(list);
+   }else{
+    const note=document.createElement('p');
+    note.className='muted';
+    note.textContent='Item details not available.';
+    section.append(note);
+   }
+
+   const date=document.createElement('small');
+   date.className='muted';
+   date.textContent=displayOrderDate(order.created_at);
+   section.append(date);
+   orders.append(section);
+  }
+ }catch{
+  orders.textContent='Unable to load your orders right now.';
+  const retry=document.createElement('button');
+  retry.type='button';
+  retry.textContent='Retry';
+  retry.addEventListener('click',()=>loadMyOrders(userId));
+  orders.append(retry);
+ }
+}
 const notifications=document.getElementById('notifications');
 
 async function loadMyNotifications(userId){
@@ -207,7 +320,7 @@ const {data:{user},error}=await supabase.auth.getUser();
 
 if(error||!user){
  who.innerHTML='<strong>Not signed in</strong><p><a href="./sign-in.html">Sign in</a> or <a href="./register.html">create an account</a>.</p>';
- orders.textContent='Sign in to view your orders when order history integration is complete.';
+ orders.textContent='Sign in to view your orders.';
  notifications.textContent='Sign in to view your notifications.';
 }else{
  const name=user.user_metadata?.full_name || user.email || 'Account';
@@ -316,8 +429,7 @@ if(error||!user){
   }
  });
 
- orders.textContent='Order history connection is pending. No orders are displayed until verified against Supabase.';
- await loadMyNotifications(user.id);
+ await Promise.all([loadMyOrders(user.id),loadMyNotifications(user.id)]);
 }
 </script>
 
