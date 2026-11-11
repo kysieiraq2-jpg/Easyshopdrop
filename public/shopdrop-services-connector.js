@@ -1,8 +1,7 @@
 
  // Shop&Drop Phase 6C — Other Services connector.
- // Preserves approved public service listings.
- // Adds location and coverage information.
- // Preserves authenticated service booking preparation.
+ // Approved public listings and service-area matching.
+ // Existing authenticated booking safeguards preserved.
  // No live payments, payouts or provider activation.
 
 (function () {
@@ -14,8 +13,8 @@
   const key =
     'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';
 
-  // Location helpers.
-  // No private provider addresses are returned.
+  // Public location helpers.
+  // Never expose private provider addresses.
 
   function normalized(value) {
     return String(value || '')
@@ -95,8 +94,8 @@
     );
   }
 
-  // Existing public approved-service search preserved.
-  // Optional location object supports town/province matching.
+  // Approved-service search.
+  // Uses the customer's selected town and province.
   // Supabase RLS remains authoritative.
 
   async function search(term, location = {}) {
@@ -107,7 +106,8 @@
       'id,title,description,category,subcategory,' +
       'pricing_unit,price,currency,country_code,' +
       'location,listing_status,base_town,' +
-      'base_province,coverage_mode,covered_areas'
+      'base_province,coverage_mode,covered_areas,' +
+      'minimum_booking_units'
     );
 
     query.set('listing_status', 'eq.approved');
@@ -141,11 +141,24 @@
 
     const needle = normalized(term);
 
-    const town =
-      String(location?.town || '').trim();
+    // Read the location selected in the existing
+    // customer service booking interface.
 
-    const province =
-      String(location?.province || '').trim();
+    const town = String(
+      location?.town ??
+      document.getElementById(
+        'shopdropBuyerTown'
+      )?.value ??
+      ''
+    ).trim();
+
+    const province = String(
+      location?.province ??
+      document.getElementById(
+        'shopdropBuyerProvince'
+      )?.value ??
+      ''
+    ).trim();
 
     return rows
       .filter(row =>
@@ -168,7 +181,11 @@
             normalized(value).includes(needle)
           )
         ) &&
-        coversCustomerArea(row, town, province)
+        coversCustomerArea(
+          row,
+          town,
+          province
+        )
       )
       .map(row => {
         const providerCents = Math.round(
@@ -189,6 +206,7 @@
           title: row.title,
           description: row.description,
           category: row.category,
+
           pricing_unit:
             row.pricing_unit || 'service',
 
@@ -198,16 +216,18 @@
           shopdrop_fee_cents:
             feeCents,
 
-          // Display customer total including
-          // the buyer-paid marketplace fee.
-          // The backend remains authoritative.
+          // Customer display includes Shop&Drop's fee.
+          // Backend calculation remains authoritative.
           unit_price_cents:
             providerCents + feeCents,
 
           currency_code:
             row.currency || 'ZAR',
 
-          minimum_units: 1,
+          minimum_units:
+            Number(row.minimum_booking_units) > 0
+              ? Number(row.minimum_booking_units)
+              : 1,
 
           base_town:
             row.base_town || null,
@@ -228,7 +248,7 @@
   }
 
   // Secure booking preparation.
-  // Existing authenticated Supabase booking RPC preserved.
+  // Location is verified by Supabase before booking.
   // No payment session or charge is created.
 
   let clientPromise = null;
@@ -333,7 +353,9 @@
     serviceId,
     requestId,
     bookingDate = null,
-    bookingTime = null
+    bookingTime = null,
+    serviceTown = '',
+    serviceProvince = ''
   } = {}) {
     if (!validUuid(serviceId)) {
       throw new Error(
@@ -359,18 +381,42 @@
       );
     }
 
+    const town = String(
+      serviceTown || ''
+    ).trim();
+
+    const province = String(
+      serviceProvince || ''
+    ).trim();
+
+    if (
+      town.length < 2 ||
+      town.length > 120 ||
+      province.length < 2 ||
+      province.length > 120
+    ) {
+      throw new Error(
+        'Enter a valid service town and province before booking.'
+      );
+    }
+
     const client =
       await authenticatedClient();
 
+    // Supabase checks provider coverage, ownership,
+    // booking reference and existing booking safeguards.
+
     const { data, error } = await client.rpc(
-      'shopdrop_create_service_booking',
+      'shopdrop_create_located_service_booking',
       {
         p_service_id: serviceId,
         p_request_id: requestId,
         p_booking_date:
           bookingDate || null,
         p_booking_time:
-          bookingTime || null
+          bookingTime || null,
+        p_service_town: town,
+        p_service_province: province
       }
     );
 
@@ -392,6 +438,8 @@
       booking_id: data,
       service_id: serviceId,
       request_id: requestId,
+      service_town: town,
+      service_province: province,
       payment_status: 'pending',
       payment_provider_status:
         'not_activated',
