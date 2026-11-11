@@ -210,10 +210,9 @@ root.append(card);
 }
 
 /*
- SHOPDROP FIX 5
- Read-only customer submission details.
- Uses existing administrator-only Supabase RPC.
- Does not modify payments, refunds or payouts.
+ SHOPDROP FIX 5 — Preserved.
+ Administrator-only customer submission viewer.
+ FIX 6E adds protected contact information.
 */
 async function showSubmissionDetails(record,container,button){
 if(!await authorized())return;
@@ -248,7 +247,9 @@ const details=[
 ['Transaction reference',data.transaction_reference],
 ['Created',data.created_at
  ?new Date(data.created_at).toLocaleString('en-ZA')
- :'—']
+ :'—'],
+['Reply email',data.reply_email],
+['Reply WhatsApp',data.reply_whatsapp]
 ];
 
 for(const [label,value] of details){
@@ -263,8 +264,9 @@ container.append(paragraph);
 
 const notice=node(
 'p',
-'This is a read-only customer submission. '+
-'Reviewing it does not release money, '+
+'Customer contact information is for authorised '+
+'administrator case handling only. '+
+'Viewing this submission does not release money, '+
 'approve a refund or automatically hold a payout.'
 );
 notice.className='muted';
@@ -280,6 +282,212 @@ node('p',
 )
 );
 button.textContent='Retry submission details';
+}finally{
+button.disabled=false;
+}
+}
+
+/*
+ SHOPDROP FIX 6E
+ Customer complaint and dispute investigation.
+
+ Uses separate administrator-only review functions.
+ Does not change the original integration event.
+ Does not release funds, approve refunds or change
+ the underlying financial dispute status.
+*/
+async function showCustomerCaseReview(record,container,button){
+if(!await authorized())return;
+
+button.disabled=true;
+container.replaceChildren(
+node('p','Loading investigation...')
+);
+
+try{
+const {data,error}=await supabase.rpc(
+'shopdrop_admin_customer_submission_review',{
+p_case_id:record.case_id
+}
+);
+
+if(error)throw error;
+if(!data||typeof data!=='object'){
+throw Error('Unexpected investigation response');
+}
+
+container.replaceChildren();
+
+container.append(
+node('h3','Customer Case Investigation')
+);
+
+container.append(
+node('p',
+'Current review status: '+
+(data.review_status||'received')
+)
+);
+
+const history=node('div');
+history.append(node('h3','Investigation History'));
+
+const notes=Array.isArray(data.notes)?data.notes:[];
+
+if(!notes.length){
+history.append(
+node('p','No investigation notes recorded.')
+);
+}else{
+for(const entry of notes){
+const item=node('div');
+item.className='panel';
+
+item.append(
+node('strong',entry.status||'Review'),
+node('p',entry.note||'—'),
+node('p',
+entry.created_at
+?new Date(entry.created_at).toLocaleString('en-ZA')
+:'—'
+)
+);
+
+history.append(item);
+}
+}
+
+container.append(history);
+
+const noteLabel=node('label','Investigation note');
+const note=node('textarea');
+note.placeholder=
+'Enter investigation findings or decision';
+note.maxLength=2000;
+note.setAttribute(
+'aria-label','Customer case investigation note'
+);
+
+container.append(noteLabel,note);
+
+const statusLabel=node('label','Review status');
+const select=node('select');
+
+select.setAttribute(
+'aria-label','Customer case review status'
+);
+
+select.style.display='block';
+select.style.width='100%';
+select.style.padding='10px';
+select.style.margin='8px 0';
+select.style.font='inherit';
+
+const choices=[
+['received','Received'],
+['in_review','Under investigation'],
+['resolved','Resolved'],
+['closed','Closed']
+];
+
+for(const [value,label] of choices){
+const option=node('option',label);
+option.value=value;
+select.append(option);
+}
+
+select.value=choices.some(
+item=>item[0]===data.review_status
+)?data.review_status:'received';
+
+container.append(statusLabel,select);
+
+const save=node(
+'button','Save investigation decision'
+);
+save.type='button';
+
+const feedback=node('p');
+feedback.setAttribute('role','status');
+feedback.setAttribute('aria-live','polite');
+
+save.onclick=async()=>{
+const investigationNote=note.value.trim();
+const nextStatus=select.value;
+
+if(
+investigationNote.length<10||
+investigationNote.length>2000
+){
+feedback.textContent=
+'Provide an investigation note of 10–2000 characters.';
+return;
+}
+
+if(!await authorized())return;
+
+if(!confirm(
+'Save this customer case review as '+nextStatus+'?'
+))return;
+
+save.disabled=true;
+feedback.textContent='Saving investigation...';
+
+try{
+const {data:result,error:saveError}=
+await supabase.rpc(
+'shopdrop_admin_update_customer_submission',{
+p_case_id:record.case_id,
+p_status:nextStatus,
+p_note:investigationNote
+}
+);
+
+if(saveError)throw saveError;
+
+if(result?.audited!==true){
+throw Error(
+'Audit confirmation was not received'
+);
+}
+
+feedback.textContent=
+'Investigation saved and audited.';
+
+await showCustomerCaseReview(
+record,container,button
+);
+
+}catch(error){
+feedback.textContent=
+'Unable to save: '+
+(error?.message||'Unknown error');
+}finally{
+save.disabled=false;
+}
+};
+
+container.append(save,feedback);
+
+const notice=node(
+'p',
+'Customer-service review status only. '+
+'This action does not approve a refund, '+
+'resolve a financial dispute or release seller funds.'
+);
+notice.className='muted';
+container.append(notice);
+
+button.textContent='Hide investigation';
+
+}catch(error){
+container.replaceChildren(
+node('p',
+'Unable to load investigation: '+
+(error?.message||'Unknown error')
+)
+);
+button.textContent='Retry investigation';
 }finally{
 button.disabled=false;
 }
@@ -314,8 +522,8 @@ node('p',
 );
 
 /*
- FIX 5: Add details only for customer submissions.
- All original case categories remain unchanged.
+ FIX 5 preserved: Customer submission viewer.
+ FIX 6E: Add investigation controls separately.
 */
 if([
 'customer_feedback',
@@ -340,12 +548,39 @@ return;
 }
 
 details.hidden=false;
+
 await showSubmissionDetails(
 record,details,button
 );
 };
 
 card.append(button,details);
+
+const reviewButton=node(
+'button',
+'Open investigation'
+);
+reviewButton.type='button';
+
+const reviewContainer=node('div');
+reviewContainer.hidden=true;
+
+reviewButton.onclick=async()=>{
+if(!reviewContainer.hidden){
+reviewContainer.hidden=true;
+reviewContainer.replaceChildren();
+reviewButton.textContent='Open investigation';
+return;
+}
+
+reviewContainer.hidden=false;
+
+await showCustomerCaseReview(
+record,reviewContainer,reviewButton
+);
+};
+
+card.append(reviewButton,reviewContainer);
 }
 
 root.append(card);
