@@ -237,7 +237,7 @@
       const notice=document.createElement('p');
       notice.className='muted';
       notice.textContent=
-        'Add products to your shopping bag. '+
+        'Shop from one seller per shopping bag. '+
         'Stock is reserved during secure checkout, '+
         'not while browsing. '+
         'Seller contact details remain private.';
@@ -359,8 +359,9 @@
 
         }catch(e){
           cartStatus.textContent=
-            e?.message||
-            'Unable to update shopping bag.';
+            String(e?.message||'').includes('one_seller_per_bag')
+              ? 'Your bag contains items from another seller. Complete that purchase or remove those items first.'
+              : (e?.message||'Unable to update shopping bag.');
         }finally{
           cartButton.disabled=false;
         }

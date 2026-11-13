@@ -17,7 +17,7 @@
 <input id="phase6CourierQuery" type="search" placeholder="Search courier name" autocomplete="off">
 <div id="phase6CourierResults" role="status" aria-live="polite"></div>
 <p class="muted" id="phase6CourierSelection">No courier selected. Live quotations and bookings are not enabled.</p>
-</section><section class="panel"><h2>Order confirmation</h2><p>Preview checkout only: no payment or courier booking occurs on GitHub Pages. The live checkout will show each seller portion, its eligible courier options and delivery charge, applicable taxes where required, the complete Shop&Drop order total and available payment methods before confirmation. One buyer payment is preferred where supported.</p><button id="previewOrderButton" onclick="place()">Preview order</button><div id="orderStatus" role="status" aria-live="polite"></div></section></main><script src="./common.js"></script>
+</section><section class="panel"><h2>Order confirmation</h2><p>Preview checkout only: no payment or courier booking occurs on GitHub Pages. The live checkout will show the chosen seller items, eligible courier options and delivery charge, applicable taxes where required, the complete Shop&Drop order total and available payment methods before confirmation. One buyer payment is preferred where supported.</p><button id="previewOrderButton" onclick="place()">Preview order</button><div id="orderStatus" role="status" aria-live="polite"></div></section></main><script src="./common.js"></script>
 <script src="./v26-consolidated.js"></script><script src="./geo.js"></script><script src="./shopdrop-payment-selection.js"></script>
 <script src="./supabase-adapter.js"></script>
 <script src="./shopdrop-checkout-connector.js"></script>
@@ -25,7 +25,7 @@
 <section id="v26CheckoutExtension">
   <!-- V26_CHECKOUT_EXTENSION -->
   <h2>V26 Checkout & Fulfilment</h2>
-  <p>One buyer order may contain items from multiple sellers. Each seller/listing allocation remains linked under the existing V25.24 order/fulfilment model.</p>
+  <p><strong>IMPORTANT: ONE SELLER PER CHECKOUT.</strong> You may buy several items from the same seller in one order. Items from another seller require a separate shopping bag and checkout.</p>
   <p>Order, payment, shipment and payout references are carried through the transaction chain. Payment methods are selected according to supported country/currency/provider capabilities.</p>
   <p>The existing V25.24 progressive/configurable marketplace service-fee and trusted server-side checkout calculations remain authoritative.</p>
 </section>

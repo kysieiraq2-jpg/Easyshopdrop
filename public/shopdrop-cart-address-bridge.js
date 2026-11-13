@@ -118,7 +118,7 @@
         select.add(new Option([addr.address_label,addr.address_line_1,addr.city,addr.country_code].filter(Boolean).join(' — '),addr.id));
         if(addr.is_default) select.value=addr.id;
       }
-      say('Cart and addresses loaded securely. Secure order creation available; payment is not yet enabled.');
+      say('One seller per checkout. You may purchase multiple items from this seller. Payment is not yet enabled.');
     } catch(e) {say('Cannot load cart/addresses: '+e.message);}
   }
   async function change(item,quantity){
@@ -222,7 +222,7 @@
       }
       say(reference ? 'Secure order created: '+reference+'. Select a verified courier quote, then continue to payment.' : 'Secure order request accepted. No payment taken. Check your order status before trying again.');
       // Keep the stable request ID until checkout/payment is safely completed.
-    } catch(e) {say('Order creation failed: '+(e?.message||'Please try again.'));}
+    } catch(e) {const msg=String(e?.message||'');say(msg.includes('one_seller_per_checkout')?'Only one seller is permitted per checkout. Please purchase from each seller separately.':'Order creation failed: '+(msg||'Please try again.'));}
     finally {creatingOrder=false;if(button)button.disabled=false;}
   }
   const button=$('previewOrderButton');
