@@ -55,24 +55,32 @@ a{color:#0f766e}
 </section>
 
 <section class="panel" id="service-arrival-pin-panel">
-<h2>My Service Arrival PIN</h2>
-<p class="muted">For a paid service booking, enter the booking ID from your confirmation. Share the PIN only when the provider arrives. Sharing it authorizes arrival confirmation and may initiate provider payout.</p>
+<h2>My Service Completion PIN</h2>
+<p class="muted">For a paid Other Services booking, keep this six-digit PIN until the work is fully completed. You may share it with your authorized recipient, who can give it to the service provider after completion. Never share it at arrival.</p>
 <label for="serviceBookingId">Service booking ID</label>
 <input id="serviceBookingId" type="text" autocomplete="off" spellcheck="false" placeholder="Booking ID" style="width:min(100%,370px)">
-<button type="button" id="showServicePin">View Arrival PIN</button>
+<button type="button" id="showServicePin">View Completion PIN</button>
 <p id="servicePinMessage" role="status" aria-live="polite"></p>
-<output id="servicePinValue" aria-label="Service arrival PIN" style="font-size:1.5rem;font-weight:bold"></output>
-<p class="muted">Only share your PIN when the provider is physically present.</p>
+<output id="servicePinValue" aria-label="Service completion PIN" style="font-size:1.5rem;font-weight:bold"></output>
+<p class="muted">Only share this PIN after the agreed service has been fully completed.</p>
 </section>
 
 <section class="panel" id="dispatch-arrival-pin-panel">
-<h2>My Dispatch Arrival PIN</h2>
-<p class="muted">For a paid vehicle-dispatch booking, enter your booking ID. Only give the PIN to the vehicle provider when they arrive at the agreed location.</p>
+<h2>My Dispatch Completion PIN</h2>
+<p class="muted">For a paid dispatch booking, keep this six-digit PIN until the entire delivery job is complete. You may share it with your authorized receiver at the delivery destination. Only give it to the assigned transport provider after completed delivery.</p>
 <label for="dispatchBookingId">Dispatch booking ID</label>
 <input id="dispatchBookingId" type="text" autocomplete="off" spellcheck="false" placeholder="Booking ID" style="width:min(100%,370px)">
-<button type="button" id="showDispatchPin">View Dispatch Arrival PIN</button>
+<button type="button" id="showDispatchPin">View Dispatch Completion PIN</button>
 <p id="dispatchPinMessage" role="status" aria-live="polite"></p>
-<output id="dispatchPinValue" aria-label="Dispatch arrival PIN" style="font-size:1.5rem;font-weight:bold"></output>
+<output id="dispatchPinValue" aria-label="Dispatch completion PIN" style="font-size:1.5rem;font-weight:bold"></output>
+</section>
+
+<section class="panel" id="provider-completion-panel">
+<h2>Providers — Confirm Completed Work</h2>
+<p>For Other Services and Dispatching: after completing your paid job, obtain the six-digit Completion PIN from the customer or their authorized receiver.</p>
+<p><strong>The provider must enter that PIN securely into Shop&amp;Drop.</strong> One valid completion PIN is sufficient for the agreed completion milestone, subject to payment and dispute safeguards.</p>
+<p><a href="./shopdrop-provider-completion.html">Open Provider Completion PIN Form</a></p>
+<p class="muted">This prepares provider-held payment for release. Live transfers remain disabled pending approval.</p>
 </section>
 
 <section class="panel">
@@ -333,7 +341,7 @@ async function loadMyNotifications(userId){
 // Standard UUID validation for both booking types.
 // Correct format: 8-4-4-4-12 hexadecimal characters.
 const validBookingId = value =>
- /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+ /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value);
 
 const {data:{user},error}=await supabase.auth.getUser();
 
@@ -483,7 +491,7 @@ pickupForm.addEventListener('submit',async event=>{
    }
 
    pinOutput.textContent=data;
-   pinMessage.textContent='Give this PIN to the provider only when they arrive.';
+   pinMessage.textContent='Give this PIN to the service provider only after the job is fully completed.';
   }catch{
    pinMessage.textContent='PIN unavailable. Check your paid booking reference and expiry.';
   }finally{
@@ -521,7 +529,7 @@ pickupForm.addEventListener('submit',async event=>{
    }
 
    dispatchOutput.textContent=data;
-   dispatchMessage.textContent='Only share this PIN when the vehicle provider arrives.';
+   dispatchMessage.textContent='Share this PIN with the assigned transport provider only after delivery is completed.';
   }catch{
    dispatchMessage.textContent='PIN unavailable. Check the paid booking reference and expiry.';
   }finally{

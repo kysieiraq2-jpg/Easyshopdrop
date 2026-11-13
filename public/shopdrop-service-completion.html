@@ -29,10 +29,10 @@ button.secondary{background:#334155}
 <body>
 <main>
 <a href="./account.html">&larr; My Account</a>
-<h1>Service Completion Evidence</h1>
+<h1>Other Services — Completion</h1>
 <p>For providers completing cleaning, pest control, repairs and other booked services on Shop&amp;Drop.</p>
 <div class="notice">
-<strong>Important:</strong> Submit photographs only after completing the agreed work.
+<strong>Optional photographs:</strong> You may submit photographs after completing the agreed work. Photographs are supporting evidence, not an additional routine PIN-payment requirement.
 Photos are stored privately and checked against the paid booking.
 This page records evidence; it does <strong>not</strong> authorize or send a payout.
 The payment provider and completion-verification system are still in prelaunch development.
@@ -60,7 +60,12 @@ The payment provider and completion-verification system are still in prelaunch d
 <p class="muted">The second button helps if a previous upload succeeded but the registration confirmation was interrupted. It does not upload files again.</p>
 <p id="message" role="status" aria-live="polite"></p>
 </section>
-<p class="muted">If the customer supplies a six-digit completion PIN, that separate verification option will be connected in a later update. Never share account passwords or arrival codes as completion evidence.</p>
+<section class="panel">
+<h2>Confirm completed work with a customer PIN</h2>
+<p>After you finish the agreed service, ask the paying customer or authorized recipient for their six-digit Completion PIN. Enter it using the secure provider form. Do not request or submit it before finishing.</p>
+<p><a href="./shopdrop-provider-completion.html?booking_type=service">Submit Service Completion PIN</a></p>
+<p class="muted">Photographs on this page are optional supporting evidence. No live payment is released from this page.</p>
+</section>
 </main>
 <script type="module">
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
