@@ -31,30 +31,17 @@ jobs:
           from pathlib import Path
           import subprocess
 
-          path = Path(
-              'supabase/functions/courier-tracking-webhook/index.ts'
-          )
-
+          path = Path('supabase/functions/courier-tracking-webhook/index.ts')
           original = path.read_text(encoding='utf-8')
-
-          expected_sha = (
-              '7f1d14d91df8444b62ffbc3d81c5f10ec971d319'
-          )
-
+          expected_sha = '7f1d14d91df8444b62ffbc3d81c5f10ec971d319'
           actual_sha = subprocess.check_output(
-              ['git', 'hash-object', str(path)],
-              text=True
+              ['git', 'hash-object', str(path)], text=True
           ).strip()
 
           if actual_sha != expected_sha:
-              raise SystemExit(
-                  'STOP: Webhook changed. Nothing replaced.'
-              )
-
+              raise SystemExit('STOP: unexpected webhook revision; no changes')
           if len(original.splitlines()) != 1366:
-              raise SystemExit(
-                  'STOP: Unexpected webhook length.'
-              )
+              raise SystemExit('STOP: unexpected webhook length; no changes')
 
           required = [
               'scanner_event_code_required',
@@ -63,86 +50,63 @@ jobs:
               'handleNonDelivery(',
               'recordTrackingEvent(',
               'eventExists(',
-              'sendDeliveredToGateway'
+              'sendDeliveredToGateway',
           ]
-
           for marker in required:
               if marker not in original:
-                  raise SystemExit(
-                      'STOP: Previous fix missing: ' + marker
-                  )
+                  raise SystemExit('STOP: previous fix missing: ' + marker)
 
-          anchor = '''          description:
-            body.description ?? null,
-
-          source:
-            "authenticated_courier_webhook",'''
-
-          replacement = '''          description:
-            body.description ?? null,
-
-          // Fix33A: retain separately validated scanner data.
-          // This does not authorize seller payment.
-          scan_event_code:
-            normalize(
-              body.scan_event_code ?? body.scan_code ??
-              (normalize(body.event_type) === "scan" ? body.event_code : ""),
-            ) || null,
-          scan_occurred_at:
-            body.scan_occurred_at ?? null,
-
-          source:
-            "authenticated_courier_webhook",'''
+          # Build the exact indentation INSIDE strings; YAML cannot strip it.
+          anchor = chr(10).join([
+              '          description:',
+              '            body.description ?? null,',
+              '',
+              '          source:',
+              '            "authenticated_courier_webhook",',
+          ])
+          replacement = chr(10).join([
+              '          description:',
+              '            body.description ?? null,',
+              '',
+              '          // Fix33A: persist validated courier scanner evidence.',
+              '          // No PIN, financial or payout state changes.',
+              '          scan_event_code:',
+              '            normalize(',
+              '              body.scan_event_code ?? body.scan_code ??',
+              '              (normalize(body.event_type) === "scan" ? body.event_code : ""),',
+              '            ) || null,',
+              '          scan_occurred_at:',
+              '            body.scan_occurred_at ?? null,',
+              '',
+              '          source:',
+              '            "authenticated_courier_webhook",',
+          ])
 
           if original.count(anchor) != 1:
-              raise SystemExit(
-                  'STOP: Exact scanner-recording anchor missing.'
-              )
+              raise SystemExit('STOP: scanner-recording anchor mismatch')
 
-          updated = original.replace(
-              anchor,
-              replacement,
-              1
-          )
+          updated = original.replace(anchor, replacement, 1)
 
           if updated.replace(replacement, anchor, 1) != original:
-              raise SystemExit(
-                  'STOP: Preservation check failed.'
-              )
+              raise SystemExit('STOP: original source not preserved')
 
           if len(updated.splitlines()) != 1376:
-              raise SystemExit(
-                  'STOP: Unexpected change size.'
-              )
+              raise SystemExit('STOP: unexpected patch size')
 
           for marker in required:
               if marker not in updated:
-                  raise SystemExit(
-                      'STOP: A previous fix was lost.'
-                  )
+                  raise SystemExit('STOP: previous fix lost: ' + marker)
 
-          path.write_text(
-              updated,
-              encoding='utf-8'
-          )
-
-          print(
-              'Fix33A prepared: original 1366 lines preserved.'
-          )
-          print(
-              'Validated scanner metadata added without payout changes.'
-          )
+          path.write_text(updated, encoding='utf-8')
+          print('PASS: exact webhook preserved, 10 scanner metadata lines added')
           PY
 
       - name: Verify and commit integration branch only
         shell: bash
         run: |
           set -euo pipefail
-
           git diff --check
-
-          git add \
-            supabase/functions/courier-tracking-webhook/index.ts
+          git add supabase/functions/courier-tracking-webhook/index.ts
 
           git diff --cached --name-only | grep -Fx \
             'supabase/functions/courier-tracking-webhook/index.ts'
@@ -152,4 +116,3 @@ jobs:
               commit -m 'Fix33A preserve courier scanner event evidence'
 
           git push origin HEAD:shopdrop-phase6-integration
-
