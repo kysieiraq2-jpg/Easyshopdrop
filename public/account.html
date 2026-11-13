@@ -35,6 +35,25 @@ a{color:#0f766e}
 <div id="orders"></div>
 </section>
 
+
+<section class="panel" id="seller-courier-pickup-panel">
+<h2>Seller — Confirm Courier Collection</h2>
+<p><strong>IMPORTANT: ASK YOUR COURIER FOR THE SIX-DIGIT SHOP&amp;DROP COLLECTION PIN AT PICKUP.</strong></p>
+<p>Only enter the PIN after the courier has physically collected your sold item. Never confirm collection before handover. Keep your collection receipt.</p>
+<p class="muted">Authenticated courier tracking or scanning may alternatively confirm pickup. The buyer's delivery confirmation is separate.</p>
+<form id="sellerCourierPickupForm">
+<label for="sellerPickupShipment">Your shipment</label>
+<select id="sellerPickupShipment" required>
+<option value="">Select your shipment</option>
+</select>
+<label for="sellerCourierPickupPin">Six-digit code from courier</label>
+<input id="sellerCourierPickupPin" type="text" inputmode="numeric" autocomplete="off" maxlength="6" pattern="[0-9]{6}" required placeholder="123456">
+<p><label><input id="sellerPickupHandover" type="checkbox" required> I confirm the courier has physically collected this item.</label></p>
+<button type="submit" id="sellerPickupSubmit">Confirm Collection</button>
+</form>
+<p id="sellerPickupStatus" role="status" aria-live="polite"></p>
+</section>
+
 <section class="panel" id="service-arrival-pin-panel">
 <h2>My Service Arrival PIN</h2>
 <p class="muted">For a paid service booking, enter the booking ID from your confirmation. Share the PIN only when the provider arrives. Sharing it authorizes arrival confirmation and may initiate provider payout.</p>
@@ -352,6 +371,87 @@ if(error||!user){
  });
 
  who.append(signout);
+// Fix36E: authenticated seller pickup confirmation.
+// No PIN generation or payout instructions in browser code.
+const pickupForm=document.getElementById('sellerCourierPickupForm');
+const pickupShipments=document.getElementById('sellerPickupShipment');
+const pickupPin=document.getElementById('sellerCourierPickupPin');
+const pickupHandover=document.getElementById('sellerPickupHandover');
+const pickupStatus=document.getElementById('sellerPickupStatus');
+const pickupSubmit=document.getElementById('sellerPickupSubmit');
+
+try{
+ const {data:rows,error:shipmentError}=await supabase
+  .from('shipments')
+  .select('id,shipment_reference,tracking_number,shipment_status')
+  .eq('seller_id',user.id)
+  .order('created_at',{ascending:false})
+  .limit(40);
+
+ if(shipmentError)throw shipmentError;
+
+ for(const shipment of rows||[]){
+  const reference=shipment.shipment_reference||
+   shipment.tracking_number||shipment.id;
+  pickupShipments.add(new Option(
+   String(reference)+' — '+String(shipment.shipment_status||'Shipment'),
+   shipment.id
+  ));
+ }
+
+ if(!(rows||[]).length){
+  pickupStatus.textContent='No courier shipments are available for confirmation yet.';
+ }
+}catch{
+ pickupStatus.textContent='Your shipments are currently unavailable.';
+}
+
+pickupForm.addEventListener('submit',async event=>{
+ event.preventDefault();
+
+ const shipmentId=pickupShipments.value;
+ const pin=pickupPin.value.trim();
+
+ if(!/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(shipmentId) ||
+    !/^[0-9]{6}$/.test(pin) ||
+    !pickupHandover.checked){
+  pickupStatus.textContent='Select a shipment, enter the six-digit PIN and confirm physical handover.';
+  return;
+ }
+
+ pickupSubmit.disabled=true;
+ pickupStatus.textContent='Checking your courier collection PIN...';
+
+ try{
+  const {data,error:verifyError}=await supabase.functions.invoke(
+   'seller-confirm-courier-pickup',
+   {body:{
+    shipment_id:shipmentId,
+    pin:pin,
+    handover_confirmed:true
+   }}
+  );
+
+  if(verifyError || data?.verified!==true){
+   throw Error(data?.error||'Pickup verification was not accepted.');
+  }
+
+  pickupStatus.textContent=
+   data.staging_status==='staged'
+   ? 'Pickup verified. Release request prepared, subject to the approved payment provider and security checks.'
+   : 'Pickup PIN verified. Payment-release preparation is pending backend reconciliation.';
+
+  pickupPin.value='';
+  pickupHandover.checked=false;
+ }catch{
+  pickupStatus.textContent=
+   'Collection could not be confirmed. Check the shipment and PIN, or contact Shop&Drop support.';
+ }finally{
+  pickupSubmit.disabled=false;
+ }
+});
+
+
 
  const bookingInput=document.getElementById('serviceBookingId');
  const pinButton=document.getElementById('showServicePin');
