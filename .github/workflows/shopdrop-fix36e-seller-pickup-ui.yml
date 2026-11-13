@@ -1,1 +1,187 @@
 
+name: ShopDrop Fix36E - Seller Pickup Confirmation
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix36e-seller-pickup-ui.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  add-seller-pickup:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Add secure pickup confirmation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          path = Path('public/account.html')
+          original = path.read_text(encoding='utf-8')
+
+          expected_sha = '37d41e461af68bde81a398f184bf41ac2f1a0ee8'
+          actual_sha = subprocess.check_output(
+              ['git', 'hash-object', str(path)],
+              text=True
+          ).strip()
+
+          if actual_sha != expected_sha:
+              raise SystemExit('STOP: My Account changed. No replacement.')
+
+          section_anchor = '<section class="panel" id="service-arrival-pin-panel">'
+          js_anchor = '  who.append(signout);'
+
+          if original.count(section_anchor) != 1:
+              raise SystemExit('STOP: Account section anchor missing.')
+          if original.count(js_anchor) != 1:
+              raise SystemExit('STOP: Account script anchor missing.')
+
+          panel = """
+          <section class="panel" id="seller-courier-pickup-panel">
+          <h2>Seller — Confirm Courier Collection</h2>
+          <p><strong>IMPORTANT: ASK YOUR COURIER FOR THE SIX-DIGIT SHOP&amp;DROP COLLECTION PIN AT PICKUP.</strong></p>
+          <p>Only enter the PIN after the courier has physically collected your sold item. Never confirm collection before handover. Keep your collection receipt.</p>
+          <p class="muted">Authenticated courier tracking or scanning may alternatively confirm pickup. The buyer's delivery confirmation is separate.</p>
+          <form id="sellerCourierPickupForm">
+          <label for="sellerPickupShipment">Your shipment</label>
+          <select id="sellerPickupShipment" required>
+          <option value="">Select your shipment</option>
+          </select>
+          <label for="sellerCourierPickupPin">Six-digit code from courier</label>
+          <input id="sellerCourierPickupPin" type="text" inputmode="numeric" autocomplete="off" maxlength="6" pattern="[0-9]{6}" required placeholder="123456">
+          <p><label><input id="sellerPickupHandover" type="checkbox" required> I confirm the courier has physically collected this item.</label></p>
+          <button type="submit" id="sellerPickupSubmit">Confirm Collection</button>
+          </form>
+          <p id="sellerPickupStatus" role="status" aria-live="polite"></p>
+          </section>
+
+          """
+
+          javascript = """
+          // Fix36E: authenticated seller pickup confirmation.
+          // No PIN generation or payout instructions in browser code.
+          const pickupForm=document.getElementById('sellerCourierPickupForm');
+          const pickupShipments=document.getElementById('sellerPickupShipment');
+          const pickupPin=document.getElementById('sellerCourierPickupPin');
+          const pickupHandover=document.getElementById('sellerPickupHandover');
+          const pickupStatus=document.getElementById('sellerPickupStatus');
+          const pickupSubmit=document.getElementById('sellerPickupSubmit');
+
+          try{
+           const {data:rows,error:shipmentError}=await supabase
+            .from('shipments')
+            .select('id,shipment_reference,tracking_number,shipment_status')
+            .eq('seller_id',user.id)
+            .order('created_at',{ascending:false})
+            .limit(40);
+
+           if(shipmentError)throw shipmentError;
+
+           for(const shipment of rows||[]){
+            const reference=shipment.shipment_reference||
+             shipment.tracking_number||shipment.id;
+            pickupShipments.add(new Option(
+             String(reference)+' — '+String(shipment.shipment_status||'Shipment'),
+             shipment.id
+            ));
+           }
+
+           if(!(rows||[]).length){
+            pickupStatus.textContent='No courier shipments are available for confirmation yet.';
+           }
+          }catch{
+           pickupStatus.textContent='Your shipments are currently unavailable.';
+          }
+
+          pickupForm.addEventListener('submit',async event=>{
+           event.preventDefault();
+
+           const shipmentId=pickupShipments.value;
+           const pin=pickupPin.value.trim();
+
+           if(!validBookingId(shipmentId) ||
+              !/^[0-9]{6}$/.test(pin) ||
+              !pickupHandover.checked){
+            pickupStatus.textContent='Select a shipment, enter the six-digit PIN and confirm physical handover.';
+            return;
+           }
+
+           pickupSubmit.disabled=true;
+           pickupStatus.textContent='Checking your courier collection PIN...';
+
+           try{
+            const {data,error:verifyError}=await supabase.functions.invoke(
+             'seller-confirm-courier-pickup',
+             {body:{
+              shipment_id:shipmentId,
+              pin:pin,
+              handover_confirmed:true
+             }}
+            );
+
+            if(verifyError || data?.verified!==true){
+             throw Error(data?.error||'Pickup verification was not accepted.');
+            }
+
+            pickupStatus.textContent=
+             data.staging_status==='staged'
+             ? 'Pickup verified. Release request prepared, subject to the approved payment provider and security checks.'
+             : 'Pickup PIN verified. Payment-release preparation is pending backend reconciliation.';
+
+            pickupPin.value='';
+            pickupHandover.checked=false;
+           }catch{
+            pickupStatus.textContent=
+             'Collection could not be confirmed. Check the shipment and PIN, or contact Shop&Drop support.';
+           }finally{
+            pickupSubmit.disabled=false;
+           }
+          });
+
+          """
+
+          updated = original.replace(section_anchor, panel+section_anchor, 1)
+          updated = updated.replace(js_anchor, js_anchor+javascript, 1)
+
+          restored = updated.replace(js_anchor+javascript, js_anchor, 1)
+          restored = restored.replace(panel+section_anchor, section_anchor, 1)
+
+          if restored != original:
+              raise SystemExit('STOP: Preservation check failed.')
+
+          if len(updated) <= len(original):
+              raise SystemExit('STOP: File unexpectedly shortened.')
+
+          path.write_text(updated, encoding='utf-8')
+          print('PASS: Existing My Account code preserved.')
+          print('PASS: Seller pickup confirmation added.')
+          print('PASS: No payment or courier backend changed.')
+          PY
+
+      - name: Verify and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git add public/account.html
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix36E add seller courier pickup confirmation'
+
+          git push origin HEAD:shopdrop-phase6-integration
+
