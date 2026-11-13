@@ -1,1 +1,322 @@
 
+name: ShopDrop Fix37D - Safe Completion UI Repair
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix37d-completion-ui-repair.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair-completion-ui:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Safely apply original verified changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import ast
+          import subprocess
+          import textwrap
+          from pathlib import Path
+
+          original_workflow = Path(
+              '.github/workflows/shopdrop-fix37d-completion-ui.yml'
+          )
+
+          expected_workflow_sha = (
+              'c2c3a2aec3b0bbf90c45a1e0b65eaeca82664686'
+          )
+
+          actual = subprocess.check_output(
+              ['git', 'hash-object', str(original_workflow)],
+              text=True
+          ).strip()
+
+          if actual != expected_workflow_sha:
+              raise SystemExit(
+                  'STOP: Original Fix37D workflow changed.'
+              )
+
+          source = original_workflow.read_text(
+              encoding='utf-8'
+          )
+
+          marker = "python3 - <<'PY'\n"
+          ending = "\n          PY\n"
+
+          if source.count(marker) != 1:
+              raise SystemExit(
+                  'STOP: Original Python block not unique.'
+              )
+
+          extracted = source.split(marker, 1)[1]
+
+          if ending not in extracted:
+              raise SystemExit(
+                  'STOP: Original Python block incomplete.'
+              )
+
+          script = textwrap.dedent(
+              extracted.split(ending, 1)[0]
+          )
+
+          # Read original source as data. Never execute it.
+          module = ast.parse(script)
+
+          required = {
+              'expected',
+              'account',
+              'service',
+              'dispatch',
+              'services',
+              'page',
+              'endpoint',
+          }
+
+          values = {}
+
+          for statement in module.body:
+              if not isinstance(statement, ast.Assign):
+                  continue
+
+              if len(statement.targets) != 1:
+                  continue
+
+              target = statement.targets[0]
+
+              if (
+                  isinstance(target, ast.Name)
+                  and target.id in required
+              ):
+                  values[target.id] = ast.literal_eval(
+                      statement.value
+                  )
+
+          if set(values) != required:
+              raise SystemExit(
+                  'STOP: Required source sections missing.'
+              )
+
+          expected = values['expected']
+
+          if len(expected) != 4:
+              raise SystemExit(
+                  'STOP: Unexpected original file count.'
+              )
+
+          original = {}
+          updated = {}
+
+          for path, sha in expected.items():
+              current_sha = subprocess.check_output(
+                  ['git', 'hash-object', path],
+                  text=True
+              ).strip()
+
+              if current_sha != sha:
+                  raise SystemExit(
+                      'STOP: Existing file changed: ' + path
+                  )
+
+              original[path] = Path(path).read_text(
+                  encoding='utf-8'
+              )
+
+              updated[path] = original[path]
+
+          changed = 0
+
+          # Recover the 20 approved replacements.
+          # Apply only exact, unique matching text.
+          for statement in module.body:
+              if not isinstance(statement, ast.Expr):
+                  continue
+
+              call = statement.value
+
+              if not isinstance(call, ast.Call):
+                  continue
+
+              if not isinstance(call.func, ast.Name):
+                  continue
+
+              if call.func.id != 'patch':
+                  continue
+
+              if len(call.args) != 3:
+                  raise SystemExit(
+                      'STOP: Unexpected patch structure.'
+                  )
+
+              file_variable = call.args[0]
+
+              if not isinstance(file_variable, ast.Name):
+                  raise SystemExit(
+                      'STOP: Unexpected file reference.'
+                  )
+
+              path = values.get(file_variable.id)
+
+              if path not in expected:
+                  raise SystemExit(
+                      'STOP: Unexpected target file.'
+                  )
+
+              before = ast.literal_eval(call.args[1])
+              after = ast.literal_eval(call.args[2])
+
+              if not before or not after:
+                  raise SystemExit(
+                      'STOP: Empty replacement prohibited.'
+                  )
+
+              current = updated[path]
+
+              if current.count(before) != 1:
+                  raise SystemExit(
+                      'STOP: Text anchor mismatch: ' + path
+                  )
+
+              position = current.index(before)
+
+              # Exact anchored replacement preserves the
+              # complete original prefix and suffix.
+              revised = (
+                  current[:position]
+                  + after
+                  + current[position + len(before):]
+              )
+
+              if (
+                  revised[:position] != current[:position]
+                  or revised[position + len(after):]
+                  != current[position + len(before):]
+              ):
+                  raise SystemExit(
+                      'STOP: Unexpected surrounding change.'
+                  )
+
+              updated[path] = revised
+              changed += 1
+
+          if changed != 20:
+              raise SystemExit(
+                  'STOP: Expected 20 approved replacements, got '
+                  + str(changed)
+              )
+
+          new_files = {
+              'public/shopdrop-provider-completion.html':
+                  values['page'],
+              'supabase/functions/confirm-provider-completion-pin/index.ts':
+                  values['endpoint'],
+          }
+
+          for path, content in new_files.items():
+              if Path(path).exists():
+                  raise SystemExit(
+                      'STOP: New file already exists: ' + path
+                  )
+
+              if not content.strip():
+                  raise SystemExit(
+                      'STOP: Empty new file: ' + path
+                  )
+
+          if (
+              'confirm-provider-completion-pin'
+              not in new_files[
+                  'public/shopdrop-provider-completion.html'
+              ]
+          ):
+              raise SystemExit(
+                  'STOP: Provider form not connected.'
+              )
+
+          if (
+              'shopdrop_confirm_provider_completion_pin'
+              not in new_files[
+                  'supabase/functions/confirm-provider-completion-pin/index.ts'
+              ]
+          ):
+              raise SystemExit(
+                  'STOP: Backend RPC connection missing.'
+              )
+
+          if not all(
+              len(updated[p]) >= len(original[p])
+              for p in expected
+          ):
+              raise SystemExit(
+                  'STOP: Unexpected existing file shortening.'
+              )
+
+          # All validation completed before writing.
+          for path in expected:
+              Path(path).write_text(
+                  updated[path],
+                  encoding='utf-8'
+              )
+
+              print(
+                  'PASS:',
+                  path,
+                  len(original[path]),
+                  '->',
+                  len(updated[path])
+              )
+
+          for path, content in new_files.items():
+              Path(path).parent.mkdir(
+                  parents=True,
+                  exist_ok=True
+              )
+
+              Path(path).write_text(
+                  content.rstrip('\n') + '\n',
+                  encoding='utf-8'
+              )
+
+              print('CREATED:', path)
+
+          print('PASS: 20 exact replacements.')
+          print('PASS: All existing file hashes verified.')
+          print('PASS: Four original pages preserved.')
+          print('PASS: Two new files created.')
+          print('PASS: No live payments or payouts enabled.')
+          PY
+
+      - name: Commit corrected Fix37D
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git diff --check
+
+          git add public/account.html
+          git add public/shopdrop-service-completion.html
+          git add public/dispatching.html
+          git add public/services.html
+          git add public/shopdrop-provider-completion.html
+          git add supabase/functions/confirm-provider-completion-pin/index.ts
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix37D verified customer and provider completion PIN UI'
+
+          git push origin HEAD:shopdrop-phase6-integration
+
