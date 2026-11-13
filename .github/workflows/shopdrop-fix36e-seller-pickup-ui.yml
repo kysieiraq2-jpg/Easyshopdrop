@@ -43,7 +43,7 @@ jobs:
               raise SystemExit('STOP: My Account changed. No replacement.')
 
           section_anchor = '<section class="panel" id="service-arrival-pin-panel">'
-          js_anchor = '  who.append(signout);'
+          js_anchor = ' who.append(signout);'
 
           if original.count(section_anchor) != 1:
               raise SystemExit('STOP: Account section anchor missing.')
@@ -113,7 +113,7 @@ jobs:
            const shipmentId=pickupShipments.value;
            const pin=pickupPin.value.trim();
 
-           if(!validBookingId(shipmentId) ||
+           if(!/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(shipmentId) ||
               !/^[0-9]{6}$/.test(pin) ||
               !pickupHandover.checked){
             pickupStatus.textContent='Select a shipment, enter the six-digit PIN and confirm physical handover.';
@@ -184,4 +184,3 @@ jobs:
               commit -m 'Fix36E add seller courier pickup confirmation'
 
           git push origin HEAD:shopdrop-phase6-integration
-
