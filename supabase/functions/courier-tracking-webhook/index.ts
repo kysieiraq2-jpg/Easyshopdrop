@@ -443,6 +443,16 @@ async function recordTrackingEvent(
           description:
             body.description ?? null,
 
+          // Fix33A: persist validated courier scanner evidence.
+          // No PIN, financial or payout state changes.
+          scan_event_code:
+            normalize(
+              body.scan_event_code ?? body.scan_code ??
+              (normalize(body.event_type) === "scan" ? body.event_code : ""),
+            ) || null,
+          scan_occurred_at:
+            body.scan_occurred_at ?? null,
+
           source:
             "authenticated_courier_webhook",
         },
