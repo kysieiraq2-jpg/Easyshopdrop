@@ -1792,7 +1792,7 @@ Deno.serve(
             .map((row: Record<string, unknown>) =>
               `${String(row.product_name ?? "Product").replace(/[\\r\\n]+/g, " ").slice(0, 120)} | Product: ${clean(row.product_id)} | Quantity: ${String(row.quantity ?? "")}`
             ),
-          "Prepare the parcel for courier collection. Check Shop&Drop for fulfilment instructions.",
+          "Prepare the parcel. IMPORTANT: at pickup ask the courier for the six-digit Shop&Drop COLLECTION PIN. Submit it in My Account only AFTER physical handover. Keep your receipt. Authenticated courier tracking or scanning can alternatively verify collection. The buyer delivery PIN is separate.",
         ].join("\n"),
         );
 
@@ -1815,7 +1815,7 @@ Deno.serve(
             .map((row: Record<string, unknown>) =>
               `${String(row.product_name ?? "Product").replace(/[\\r\\n]+/g, " ").slice(0, 120)} | Product: ${clean(row.product_id)} | Quantity: ${String(row.quantity ?? "")}`
             ),
-          "Prepare the parcel for courier collection. Check Shop&Drop for fulfilment instructions.",
+          "Prepare the parcel. IMPORTANT: at pickup ask the courier for the six-digit Shop&Drop COLLECTION PIN. Submit it in My Account only AFTER physical handover. Keep your receipt. Authenticated courier tracking or scanning can alternatively verify collection. The buyer delivery PIN is separate.",
         ].join("\n"),
           "email",
         );

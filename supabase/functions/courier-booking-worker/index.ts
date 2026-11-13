@@ -617,6 +617,14 @@ async function bookWithProvider(
         handoff.dropoff.country_code,
     },
 
+    pickup_confirmation: {
+    method: "courier_issued_shopdrop_six_digit_pin",
+    instructions: "After verified payment and booking, Shop&Drop issues the collection PIN separately through an approved secure courier channel. Give the PIN to the seller or authorized handover person ONLY AFTER physically taking the parcel. The seller submits the PIN in Shop&Drop My Account. Courier tracking or scanning can alternatively confirm pickup. Buyer delivery confirmation is separate.",
+    pin_in_initial_booking: false,
+    verified_payment_required: true,
+    buyer_delivery_confirmation_separate: true,
+    },
+
     items: courierItems,
 
     booking_payload:
@@ -1441,7 +1449,7 @@ async function processBooking(
       "selected courier"
     }. Tracking reference: ${
       result.tracking_number
-    }. Please prepare the parcel for collection.`,
+    }. Prepare the parcel. IMPORTANT: at pickup ask the courier for the six-digit Shop&Drop COLLECTION PIN. Submit it in My Account only after physical handover. Keep the receipt. Authenticated tracking or scanning can alternatively confirm pickup. Do not use this as the buyer delivery PIN.`,
   );
 
 
