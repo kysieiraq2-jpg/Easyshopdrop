@@ -1,1 +1,149 @@
 
+name: ShopDrop Fix34 - One Seller Checkout UI
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix34-one-seller-checkout-ui.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  preserve-and-update:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Add single-seller buyer instructions
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          files = {
+            'public/checkout.html':
+              '3319c8a7d8f41a15f18256ea9038fef616df5210',
+            'public/shopdrop-product-detail-supabase.js':
+              'b2250030e42b0fde9d0d06be4ded17eeb880dbc2',
+            'public/shopdrop-cart-address-bridge.js':
+              '0980352e9482df4ed392fb60f96bc9004bc73c8f',
+          }
+
+          patches = {
+            'public/checkout.html': [
+              (
+                '<p>One buyer order may contain items from multiple sellers. Each seller/listing allocation remains linked under the existing V25.24 order/fulfilment model.</p>',
+                '<p><strong>IMPORTANT: ONE SELLER PER CHECKOUT.</strong> You may buy several items from the same seller in one order. Items from another seller require a separate shopping bag and checkout.</p>'
+              ),
+              (
+                'The live checkout will show each seller portion, its eligible courier options and delivery charge',
+                'The live checkout will show the chosen seller items, eligible courier options and delivery charge'
+              ),
+            ],
+            'public/shopdrop-product-detail-supabase.js': [
+              (
+                "'Add products to your shopping bag. '+",
+                "'Shop from one seller per shopping bag. '+"
+              ),
+              (
+                "cartStatus.textContent=\n            e?.message||\n            'Unable to update shopping bag.';",
+                "cartStatus.textContent=\n            String(e?.message||'').includes('one_seller_per_bag')\n              ? 'Your bag contains items from another seller. Complete that purchase or remove those items first.'\n              : (e?.message||'Unable to update shopping bag.');"
+              ),
+            ],
+            'public/shopdrop-cart-address-bridge.js': [
+              (
+                "      say('Cart and addresses loaded securely. Secure order creation available; payment is not yet enabled.');",
+                "      say('One seller per checkout. You may purchase multiple items from this seller. Payment is not yet enabled.');"
+              ),
+              (
+                "    } catch(e) {say('Order creation failed: '+(e?.message||'Please try again.'));}",
+                "    } catch(e) {const msg=String(e?.message||'');say(msg.includes('one_seller_per_checkout')?'Only one seller is permitted per checkout. Please purchase from each seller separately.':'Order creation failed: '+(msg||'Please try again.'));}"
+              ),
+            ],
+          }
+
+          # Check EVERY original file before writing ANY change.
+          originals = {}
+
+          for filename, expected in files.items():
+              path = Path(filename)
+
+              actual = subprocess.check_output(
+                  ['git', 'hash-object', filename],
+                  text=True
+              ).strip()
+
+              if actual != expected:
+                  raise SystemExit(
+                      'STOP: Source changed; preserved ' + filename
+                  )
+
+              content = path.read_text(encoding='utf-8')
+
+              for before, after in patches[filename]:
+                  if content.count(before) != 1:
+                      raise SystemExit(
+                          'STOP: Expected text mismatch: ' + filename
+                      )
+
+              originals[filename] = content
+
+          # Make only the verified text additions.
+          for filename, original in originals.items():
+              updated = original
+
+              for before, after in patches[filename]:
+                  updated = updated.replace(before, after, 1)
+
+              # Confirm exact reversibility.
+              restored = updated
+              for before, after in reversed(patches[filename]):
+                  restored = restored.replace(after, before, 1)
+
+              if restored != original:
+                  raise SystemExit(
+                      'STOP: Preservation failed: ' + filename
+                  )
+
+              if len(updated) <= len(original):
+                  raise SystemExit(
+                      'STOP: Unexpected file reduction: ' + filename
+                  )
+
+              Path(filename).write_text(
+                  updated,
+                  encoding='utf-8'
+              )
+
+              print('PRESERVED AND UPDATED:', filename)
+
+          PY
+
+      - name: Commit preserved files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+
+          git add public/checkout.html
+          git add public/shopdrop-product-detail-supabase.js
+          git add public/shopdrop-cart-address-bridge.js
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix34 explain one seller per checkout'
+
+          git push origin HEAD:shopdrop-phase6-integration
+
