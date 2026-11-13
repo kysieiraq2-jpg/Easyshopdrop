@@ -421,6 +421,12 @@ Deno.serve(
     }
 
 
+    // Fix35: exact seller for single-seller checkout.
+    const checkoutSellerId = String(order.seller_id ?? "").trim();
+    if (!/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(checkoutSellerId)) {
+      return reply({ ok:false, version:VERSION, error:"one_seller_checkout_required" },409);
+    }
+
     const currency =
       isoCurrency(
         order.currency,
@@ -500,6 +506,11 @@ Deno.serve(
       );
     }
 
+
+    // Check authoritative item-level seller count.
+    if (Number(financialData.seller_count ?? 0) !== 1) {
+      return reply({ ok:false, version:VERSION, error:"one_seller_checkout_required" },409);
+    }
 
     const productTotal =
       money(
@@ -1433,6 +1444,9 @@ Deno.serve(
         buyer_id:
           user.id,
 
+        seller_id:
+          checkoutSellerId,
+
         currency,
 
         product_amount:
@@ -1441,16 +1455,19 @@ Deno.serve(
         courier_amount:
           courierTotal,
 
-        commission_amount:
+        shopdrop_commission:
           commissionTotal,
 
-        gross_amount:
+        seller_payout_amount:
+          productTotal,
+
+        total_paid:
           checkoutTotal,
 
-        provider_id:
-          selected.id ?? null,
+        provider:
+          providerCode,
 
-        status:
+        payment_status:
           "pending",
       };
 
@@ -1662,7 +1679,7 @@ Deno.serve(
         .from("payments")
         .update(
           {
-            status:
+            payment_status:
               "failed",
           },
         )
@@ -1793,7 +1810,7 @@ Deno.serve(
       },
 
       seller_policy: {
-        held_until_verified_delivery:
+        held_until_verified_courier_pickup:
           true,
 
         inspection_window:
@@ -1880,7 +1897,7 @@ Deno.serve(
         .from("payments")
         .update(
           {
-            status:
+            payment_status:
               "failed",
           },
         )
@@ -1948,7 +1965,7 @@ Deno.serve(
         .from("payments")
         .update(
           {
-            status:
+            payment_status:
               "failed",
           },
         )
@@ -2012,8 +2029,9 @@ Deno.serve(
         string,
         unknown
       > = {
-        status:
-          "session_created",
+        // Session creation is not confirmed payment.
+        payment_status:
+          "pending",
       };
 
 
