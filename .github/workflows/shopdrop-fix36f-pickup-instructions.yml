@@ -50,28 +50,39 @@ jobs:
           updated = {}
           changes = {name: [] for name in expected}
 
-          # Verify all originals before changing anything.
+          # Verify all originals before writing anything.
           for name, sha in expected.items():
               actual = subprocess.check_output(
                   ['git', 'hash-object', name],
                   text=True
               ).strip()
+
               if actual != sha:
-                  raise SystemExit('STOP: Original changed: ' + name)
-              original[name] = Path(name).read_text(encoding='utf-8')
+                  raise SystemExit(
+                      'STOP: Original file changed: ' + name
+                  )
+
+              original[name] = Path(name).read_text(
+                  encoding='utf-8'
+              )
               updated[name] = original[name]
 
           def patch(name, before, after, count=1):
               found = updated[name].count(before)
+
               if found != count:
                   raise SystemExit(
-                      'STOP: Expected text not found in ' + name
-                      + ' (expected ' + str(count)
-                      + ', found ' + str(found) + ')'
+                      'STOP: Patch mismatch: ' + name +
+                      ' expected ' + str(count) +
+                      ', found ' + str(found)
                   )
-              updated[name] = updated[name].replace(before, after)
+
+              updated[name] = updated[name].replace(
+                  before, after
+              )
               changes[name].append((before, after))
 
+          # COURIER BOOKING WORKER
           worker = 'supabase/functions/courier-booking-worker/index.ts'
 
           patch(
@@ -88,16 +99,14 @@ jobs:
               items: courierItems,"""
           )
 
+          # Corrected: match the exact sentence rather than indentation.
           patch(
               worker,
-              """    }. Tracking reference: ${
-                  result.tracking_number
-                }. Please prepare the parcel for collection.`,""",
-              """    }. Tracking reference: ${
-                  result.tracking_number
-                }. Prepare the parcel. IMPORTANT: at pickup ask the courier for the six-digit Shop&Drop COLLECTION PIN. Submit it in My Account only after physical handover. Keep the receipt. Authenticated tracking or scanning can alternatively confirm pickup. Do not use this as the buyer delivery PIN.`,"""
+              'Please prepare the parcel for collection.',
+              'Prepare the parcel. IMPORTANT: at pickup ask the courier for the six-digit Shop&Drop COLLECTION PIN. Submit it in My Account only after physical handover. Keep the receipt. Authenticated tracking or scanning can alternatively confirm pickup. Do not use this as the buyer delivery PIN.'
           )
 
+          # PAYMENT WEBHOOK
           webhook = 'supabase/functions/payment-webhook/index.ts'
 
           patch(
@@ -107,6 +116,7 @@ jobs:
               2
           )
 
+          # HOMEPAGE
           home = 'public/index.html'
 
           patch(
@@ -116,6 +126,7 @@ jobs:
               <p><b>Buy. Sell. Shop simply.</b></p>"""
           )
 
+          # HOW SHOP&DROP WORKS
           help_page = 'public/help.html'
 
           help_seller = '<div class=box><h2>Sell a product — FREE</h2><p>Registration and product listing are free. You choose the amount you want to receive; Shop&Drop shows its marketplace service fee and the published customer price before the listing goes live.</p></div>'
@@ -135,6 +146,7 @@ jobs:
               '<div class=box><h2>Completion, disputes and payout</h2><p>For physical products, seller proceeds are intended for direct provider-controlled release after verified courier pickup, subject to payment, dispute and fraud checks. The buyer\'s separate delivery confirmation remains important for tracking and disputes. Other Services and Dispatching have their own completion and payment rules.</p></div>'
           )
 
+          # TERMS AND CONDITIONS
           terms = 'public/terms.html'
 
           patch(
@@ -156,6 +168,7 @@ jobs:
               '<p><strong>SELLERS MUST ASK THE COURIER FOR THE SIX-DIGIT COLLECTION PIN AT PICKUP.</strong> Submit the code in My Account only after the parcel is physically handed over, and keep the collection receipt. Authenticated courier tracking, pickup scanning or the courier-held PIN are alternative verification methods; one accepted method is sufficient, subject to security checks.</p>'
           )
 
+          # SELLER AND PROVIDER RULES
           rules = 'public/seller-provider-rules.html'
 
           patch(
@@ -177,24 +190,30 @@ jobs:
               '<p><strong>SELLERS MUST REQUEST THE SIX-DIGIT SHOP&amp;DROP COLLECTION PIN FROM THE COURIER AT PHYSICAL PICKUP.</strong> Submit it securely in My Account only after handing over the parcel. Keep the collection receipt. Verified courier tracking or scanning may alternatively confirm pickup; the pickup PIN is separate from the buyer\'s delivery confirmation PIN.</p>'
           )
 
-          # Ensure no unrelated previous code was lost.
+          # PRESERVE ALL PREVIOUS CODE
           for name in expected:
               restored = updated[name]
+
               for before, after in reversed(changes[name]):
                   restored = restored.replace(after, before)
 
               if restored != original[name]:
-                  raise SystemExit('STOP: Preservation failed: ' + name)
+                  raise SystemExit(
+                      'STOP: Preservation failed: ' + name
+                  )
 
               if len(updated[name]) < len(original[name]):
-                  raise SystemExit('STOP: File shortened: ' + name)
+                  raise SystemExit(
+                      'STOP: File shortened: ' + name
+                  )
 
-          # All files passed: write changes together.
+          # Only write after every verification passes.
           for name in expected:
               Path(name).write_text(
                   updated[name],
                   encoding='utf-8'
               )
+
               print(
                   'PASS:', name,
                   len(original[name]),
@@ -203,9 +222,9 @@ jobs:
                   'characters'
               )
 
-          print('PASS: Six original files preserved and updated.')
-          print('PASS: No PIN included in public or seller messages.')
-          print('PASS: No payment or payout activation.')
+          print('PASS: All six original files preserved.')
+          print('PASS: Courier and seller instructions added.')
+          print('PASS: No live PIN or payout activation.')
           PY
 
       - name: Commit Fix36F
@@ -226,4 +245,3 @@ jobs:
               commit -m 'Fix36F courier collection instructions and seller reminders'
 
           git push origin HEAD:shopdrop-phase6-integration
-
