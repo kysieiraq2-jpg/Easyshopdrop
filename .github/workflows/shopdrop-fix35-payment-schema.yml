@@ -1,1 +1,182 @@
 
+name: ShopDrop Fix35 - Payment Schema Compatibility
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix35-payment-schema.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair-payment-session:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Preserve and patch complete payment function
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          path = Path(
+              'supabase/functions/create-payment-session/index.ts'
+          )
+
+          original = path.read_text(encoding='utf-8')
+
+          expected = 'a6d7065254d6c34e6ad2f0c18d2c05052bb3bef8'
+          actual = subprocess.check_output(
+              ['git', 'hash-object', str(path)],
+              text=True
+          ).strip()
+
+          if actual != expected or len(original.splitlines()) != 2141:
+              raise SystemExit(
+                  'STOP: Original payment function changed. No replacement.'
+              )
+
+          updated = original
+          changes = []
+
+          def change(before, after, expected_count=1):
+              global updated
+              found = updated.count(before)
+              if found != expected_count:
+                  raise SystemExit(
+                      'STOP: Patch anchor mismatch. Expected '
+                      + str(expected_count) + ', found ' + str(found)
+                  )
+              updated = updated.replace(before, after)
+              changes.append((before, after))
+
+          change(
+              '    const currency =\n'
+              '      isoCurrency(\n'
+              '        order.currency,\n'
+              '      );',
+              '    // Fix35: exact seller for single-seller checkout.\n'
+              '    const checkoutSellerId = String(order.seller_id ?? "").trim();\n'
+              '    if (!/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(checkoutSellerId)) {\n'
+              '      return reply({ ok:false, version:VERSION, error:"one_seller_checkout_required" },409);\n'
+              '    }\n\n'
+              '    const currency =\n'
+              '      isoCurrency(\n'
+              '        order.currency,\n'
+              '      );'
+          )
+
+          change(
+              '    const productTotal =\n      money(',
+              '    // Check authoritative item-level seller count.\n'
+              '    if (Number(financialData.seller_count ?? 0) !== 1) {\n'
+              '      return reply({ ok:false, version:VERSION, error:"one_seller_checkout_required" },409);\n'
+              '    }\n\n'
+              '    const productTotal =\n      money('
+          )
+
+          change(
+              '        buyer_id:\n'
+              '          user.id,\n\n'
+              '        currency,',
+              '        buyer_id:\n'
+              '          user.id,\n\n'
+              '        seller_id:\n'
+              '          checkoutSellerId,\n\n'
+              '        currency,'
+          )
+
+          change(
+              '        commission_amount:\n'
+              '          commissionTotal,\n\n'
+              '        gross_amount:\n'
+              '          checkoutTotal,\n\n'
+              '        provider_id:\n'
+              '          selected.id ?? null,\n\n'
+              '        status:\n'
+              '          "pending",',
+              '        shopdrop_commission:\n'
+              '          commissionTotal,\n\n'
+              '        seller_payout_amount:\n'
+              '          productTotal,\n\n'
+              '        total_paid:\n'
+              '          checkoutTotal,\n\n'
+              '        provider:\n'
+              '          providerCode,\n\n'
+              '        payment_status:\n'
+              '          "pending",'
+          )
+
+          change(
+              '            status:\n'
+              '              "failed",',
+              '            payment_status:\n'
+              '              "failed",',
+              3
+          )
+
+          change(
+              '        status:\n'
+              '          "session_created",',
+              '        // Session creation is not confirmed payment.\n'
+              '        payment_status:\n'
+              '          "pending",'
+          )
+
+          change(
+              '        held_until_verified_delivery:\n'
+              '          true,',
+              '        held_until_verified_courier_pickup:\n'
+              '          true,'
+          )
+
+          restored = updated
+          for before, after in reversed(changes):
+              restored = restored.replace(after, before)
+
+          if restored != original:
+              raise SystemExit('STOP: Earlier code not preserved.')
+
+          if len(updated.splitlines()) != 2159:
+              raise SystemExit('STOP: Unexpected function length.')
+
+          if not all(text in updated for text in [
+              'create_multiseller_payment_allocations',
+              'reserve_order_inventory',
+              'release_order_inventory',
+              'payment_webhook',
+          ] if text != 'payment_webhook'):
+              raise SystemExit('STOP: Critical function marker missing.')
+
+          path.write_text(updated, encoding='utf-8')
+          print('PASS: All original source preserved.')
+          print('PASS: Payment columns aligned.')
+          print('PASS: Single seller checked.')
+          print('PASS: 2141 original lines -> 2159 lines.')
+          PY
+
+      - name: Commit integration-branch change
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git add supabase/functions/create-payment-session/index.ts
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix35 preserve payment function and align schema'
+
+          git push origin HEAD:shopdrop-phase6-integration
+
