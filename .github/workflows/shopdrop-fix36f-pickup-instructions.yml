@@ -1,1 +1,229 @@
 
+name: ShopDrop Fix36F - Pickup Instructions
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix36f-pickup-instructions.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  pickup-instructions:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Preserve and update existing files
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          expected = {
+              'supabase/functions/courier-booking-worker/index.ts':
+                  'a9614ffadb1813b16e5af557bb5d203f6fdc1fc0',
+              'supabase/functions/payment-webhook/index.ts':
+                  'ab3dce6a7e4c3a4fc6fe13069e38c73d7e542c20',
+              'public/index.html':
+                  '71872cc22c16f1b12c89426c123b9aef270e644c',
+              'public/help.html':
+                  '1b1817e0eee073570bb73d8cc5a599466ac7f2c0',
+              'public/terms.html':
+                  'ec5ff7c31711e39d5c2edd6dba2da372edbc0037',
+              'public/seller-provider-rules.html':
+                  'cddff4ea57412242902d792d92c1b53f5cd640bc',
+          }
+
+          original = {}
+          updated = {}
+          changes = {name: [] for name in expected}
+
+          # Verify all originals before changing anything.
+          for name, sha in expected.items():
+              actual = subprocess.check_output(
+                  ['git', 'hash-object', name],
+                  text=True
+              ).strip()
+              if actual != sha:
+                  raise SystemExit('STOP: Original changed: ' + name)
+              original[name] = Path(name).read_text(encoding='utf-8')
+              updated[name] = original[name]
+
+          def patch(name, before, after, count=1):
+              found = updated[name].count(before)
+              if found != count:
+                  raise SystemExit(
+                      'STOP: Expected text not found in ' + name
+                      + ' (expected ' + str(count)
+                      + ', found ' + str(found) + ')'
+                  )
+              updated[name] = updated[name].replace(before, after)
+              changes[name].append((before, after))
+
+          worker = 'supabase/functions/courier-booking-worker/index.ts'
+
+          patch(
+              worker,
+              '    items: courierItems,',
+              """    pickup_confirmation: {
+              method: "courier_issued_shopdrop_six_digit_pin",
+              instructions: "After verified payment and booking, Shop&Drop issues the collection PIN separately through an approved secure courier channel. Give the PIN to the seller or authorized handover person ONLY AFTER physically taking the parcel. The seller submits the PIN in Shop&Drop My Account. Courier tracking or scanning can alternatively confirm pickup. Buyer delivery confirmation is separate.",
+              pin_in_initial_booking: false,
+              verified_payment_required: true,
+              buyer_delivery_confirmation_separate: true,
+              },
+
+              items: courierItems,"""
+          )
+
+          patch(
+              worker,
+              """    }. Tracking reference: ${
+                  result.tracking_number
+                }. Please prepare the parcel for collection.`,""",
+              """    }. Tracking reference: ${
+                  result.tracking_number
+                }. Prepare the parcel. IMPORTANT: at pickup ask the courier for the six-digit Shop&Drop COLLECTION PIN. Submit it in My Account only after physical handover. Keep the receipt. Authenticated tracking or scanning can alternatively confirm pickup. Do not use this as the buyer delivery PIN.`,"""
+          )
+
+          webhook = 'supabase/functions/payment-webhook/index.ts'
+
+          patch(
+              webhook,
+              '"Prepare the parcel for courier collection. Check Shop&Drop for fulfilment instructions.",',
+              '"Prepare the parcel. IMPORTANT: at pickup ask the courier for the six-digit Shop&Drop COLLECTION PIN. Submit it in My Account only AFTER physical handover. Keep your receipt. Authenticated courier tracking or scanning can alternatively verify collection. The buyer delivery PIN is separate.",',
+              2
+          )
+
+          home = 'public/index.html'
+
+          patch(
+              home,
+              '<p><b>Buy. Sell. Shop simply.</b></p>',
+              """<p><strong>SELLERS: ASK THE COURIER FOR THE SIX-DIGIT SHOP&amp;DROP COLLECTION PIN AT PICKUP.</strong> After physically handing over your parcel, open My Account and submit the code against your shipment. Keep your receipt. Verified courier tracking or a pickup scan may alternatively confirm collection. Provider-controlled seller proceeds are released only after accepted pickup verification and security checks.</p>
+              <p><b>Buy. Sell. Shop simply.</b></p>"""
+          )
+
+          help_page = 'public/help.html'
+
+          help_seller = '<div class=box><h2>Sell a product — FREE</h2><p>Registration and product listing are free. You choose the amount you want to receive; Shop&Drop shows its marketplace service fee and the published customer price before the listing goes live.</p></div>'
+
+          patch(
+              help_page,
+              help_seller,
+              help_seller.replace(
+                  '</div>',
+                  '<p><strong>SELLERS: ASK THE COURIER FOR THE SIX-DIGIT SHOP&amp;DROP COLLECTION PIN AT PICKUP.</strong> Only after physically handing over the parcel, sign in to My Account, select your shipment and submit the code. Keep the collection receipt. Verified courier tracking or scanning may also confirm pickup.</p></div>'
+              )
+          )
+
+          patch(
+              help_page,
+              '<div class=box><h2>Completion, disputes and payout</h2><p>After delivery/service completion, the customer may confirm completion or report a problem. If no qualifying dispute is opened during the protection period, completion can occur automatically and the relevant seller/provider transaction becomes payout-eligible.</p></div>',
+              '<div class=box><h2>Completion, disputes and payout</h2><p>For physical products, seller proceeds are intended for direct provider-controlled release after verified courier pickup, subject to payment, dispute and fraud checks. The buyer\'s separate delivery confirmation remains important for tracking and disputes. Other Services and Dispatching have their own completion and payment rules.</p></div>'
+          )
+
+          terms = 'public/terms.html'
+
+          patch(
+              terms,
+              '<li>A collection-specific six-digit PIN supplied by the seller at the physical handover.</li>',
+              '<li><strong>Courier-held collection PIN:</strong> Shop&amp;Drop issues a six-digit code securely to the authorized courier after confirmed buyer payment, courier payment and booking. The courier gives it to the seller or authorized handover person only after taking the parcel, and the seller enters it securely in Shop&amp;Drop.</li>'
+          )
+
+          patch(
+              terms,
+              '\n'.join([
+                  '<p>',
+                  'The seller must not provide',
+                  'the collection PIN before',
+                  'the courier physically',
+                  'takes custody of the parcel.',
+                  '</p>'
+              ]),
+              '<p><strong>SELLERS MUST ASK THE COURIER FOR THE SIX-DIGIT COLLECTION PIN AT PICKUP.</strong> Submit the code in My Account only after the parcel is physically handed over, and keep the collection receipt. Authenticated courier tracking, pickup scanning or the courier-held PIN are alternative verification methods; one accepted method is sufficient, subject to security checks.</p>'
+          )
+
+          rules = 'public/seller-provider-rules.html'
+
+          patch(
+              rules,
+              '<li>A six-digit collection-specific PIN provided by the seller during handover.</li>',
+              '<li><strong>Courier-held Shop&amp;Drop collection PIN:</strong> Shop&amp;Drop sends a six-digit code securely to the authorized courier after confirmed payment and booking. The courier gives it to the seller or handover person when physically collecting the goods, and the seller submits it through My Account.</li>'
+          )
+
+          patch(
+              rules,
+              '\n'.join([
+                  '<p>',
+                  'The collection PIN must',
+                  'not be provided before',
+                  'the courier physically',
+                  'takes custody of the parcel.',
+                  '</p>'
+              ]),
+              '<p><strong>SELLERS MUST REQUEST THE SIX-DIGIT SHOP&amp;DROP COLLECTION PIN FROM THE COURIER AT PHYSICAL PICKUP.</strong> Submit it securely in My Account only after handing over the parcel. Keep the collection receipt. Verified courier tracking or scanning may alternatively confirm pickup; the pickup PIN is separate from the buyer\'s delivery confirmation PIN.</p>'
+          )
+
+          # Ensure no unrelated previous code was lost.
+          for name in expected:
+              restored = updated[name]
+              for before, after in reversed(changes[name]):
+                  restored = restored.replace(after, before)
+
+              if restored != original[name]:
+                  raise SystemExit('STOP: Preservation failed: ' + name)
+
+              if len(updated[name]) < len(original[name]):
+                  raise SystemExit('STOP: File shortened: ' + name)
+
+          # All files passed: write changes together.
+          for name in expected:
+              Path(name).write_text(
+                  updated[name],
+                  encoding='utf-8'
+              )
+              print(
+                  'PASS:', name,
+                  len(original[name]),
+                  '->',
+                  len(updated[name]),
+                  'characters'
+              )
+
+          print('PASS: Six original files preserved and updated.')
+          print('PASS: No PIN included in public or seller messages.')
+          print('PASS: No payment or payout activation.')
+          PY
+
+      - name: Commit Fix36F
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+
+          git add public/index.html
+          git add public/help.html
+          git add public/terms.html
+          git add public/seller-provider-rules.html
+          git add supabase/functions/courier-booking-worker/index.ts
+          git add supabase/functions/payment-webhook/index.ts
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix36F courier collection instructions and seller reminders'
+
+          git push origin HEAD:shopdrop-phase6-integration
+
