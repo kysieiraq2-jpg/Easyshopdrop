@@ -4,6 +4,9 @@
  * Customer and provider appointment agreement.
  * No payment collection or contact disclosure.
  * Uses existing Supabase security functions.
+ *
+ * Update: Link to private Service Completion
+ * Photographs page. No payout activation.
  */
 (() => {
   'use strict';
@@ -15,7 +18,7 @@
     'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';
 
   const UUID =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
   let dbPromise;
 
@@ -103,7 +106,30 @@
 
     const content = node('div');
 
-    panel.append(input, load, status, content);
+    // The linked page and Supabase recheck
+    // paid-booking ownership before upload.
+    const completionHelp = node(
+      'p',
+      'Service providers can submit private evidence ' +
+      'after the agreed work is completed.'
+    );
+
+    const completionLink = node(
+      'a',
+      'Open Service Completion Photographs'
+    );
+
+    completionLink.href =
+      './shopdrop-service-completion.html';
+
+    panel.append(
+      input,
+      load,
+      status,
+      content,
+      completionHelp,
+      completionLink
+    );
 
     const anchor = document.getElementById(
       'service-arrival-pin-panel'
@@ -120,10 +146,14 @@
 
     async function authenticatedDb() {
       const db = await getDb();
-      const { data, error } = await db.auth.getUser();
+
+      const { data, error } =
+        await db.auth.getUser();
 
       if (error || !data?.user) {
-        throw new Error('Please sign in first.');
+        throw new Error(
+          'Please sign in first.'
+        );
       }
 
       return db;
@@ -131,7 +161,9 @@
 
     async function rpc(name, args) {
       const db = await authenticatedDb();
-      const { data, error } = await db.rpc(name, args);
+
+      const { data, error } =
+        await db.rpc(name, args);
 
       if (error) {
         throw new Error(
@@ -143,25 +175,32 @@
     }
 
     async function action(name, args) {
-      status.textContent = 'Updating appointment…';
+      status.textContent =
+        'Updating appointment…';
 
       try {
-        const result = await rpc(name, args);
+        const result =
+          await rpc(name, args);
 
         if (!result || result.ok !== true) {
-          throw new Error('Appointment update failed.');
+          throw new Error(
+            'Appointment update failed.'
+          );
         }
 
         await show();
+
       } catch (error) {
-        status.textContent = error.message;
+        status.textContent =
+          error.message;
       }
     }
 
     async function show() {
       clear(content);
 
-      const bookingId = input.value.trim();
+      const bookingId =
+        input.value.trim();
 
       if (!UUID.test(bookingId)) {
         status.textContent =
@@ -170,7 +209,9 @@
       }
 
       load.disabled = true;
-      status.textContent = 'Loading appointment…';
+
+      status.textContent =
+        'Loading appointment…';
 
       try {
         const result = await rpc(
@@ -178,8 +219,13 @@
           { p_booking_id: bookingId }
         );
 
-        if (!result || result.ok !== true) {
-          throw new Error('Appointment unavailable.');
+        if (
+          !result ||
+          result.ok !== true
+        ) {
+          throw new Error(
+            'Appointment unavailable.'
+          );
         }
 
         status.textContent =
@@ -232,7 +278,27 @@
           result.payment_status
         );
 
-        if (result.payment_status !== 'pending') {
+        // Deep link for an authorized provider
+        // with a confirmed paid booking.
+        if (
+          result.my_role === 'provider' &&
+          result.payment_status === 'paid'
+        ) {
+          const evidenceLink = node(
+            'a',
+            'Upload completion photos for this booking'
+          );
+
+          evidenceLink.href =
+            './shopdrop-service-completion.html?booking_id=' +
+            encodeURIComponent(bookingId);
+
+          content.append(evidenceLink);
+        }
+
+        if (
+          result.payment_status !== 'pending'
+        ) {
           return;
         }
 
@@ -242,8 +308,9 @@
             'awaiting_provider'
         ) {
           content.append(
-            makeButton('Accept Requested Time', () =>
-              action(
+            makeButton(
+              'Accept Requested Time',
+              () => action(
                 'shopdrop_service_provider_schedule_response',
                 {
                   p_booking_id: bookingId,
@@ -252,8 +319,9 @@
               )
             ),
 
-            makeButton('Decline Appointment', () =>
-              action(
+            makeButton(
+              'Decline Appointment',
+              () => action(
                 'shopdrop_service_provider_schedule_response',
                 {
                   p_booking_id: bookingId,
@@ -270,26 +338,38 @@
           time.type = 'time';
 
           content.append(
-            node('p', 'Suggest another date and time:'),
+            node(
+              'p',
+              'Suggest another date and time:'
+            ),
             date,
             time,
-            makeButton('Propose Alternative', () => {
-              if (!date.value || !time.value) {
-                status.textContent =
-                  'Select a date and arrival time.';
-                return;
-              }
 
-              action(
-                'shopdrop_service_provider_schedule_response',
-                {
-                  p_booking_id: bookingId,
-                  p_action: 'propose',
-                  p_alternative_date: date.value,
-                  p_alternative_time: time.value
+            makeButton(
+              'Propose Alternative',
+              () => {
+                if (
+                  !date.value ||
+                  !time.value
+                ) {
+                  status.textContent =
+                    'Select a date and arrival time.';
+                  return;
                 }
-              );
-            })
+
+                action(
+                  'shopdrop_service_provider_schedule_response',
+                  {
+                    p_booking_id: bookingId,
+                    p_action: 'propose',
+                    p_alternative_date:
+                      date.value,
+                    p_alternative_time:
+                      time.value
+                  }
+                );
+              }
+            )
           );
         }
 
@@ -299,8 +379,9 @@
             'alternative_proposed'
         ) {
           content.append(
-            makeButton('Accept Alternative', () =>
-              action(
+            makeButton(
+              'Accept Alternative',
+              () => action(
                 'shopdrop_service_customer_schedule_response',
                 {
                   p_booking_id: bookingId,
@@ -309,8 +390,9 @@
               )
             ),
 
-            makeButton('Reject Alternative', () =>
-              action(
+            makeButton(
+              'Reject Alternative',
+              () => action(
                 'shopdrop_service_customer_schedule_response',
                 {
                   p_booking_id: bookingId,
@@ -321,7 +403,10 @@
           );
         }
 
-        if (result.agreement_status === 'confirmed') {
+        if (
+          result.agreement_status ===
+          'confirmed'
+        ) {
           content.append(
             node(
               'p',
@@ -332,16 +417,23 @@
         }
 
       } catch (error) {
-        status.textContent = error.message;
+        status.textContent =
+          error.message;
+
       } finally {
         load.disabled = false;
       }
     }
 
-    load.addEventListener('click', show);
+    load.addEventListener(
+      'click',
+      show
+    );
   }
 
-  if (document.readyState === 'loading') {
+  if (
+    document.readyState === 'loading'
+  ) {
     document.addEventListener(
       'DOMContentLoaded',
       initialize,
@@ -351,4 +443,3 @@
     initialize();
   }
 })();
-
