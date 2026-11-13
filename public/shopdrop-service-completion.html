@@ -1,1 +1,248 @@
 
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Service Completion | Shop&amp;Drop</title>
+<link rel="stylesheet" href="./v26-professional.css">
+<style>
+/* SHOPDROP_SERVICE_COMPLETION_UI_V1 — private evidence submission only. */
+*{box-sizing:border-box}
+body{margin:0;background:#f3f5f8;color:#17202a;font:16px Arial,system-ui,sans-serif;line-height:1.55}
+main{max-width:780px;margin:auto;padding:20px 14px 48px}
+a{color:#0f766e}
+.panel{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin:16px 0}
+h1{font-size:clamp(26px,5vw,36px)}
+h2{font-size:21px}
+.muted{color:#526273}
+.notice{background:#eef2ff;border-radius:9px;padding:14px}
+label{display:block;font-weight:700;margin-top:15px}
+input,select{display:block;width:100%;padding:12px;margin-top:6px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;min-height:46px}
+button{background:#0f766e;border:0;border-radius:8px;color:#fff;font:inherit;padding:12px 16px;margin:12px 8px 0 0;cursor:pointer}
+button:disabled{opacity:.55;cursor:default}
+button.secondary{background:#334155}
+#message{overflow-wrap:anywhere;font-weight:600}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<a href="./account.html">&larr; My Account</a>
+<h1>Service Completion Evidence</h1>
+<p>For providers completing cleaning, pest control, repairs and other booked services on Shop&amp;Drop.</p>
+<div class="notice">
+<strong>Important:</strong> Submit photographs only after completing the agreed work.
+Photos are stored privately and checked against the paid booking.
+This page records evidence; it does <strong>not</strong> authorize or send a payout.
+The payment provider and completion-verification system are still in prelaunch development.
+</div>
+<section class="panel">
+<h2>Your paid service bookings</h2>
+<p id="access" role="status" aria-live="polite">Checking your sign-in…</p>
+<div id="formArea" hidden>
+<label for="bookingChoice">Choose one of your paid bookings</label>
+<select id="bookingChoice"><option value="">Select a booking (or enter its reference below)</option></select>
+<button id="refresh" type="button" class="secondary">Refresh bookings</button>
+<label for="bookingId">Service booking reference (UUID)</label>
+<input id="bookingId" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+<button id="check" type="button" class="secondary">Check booking and previous photos</button>
+<p class="muted" id="previous">No booking selected.</p>
+</div>
+</section>
+<section class="panel" id="photoSection" hidden>
+<h2>Submit completion photographs</h2>
+<p class="muted">Choose 1–6 JPEG, PNG or WebP photographs, each 10 MB or less. The limit is six photos <em>in total</em> for each booking. Do not photograph children, personal documents or unnecessary private information.</p>
+<label for="photos">Photos of completed work</label>
+<input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple>
+<button id="submit" type="button">Upload and register photos</button>
+<button id="recover" type="button" class="secondary">Register already uploaded photos</button>
+<p class="muted">The second button helps if a previous upload succeeded but the registration confirmation was interrupted. It does not upload files again.</p>
+<p id="message" role="status" aria-live="polite"></p>
+</section>
+<p class="muted">If the customer supplies a six-digit completion PIN, that separate verification option will be connected in a later update. Never share account passwords or arrival codes as completion evidence.</p>
+</main>
+<script type="module">
+import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
+
+const db=createClient(
+ 'https://dtkdvvxpwonywtsgqmdx.supabase.co',
+ 'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q',
+ {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}
+);
+const BUCKET='shopdrop-completion-evidence';
+const UUID=/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+const FILE=/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}\.(jpg|jpeg|png|webp)$/i;
+const MIME={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'};
+const $=id=>document.getElementById(id);
+let user=null;
+let busy=false;
+
+function show(text){$('message').textContent=text;}
+function buttonsLocked(locked){
+ busy=locked;
+ for(const id of ['submit','recover','refresh','check'])$(id).disabled=locked;
+}
+function bookingId(){
+ const id=$('bookingId').value.trim().toLowerCase();
+ if(!UUID.test(id))throw new Error('Enter a valid service booking reference.');
+ return id;
+}
+async function sessionUser(){
+ const {data,error}=await db.auth.getUser();
+ if(error||!data?.user?.id)throw new Error('Please sign in to Shop&Drop first.');
+ return data.user;
+}
+async function eligibleBooking(id){
+ const verified=await sessionUser();
+ if(!user||verified.id!==user.id)throw new Error('Sign in again.');
+ const {data:booking,error}=await db.from('service_bookings')
+  .select('id,provider_id,booking_status,payment_status')
+  .eq('id',id).eq('provider_id',user.id).maybeSingle();
+ if(error||!booking)throw new Error('Booking not found or not assigned to your account.');
+ if(booking.payment_status!=='paid'||
+    ['cancelled','canceled','disputed','refunded'].includes(booking.booking_status))
+  throw new Error('An active paid service booking is required.');
+ const {data:payments,error:paymentError}=await db.from('service_payments')
+  .select('id,payment_status,provider_payout_status,paid_at')
+  .eq('booking_id',id).eq('provider_id',user.id)
+  .eq('payment_status','paid').not('paid_at','is',null).limit(5);
+ if(paymentError||!(payments||[]).some(p=>p.provider_payout_status==='held'))
+  throw new Error('Confirmed provider-held payment is not available for this booking.');
+ return booking;
+}
+async function storedPaths(id){
+ const prefix=user.id+'/'+id;
+ const {data,error}=await db.storage.from(BUCKET).list(prefix,{limit:100});
+ if(error)throw new Error('Unable to check private completion photographs.');
+ return (data||[]).filter(x=>FILE.test(x.name)).map(x=>prefix+'/'+x.name);
+}
+async function checkBooking(){
+ if(busy)return;
+ buttonsLocked(true);
+ $('photoSection').hidden=true;
+ $('previous').textContent='Checking booking…';
+ show('');
+ try{
+  const id=bookingId();
+  await eligibleBooking(id);
+  const paths=await storedPaths(id);
+  $('previous').textContent=paths.length+' of 6 photos uploaded for this booking.';
+  $('photoSection').hidden=false;
+ }catch(err){$('previous').textContent=err.message||'Booking unavailable.';}
+ finally{buttonsLocked(false);}
+}
+async function loadBookings(){
+ const {data,error}=await db.from('service_bookings')
+  .select('id,booking_date,booking_time,booking_status,created_at')
+  .eq('provider_id',user.id).eq('payment_status','paid')
+  .order('created_at',{ascending:false}).limit(50);
+ if(error)throw new Error('Unable to load your service bookings.');
+ const choices=$('bookingChoice');
+ choices.replaceChildren(new Option('Select a paid booking (or enter its reference below)',''));
+ for(const b of (data||[])){
+  const when=b.booking_date||'Date not supplied';
+  choices.append(new Option(when+' — '+b.id,b.id));
+ }
+ if(!(data||[]).length)$('access').textContent='Signed in. No paid service bookings available yet.';
+ else $('access').textContent='Signed in. Choose your paid booking.';
+}
+async function submitPhotos(){
+ if(busy)return;
+ buttonsLocked(true);
+ let uploaded=[];
+ try{
+  const id=bookingId();
+  await eligibleBooking(id);
+  const selected=Array.from($('photos').files||[]);
+  if(selected.length<1||selected.length>6)
+   throw new Error('Choose between one and six photos.');
+  const existing=await storedPaths(id);
+  if(existing.length+selected.length>6)
+   throw new Error('Maximum six photographs per booking. Check existing photos first.');
+  for(const file of selected){
+   if(!MIME[file.type]||file.size<1||file.size>10485760)
+    throw new Error('Only JPEG, PNG or WebP images up to 10 MB are allowed.');
+  }
+  if(!globalThis.crypto?.randomUUID)
+   throw new Error('A secure browser is required to create photo references.');
+  const prefix=user.id+'/'+id+'/';
+  let uploadError=null;
+  for(let i=0;i<selected.length;i++){
+   const file=selected[i];
+   const path=prefix+crypto.randomUUID().toLowerCase()+'.'+MIME[file.type];
+   show('Uploading photo '+(i+1)+' of '+selected.length+'…');
+   const {error}=await db.storage.from(BUCKET).upload(path,file,{
+    contentType:file.type,upsert:false
+   });
+   if(error){uploadError=error;break;}
+   uploaded.push(path);
+  }
+  if(uploaded.length){
+   show('Registering '+uploaded.length+' uploaded photograph(s)…');
+   const {data,error}=await db.rpc('shopdrop_submit_service_completion_photos',{
+    p_booking_id:id,p_object_paths:uploaded
+   });
+   if(error||data?.ok!==true)
+    throw new Error('Photos uploaded privately, but registration was not confirmed. Use “Register already uploaded photos” instead of uploading them again.');
+  }
+  const paths=await storedPaths(id);
+  $('previous').textContent=paths.length+' of 6 photos uploaded for this booking.';
+  $('photos').value='';
+  if(uploadError)throw new Error(uploaded.length+' photo(s) registered; a later upload failed. You can retry with the remaining photos.');
+  show('Photos successfully registered as submitted evidence. Verification is pending. No payout has been initiated.');
+ }catch(err){show(err.message||'Photo submission failed.');}
+ finally{buttonsLocked(false);}
+}
+async function recoverPhotos(){
+ if(busy)return;
+ buttonsLocked(true);
+ try{
+  const id=bookingId();
+  await eligibleBooking(id);
+  const paths=await storedPaths(id);
+  if(!paths.length||paths.length>6)
+   throw new Error('Expected one to six uploaded photographs. Contact support if the count exceeds six.');
+  show('Registering existing private photographs…');
+  const {data,error}=await db.rpc('shopdrop_submit_service_completion_photos',{
+   p_booking_id:id,p_object_paths:paths
+  });
+  if(error||data?.ok!==true)throw new Error('Existing photos could not be registered. Contact support with the booking reference.');
+  $('previous').textContent=paths.length+' of 6 photos uploaded for this booking.';
+  show('Existing photographs registered or already present as submitted evidence. No payout has been initiated.');
+ }catch(err){show(err.message||'Unable to register existing photographs.');}
+ finally{buttonsLocked(false);}
+}
+$('bookingChoice').addEventListener('change',()=>{
+ $('bookingId').value=$('bookingChoice').value;
+ $('photoSection').hidden=true;
+ $('previous').textContent='Check the selected booking before uploading.';
+});
+$('check').addEventListener('click',checkBooking);
+$('submit').addEventListener('click',submitPhotos);
+$('recover').addEventListener('click',recoverPhotos);
+$('refresh').addEventListener('click',async()=>{
+ if(busy)return;
+ buttonsLocked(true);
+ try{await loadBookings();}
+ catch(err){$('access').textContent=err.message;}
+ finally{buttonsLocked(false);}
+});
+try{
+ user=await sessionUser();
+ $('formArea').hidden=false;
+ const requested=new URLSearchParams(location.search).get('booking_id')||'';
+ if(UUID.test(requested))$('bookingId').value=requested.toLowerCase();
+ await loadBookings();
+}catch(err){
+ $('access').replaceChildren();
+ $('access').append(document.createTextNode('Please sign in to use service completion. '));
+ const link=document.createElement('a');
+ link.href='./sign-in.html';
+ link.textContent='Sign in';
+ $('access').append(link);
+}
+</script>
+</body>
+</html>
+
