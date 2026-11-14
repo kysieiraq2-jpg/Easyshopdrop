@@ -1,1 +1,138 @@
 
+name: ShopDrop Fix39 - Seller Courier Reference Form
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix39-account-reference.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update-account:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Apply exact seller pickup form changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          path = Path('public/account.html')
+          expected = '71c041f75298b6934a5325136093dfcc04e5e6b4'
+          actual = subprocess.check_output(['git', 'hash-object', str(path)], text=True).strip()
+          if actual != expected:
+              raise SystemExit('STOP: account.html changed; preserve latest changes and review before patching')
+
+          original = path.read_text(encoding='utf-8')
+          revised = original
+          count = 0
+
+          def change(before, after):
+              global revised, count
+              if revised.count(before) != 1:
+                  raise SystemExit('STOP: account.html exact replacement mismatch: ' + before[:70])
+              revised = revised.replace(before, after, 1)
+              count += 1
+
+          change(
+              'IMPORTANT: ASK YOUR COURIER FOR THE SIX-DIGIT SHOP&amp;DROP COLLECTION PIN AT PICKUP.',
+              'IMPORTANT: ASK YOUR COURIER FOR THE COURIER COMPANY&#39;S OWN BOOKING, WAYBILL OR TRACKING REFERENCE AT PICKUP.'
+          )
+          change(
+              'Only enter the PIN after the courier has physically collected your sold item. Never confirm collection before handover. Keep your collection receipt.',
+              'Enter the actual courier reference only after your sold item is physically collected. Keep your collection receipt. A reference alone cannot verify collection or release seller funds.'
+          )
+          change(
+              'Authenticated courier tracking or scanning may alternatively confirm pickup. The buyer\'s delivery confirmation is separate.',
+              'An authenticated courier tracking event or authorized pickup scan must independently verify collection. Any buyer delivery PIN is separate.'
+          )
+          change(
+              '<label for="sellerCourierPickupPin">Six-digit code from courier</label>',
+              '<label for="sellerCourierPickupPin">Courier booking, waybill or tracking reference</label>'
+          )
+          change(
+              '<input id="sellerCourierPickupPin" type="text" inputmode="numeric" autocomplete="off" maxlength="6" pattern="[0-9]{6}" required placeholder="123456">',
+              '<input id="sellerCourierPickupPin" type="text" autocomplete="off" spellcheck="false" minlength="4" maxlength="128" pattern="[A-Za-z0-9][A-Za-z0-9 ._:/#-]{2,126}[A-Za-z0-9]" required placeholder="Courier reference">'
+          )
+          change(
+              '// Fix36E: authenticated seller pickup confirmation.\n// No PIN generation or payout instructions in browser code.',
+              '// Fix39: seller records the courier reference; independent courier evidence is also mandatory.\n// Browser never authorizes payments or treats this reference as proof of collection.'
+          )
+          change(
+              'const pin=pickupPin.value.trim();',
+              'const courierReference=pickupPin.value.trim();'
+          )
+          change(
+              '!/^[0-9]{6}$/.test(pin) ||',
+              '!/^[A-Za-z0-9][A-Za-z0-9 ._:/#-]{2,126}[A-Za-z0-9]$/.test(courierReference) ||'
+          )
+          change(
+              'Select a shipment, enter the six-digit PIN and confirm physical handover.',
+              'Select your shipment, enter the courier company reference and confirm physical handover.'
+          )
+          change(
+              'Checking your courier collection PIN...',
+              'Recording your courier reference securely...'
+          )
+          change(
+              'pin:pin,',
+              'courier_reference:courierReference,'
+          )
+          change(
+              'if(verifyError || data?.verified!==true){',
+              'if(verifyError || data?.recorded!==true){'
+          )
+          change(
+              'throw Error(data?.error||\'Pickup verification was not accepted.\');',
+              'throw Error(data?.error||\'Courier reference could not be recorded.\');'
+          )
+          change(
+              "pickupStatus.textContent=\n   data.staging_status==='staged'\n   ? 'Pickup verified. Release request prepared, subject to the approved payment provider and security checks.'\n   : 'Pickup PIN verified. Payment-release preparation is pending backend reconciliation.';",
+              "pickupStatus.textContent=data.reference_matches_booking===true\n   ? 'Courier reference recorded. Independent courier tracking or a pickup scan is required for confirmation. No payment has been released.'\n   : 'Reference recorded, but it does not match the booked courier. Please contact support. No payment has been released.';"
+          )
+          change(
+              'Collection could not be confirmed. Check the shipment and PIN, or contact Shop&Drop support.',
+              'Courier reference could not be recorded. Check the shipment and reference, or contact Shop&Drop support.'
+          )
+
+          if count != 15:
+              raise SystemExit('STOP: Unexpected change count')
+          if revised.count('courier_reference:courierReference') != 1 or \
+             revised.count('data?.recorded!==true') != 1:
+              raise SystemExit('STOP: New backend contract missing')
+          if 'const pin=pickupPin.value.trim();' in revised or \
+             'pin:pin,' in revised:
+              raise SystemExit('STOP: Old physical-goods pickup PIN flow remains')
+          if len(revised) < len(original) - 500:
+              raise SystemExit('STOP: Unexpected file shortening')
+
+          path.write_text(revised, encoding='utf-8')
+          print('PASS: 15 exact changes to public/account.html')
+          print('PASS: Original Git blob confirmed; other account sections preserved')
+          print('PASS: Live payments and payouts not activated')
+          PY
+
+      - name: Commit account change
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git add public/account.html
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix39 seller courier reference form; independent pickup verification'
+          git push origin HEAD:shopdrop-phase6-integration
+
