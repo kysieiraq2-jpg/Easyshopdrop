@@ -307,9 +307,136 @@ mainMenuButton.addEventListener('click',e=>{
 mainMenu.addEventListener('click',e=>e.stopPropagation());
 const productsCategoriesButton=document.getElementById('productsCategoriesButton');
 const productsCategoriesPanel=document.getElementById('productsCategoriesPanel');
+let shopdropCategoryMenuLoading=null;
+
+async function shopdropPopulateCategoryMenu(){
+ const host=document.getElementById('mainMenuCategories');
+
+ if(!host)return;
+
+ if(host.dataset.shopdropReady==='true')return;
+
+ if(shopdropCategoryMenuLoading){
+  return shopdropCategoryMenuLoading;
+ }
+
+ const loading=document.createElement('p');
+ loading.textContent='Loading product categories…';
+ host.replaceChildren(loading);
+
+ shopdropCategoryMenuLoading=(async()=>{
+  try{
+   const response=await fetch(
+    './taxonomy.json',
+    {cache:'no-store'}
+   );
+
+   if(!response.ok){
+    throw Error('Categories unavailable');
+   }
+
+   const data=await response.json();
+
+   if(
+    !Array.isArray(data.departments) ||
+    !data.departments.length
+   ){
+    throw Error('Categories unavailable');
+   }
+
+   const departments=[...data.departments].sort(
+    (a,b)=>String(a.name||'').localeCompare(
+     String(b.name||''),
+     'en',
+     {sensitivity:'base'}
+    )
+   );
+
+   const list=document.createDocumentFragment();
+   let count=0;
+
+   for(const department of departments){
+    if(
+     typeof department.name!=='string' ||
+     !Array.isArray(department.subcategories)
+    )continue;
+
+    const item=document.createElement('details');
+    item.className='v26-menu-category';
+
+    const heading=document.createElement('summary');
+    heading.textContent=department.name;
+
+    item.append(heading);
+
+    const links=document.createElement('div');
+    links.className='v26-menu-subcategories';
+
+    const subs=department.subcategories
+     .filter(s=>typeof s==='string'&&s.trim())
+     .sort((a,b)=>a.localeCompare(
+      b,'en',{sensitivity:'base'}
+     ));
+
+    for(const sub of subs){
+     const link=document.createElement('a');
+
+     link.textContent=sub;
+
+     link.href='./category-results.html?'+
+      new URLSearchParams({
+       category:department.name,
+       subcategory:sub
+      }).toString();
+
+     links.append(link);
+    }
+
+    item.append(links);
+    list.append(item);
+    count++;
+   }
+
+   if(!count){
+    throw Error('Categories unavailable');
+   }
+
+   host.replaceChildren(list);
+   host.dataset.shopdropReady='true';
+
+  }catch(error){
+   host.replaceChildren();
+
+   const status=document.createElement('p');
+   status.textContent=
+    'Unable to load categories. Tap Products & Categories again to retry.';
+
+   host.append(status);
+
+   const browse=document.createElement('a');
+   browse.href='./categories.html';
+   browse.textContent='Browse all product categories';
+
+   host.append(browse);
+
+  }finally{
+   shopdropCategoryMenuLoading=null;
+  }
+ })();
+
+ return shopdropCategoryMenuLoading;
+}
+
 function setProductsCategories(open){
  productsCategoriesPanel.hidden=!open;
- productsCategoriesButton.setAttribute('aria-expanded',String(open));
+ productsCategoriesButton.setAttribute(
+  'aria-expanded',
+  String(open)
+ );
+
+ if(open){
+  shopdropPopulateCategoryMenu();
+ }
 }
 productsCategoriesButton.addEventListener('click',()=>setProductsCategories(productsCategoriesPanel.hidden));
 document.addEventListener('click',()=>{
