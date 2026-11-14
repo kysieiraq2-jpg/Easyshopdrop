@@ -145,7 +145,7 @@ footer{padding:30px;text-align:center;color:#64748b}
           <a href="./categories.html?view=new">Shop New Products</a>
           <button class="shopdrop-menu-link shopdrop-products-toggle" id="productsCategoriesButton" type="button" aria-expanded="false" aria-controls="productsCategoriesPanel">Products &amp; Categories</button>
           <section class="shopdrop-menu-categories" id="productsCategoriesPanel" aria-label="Product categories" hidden>
-            <div id="mainMenuCategories" data-v26-category-menu></div>
+            <div id="mainMenuCategories"></div>
           </section>
           <a href="./services.html">Other Services</a>
           <a href="./dispatching.html">Dispatching &amp; Transport</a>
@@ -231,7 +231,7 @@ footer{padding:30px;text-align:center;color:#64748b}
 </main>
 <footer>Shop&Drop · Marketplace transactions stay inside Shop&Drop · Seller contact details remain private<br><a href="./admin-login.html" style="display:inline-block;margin-top:12px;color:#64748b">Administrator sign in</a></footer>
 <script src="./common.js"></script>
-<script src="./v26-consolidated.js?v=26.22"></script>
+<script src="./v26-consolidated.js?v=26.49"></script>
 <script>
 const {api,esc,money}=ShopDrop;
 function card(p){
@@ -419,15 +419,7 @@ window.ShopDropPublicContact = Object.freeze({
  }));
 })();
 </script>
-<script id="V26_10_CATEGORY_RUNTIME_MOUNT">
-document.addEventListener("DOMContentLoaded",()=>{
- const targets=[
-  document.getElementById("v26NestedCategoryMenu"),
-  document.querySelector("[data-v26-category-menu]")
- ].filter(Boolean);
- targets.forEach(t=>renderMainMenuCategories(t).catch(console.error));
-});
-</script>
+
 <script src="v26-homepage-layout.js"></script>
 <script defer src="shopdrop-language.js"></script>
 </body>

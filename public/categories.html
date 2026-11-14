@@ -352,7 +352,7 @@ async function loadCats(){
      <span class="hint">Tap to view subcategories</span>
     </button>
     <div class="subcats">
-     ${d.subcategories.map(sc=>`
+     ${[...d.subcategories].sort((a,b)=>a.localeCompare(b,"en",{sensitivity:"base"})).map(sc=>`
       <button class="subcat" type="button"
        data-parent="${ShopDrop.esc(d.name)}"
        data-sub="${ShopDrop.esc(sc)}">${ShopDrop.esc(sc)}</button>
@@ -433,9 +433,7 @@ country.disabled=true;
 currencyHint.textContent='South African marketplace — prices shown in the listing currency.';
 </script>
 <script src="v26-bridge.js"></script>
-<section id="v26CategoriesNestedNavigation" aria-label="Category and subcategory navigation">
-<div data-v26-category-menu></div>
-</section>
+
 <script defer src="shopdrop-buyer-language.js"></script>
 </body>
 </html>
