@@ -1,1 +1,159 @@
 
+name: ShopDrop Fix48B - Repair Direct Subcategory Pages
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix48b-direct-results-repair.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  repair-direct-subcategory-pages:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch only
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Recover the already approved Fix48 code
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import ast
+          import subprocess
+
+          original = Path('.github/workflows/shopdrop-fix48-direct-category-results.yml')
+          category = Path('public/categories.html')
+          destination = Path('public/category-results.html')
+          guards = {
+              original: 'cd05b7fb4c2c97e17c4046702c632eed2d121e55',
+              category: '5a6ef82a00b06a67235d9caec1cc5b841b0e797d',
+          }
+          for path, expected in guards.items():
+              actual = subprocess.check_output(['git', 'hash-object', str(path)], text=True).strip()
+              if actual != expected:
+                  raise SystemExit('STOP: Source file changed: ' + str(path))
+          if destination.exists():
+              raise SystemExit('STOP: Results page already exists; no overwrite.')
+
+          lines = original.read_text(encoding='utf-8').splitlines()
+          begin = [i for i, line in enumerate(lines) if line.strip() == "python3 - <<'PY'"]
+          ends = [i for i, line in enumerate(lines) if line.strip() == 'PY']
+          starts_html = [i for i, line in enumerate(lines) if line.strip() == "cat > public/category-results.html <<'HTML'"]
+          ends_html = [i for i, line in enumerate(lines) if line.strip() == 'HTML']
+          if len(begin) != 2 or len(ends) != 2 or len(starts_html) != 1 or len(ends_html) != 1:
+              raise SystemExit('STOP: Approved Fix48 workflow structure changed.')
+          if not (begin[0] < ends[0] < starts_html[0] < ends_html[0] < begin[1] < ends[1]):
+              raise SystemExit('STOP: Unexpected Fix48 source sections.')
+
+          def unindent(block):
+              out = []
+              for line in block:
+                  if not line.strip():
+                      out.append('')
+                  elif line.startswith('          '):
+                      out.append(line[10:])
+                  else:
+                      raise SystemExit('STOP: Unexpected workflow indentation.')
+              return '\n'.join(out) + '\n'
+
+          tree = ast.parse(unindent(lines[begin[0] + 1:ends[0]]))
+          replacements = []
+          for statement in tree.body:
+              if not isinstance(statement, ast.Expr) or not isinstance(statement.value, ast.Call):
+                  continue
+              call = statement.value
+              if not isinstance(call.func, ast.Name) or call.func.id != 'change':
+                  continue
+              if len(call.args) != 3 or call.keywords:
+                  raise SystemExit('STOP: Unexpected Fix48 replacement format.')
+              replacements.append(tuple(ast.literal_eval(arg) for arg in call.args))
+          if len(replacements) != 3:
+              raise SystemExit('STOP: Expected exactly three approved Fix48 changes.')
+
+          rows = category.read_text(encoding='utf-8').splitlines()
+          for old, new, description in replacements:
+              wanted = [line.strip() for line in old.splitlines()]
+              indices = [i for i in range(len(rows) - len(wanted) + 1)
+                         if [line.strip() for line in rows[i:i + len(wanted)]] == wanted]
+              if len(indices) != 1:
+                  raise SystemExit('STOP: Cannot uniquely match ' + description)
+              index = indices[0]
+              rows[index:index + len(wanted)] = new.splitlines()
+              print('PASS:', description)
+
+          updated = '\n'.join(rows) + '\n'
+          page = unindent(lines[starts_html[0] + 1:ends_html[0]])
+          required = [
+              "window.location.assign('./category-results.html?'",
+              "query.set('view',browseView)",
+              'const requested=new URLSearchParams(location.search)',
+          ]
+          if any(value not in updated for value in required):
+              raise SystemExit('STOP: Category routing checks failed.')
+          if any(value not in page for value in [
+              'subcategory', "category:'eq.'+category", "subcategory:'eq.'+subcategory",
+              'product.html?id=', 'taxonomy.json', 'listing-images',
+          ]):
+              raise SystemExit('STOP: New results page incomplete.')
+          category.write_text(updated, encoding='utf-8')
+          destination.write_text(page, encoding='utf-8')
+          print('PASS: Existing Fix48 results page recovered, no other source files changed.')
+          PY
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import subprocess
+          for name in ('public/categories.html', 'public/category-results.html'):
+              html = Path(name).read_text(encoding='utf-8')
+              scripts = re.findall(r'<script(?:\s+[^>]*)?>([\s\S]*?)</script>', html, re.I)
+              if not scripts:
+                  raise SystemExit('STOP: No JavaScript in ' + name)
+              for script in scripts:
+                  subprocess.run(['node', '--check'], input=script, text=True, check=True)
+          print('PASS: Category navigation and results page JavaScript syntax.')
+          PY
+          git diff --check
+
+      - name: Commit only category navigation and the new results page
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add public/categories.html public/category-results.html
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix48B direct subcategory navigation and results page'
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure integrated website
+        uses: actions/configure-pages@v5
+
+      - name: Upload verified website files
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy dedicated subcategory results page
+        id: deployment
+        uses: actions/deploy-pages@v4
+
