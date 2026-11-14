@@ -1,1 +1,199 @@
 
+name: ShopDrop Fix42 - Restore Simple Selling Navigation
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix42-v2624-flow-reconciliation.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  reconcile-and-deploy:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout protected integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Guard and reconcile selling workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          expected = {
+              'public/index.html': 'd0e1d8105aa1e0e61121c135734a2e0ca6a00679',
+              'public/sell-item.html': '65e636ac6ce46c4762e8e6f02244b8aef2f40c39',
+              'public/sign-in.html': '14462a8937148c9ad0724aee6ecfa42ab58c0e49',
+              'public/register.html': 'd76252b9a13d2baf624e23ef51ce2b02f0792c63',
+              'public/seller-apply.html': 'd2926f05013dd235cb244cba28b9c6c5fbcb294a',
+              'public/seller.html': 'fd49517dd981b04a147506e17682a6c31c2db88e',
+              'public/account.html': '794e91d66f3027338b38795c001cac4c5142c1eb',
+              'public/shopdrop-seller-product-supabase.js': 'f7f5422d1b38180f2985e64f04bcf6c5098d44d0',
+          }
+          current = {}
+          for name, sha in expected.items():
+              actual = subprocess.check_output(
+                  ['git', 'hash-object', name], text=True
+              ).strip()
+              if actual != sha:
+                  raise SystemExit('STOP: source changed - ' + name)
+              current[name] = Path(name).read_text(encoding='utf-8')
+
+          if current['public/index.html'].count('./sell-item.html') != 2:
+              raise SystemExit('STOP: homepage selling links differ')
+          if './seller-apply.html?type=product' in current['public/index.html']:
+              raise SystemExit('STOP: homepage still has application route')
+          if not Path('public/shopdrop-product-photos.js').is_file():
+              raise SystemExit('STOP: Fix40 photo helper missing')
+
+          def replace(name, before, after):
+              if current[name].count(before) != 1:
+                  raise SystemExit('STOP: replacement anchor changed - ' + name + ': ' + before[:50])
+              current[name] = current[name].replace(before, after, 1)
+
+          # Every visitor sees the same simple instructions and listing form.
+          replace('public/sell-item.html',
+              '<p>Take photos, describe your item, set your price and post it. No seller application or manual approval required for ordinary lawful listings.</p>',
+              '<p>Sell in four steps: register once, sign in, take or select 1–6 pictures, then describe and post your item. Ordinary advertisements do not wait for Shop&amp;Drop approval.</p>')
+          replace('public/sell-item.html',
+              '<p class="muted">New? <a href="./register.html">Create a free account</a>. Already registered? <a href="./sign-in.html">Sign in</a>. You only register once; bank card details are not collected to advertise.</p>',
+              '<p><strong>Step 1:</strong> New? <a href="./register.html?next=sell-item.html">Register a free account</a> once.</p><p><strong>Step 2:</strong> Already registered? <a href="./sign-in.html?next=sell-item.html">Sign in to continue selling</a>.</p><p class="muted">Step 3: photos and item details below. Step 4: tap Post My Item. No bank card or application approval is needed to advertise.</p>')
+
+          # Sign-in returns only to the explicitly allowed selling page.
+          # Other sign-ins retain the existing My Account destination.
+          replace('public/sign-in.html',
+              "ShopDrop.msg(messageEl,'Signed in successfully. Opening your account...');\n  window.location.assign('./account.html');",
+              "const next=new URLSearchParams(location.search).get('next');\n  const destination=next==='sell-item.html'?'./sell-item.html':'./account.html';\n  ShopDrop.msg(messageEl,'Signed in successfully. Opening your selected page...');\n  window.location.assign(destination);")
+
+          # New account creates the same return-to-selling path.
+          replace('public/register.html',
+              'One simple Shop&Drop account can be used to buy and, after seller/provider approval where required, to sell products or services. We ask for extra information only when it is needed for a transaction.',
+              'One free Shop&amp;Drop account lets you buy and advertise products. No Shop&amp;Drop approval is required for an ordinary product advertisement. Payment providers handle any necessary financial checks when money is actually involved.')
+          replace('public/register.html',
+              "if(data.session){ShopDrop.msg(message,'Account created. Open My Account to save your private courier pickup/delivery address before checkout.');}",
+              "if(data.session){const next=new URLSearchParams(location.search).get('next');if(next==='sell-item.html'){window.location.assign('./sell-item.html');return;}ShopDrop.msg(message,'Account created. You can now buy or advertise items.');}")
+          replace('public/register.html',
+              "else{ShopDrop.msg(message,'Registration request received. If the address is eligible, check your email for a confirmation link, then sign in and save your private courier address in My Account.');}",
+              "else{ShopDrop.msg(message,'Registration received. If email confirmation is required, confirm it first, then sign in to continue.');}")
+          replace('public/register.html',
+              "const form=document.getElementById('form');\nconst message=document.getElementById('message');",
+              "const form=document.getElementById('form');\nconst message=document.getElementById('message');\nif(new URLSearchParams(location.search).get('next')==='sell-item.html'){const link=document.querySelector('a[href=\"./sign-in.html\"]');if(link)link.href='./sign-in.html?next=sell-item.html';}")
+
+          # Stale bookmarks and cached selling links must not reopen the
+          # old seller approval application. Keep explicit service or
+          # dispatch provider applications unchanged.
+          replace('public/seller-apply.html',
+              '<title>Sell on Shop&Drop</title>',
+              '<title>Sell on Shop&Drop</title><script>const kind=new URLSearchParams(location.search).get("type");if(kind!=="service"&&kind!=="dispatch"){location.replace("./sell-item.html");}</script>')
+
+          # The original Seller Centre still contains legacy /api/seller
+          # handlers. Keep them intact but remove their confusing old
+          # product submission screen from the ordinary selling journey.
+          replace('public/seller.html',
+              '<p><a href="./seller-apply.html">Apply to become a Seller / Service Provider</a></p>',
+              '<p><a href="./sell-item.html"><strong>Sell an Item — take pictures and post</strong></a></p><p>For ordinary product advertisements, no separate application or administrator approval is required.</p>')
+          replace('public/seller.html',
+              '<div class=box><h2>Add product</h2>',
+              '<div class=box id="shopdropLegacyAddProduct" hidden><h2>Add product</h2>')
+
+          # Even direct callers of the older product submit handler must
+          # not be blocked by identity/payout verification before listing.
+          name='public/shopdrop-seller-product-supabase.js'
+          start=current[name].find('  // Existing seller verification.')
+          end=current[name].find('  // Existing private courier collection address.')
+          if start < 0 or end <= start or current[name].count('  // Existing seller verification.') != 1:
+              raise SystemExit('STOP: seller verification function changed')
+          replacement = '''  // An ordinary advert requires an authenticated, unsuspended account.
+          // Provider payout onboarding is independent from advertising.
+          async function verifySeller(sb,userId){
+            const {data,error}=await sb.from('seller_verification_status')
+              .select('suspended_at').eq('seller_id',userId).maybeSingle();
+            if(error)throw Error('Unable to check account restrictions. Please try again.');
+            if(data?.suspended_at)throw Error('This account is suspended. Contact support.');
+            return true;
+          }
+
+          '''
+          current[name] = current[name][:start] + replacement + current[name][end:]
+
+          # Buyers and existing registered sellers can get to the selling
+          # form from My Account without any extra application steps.
+          replace('public/account.html',
+              '<h1>My account</h1>',
+              '<h1>My account</h1><p><a href="./sell-item.html"><strong>Sell an Item — take photos and post</strong></a></p>')
+
+          for name in expected:
+              if name != 'public/index.html':
+                  Path(name).write_text(current[name], encoding='utf-8')
+          print('PASS: seven existing pages/JS files patched; homepage verified unchanged')
+          print('PASS: no approval barrier for ordinary product advertisements')
+          print('PASS: existing other services, dispatch, courier and payment flows preserved')
+          PY
+
+          node --check public/shopdrop-seller-product-supabase.js
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess
+          for name in ('sell-item.html','sign-in.html','register.html','seller-apply.html'):
+              source=(Path('public')/name).read_text(encoding='utf-8')
+              blocks=re.findall(r'<script(?:\s+[^>]*)?>([\s\S]*?)</script>', source, re.I)
+              if not blocks: raise SystemExit('STOP: script missing - '+name)
+              for block in blocks:
+                  subprocess.run(['node','--input-type=module','--check'],input=block,text=True,check=True)
+          home=Path('public/index.html').read_text(encoding='utf-8')
+          sell=Path('public/sell-item.html').read_text(encoding='utf-8')
+          signin=Path('public/sign-in.html').read_text(encoding='utf-8')
+          assert home.count('./sell-item.html')==2
+          assert 'register.html?next=sell-item.html' in sell
+          assert 'sign-in.html?next=sell-item.html' in sell
+          assert "next==='sell-item.html'" in signin
+          assert 'shopdrop-quick-publish' in sell
+          assert 'shopdrop-product-photos.js' in sell
+          print('PASS: signup/signin/sell route and JavaScript syntax checks')
+          PY
+          git diff --check
+
+      - name: Commit only integration-branch frontend adjustments
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add public/sell-item.html public/sign-in.html public/register.html
+          git add public/seller-apply.html public/seller.html public/account.html
+          git add public/shopdrop-seller-product-supabase.js
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix42 V26.24 selling-flow reconciliation without approval barrier'
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Prepare integration-only website deployment
+        uses: actions/configure-pages@v5
+
+      - name: Upload verified integration website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy verified integration website
+        id: deployment
+        uses: actions/deploy-pages@v4
+
