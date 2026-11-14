@@ -56,6 +56,10 @@ a{color:#0f766e}
 <select id="c" required>
 <option value="">Choose a category</option>
 </select>
+<label for="subcat">Subcategory</label>
+<select id="subcat" required disabled>
+<option value="">Choose a main category first</option>
+</select>
 
 <label for="condition">Condition</label>
 <select id="condition">
@@ -110,6 +114,18 @@ const sb=createClient(
 
 const $=id=>document.getElementById(id);
 let pendingId=null,photosAttached=false,processing=false,recoveredListing=false;
+const departmentSubs=new Map();
+function fillSubcategories(selected=''){
+  const select=$('subcat');
+  const options=departmentSubs.get($('c').value)||[];
+  select.replaceChildren(new Option(
+    options.length?'Choose a subcategory':'Choose a main category first',''
+  ));
+  for(const name of options)select.add(new Option(name,name));
+  select.disabled=options.length===0;
+  select.value=options.includes(selected)?selected:'';
+}
+$('c').addEventListener('change',()=>fillSubcategories());
 
 function show(message,error=false){
   const el=$('result');
@@ -122,7 +138,7 @@ function show(message,error=false){
 // Recovery is account-bound and uses existing Supabase RLS.
 async function loadUnfinished(user){
   const {data, error}=await sb.from('products')
-    .select('id,title,description,category,condition,price,location,listing_reference,created_at')
+    .select('id,title,description,category,subcategory,condition,price,location,listing_reference,created_at')
     .eq('seller_id',user.id)
     .eq('listing_status','pending')
     .order('created_at',{ascending:false})
@@ -158,6 +174,7 @@ async function resumeItem(product){
     $('d').value=product.description||'';
     $('p').value=product.price||'';
     $('c').value=product.category||'';
+    fillSubcategories(product.subcategory||'');
     $('condition').value=product.condition||'used';
     $('town').value=product.location||'';
     window.ShopDropProductPhotos.recover(product,images.length);
@@ -185,8 +202,6 @@ async function setup(){
     $('accountStatus').textContent=user
       ?'Signed in. You can post your item now.'
       :'Sign in to post. You can fill in the form and select photos first.';
-    if(user)await loadUnfinished(user);
-
     const response=await fetch(
       './taxonomy.json',
       {cache:'no-store'}
@@ -197,6 +212,7 @@ async function setup(){
     }
 
     const taxonomy=await response.json();
+    departmentSubs.clear();
 
     for(const department of taxonomy.departments||[]){
       if(
@@ -209,8 +225,14 @@ async function setup(){
             department.name
           )
         );
+        departmentSubs.set(department.name,
+          Array.isArray(department.subcategories)
+            ?department.subcategories.filter(x=>typeof x==='string'&&x.trim())
+            :[]);
       }
     }
+    fillSubcategories();
+    if(user)await loadUnfinished(user);
   }catch(e){
     $('accountStatus').textContent=
       'Unable to load account or categories. Refresh and try again.';
@@ -266,6 +288,13 @@ $('itemForm').addEventListener('submit',async event=>{
       );
     }
 
+    const category=$('c').value;
+    const subcategory=$('subcat').value;
+    if(!departmentSubs.has(category) ||
+       !(departmentSubs.get(category)||[]).includes(subcategory)){
+      throw Error('Please choose a main category and a matching subcategory.');
+    }
+
     const amount=Number($('p').value);
 
     if(!Number.isFinite(amount)||amount<=0){
@@ -283,7 +312,8 @@ $('itemForm').addEventListener('submit',async event=>{
           seller_id:user.id,
           title:$('n').value.trim(),
           description,
-          category:$('c').value,
+          category,
+          subcategory,
           condition:$('condition').value,
           price:amount,
           currency:'ZAR',
@@ -313,7 +343,8 @@ $('itemForm').addEventListener('submit',async event=>{
         title:$('n').value.trim(),
         description,
         price:amount,
-        category:$('c').value,
+        category,
+        subcategory,
         condition:$('condition').value,
         location:$('town').value.trim()||null
       }).eq('id',pendingId).eq('seller_id',user.id).eq('listing_status','pending');

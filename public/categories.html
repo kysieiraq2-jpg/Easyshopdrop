@@ -103,12 +103,13 @@ select,input,button{max-width:100%;box-sizing:border-box}
 </div>
 </section>
 <section class="panel">
-<h2>Product departments A–Z</h2>
-<div id="cats" class="cats"></div>
-<p id="result" class="muted"></p>
 <h2>Available advertisements</h2>
+<p id="shopdropCurrentSelection" class="muted" aria-live="polite"></p>
 <div id="shopdropPublicProductResults" class="grid" aria-live="polite"></div>
 <button id="shopdropLoadMore" class="btn" type="button" hidden>Load more products</button>
+<h2>Browse product departments A–Z</h2>
+<div id="cats" class="cats"></div>
+<p id="result" class="muted"></p>
 </section>
 </main>
 <script src="./common.js"></script>
@@ -259,6 +260,11 @@ async function browsePublicProducts(filters={},append=false){
   browseResults.replaceChildren();
  }
  browseMore.hidden=true;
+ const selections=[browseFilters.category,browseFilters.subcategory].filter(Boolean);
+ if(browseFilters.view==='new')selections.push('New Products');
+ if(browseFilters.view==='preowned')selections.push('Second-Hand & Pre-Owned');
+ document.getElementById('shopdropCurrentSelection').textContent=
+   selections.length?'Showing: '+selections.join(' → '):'Showing all available products';
  browseMessage.textContent='Loading available advertisements…';
 
  const params=new URLSearchParams({
@@ -278,10 +284,10 @@ async function browsePublicProducts(filters={},append=false){
   params.set('subcategory','eq.'+browseFilters.subcategory);
  }
  if(browseFilters.view==='new'){
-  params.set('condition','eq.New');
+  params.set('condition','ilike.new');
  }
  if(browseFilters.view==='preowned'){
-  params.set('condition','in.("Like New","Used / Pre-Owned","Refurbished")');
+  params.set('condition','not.ilike.new');
  }
  if(browseFilters.term){
   const safe=browseFilters.term.replace(/[(),.*%]/g,' ').trim();
@@ -363,6 +369,7 @@ async function loadCats(){
      ?box.dataset.name+': choose a subcategory below.':'';
     if(box.classList.contains('open')){
      browsePublicProducts({category:box.dataset.name,view:browseView});
+    browseResults.scrollIntoView({behavior:'smooth',block:'start'});
     }
    };
   });
@@ -395,7 +402,7 @@ async function loadCats(){
      box.dataset.name+': choose a subcategory below.';
     browsePublicProducts({category:requested,view:browseView});
     requestAnimationFrame(()=>
-     box.scrollIntoView({behavior:'auto',block:'start'})
+     browseResults.scrollIntoView({behavior:'auto',block:'start'})
     );
    }
   }

@@ -238,27 +238,61 @@ function card(p){
  return `<article class=card><div class=pic>${p.image_url?`<img src="${esc(p.image_url)}" loading="lazy" decoding="async">`:'Product image'}</div><div class=body><h3><a href="./product.html?id=${p.id}">${esc(p.name)}</a></h3><div class=price>${money(p.price_cents,p.currency_code)}</div><p>${esc(({new:'New',like_new:'Like New',used:'Used / Pre-Owned',refurbished:'Refurbished'}[p.condition]||p.condition||'New'))} · ${p.stock>0?'In stock':'Out of stock'}</p></div></article>`;
 }
 async function loadProducts(userInitiated=false){
- const q=search.value.trim();
+ const query=search.value.trim();
  status.hidden=false;
- status.textContent=q?`Searching for “${q}”…`:'Loading products…';
- if(ShopDrop.isStatic){
-  const text=q?`Search preview: live products are not available here yet. Product search for “${q}” will use the live Shop&Drop catalogue when the backend is connected.`:'No live products are loaded in this GitHub Pages preview.';
-  status.textContent=text;
-  productGrid.innerHTML='';
-  if(userInitiated){
-   searchFeedback.textContent=text;
-   searchFeedback.hidden=false;
-   searchFeedback.scrollIntoView({behavior:'smooth',block:'start'});
-  }
-  return;
- }
+ status.textContent='Loading Shop&Drop advertisements…';
  try{
-  const d=await api('/api/products?q='+encodeURIComponent(q));
-  productGrid.innerHTML=d.products.map(card).join('')||'<p>No products found.</p>';
-  status.hidden=true;
+   const endpoint='https://dtkdvvxpwonywtsgqmdx.supabase.co';
+   const key='sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';
+   const headers={apikey:key,Accept:'application/json'};
+   const params=new URLSearchParams({
+     select:'id,title,price,currency,condition,quantity',
+     listing_status:'eq.active',quantity:'gt.0',country_code:'eq.ZA',
+     order:'created_at.desc',limit:'24'
+   });
+   const safe=query.replace(/[(),.*%]/g,' ').trim();
+   if(safe)params.set('or','(title.ilike.*'+safe+'*,description.ilike.*'+safe+'*)');
+   const response=await fetch(endpoint+'/rest/v1/products?'+params.toString(),{headers});
+   if(!response.ok)throw Error('Public advertisements are temporarily unavailable.');
+   const rows=await response.json();
+   if(!Array.isArray(rows))throw Error('Invalid marketplace response.');
+   const imageMap=new Map();
+   const ids=rows.map(x=>x.id).filter(x=>/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(String(x)));
+   if(ids.length){
+     try{
+       const options=new URLSearchParams({
+         select:'product_id,storage_bucket,storage_path,is_primary,image_position',
+         product_id:'in.('+ids.join(',')+')',order:'image_position.asc'
+       });
+       const imageResponse=await fetch(endpoint+'/rest/v1/listing_images?'+options.toString(),{headers});
+       if(imageResponse.ok){
+         const images=await imageResponse.json();
+         if(Array.isArray(images))for(const image of images){
+           const path=String(image.storage_path||'');
+           if(image.storage_bucket!=='listing-images'||!path||path.startsWith('/')||path.split('/').includes('..'))continue;
+           if(imageMap.has(image.product_id)&&image.is_primary!==true)continue;
+           imageMap.set(image.product_id,endpoint+'/storage/v1/object/public/listing-images/'+
+             path.split('/').map(encodeURIComponent).join('/'));
+         }
+       }
+     }catch(e){console.warn('Product picture preview unavailable:',e);}
+   }
+   productGrid.innerHTML=rows.map(p=>card({
+     id:p.id,name:p.title,condition:p.condition,
+     stock:Number(p.quantity),currency_code:p.currency||'ZAR',
+     price_cents:Math.round(Number(p.price)*100),
+     image_url:imageMap.get(p.id)||null
+   })).join('')||'<p>No advertisements match your search.</p>';
+   status.hidden=true;
+   if(userInitiated){
+     searchFeedback.textContent=rows.length+' available advertisement(s).';
+     searchFeedback.hidden=false;
+     searchFeedback.scrollIntoView({behavior:'smooth',block:'start'});
+   }
  }catch(e){
-  status.hidden=false;
-  status.textContent=e.message;
+   productGrid.innerHTML='';
+   status.hidden=false;
+   status.textContent=e?.message||'Unable to load marketplace products.';
  }
 }
 const mainMenuButton=document.getElementById('menuButton'),mainMenu=document.getElementById('menu');
