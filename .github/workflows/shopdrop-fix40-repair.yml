@@ -1,1 +1,93 @@
 
+name: ShopDrop Fix40R - Repair Seller Photo Workflow
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix40-repair.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair-photos:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout integration branch only
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Recover and validate the approved Fix40 script
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import ast
+          import subprocess
+          import sys
+
+          source_path = Path('.github/workflows/shopdrop-fix40-seller-photos.yml')
+          expected = '331da9d5974b5a2361470f19cb7094dacf8309e4'
+          actual = subprocess.check_output(
+              ['git', 'hash-object', str(source_path)], text=True
+          ).strip()
+          if actual != expected:
+              raise SystemExit('STOP: Original Fix40 workflow changed.')
+
+          lines = source_path.read_text(encoding='utf-8').splitlines()
+          starts = [i for i, line in enumerate(lines)
+                    if line.strip() == "python3 - <<'PY'"]
+          if len(starts) != 1:
+              raise SystemExit('STOP: Original Python start is not unique.')
+          start = starts[0]
+          ends = [i for i in range(start + 1, len(lines))
+                  if lines[i].strip() == 'PY']
+          if len(ends) != 1 or ends[0] <= start + 1:
+              raise SystemExit('STOP: Original Python end is invalid.')
+
+          script_lines = []
+          inside_triple_string = False
+          for raw in lines[start + 1:ends[0]]:
+              if not inside_triple_string and raw.strip():
+                  if not raw.startswith('          '):
+                      raise SystemExit('STOP: Unexpected Python indentation.')
+                  clean = raw[10:]
+              elif inside_triple_string:
+                  clean = raw
+              else:
+                  clean = ''
+              script_lines.append(clean)
+              if clean.count('"""') % 2:
+                  inside_triple_string = not inside_triple_string
+
+          if inside_triple_string:
+              raise SystemExit('STOP: Unclosed original Python text.')
+          script = '\n'.join(script_lines) + '\n'
+          ast.parse(script)
+          if 'create-signed-upload' not in script or 'listing_images' not in script:
+              raise SystemExit('STOP: Secure upload flow is missing.')
+          subprocess.run([sys.executable, '-c', script], check=True)
+          PY
+
+          node --check public/shopdrop-seller-product-supabase.js
+          node --check public/shopdrop-product-photos.js
+          git diff --check
+
+      - name: Commit only the three approved seller photo files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add public/seller.html
+          git add public/shopdrop-seller-product-supabase.js
+          git add public/shopdrop-product-photos.js
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix40R verify and apply secure seller photos'
+          git push origin HEAD:shopdrop-phase6-integration
+
