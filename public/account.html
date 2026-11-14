@@ -38,16 +38,16 @@ a{color:#0f766e}
 
 <section class="panel" id="seller-courier-pickup-panel">
 <h2>Seller — Confirm Courier Collection</h2>
-<p><strong>IMPORTANT: ASK YOUR COURIER FOR THE SIX-DIGIT SHOP&amp;DROP COLLECTION PIN AT PICKUP.</strong></p>
-<p>Only enter the PIN after the courier has physically collected your sold item. Never confirm collection before handover. Keep your collection receipt.</p>
-<p class="muted">Authenticated courier tracking or scanning may alternatively confirm pickup. The buyer's delivery confirmation is separate.</p>
+<p><strong>IMPORTANT: ASK YOUR COURIER FOR THE COURIER COMPANY&#39;S OWN BOOKING, WAYBILL OR TRACKING REFERENCE AT PICKUP.</strong></p>
+<p>Enter the actual courier reference only after your sold item is physically collected. Keep your collection receipt. A reference alone cannot verify collection or release seller funds.</p>
+<p class="muted">An authenticated courier tracking event or authorized pickup scan must independently verify collection. Any buyer delivery PIN is separate.</p>
 <form id="sellerCourierPickupForm">
 <label for="sellerPickupShipment">Your shipment</label>
 <select id="sellerPickupShipment" required>
 <option value="">Select your shipment</option>
 </select>
-<label for="sellerCourierPickupPin">Six-digit code from courier</label>
-<input id="sellerCourierPickupPin" type="text" inputmode="numeric" autocomplete="off" maxlength="6" pattern="[0-9]{6}" required placeholder="123456">
+<label for="sellerCourierPickupPin">Courier booking, waybill or tracking reference</label>
+<input id="sellerCourierPickupPin" type="text" autocomplete="off" spellcheck="false" minlength="4" maxlength="128" pattern="[A-Za-z0-9][A-Za-z0-9 ._:/#-]{2,126}[A-Za-z0-9]" required placeholder="Courier reference">
 <p><label><input id="sellerPickupHandover" type="checkbox" required> I confirm the courier has physically collected this item.</label></p>
 <button type="submit" id="sellerPickupSubmit">Confirm Collection</button>
 </form>
@@ -379,8 +379,8 @@ if(error||!user){
  });
 
  who.append(signout);
-// Fix36E: authenticated seller pickup confirmation.
-// No PIN generation or payout instructions in browser code.
+// Fix39: seller records the courier reference; independent courier evidence is also mandatory.
+// Browser never authorizes payments or treats this reference as proof of collection.
 const pickupForm=document.getElementById('sellerCourierPickupForm');
 const pickupShipments=document.getElementById('sellerPickupShipment');
 const pickupPin=document.getElementById('sellerCourierPickupPin');
@@ -418,42 +418,41 @@ pickupForm.addEventListener('submit',async event=>{
  event.preventDefault();
 
  const shipmentId=pickupShipments.value;
- const pin=pickupPin.value.trim();
+ const courierReference=pickupPin.value.trim();
 
  if(!/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(shipmentId) ||
-    !/^[0-9]{6}$/.test(pin) ||
+    !/^[A-Za-z0-9][A-Za-z0-9 ._:/#-]{2,126}[A-Za-z0-9]$/.test(courierReference) ||
     !pickupHandover.checked){
-  pickupStatus.textContent='Select a shipment, enter the six-digit PIN and confirm physical handover.';
+  pickupStatus.textContent='Select your shipment, enter the courier company reference and confirm physical handover.';
   return;
  }
 
  pickupSubmit.disabled=true;
- pickupStatus.textContent='Checking your courier collection PIN...';
+ pickupStatus.textContent='Recording your courier reference securely...';
 
  try{
   const {data,error:verifyError}=await supabase.functions.invoke(
    'seller-confirm-courier-pickup',
    {body:{
     shipment_id:shipmentId,
-    pin:pin,
+    courier_reference:courierReference,
     handover_confirmed:true
    }}
   );
 
-  if(verifyError || data?.verified!==true){
-   throw Error(data?.error||'Pickup verification was not accepted.');
+  if(verifyError || data?.recorded!==true){
+   throw Error(data?.error||'Courier reference could not be recorded.');
   }
 
-  pickupStatus.textContent=
-   data.staging_status==='staged'
-   ? 'Pickup verified. Release request prepared, subject to the approved payment provider and security checks.'
-   : 'Pickup PIN verified. Payment-release preparation is pending backend reconciliation.';
+  pickupStatus.textContent=data.reference_matches_booking===true
+   ? 'Courier reference recorded. Independent courier tracking or a pickup scan is required for confirmation. No payment has been released.'
+   : 'Reference recorded, but it does not match the booked courier. Please contact support. No payment has been released.';
 
   pickupPin.value='';
   pickupHandover.checked=false;
  }catch{
   pickupStatus.textContent=
-   'Collection could not be confirmed. Check the shipment and PIN, or contact Shop&Drop support.';
+   'Courier reference could not be recorded. Check the shipment and reference, or contact Shop&Drop support.';
  }finally{
   pickupSubmit.disabled=false;
  }
