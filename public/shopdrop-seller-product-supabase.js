@@ -36,46 +36,15 @@
     return n;
   }
 
-  // Existing seller verification.
-  async function verifySeller(sb,userId){
-    const {data,error}=await sb
-      .from('seller_verification_status')
-      .select(
-        'identity_verified,account_verified,'+
-        'payout_verified,suspended_at'
-      )
-      .eq('seller_id',userId)
-      .maybeSingle();
-
-    if(error){
-      throw Error(
-        'Seller verification could not be checked: '+
-        error.message
-      );
-    }
-
-    if(!data){
-      throw Error(
-        'Seller verification is not yet available for this account.'
-      );
-    }
-
-    if(data.suspended_at){
-      throw Error('This seller account is suspended.');
-    }
-
-    if(
-      data.identity_verified!==true||
-      data.account_verified!==true||
-      data.payout_verified!==true
-    ){
-      throw Error(
-        'Seller identity, account or payout verification is incomplete.'
-      );
-    }
-
-    return true;
-  }
+  // An ordinary advert requires an authenticated, unsuspended account.
+// Provider payout onboarding is independent from advertising.
+async function verifySeller(sb,userId){
+  const {data,error}=await sb.from('seller_verification_status')
+    .select('suspended_at').eq('seller_id',userId).maybeSingle();
+  if(error)throw Error('Unable to check account restrictions. Please try again.');
+  if(data?.suspended_at)throw Error('This account is suspended. Contact support.');
+  return true;
+}
 
   // Existing private courier collection address.
   async function preparePickupAddresses(sb,userId){
