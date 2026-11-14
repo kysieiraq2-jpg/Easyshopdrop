@@ -1,1 +1,359 @@
 
+name: ShopDrop Fix48 - Direct Subcategory Product Pages
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix48-direct-category-results.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  direct-subcategory-results:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Connect subcategories to dedicated product pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          source=Path('public/categories.html')
+          new_page=Path('public/category-results.html')
+          expected='5a6ef82a00b06a67235d9caec1cc5b841b0e797d'
+          actual=subprocess.check_output(['git','hash-object',str(source)],text=True).strip()
+          if actual!=expected:
+              raise SystemExit('STOP: The current category page differs from the verified source.')
+          if new_page.exists():
+              raise SystemExit('STOP: A product category results page already exists.')
+
+          html=source.read_text(encoding='utf-8')
+          def change(old,new,label):
+              global html
+              if html.count(old)!=1:
+                  raise SystemExit('STOP: Unexpected source in '+label)
+              html=html.replace(old,new,1)
+
+          change('''  document.querySelectorAll('.cat>button').forEach(button=>{
+           button.onclick=()=>{
+            const box=button.closest('.cat');
+            box.classList.toggle('open');
+            browseCategoryMessage.textContent=box.classList.contains('open')
+             ?box.dataset.name+': choose a subcategory below.':'';
+            if(box.classList.contains('open')){
+             browsePublicProducts({category:box.dataset.name,view:browseView});
+            browseResults.scrollIntoView({behavior:'smooth',block:'start'});
+            }
+           };
+          });''',
+          '''  document.querySelectorAll('.cat>button').forEach(button=>{
+           button.onclick=()=>{
+            const box=button.closest('.cat');
+            const opening=!box.classList.contains('open');
+            document.querySelectorAll('.cat.open').forEach(other=>{
+             if(other!==box)other.classList.remove('open');
+            });
+            box.classList.toggle('open',opening);
+            browseCategoryMessage.textContent=opening
+             ?box.dataset.name+': choose a subcategory to see its advertised items.':'';
+            if(opening)box.scrollIntoView({behavior:'smooth',block:'start'});
+           };
+          });''','main category navigation')
+
+          change('''  document.querySelectorAll('.subcat').forEach(button=>{
+           button.onclick=event=>{
+            event.stopPropagation();
+            document.querySelectorAll('.subcat.selected')
+             .forEach(x=>x.classList.remove('selected'));
+            button.classList.add('selected');
+            browseQuery.value=button.dataset.sub;
+            browseCategoryMessage.textContent=
+             button.dataset.parent+' → '+button.dataset.sub;
+            browsePublicProducts({
+             category:button.dataset.parent,
+             subcategory:button.dataset.sub,
+             view:browseView
+            });
+            browseResults.scrollIntoView({behavior:'smooth',block:'start'});
+           };
+          });''',
+          '''  document.querySelectorAll('.subcat').forEach(button=>{
+           button.onclick=event=>{
+            event.preventDefault();
+            event.stopPropagation();
+            const query=new URLSearchParams({
+             category:button.dataset.parent,
+             subcategory:button.dataset.sub
+            });
+            if(browseView==='new'||browseView==='preowned'){
+             query.set('view',browseView);
+            }
+            window.location.assign('./category-results.html?'+query.toString());
+           };
+          });''','subcategory opens separate results page')
+
+          change('''  const requested=new URLSearchParams(location.search).get('category');
+          if(requested){
+           const box=[...document.querySelectorAll('.cat')]
+            .find(x=>x.dataset.name===requested);
+           if(box){
+            box.classList.add('open');
+            browseCategoryMessage.textContent=
+             box.dataset.name+': choose a subcategory below.';
+            browsePublicProducts({category:requested,view:browseView});
+            requestAnimationFrame(()=>
+             browseResults.scrollIntoView({behavior:'auto',block:'start'})
+            );
+           }
+          }''',
+          '''  const requested=new URLSearchParams(location.search).get('category');
+          if(requested){
+           const box=[...document.querySelectorAll('.cat')]
+            .find(x=>x.dataset.name===requested);
+           if(box){
+            box.classList.add('open');
+            browseCategoryMessage.textContent=box.dataset.name+
+             ': choose a subcategory to see advertised products.';
+            requestAnimationFrame(()=>
+             box.scrollIntoView({behavior:'auto',block:'start'})
+            );
+           }
+          }''','homepage category links focus on subcategory choices')
+          source.write_text(html,encoding='utf-8')
+          PY
+
+          cat > public/category-results.html <<'HTML'
+          <!doctype html>
+          <html lang="en">
+          <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width,initial-scale=1">
+          <title>Browse Products | Shop&amp;Drop</title>
+          <style>
+          *{box-sizing:border-box}
+          body{margin:0;background:#f4f6f8;color:#17202a;font:16px Arial,sans-serif}
+          header{background:#101827;color:white;padding:16px}
+          header a{color:white;margin-right:18px}
+          main{max-width:1000px;margin:auto;padding:18px}
+          .panel{background:white;padding:18px;border-radius:12px;margin:16px 0}
+          .muted{color:#526273}
+          h1{font-size:27px;margin:10px 0}
+          .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:14px}
+          .item{display:block;border:1px solid #dae2e5;border-radius:11px;padding:15px;color:inherit;text-decoration:none}
+          .item img,.image-empty{width:100%;height:215px;object-fit:contain;background:#f1f5f9;border-radius:8px}
+          .image-empty{display:flex;align-items:center;justify-content:center;color:#677681}
+          .item h2{font-size:20px;margin:12px 0}
+          .price{font-size:23px;font-weight:700;color:#0f766e}
+          button{border:0;border-radius:8px;padding:12px 16px;background:#0f766e;color:white;font:inherit}
+          a:focus-visible,button:focus-visible{outline:3px solid #0f766e;outline-offset:2px}
+          @media(max-width:600px){.grid{grid-template-columns:1fr}main{padding:12px}}
+          </style>
+          </head>
+          <body>
+          <header><a href="./index.html">Shop&amp;Drop</a><a href="./categories.html">All Categories</a><a href="./checkout.html">Shopping Bag</a></header>
+          <main>
+          <section class="panel">
+          <p><a href="./categories.html">← Choose another category</a></p>
+          <p id="crumb" class="muted"></p>
+          <h1 id="heading">Products in this subcategory</h1>
+          <p id="status" role="status" aria-live="polite">Loading available advertisements…</p>
+          </section>
+          <section class="panel">
+          <div id="items" class="grid"></div>
+          <button id="more" type="button" hidden>Show more products</button>
+          </section>
+          </main>
+          <script>
+          (()=>{
+           'use strict';
+           const endpoint='https://dtkdvvxpwonywtsgqmdx.supabase.co';
+           const key='sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';
+           const headers={apikey:key,Accept:'application/json'};
+           const $=id=>document.getElementById(id);
+           const query=new URLSearchParams(location.search);
+           const category=query.get('category')||'';
+           const subcategory=query.get('subcategory')||'';
+           const view=query.get('view')||'';
+           let offset=0,loading=false;
+           const pageSize=24;
+
+           function imageUrl(image){
+            if(image.storage_bucket!=='listing-images')return null;
+            const path=String(image.storage_path||'');
+            if(!path||path.startsWith('/')||path.split('/').includes('..'))return null;
+            return endpoint+'/storage/v1/object/public/listing-images/'+
+             path.split('/').map(encodeURIComponent).join('/');
+           }
+           async function primaryImages(rows){
+            const found=new Map();
+            const ids=rows.map(p=>p.id).filter(id=>
+             /^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(String(id)));
+            if(!ids.length)return found;
+            const p=new URLSearchParams({
+             select:'product_id,storage_bucket,storage_path,is_primary,image_position',
+             product_id:'in.('+ids.join(',')+')',order:'image_position.asc'
+            });
+            try{
+             const response=await fetch(endpoint+'/rest/v1/listing_images?'+p,{headers});
+             if(!response.ok)return found;
+             const images=await response.json();
+             if(!Array.isArray(images))return found;
+             for(const image of images){
+              const url=imageUrl(image);
+              if(url&&(!found.has(image.product_id)||image.is_primary))
+               found.set(image.product_id,url);
+             }
+            }catch(error){console.warn('Product image previews unavailable',error);}
+            return found;
+           }
+           function createCard(product,images){
+            const card=document.createElement('a');
+            card.className='item';
+            card.href='./product.html?id='+encodeURIComponent(product.id);
+            const url=images.get(product.id);
+            if(url){
+             const img=document.createElement('img');
+             img.src=url;
+             img.alt='Photograph of '+(product.title||'product');
+             img.loading='lazy';
+             img.onerror=()=>{
+              const empty=document.createElement('div');
+              empty.className='image-empty';empty.textContent='Photo unavailable';
+              img.replaceWith(empty);
+             };
+             card.append(img);
+            }else{
+             const empty=document.createElement('div');
+             empty.className='image-empty';empty.textContent='Photo unavailable';
+             card.append(empty);
+            }
+            const title=document.createElement('h2');
+            title.textContent=product.title||'Product';
+            const condition=document.createElement('p');
+            condition.className='muted';
+            condition.textContent=String(product.condition||'').replaceAll('_',' ');
+            const price=document.createElement('p');
+            price.className='price';
+            price.textContent=new Intl.NumberFormat('en-ZA',{
+             style:'currency',currency:'ZAR'
+            }).format(Number(product.price));
+            const detail=document.createElement('p');
+            detail.textContent='View item and add to shopping bag';
+            card.append(title,condition,price,detail);
+            return card;
+           }
+           async function load(){
+            if(loading)return;
+            loading=true;
+            $('more').disabled=true;
+            $('status').textContent='Loading '+subcategory+' advertisements…';
+            try{
+             const p=new URLSearchParams({
+              select:'id,title,condition,price,currency',
+              listing_status:'eq.active',quantity:'gt.0',country_code:'eq.ZA',
+              category:'eq.'+category,subcategory:'eq.'+subcategory,
+              order:'created_at.desc',limit:String(pageSize),offset:String(offset)
+             });
+             if(view==='new')p.set('condition','ilike.new');
+             if(view==='preowned')p.set('condition','not.ilike.new');
+             const response=await fetch(endpoint+'/rest/v1/products?'+p,{headers});
+             if(!response.ok)throw Error('Advertisements could not be loaded. Please try again.');
+             const rows=await response.json();
+             if(!Array.isArray(rows))throw Error('Invalid marketplace response.');
+             const images=await primaryImages(rows);
+             for(const item of rows)$('items').append(createCard(item,images));
+             offset+=rows.length;
+             $('status').textContent=offset
+              ?offset+' product(s) in '+subcategory+'. Tap a product to view it.'
+              :'No products currently advertised in '+subcategory+'.';
+             $('more').hidden=rows.length<pageSize;
+            }catch(error){$('status').textContent=error.message||'Unable to load products.';}
+            finally{loading=false;$('more').disabled=false;}
+           }
+           async function start(){
+            try{
+             const response=await fetch('./taxonomy.json',{cache:'no-store'});
+             if(!response.ok)throw Error('Categories unavailable.');
+             const data=await response.json();
+             const department=(data.departments||[]).find(d=>d.name===category);
+             if(!department||!Array.isArray(department.subcategories)||
+                !department.subcategories.includes(subcategory)){
+              throw Error('Choose a valid category and subcategory from Shop&Drop.');
+             }
+             $('crumb').textContent=category+' → '+subcategory;
+             $('heading').textContent=subcategory;
+             document.title=subcategory+' | Shop&Drop';
+             await load();
+            }catch(error){$('status').textContent=error.message||'Unable to open category.';}
+           }
+           $('more').addEventListener('click',load);
+           start();
+          })();
+          </script>
+          </body>
+          </html>
+          HTML
+
+          python3 - <<'PY'
+          import re,subprocess
+          from pathlib import Path
+          for file in ('public/categories.html','public/category-results.html'):
+              html=Path(file).read_text(encoding='utf-8')
+              scripts=re.findall(r'<script(?:\s+[^>]*)?>([\s\S]*?)</script>',html,re.I)
+              if not scripts:raise SystemExit('STOP: no JavaScript in '+file)
+              for script in scripts:
+                  subprocess.run(['node','--check'],input=script,text=True,check=True)
+          cats=Path('public/categories.html').read_text(encoding='utf-8')
+          results=Path('public/category-results.html').read_text(encoding='utf-8')
+          assert "window.location.assign('./category-results.html?'" in cats
+          assert "box.scrollIntoView({behavior:'smooth'" in cats
+          assert "subcategory:'eq.'+subcategory" in results
+          assert 'createCard(item,images)' in results
+          assert 'product.html?id=' in results
+          print('PASS: Dedicated subcategory navigation and JS syntax verified')
+          PY
+          git diff --check
+
+      - name: Commit only category navigation and new results page
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add public/categories.html public/category-results.html
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix48 open dedicated product results when selecting subcategory'
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure integration website
+        uses: actions/configure-pages@v5
+
+      - name: Upload corrected integration website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy corrected integration website
+        id: deployment
+        uses: actions/deploy-pages@v4
+
