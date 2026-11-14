@@ -1,1 +1,602 @@
 
+name: ShopDrop Fix43 - Original Gallery Photos and Recovery
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix43-original-gallery.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  fix-original-gallery-photos:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch only
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Preserve originals and fix gallery photo handling
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          
+          ROOT = Path('public')
+          GUARDS = {
+              'shopdrop-product-photos.js': 'b98a0ef5d9d05f6ab970a8f8f793cd1093b6f809',
+              'sell-item.html': '638eb1a0ef8b3b9005c17ae8c5a8860f91e4f842',
+          }
+          for fname, expected_sha in GUARDS.items():
+              full = ROOT / fname
+              actual = subprocess.check_output(['git', 'hash-object', str(full)], text=True).strip()
+              if actual != expected_sha:
+                  raise SystemExit('STOP: Source file changed - ' + str(full))
+          
+          
+          def replace_once(source, original, replacement, tag):
+              if source.count(original) != 1:
+                  raise SystemExit('STOP: Expected source differs at ' + tag + ' (' + str(source.count(original)) + ' occurrences)')
+              return source.replace(original, replacement, 1)
+          
+          
+          def replace_between(source, start, end, replacement, tag):
+              if source.count(start) != 1 or source.count(end) != 1:
+                  raise SystemExit('STOP: Unexpected section ' + tag)
+              a, b = source.index(start), source.index(end)
+              if b <= a:
+                  raise SystemExit('STOP: Section order changed ' + tag)
+              return source[:a] + replacement + source[b:]
+          
+          photo_file = ROOT / 'shopdrop-product-photos.js'
+          photo = photo_file.read_text(encoding='utf-8')
+          photo = replace_once(photo,
+              '            let pending = null;',
+              '''            let pending = null;
+                      let originalCount = null;
+                      let uploading = false;
+                      let reading = false;
+                      let pendingSelection = Promise.resolve();
+                      const linkedPositions = new Set();''', 'state')
+          photo = replace_once(photo,
+              '            const maxRaw = 15 * 1024 * 1024;\n            const maxPrepared = 10 * 1024 * 1024;',
+              '            const maxRaw = 10 * 1024 * 1024;', 'file size')
+          
+          photo = replace_once(photo,
+          '''                remove.addEventListener('click', () => {
+                            if (pending) {
+                              message(
+                                'Finish the current listing upload first.'
+                              );
+                              return;
+                            }
+          
+                            URL.revokeObjectURL(item.url);''',
+          '''                remove.addEventListener('click', () => {
+                            if (uploading || linkedPositions.has((originalCount ?? 0) + index + 1)) {
+                              message('A photograph already saved to this item cannot be removed during posting.');
+                              return;
+                            }
+          
+                            URL.revokeObjectURL(item.url);''', 'remove safety')
+          
+          photo = replace_between(photo,
+              '            function selectFiles(files) {',
+              '            function init() {',
+          '''            // Capture original gallery bytes while the Android picker still owns
+                      // the file. No canvas, resampling, JPEG conversion or forced WebP.
+                      function detectedMime(bytes) {
+                        if (bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff)
+                          return 'image/jpeg';
+                        if (bytes.length > 8 &&
+                            [137,80,78,71,13,10,26,10].every((value, i) => bytes[i] === value))
+                          return 'image/png';
+                        if (bytes.length > 12 &&
+                            String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF' &&
+                            String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP')
+                          return 'image/webp';
+                        return null;
+                      }
+          
+                      async function readOriginal(file) {
+                        if (!file || !file.size || file.size > maxRaw)
+                          throw Error('Photograph must be between 1 byte and 10 MB.');
+                        let data;
+                        try { data = await file.arrayBuffer(); }
+                        catch {
+                          // Android content providers can require the FileReader route.
+                          if (typeof FileReader === 'undefined')
+                            throw Error('A selected gallery photograph could not be read.');
+                          data = await new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = () => resolve(reader.result);
+                            reader.onerror = () => reject(Error('The photo could not be read from the gallery.'));
+                            reader.readAsArrayBuffer(file);
+                          });
+                        }
+                        const bytes = new Uint8Array(data);
+                        const mime = detectedMime(bytes.subarray(0, 24));
+                        if (!mime) throw Error('This photograph uses an image format not yet supported by Shop&Drop storage.');
+                        const blob = new Blob([bytes], { type: mime });
+                        return {
+                          file: {
+                            name: String(file.name || 'photograph').slice(0, 150),
+                            size: file.size,
+                            lastModified: file.lastModified || 0
+                          },
+                          mime,
+                          blob,
+                          url: URL.createObjectURL(blob)
+                        };
+                      }
+          
+                      async function selectFiles(files) {
+                        if (uploading || reading) { message('Please finish selecting your photographs.'); return; }
+                        reading = true;
+                        try {
+                        const current = selected.map(x => x.file);
+                        const additions = [];
+                        const max = 6 - (originalCount ?? 0);
+                        for (const file of files) {
+                          if (selected.length + additions.length >= max) break;
+                          const duplicate = current.concat(additions).some(x =>
+                            x.name === file.name && x.size === file.size &&
+                            x.lastModified === file.lastModified);
+                          if (!duplicate) additions.push(file);
+                        }
+                        // Start reading all provider-backed files before the file input is cleared.
+                        const results = await Promise.allSettled(additions.map(readOriginal));
+                        let errorMessage = '';
+                        results.forEach(result => {
+                          if (result.status === 'fulfilled') selected.push(result.value);
+                          else errorMessage = String(result.reason?.message || 'Photograph could not be read.');
+                        });
+                        render();
+                        if (files.length + current.length + (originalCount ?? 0) > 6)
+                          message('Maximum six photographs per item.');
+                        else if (errorMessage) message(errorMessage);
+                        } finally { reading = false; }
+                      }
+          
+          ''', 'gallery buffering')
+          
+          photo = replace_once(photo,
+          '''                input.addEventListener('change', () => {
+                            const files = Array.from(input.files || []);
+                            input.value = '';
+                            selectFiles(files);
+                          });''',
+          '''                input.addEventListener('change', async () => {
+                            const files = Array.from(input.files || []);
+                            try { pendingSelection = selectFiles(files); await pendingSelection; }
+                            catch (error) { message(error?.message || 'Could not read photograph.'); }
+                            finally { input.value = ''; }
+                          });''', 'picker lifecycle')
+          
+          photo = replace_between(photo,
+              '            async function optimize(file) {',
+              '            function clear() {',
+          '''            // Original bytes are uploaded directly. The seller never has to
+                      // convert, crop or screenshot an image before advertising it.
+          
+          ''', 'remove conversion')
+          photo = replace_once(photo,
+          '''              uploaded.clear();
+                        pending = null;
+                        render();''',
+          '''              uploaded.clear();
+                        pending = null;
+                        originalCount = null;
+                        linkedPositions.clear();
+                        render();''', 'clear session')
+          photo = replace_once(photo,
+          '''              if (
+                          !pending ||
+                          pending.id !== product.id ||
+                          selected.length < 1 ||
+                          selected.length > 6
+                        ) {
+                          throw Error(
+                            'Select one to six photos for this product.'
+                          );
+                        }''',
+          '''              if (
+                          !pending ||
+                          pending.id !== product.id ||
+                          selected.length > 6 ||
+                          (selected.length < 1 && !(originalCount > 0))
+                        ) {
+                          throw Error(
+                            'Select one to six photos for this product.'
+                          );
+                        }''', 'recover already saved photograph')
+          photo = replace_once(photo,
+          '''              const { data: current, error: readError } =''',
+          '''              uploading = true;
+                        try {
+                        const { data: current, error: readError } =''', 'upload progress guard')
+          photo = replace_once(photo,
+          '''              const positions = new Set(
+                          (current || []).map(
+                            x => Number(x.image_position)
+                          )
+                        );
+          
+                        const reference''',
+          '''              const positions = new Set(
+                          (current || []).map(x => Number(x.image_position))
+                        );
+                        if (originalCount === null) originalCount = positions.size;
+                        if (originalCount + selected.length > 6 ||
+                            (originalCount === 0 && selected.length === 0))
+                          throw Error('Choose between one and six photographs.');
+          
+                        const reference''', 'recovery position')
+          photo = replace_once(photo,
+          '''                const pos = index + 1;
+          
+                          if (positions.has(pos)) continue;''',
+          '''                const pos = originalCount + index + 1;
+          
+                          if (positions.has(pos)) { linkedPositions.add(pos); continue; }''', 'correct photo position')
+          photo = replace_once(photo,
+          '''                const source = selected[index].file;
+          
+                          let item = uploaded.get(pos);
+          
+                          if (!item) {
+                            const blob = await optimize(source);''',
+          '''                const source = selected[index].file;
+                          const blob = selected[index].blob;
+                          const mime = selected[index].mime;
+          
+                          let item = uploaded.get(pos);
+          
+                          if (!item) {''', 'send original file')
+          photo = replace_once(photo,"mime_type: 'image/webp',\n                        file_size: blob.size", "mime_type: mime,\n                        file_size: blob.size", 'ticket content type')
+          photo = replace_once(photo,"contentType: 'image/webp'", "contentType: mime", 'storage content type')
+          photo = replace_once(photo,"mime_type: 'image/webp',\n                      file_size_bytes: item.size", "mime_type: mime,\n                      file_size_bytes: item.size", 'database content type')
+          photo = replace_once(photo,
+          '''                positions.add(pos);
+                        }
+          
+                        const {''',
+          '''                positions.add(pos);
+                          linkedPositions.add(pos);
+                        }
+          
+                        const {''', 'linked preservation')
+          photo = replace_once(photo,
+          '''                confirmed.length !== selected.length ||
+                          !selected.every(
+                            (_, i) => confirmed.some(
+                              row => row.image_position === i + 1
+                            )
+                          )''',
+          '''                confirmed.length !== originalCount + selected.length ||
+                          !Array.from({ length: originalCount + selected.length },
+                            (_, i) => i + 1).every(pos =>
+                              confirmed.some(row => Number(row.image_position) === pos)
+                            )''', 'recovered completion')
+          photo = replace_once(photo,
+          '''              const count = confirmed.length;
+                        clear();
+                        return count;
+                      }''',
+          '''              const count = confirmed.length;
+                        clear();
+                        return count;
+                        } finally { uploading = false; }
+                      }''', 'reset uploading flag')
+          photo = replace_once(photo,
+          '''              setPending: product => {
+                          pending = product;
+                          uploaded.clear();
+                        },
+                        attach''',
+          '''              setPending: (product, savedCount) => {
+                          pending = product;
+                          originalCount = Number.isInteger(savedCount) ? savedCount : null;
+                          uploaded.clear();
+                          linkedPositions.clear();
+                        },
+                        recover: (product, savedCount) => {
+                          clear();
+                          pending = product;
+                          originalCount = savedCount;
+                          render();
+                        },
+                        attach''', 'recovery API')
+          photo = replace_once(photo,
+          '''              count: () => selected.length,
+                        pendingProduct: () => pending,''',
+          '''              count: () => selected.length,
+                        ready: () => pendingSelection,
+                        pendingProduct: () => pending,''', 'wait for gallery read')
+          photo = replace_once(photo,
+          '''              message(
+                          selected.length +
+                          ' of 6 photographs selected. ' +
+                          'The first photo is the main image.'
+                        );''',
+          '''              message(
+                          ((originalCount ?? 0) + selected.length) +
+                          ' of 6 photographs selected or saved. ' +
+                          'The first photo is the main image.'
+                        );''', 'show recovered photo count')
+          photo_file.write_text(photo, encoding='utf-8')
+          
+          page_file = ROOT / 'sell-item.html'
+          page = page_file.read_text(encoding='utf-8')
+          page = replace_once(page,
+              '<form id="itemForm">',
+          '''<section id="unfinishedSection" hidden>
+          <h2>Finish an item you already started</h2>
+          <p class="muted">Your unfinished advertisements are saved privately. Select one to continue without creating a duplicate.</p>
+          <div id="unfinishedRows"></div>
+          </section>
+          
+          <form id="itemForm">''', 'resume panel')
+          page = replace_once(page,
+              '<div id="shopdropPhotoPreview" aria-label="Selected photographs"></div>',
+              '<div id="savedPhotographs" aria-label="Already uploaded photographs"></div>\n<div id="shopdropPhotoPreview" aria-label="Selected photographs"></div>', 'saved photo preview')
+          page = replace_once(page,
+              'let pendingId=null,photosAttached=false,processing=false;',
+              'let pendingId=null,photosAttached=false,processing=false,recoveredListing=false;', 'form session')
+          resume_script = '''
+          // Recovery is account-bound and uses existing Supabase RLS.
+          async function loadUnfinished(user){
+            const {data, error}=await sb.from('products')
+              .select('id,title,description,category,condition,price,location,listing_reference,created_at')
+              .eq('seller_id',user.id)
+              .eq('listing_status','pending')
+              .order('created_at',{ascending:false})
+              .limit(8);
+            if(error || !Array.isArray(data) || data.length===0)return;
+            const section=$('unfinishedSection');
+            section.hidden=false;
+            const rows=$('unfinishedRows');
+            rows.replaceChildren();
+            for(const product of data){
+              const button=document.createElement('button');
+              button.type='button';
+              button.textContent='Continue: '+String(product.title||'Unfinished item');
+              button.addEventListener('click',()=>resumeItem(product));
+              rows.append(button);
+            }
+          }
+          async function resumeItem(product){
+            if(processing)return;
+            try{
+              const {data:images,error}=await sb.from('listing_images')
+                .select('image_position,storage_bucket,storage_path')
+                .eq('product_id',product.id)
+                .order('image_position',{ascending:true});
+              if(error||!Array.isArray(images)||images.length>6)
+                throw Error('Saved photographs could not be loaded.');
+              if(!images.every((image,i)=>Number(image.image_position)===i+1))
+                throw Error('Saved photo order could not be verified.');
+              pendingId=product.id;
+              photosAttached=false;
+              recoveredListing=true;
+              $('n').value=product.title||'';
+              $('d').value=product.description||'';
+              $('p').value=product.price||'';
+              $('c').value=product.category||'';
+              $('condition').value=product.condition||'used';
+              $('town').value=product.location||'';
+              window.ShopDropProductPhotos.recover(product,images.length);
+              const saved=$('savedPhotographs');
+              saved.replaceChildren();
+              for(const image of images){
+                const {data:urlData}=sb.storage.from('listing-images').getPublicUrl(image.storage_path);
+                if(!urlData?.publicUrl)continue;
+                const img=document.createElement('img');
+                img.src=urlData.publicUrl;
+                img.alt='Already saved photograph '+image.image_position;
+                img.style.cssText='width:85px;height:85px;object-fit:cover;margin:5px;border-radius:8px';
+                saved.append(img);
+              }
+              show('Existing advertisement recovered. '+images.length+
+                ' photograph(s) already saved. Add more if you wish, then press Post My Item.');
+              $('itemForm').scrollIntoView({behavior:'smooth',block:'start'});
+            }catch(error){show(error?.message||'Unable to reopen saved advertisement.',true);}
+          }
+          '''
+          page = replace_once(page,
+              'async function setup(){',
+              resume_script + '\nasync function setup(){', 'resume logic')
+          page = replace_once(page,
+              '''    $('accountStatus').textContent=user
+                ?'Signed in. You can post your item now.'
+                :'Sign in to post. You can fill in the form and select photos first.';''',
+              '''    $('accountStatus').textContent=user
+                ?'Signed in. You can post your item now.'
+                :'Sign in to post. You can fill in the form and select photos first.';
+              if(user)await loadUnfinished(user);''', 'list unfinished')
+          page = replace_once(page,
+              '''    if(
+                !photosAttached &&''',
+              '''    await photos.ready();
+          
+              if(
+                !photosAttached &&''', 'await gallery selections')
+          page = replace_once(page,
+              '''      !photosAttached &&
+                (photos.count()<1||photos.count()>6)''',
+              '''      !photosAttached && !pendingId &&
+                (photos.count()<1||photos.count()>6)''', 'allow recovered photo')
+          page = replace_once(page,
+              '''    if(!photosAttached){
+                const {
+                  data:product,''',
+              '''    if(recoveredListing){
+                const {error:updateError}=await sb.from('products').update({
+                  title:$('n').value.trim(),
+                  description,
+                  price:amount,
+                  category:$('c').value,
+                  condition:$('condition').value,
+                  location:$('town').value.trim()||null
+                }).eq('id',pendingId).eq('seller_id',user.id).eq('listing_status','pending');
+                if(updateError)throw Error('Unable to update your saved item: '+updateError.message);
+              }
+          
+              if(!photosAttached){
+                const {
+                  data:product,''', 'save recovered edits')
+          page_file.write_text(page, encoding='utf-8')
+          print('PASS: Original photo bytes retained without canvas or encoding changes')
+          print('PASS: Selection buffers all gallery files before picker reset')
+          print('PASS: Existing incomplete item can be resumed')
+          print('PASS: No payment, courier, seller profile or main branch files touched')
+          PY
+          node --check public/shopdrop-product-photos.js
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess
+          html=Path('public/sell-item.html').read_text(encoding='utf-8')
+          match=re.search(r'<script type="module">([\s\S]*?)</script>',html)
+          if not match: raise SystemExit('STOP: inline selling script missing')
+          subprocess.run(['node','--input-type=module','--check'],input=match.group(1),text=True,check=True)
+          js=Path('public/shopdrop-product-photos.js').read_text(encoding='utf-8')
+          assert 'await file.arrayBuffer()' in js
+          assert 'canvas.toBlob' not in js and 'async function optimize(' not in js
+          assert 'photos.ready()' in html
+          assert 'resumeItem(product)' in html
+          print('PASS: JS syntax and original image preservation checks')
+          PY
+          cat > /tmp/shopdrop-fix43-photo-test.js <<'JS'
+          const fs = require('fs');
+          const vm = require('vm');
+          const assert = require('node:assert/strict');
+          const elements = {};
+          const createElement = tag => ({
+            tagName: tag, style: {}, dataset: {}, children: [],
+            append(...els) { this.children.push(...els); },
+            replaceChildren(...els) { this.children = els; },
+            addEventListener(event, handler) { this[event] = handler; },
+          });
+          for (const id of ['photo', 'shopdropPhotoCamera', 'shopdropPhotoPreview', 'uploadStatus'])
+            elements[id] = createElement(id);
+          const fakeDocument = {
+            readyState: 'complete',
+            getElementById: id => elements[id] || null,
+            createElement,
+          };
+          const context = {
+            Blob,
+            URL: { createObjectURL: () => 'blob:test', revokeObjectURL:()=>{} },
+            document: fakeDocument, window: {}, console, Promise,
+            crypto: require('node:crypto'),
+          };
+          vm.runInNewContext(fs.readFileSync('public/shopdrop-product-photos.js','utf8'), context);
+          const photos = context.window.ShopDropProductPhotos;
+          const makeFile = (name, raw, lastModified) => ({
+            name, size:raw.length, lastModified,
+            arrayBuffer: async()=>Uint8Array.from(raw).buffer,
+          });
+          const jpeg = makeFile('camera.jpg', [255,216,255,8,1,2,3,4,5,6,7,8], 1);
+          const gallery = makeFile('download-from-gallery.png', [137,80,78,71,13,10,26,10,0,0,0,0,0,0,0], 2);
+          let rows = [];
+          let uploaded = [];
+          let n = 0;
+          const sb = {
+            from(table){
+              assert.equal(table,'listing_images');
+              return {
+                select(){return { eq: async()=>({data:rows.map(x=>({image_position:x.image_position})),error:null})};},
+                insert: async row => { rows.push(row); return {error:null}; },
+              };
+            },
+            functions: {
+              invoke: async (name, opts) => {
+                assert.equal(name,'create-signed-upload');
+                const mime=opts.body.mime_type;
+                assert.equal(opts.body.upload_type,'listing_image');
+                const ext = mime==='image/jpeg'?'jpg':mime==='image/png'?'png':'webp';
+                return { data:{ok:true,bucket:'listing-images',path:`seller123/${opts.body.reference}/${++n}.${ext}`,token:'token'},error:null};
+              }
+            },
+            storage:{from(bucket){
+              assert.equal(bucket,'listing-images');
+              return {uploadToSignedUrl: async(path,token,blob,options)=>{
+                assert.equal(blob.type,options.contentType);
+                uploaded.push({path,blob,contentType:options.contentType});
+                return {error:null};
+              }};
+            }}
+          };
+          (async()=>{
+            elements.photo.files=[jpeg,gallery];
+            await elements.photo.change();
+            await photos.ready();
+            assert.equal(photos.count(),2,'camera and gallery photos selected');
+            photos.setPending({id:'a',listing_reference:'SD-TEST'});
+            let count = await photos.attach(sb,'seller123',{id:'a',listing_reference:'SD-TEST'},()=>{});
+            assert.equal(count,2);
+            assert.deepEqual(uploaded.map(x=>x.contentType),['image/jpeg','image/png']);
+            assert.deepEqual(uploaded.map(x=>x.blob.size),[jpeg.size,gallery.size]);
+            assert.equal(rows[0].is_primary,true);
+            assert.equal(rows[1].image_position,2);
+            // An earlier attempt already saved image 1; a newly selected gallery file is image 2.
+            rows=[{image_position:1,is_primary:true,storage_path:'seller123/ref/1.webp'}];
+            uploaded=[];
+            photos.recover({id:'b',listing_reference:'SD-RECOVER'},1);
+            elements.photo.files=[gallery];
+            await elements.photo.change();
+            count = await photos.attach(sb,'seller123',{id:'b',listing_reference:'SD-RECOVER'},()=>{});
+            assert.equal(count,2);
+            assert.equal(rows[1].image_position,2);
+            assert.equal(uploaded[0].contentType,'image/png');
+            // Resuming with just the already-uploaded image must also be valid.
+            rows=[{image_position:1,is_primary:true}];
+            photos.recover({id:'c',listing_reference:'SD-SAVED'},1);
+            count = await photos.attach(sb,'seller123',{id:'c',listing_reference:'SD-SAVED'},()=>{});
+            assert.equal(count,1);
+            console.log('PASS: originals unchanged, two photos uploaded, recovered item extends or publishes');
+          })().catch(e=>{console.error(e);process.exit(1)});
+          JS
+          node /tmp/shopdrop-fix43-photo-test.js
+          git diff --check
+
+      - name: Commit only the two corrected frontend files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add public/shopdrop-product-photos.js public/sell-item.html
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix43 preserve camera gallery originals and resume incomplete photo listings'
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure integrated website deployment
+        uses: actions/configure-pages@v5
+
+      - name: Upload updated integration website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy corrected integration website
+        id: deployment
+        uses: actions/deploy-pages@v4
+
