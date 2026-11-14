@@ -8,6 +8,11 @@
             const selected = [];
             const uploaded = new Map();
             let pending = null;
+            let originalCount = null;
+            let uploading = false;
+            let reading = false;
+            let pendingSelection = Promise.resolve();
+            const linkedPositions = new Set();
 
             const $ = id => document.getElementById(id);
 
@@ -17,8 +22,7 @@
               'image/webp'
             ]);
 
-            const maxRaw = 15 * 1024 * 1024;
-            const maxPrepared = 10 * 1024 * 1024;
+            const maxRaw = 10 * 1024 * 1024;
 
             function message(value) {
               const node = $('uploadStatus');
@@ -51,10 +55,8 @@
                 remove.textContent = 'Remove ' + (index + 1);
 
                 remove.addEventListener('click', () => {
-                  if (pending) {
-                    message(
-                      'Finish the current listing upload first.'
-                    );
+                  if (uploading || linkedPositions.has((originalCount ?? 0) + index + 1)) {
+                    message('A photograph already saved to this item cannot be removed during posting.');
                     return;
                   }
 
@@ -68,55 +70,85 @@
               });
 
               message(
-                selected.length +
-                ' of 6 photographs selected. ' +
+                ((originalCount ?? 0) + selected.length) +
+                ' of 6 photographs selected or saved. ' +
                 'The first photo is the main image.'
               );
             }
 
-            function selectFiles(files) {
-              if (pending) {
-                message(
-                  'Finish uploading the pending listing first.'
-                );
-                return;
-              }
+            // Capture original gallery bytes while the Android picker still owns
+            // the file. No canvas, resampling, JPEG conversion or forced WebP.
+            function detectedMime(bytes) {
+              if (bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff)
+                return 'image/jpeg';
+              if (bytes.length > 8 &&
+                  [137,80,78,71,13,10,26,10].every((value, i) => bytes[i] === value))
+                return 'image/png';
+              if (bytes.length > 12 &&
+                  String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF' &&
+                  String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP')
+                return 'image/webp';
+              return null;
+            }
 
-              for (const file of files) {
-                if (selected.length >= 6) {
-                  render();
-                  message('Maximum six photographs allowed.');
-                  return;
-                }
-
-                if (
-                  !validTypes.has(file.type) ||
-                  !file.size ||
-                  file.size > maxRaw
-                ) {
-                  render();
-                  message(
-                    'Choose JPG, PNG or WebP images ' +
-                    'no larger than 15 MB each.'
-                  );
-                  return;
-                }
-
-                const duplicate = selected.some(x =>
-                  x.file.name === file.name &&
-                  x.file.size === file.size &&
-                  x.file.lastModified === file.lastModified
-                );
-
-                if (duplicate) continue;
-
-                selected.push({
-                  file,
-                  url: URL.createObjectURL(file)
+            async function readOriginal(file) {
+              if (!file || !file.size || file.size > maxRaw)
+                throw Error('Photograph must be between 1 byte and 10 MB.');
+              let data;
+              try { data = await file.arrayBuffer(); }
+              catch {
+                // Android content providers can require the FileReader route.
+                if (typeof FileReader === 'undefined')
+                  throw Error('A selected gallery photograph could not be read.');
+                data = await new Promise((resolve, reject) => {
+                  const reader = new FileReader();
+                  reader.onload = () => resolve(reader.result);
+                  reader.onerror = () => reject(Error('The photo could not be read from the gallery.'));
+                  reader.readAsArrayBuffer(file);
                 });
               }
+              const bytes = new Uint8Array(data);
+              const mime = detectedMime(bytes.subarray(0, 24));
+              if (!mime) throw Error('This photograph uses an image format not yet supported by Shop&Drop storage.');
+              const blob = new Blob([bytes], { type: mime });
+              return {
+                file: {
+                  name: String(file.name || 'photograph').slice(0, 150),
+                  size: file.size,
+                  lastModified: file.lastModified || 0
+                },
+                mime,
+                blob,
+                url: URL.createObjectURL(blob)
+              };
+            }
 
+            async function selectFiles(files) {
+              if (uploading || reading) { message('Please finish selecting your photographs.'); return; }
+              reading = true;
+              try {
+              const current = selected.map(x => x.file);
+              const additions = [];
+              const max = 6 - (originalCount ?? 0);
+              for (const file of files) {
+                if (selected.length + additions.length >= max) break;
+                const duplicate = current.concat(additions).some(x =>
+                  x.name === file.name && x.size === file.size &&
+                  x.lastModified === file.lastModified);
+                if (!duplicate) additions.push(file);
+              }
+              // Start reading all provider-backed files before the file input is cleared.
+              const results = await Promise.allSettled(additions.map(readOriginal));
+              let errorMessage = '';
+              results.forEach(result => {
+                if (result.status === 'fulfilled') selected.push(result.value);
+                else errorMessage = String(result.reason?.message || 'Photograph could not be read.');
+              });
               render();
+              if (files.length + current.length + (originalCount ?? 0) > 6)
+                message('Maximum six photographs per item.');
+              else if (errorMessage) message(errorMessage);
+              } finally { reading = false; }
             }
 
             function init() {
@@ -133,10 +165,11 @@
 
                 input.dataset.shopdropPhotosReady = 'true';
 
-                input.addEventListener('change', () => {
+                input.addEventListener('change', async () => {
                   const files = Array.from(input.files || []);
-                  input.value = '';
-                  selectFiles(files);
+                  try { pendingSelection = selectFiles(files); await pendingSelection; }
+                  catch (error) { message(error?.message || 'Could not read photograph.'); }
+                  finally { input.value = ''; }
                 });
               }
 
@@ -153,89 +186,8 @@
               init();
             }
 
-            async function optimize(file) {
-              const url = URL.createObjectURL(file);
-
-              try {
-                const img = await new Promise(
-                  (resolve, reject) => {
-                    const node = new Image();
-
-                    node.onload = () => resolve(node);
-                    node.onerror = () => reject(
-                      Error('Photograph cannot be opened.')
-                    );
-                    node.src = url;
-                  }
-                );
-
-                const ratio = Math.min(
-                  1,
-                  1200 / img.naturalWidth,
-                  1200 / img.naturalHeight
-                );
-
-                if (
-                  !Number.isFinite(ratio) ||
-                  ratio <= 0
-                ) {
-                  throw Error('Invalid photograph dimensions.');
-                }
-
-                const canvas = document.createElement('canvas');
-
-                canvas.width = Math.max(
-                  1,
-                  Math.round(img.naturalWidth * ratio)
-                );
-
-                canvas.height = Math.max(
-                  1,
-                  Math.round(img.naturalHeight * ratio)
-                );
-
-                const ctx = canvas.getContext('2d');
-
-                if (!ctx) {
-                  throw Error(
-                    'Photo preparation is unsupported.'
-                  );
-                }
-
-                ctx.drawImage(
-                  img,
-                  0,
-                  0,
-                  canvas.width,
-                  canvas.height
-                );
-
-                const blob = await new Promise(resolve =>
-                  canvas.toBlob(
-                    resolve,
-                    'image/webp',
-                    0.82
-                  )
-                );
-
-                if (
-                  !blob ||
-                  blob.type !== 'image/webp' ||
-                  !blob.size ||
-                  blob.size > maxPrepared
-                ) {
-                  throw Error(
-                    'Photo preparation failed. ' +
-                    'Try a smaller image.'
-                  );
-                }
-
-                return blob;
-
-              } finally {
-                URL.revokeObjectURL(url);
-              }
-            }
+            // Original bytes are uploaded directly. The seller never has to
+            // convert, crop or screenshot an image before advertising it.
 
             function clear() {
               selected.forEach(item =>
@@ -245,6 +197,8 @@
               selected.length = 0;
               uploaded.clear();
               pending = null;
+              originalCount = null;
+              linkedPositions.clear();
               render();
             }
 
@@ -257,14 +211,16 @@
               if (
                 !pending ||
                 pending.id !== product.id ||
-                selected.length < 1 ||
-                selected.length > 6
+                selected.length > 6 ||
+                (selected.length < 1 && !(originalCount > 0))
               ) {
                 throw Error(
                   'Select one to six photos for this product.'
                 );
               }
 
+              uploading = true;
+              try {
               const { data: current, error: readError } =
                 await sb
                   .from('listing_images')
@@ -279,10 +235,12 @@
               }
 
               const positions = new Set(
-                (current || []).map(
-                  x => Number(x.image_position)
-                )
+                (current || []).map(x => Number(x.image_position))
               );
+              if (originalCount === null) originalCount = positions.size;
+              if (originalCount + selected.length > 6 ||
+                  (originalCount === 0 && selected.length === 0))
+                throw Error('Choose between one and six photographs.');
 
               const reference = String(
                 product.listing_reference || product.id
@@ -295,9 +253,9 @@
                 index < selected.length;
                 index++
               ) {
-                const pos = index + 1;
+                const pos = originalCount + index + 1;
 
-                if (positions.has(pos)) continue;
+                if (positions.has(pos)) { linkedPositions.add(pos); continue; }
 
                 report(
                   'Uploading photograph ' +
@@ -305,11 +263,12 @@
                 );
 
                 const source = selected[index].file;
+                const blob = selected[index].blob;
+                const mime = selected[index].mime;
 
                 let item = uploaded.get(pos);
 
                 if (!item) {
-                  const blob = await optimize(source);
 
                   const {
                     data: ticket,
@@ -320,7 +279,7 @@
                       body: {
                         upload_type: 'listing_image',
                         reference,
-                        mime_type: 'image/webp',
+                        mime_type: mime,
                         file_size: blob.size
                       }
                     }
@@ -347,7 +306,7 @@
                         ticket.token,
                         blob,
                         {
-                          contentType: 'image/webp'
+                          contentType: mime
                         }
                       );
 
@@ -380,7 +339,7 @@
                       is_primary: pos === 1,
                       original_filename:
                         source.name.slice(0, 150),
-                      mime_type: 'image/webp',
+                      mime_type: mime,
                       file_size_bytes: item.size
                     });
 
@@ -393,6 +352,7 @@
                 }
 
                 positions.add(pos);
+                linkedPositions.add(pos);
               }
 
               const {
@@ -406,12 +366,11 @@
               if (
                 checkError ||
                 !Array.isArray(confirmed) ||
-                confirmed.length !== selected.length ||
-                !selected.every(
-                  (_, i) => confirmed.some(
-                    row => row.image_position === i + 1
+                confirmed.length !== originalCount + selected.length ||
+                !Array.from({ length: originalCount + selected.length },
+                  (_, i) => i + 1).every(pos =>
+                    confirmed.some(row => Number(row.image_position) === pos)
                   )
-                )
               ) {
                 throw Error(
                   'Photo verification incomplete. ' +
@@ -422,14 +381,24 @@
               const count = confirmed.length;
               clear();
               return count;
+              } finally { uploading = false; }
             }
 
             window.ShopDropProductPhotos = Object.freeze({
               count: () => selected.length,
+              ready: () => pendingSelection,
               pendingProduct: () => pending,
-              setPending: product => {
+              setPending: (product, savedCount) => {
                 pending = product;
+                originalCount = Number.isInteger(savedCount) ? savedCount : null;
                 uploaded.clear();
+                linkedPositions.clear();
+              },
+              recover: (product, savedCount) => {
+                clear();
+                pending = product;
+                originalCount = savedCount;
+                render();
               },
               attach
             });

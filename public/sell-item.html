@@ -35,6 +35,12 @@ a{color:#0f766e}
 <p><strong>Step 1:</strong> New? <a href="./register.html?next=sell-item.html">Register a free account</a> once.</p><p><strong>Step 2:</strong> Already registered? <a href="./sign-in.html?next=sell-item.html">Sign in to continue selling</a>.</p><p class="muted">Step 3: photos and item details below. Step 4: tap Post My Item. No bank card or application approval is needed to advertise.</p>
 </section>
 
+<section id="unfinishedSection" hidden>
+<h2>Finish an item you already started</h2>
+<p class="muted">Your unfinished advertisements are saved privately. Select one to continue without creating a duplicate.</p>
+<div id="unfinishedRows"></div>
+</section>
+
 <form id="itemForm">
 <section>
 <label for="n">What are you selling?</label>
@@ -72,6 +78,7 @@ a{color:#0f766e}
 <input id="shopdropPhotoCamera" type="file" accept="image/*" capture="environment">
 
 <p class="muted">The first picture is the main picture. You can add photos in more than one selection.</p>
+<div id="savedPhotographs" aria-label="Already uploaded photographs"></div>
 <div id="shopdropPhotoPreview" aria-label="Selected photographs"></div>
 <p id="uploadStatus" class="muted" role="status"></p>
 </section>
@@ -102,13 +109,73 @@ const sb=createClient(
 );
 
 const $=id=>document.getElementById(id);
-let pendingId=null,photosAttached=false,processing=false;
+let pendingId=null,photosAttached=false,processing=false,recoveredListing=false;
 
 function show(message,error=false){
   const el=$('result');
   el.hidden=false;
   el.className='message'+(error?' error':'');
   el.textContent=message;
+}
+
+
+// Recovery is account-bound and uses existing Supabase RLS.
+async function loadUnfinished(user){
+  const {data, error}=await sb.from('products')
+    .select('id,title,description,category,condition,price,location,listing_reference,created_at')
+    .eq('seller_id',user.id)
+    .eq('listing_status','pending')
+    .order('created_at',{ascending:false})
+    .limit(8);
+  if(error || !Array.isArray(data) || data.length===0)return;
+  const section=$('unfinishedSection');
+  section.hidden=false;
+  const rows=$('unfinishedRows');
+  rows.replaceChildren();
+  for(const product of data){
+    const button=document.createElement('button');
+    button.type='button';
+    button.textContent='Continue: '+String(product.title||'Unfinished item');
+    button.addEventListener('click',()=>resumeItem(product));
+    rows.append(button);
+  }
+}
+async function resumeItem(product){
+  if(processing)return;
+  try{
+    const {data:images,error}=await sb.from('listing_images')
+      .select('image_position,storage_bucket,storage_path')
+      .eq('product_id',product.id)
+      .order('image_position',{ascending:true});
+    if(error||!Array.isArray(images)||images.length>6)
+      throw Error('Saved photographs could not be loaded.');
+    if(!images.every((image,i)=>Number(image.image_position)===i+1))
+      throw Error('Saved photo order could not be verified.');
+    pendingId=product.id;
+    photosAttached=false;
+    recoveredListing=true;
+    $('n').value=product.title||'';
+    $('d').value=product.description||'';
+    $('p').value=product.price||'';
+    $('c').value=product.category||'';
+    $('condition').value=product.condition||'used';
+    $('town').value=product.location||'';
+    window.ShopDropProductPhotos.recover(product,images.length);
+    const saved=$('savedPhotographs');
+    saved.replaceChildren();
+    for(const image of images){
+      const {data:urlData}=sb.storage.from('listing-images').getPublicUrl(image.storage_path);
+      if(!urlData?.publicUrl)continue;
+      const img=document.createElement('img');
+      img.src=urlData.publicUrl;
+      img.alt='Already saved photograph '+image.image_position;
+      img.style.cssText='width:85px;height:85px;object-fit:cover;margin:5px;border-radius:8px';
+      saved.append(img);
+    }
+    show('Existing advertisement recovered. '+images.length+
+      ' photograph(s) already saved. Add more if you wish, then press Post My Item.');
+    $('itemForm').scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(error){show(error?.message||'Unable to reopen saved advertisement.',true);}
 }
 
 async function setup(){
@@ -118,6 +185,7 @@ async function setup(){
     $('accountStatus').textContent=user
       ?'Signed in. You can post your item now.'
       :'Sign in to post. You can fill in the form and select photos first.';
+    if(user)await loadUnfinished(user);
 
     const response=await fetch(
       './taxonomy.json',
@@ -179,8 +247,10 @@ $('itemForm').addEventListener('submit',async event=>{
       );
     }
 
+    await photos.ready();
+
     if(
-      !photosAttached &&
+      !photosAttached && !pendingId &&
       (photos.count()<1||photos.count()>6)
     ){
       throw Error(
@@ -236,6 +306,18 @@ $('itemForm').addEventListener('submit',async event=>{
 
       pendingId=created.id;
       photos.setPending(created);
+    }
+
+    if(recoveredListing){
+      const {error:updateError}=await sb.from('products').update({
+        title:$('n').value.trim(),
+        description,
+        price:amount,
+        category:$('c').value,
+        condition:$('condition').value,
+        location:$('town').value.trim()||null
+      }).eq('id',pendingId).eq('seller_id',user.id).eq('listing_status','pending');
+      if(updateError)throw Error('Unable to update your saved item: '+updateError.message);
     }
 
     if(!photosAttached){
