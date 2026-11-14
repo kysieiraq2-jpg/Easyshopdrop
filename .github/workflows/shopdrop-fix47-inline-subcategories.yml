@@ -1,1 +1,372 @@
 
+name: ShopDrop Fix47 - Advertisements Inside Subcategories
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix47-inline-subcategories.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  fix-inline-subcategories:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Correct category and subcategory display
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          path = Path('public/categories.html')
+          expected = '5a6ef82a00b06a67235d9caec1cc5b841b0e797d'
+          actual = subprocess.check_output(
+              ['git', 'hash-object', str(path)],
+              text=True
+          ).strip()
+
+          if actual != expected:
+              raise SystemExit('STOP: Categories source has changed.')
+
+          source = path.read_text(encoding='utf-8')
+
+          def change(old, new, label):
+              global source
+              if source.count(old) != 1:
+                  raise SystemExit(
+                      'STOP: Unexpected source at ' + label
+                  )
+              source = source.replace(old, new, 1)
+
+          change(
+              '#shopdropPublicProductResults{margin-top:14px}',
+              '''#shopdropPublicProductResults{margin-top:14px}
+          .cat.shopdrop-showing-results{
+           grid-column:1/-1;
+           border-color:#0f766e;
+           background:#f7fffc;
+          }
+          .cat.shopdrop-showing-results>button{
+           width:100%;
+           text-align:left;
+          }
+          #shopdropListingsPanel.shopdrop-inline{
+           padding:10px;
+           margin:10px 0;
+           border:1px solid #b7dcd6;
+           border-radius:10px;
+           background:#f8fffd;
+          }
+          #shopdropListingsPanel.shopdrop-inline h2{
+           font-size:20px;
+           margin:4px 0 10px;
+          }
+          #shopdropListingsPanel .grid{
+           grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+          }
+          .cat .subcats #shopdropListingsPanel{
+           margin-left:0;
+          }''',
+              'Inline advertisements styling'
+          )
+
+          change(
+              '''<h2>Available advertisements</h2>
+          <p id="shopdropCurrentSelection" class="muted" aria-live="polite"></p>
+          <div id="shopdropPublicProductResults" class="grid" aria-live="polite"></div>
+          <button id="shopdropLoadMore" class="btn" type="button" hidden>Load more products</button>''',
+              '''<div id="shopdropListingsHome">
+          <div id="shopdropListingsPanel">
+          <h2>Available advertisements</h2>
+          <p id="shopdropCurrentSelection" class="muted" aria-live="polite"></p>
+          <div id="shopdropPublicProductResults" class="grid" aria-live="polite"></div>
+          <button id="shopdropLoadMore" class="btn" type="button" hidden>Load more products</button>
+          </div>
+          </div>''',
+              'Movable advertisement section'
+          )
+
+          change(
+              "const browseCategories=document.getElementById('cats');",
+              '''const browseCategories=document.getElementById('cats');
+          const shopdropListingsHome=document.getElementById('shopdropListingsHome');
+          const shopdropListingsPanel=document.getElementById('shopdropListingsPanel');
+
+          function positionListings(box=null,subButton=null){
+           document.querySelectorAll('.cat.shopdrop-showing-results')
+            .forEach(item=>item.classList.remove('shopdrop-showing-results'));
+
+           if(!box){
+            shopdropListingsHome.appendChild(shopdropListingsPanel);
+            shopdropListingsPanel.classList.remove('shopdrop-inline');
+            return;
+           }
+
+           box.classList.add('open','shopdrop-showing-results');
+           shopdropListingsPanel.classList.add('shopdrop-inline');
+
+           if(subButton){
+            subButton.insertAdjacentElement(
+             'afterend',shopdropListingsPanel
+            );
+           }else{
+            box.insertBefore(
+             shopdropListingsPanel,
+             box.querySelector('.subcats')
+            );
+           }
+
+           requestAnimationFrame(()=>
+            shopdropListingsPanel.scrollIntoView({
+             behavior:'smooth',
+             block:'start'
+            })
+           );
+          }''',
+              'Position results inside selected category'
+          )
+
+          change(
+              '''  document.querySelectorAll('.cat>button').forEach(button=>{
+           button.onclick=()=>{
+            const box=button.closest('.cat');
+            box.classList.toggle('open');
+            browseCategoryMessage.textContent=box.classList.contains('open')
+             ?box.dataset.name+': choose a subcategory below.':'';
+            if(box.classList.contains('open')){
+             browsePublicProducts({category:box.dataset.name,view:browseView});
+            browseResults.scrollIntoView({behavior:'smooth',block:'start'});
+            }
+           };
+          });''',
+              '''  document.querySelectorAll('.cat>button').forEach(button=>{
+           button.onclick=()=>{
+            const box=button.closest('.cat');
+            const opening=!box.classList.contains('open');
+
+            document.querySelectorAll('.cat.open').forEach(other=>{
+             if(other!==box)other.classList.remove('open');
+            });
+
+            document.querySelectorAll('.subcat.selected')
+             .forEach(x=>x.classList.remove('selected'));
+
+            box.classList.toggle('open',opening);
+
+            browseCategoryMessage.textContent=opening
+             ?box.dataset.name+': choose a subcategory below.':'';
+
+            if(opening){
+             positionListings(box);
+             browsePublicProducts({
+              category:box.dataset.name,
+              view:browseView
+             });
+            }else{
+             positionListings();
+             browsePublicProducts({view:browseView});
+            }
+           };
+          });''',
+              'Main category browsing'
+          )
+
+          change(
+              '''  document.querySelectorAll('.subcat').forEach(button=>{
+           button.onclick=event=>{
+            event.stopPropagation();
+            document.querySelectorAll('.subcat.selected')
+             .forEach(x=>x.classList.remove('selected'));
+            button.classList.add('selected');
+            browseQuery.value=button.dataset.sub;
+            browseCategoryMessage.textContent=
+             button.dataset.parent+' → '+button.dataset.sub;
+            browsePublicProducts({
+             category:button.dataset.parent,
+             subcategory:button.dataset.sub,
+             view:browseView
+            });
+            browseResults.scrollIntoView({behavior:'smooth',block:'start'});
+           };
+          });''',
+              '''  document.querySelectorAll('.subcat').forEach(button=>{
+           button.onclick=event=>{
+            event.stopPropagation();
+
+            document.querySelectorAll('.subcat.selected')
+             .forEach(x=>x.classList.remove('selected'));
+
+            button.classList.add('selected');
+            browseQuery.value='';
+
+            const box=button.closest('.cat');
+
+            positionListings(box,button);
+
+            browseCategoryMessage.textContent=
+             button.dataset.parent+' → '+button.dataset.sub;
+
+            browsePublicProducts({
+             category:button.dataset.parent,
+             subcategory:button.dataset.sub,
+             view:browseView
+            });
+           };
+          });''',
+              'Show products directly under selected subcategory'
+          )
+
+          change(
+              '''  const requested=new URLSearchParams(location.search).get('category');
+          if(requested){
+           const box=[...document.querySelectorAll('.cat')]
+            .find(x=>x.dataset.name===requested);
+           if(box){
+            box.classList.add('open');
+            browseCategoryMessage.textContent=
+             box.dataset.name+': choose a subcategory below.';
+            browsePublicProducts({category:requested,view:browseView});
+            requestAnimationFrame(()=>
+             browseResults.scrollIntoView({behavior:'auto',block:'start'})
+            );
+           }
+          }''',
+              '''  const queryParams=new URLSearchParams(location.search);
+          const requested=queryParams.get('category');
+          const requestedSub=queryParams.get('subcategory');
+
+          if(requested){
+           const box=[...document.querySelectorAll('.cat')]
+            .find(x=>x.dataset.name===requested);
+
+           if(box){
+            box.classList.add('open');
+
+            const subButton=requestedSub
+             ?[...box.querySelectorAll('.subcat')]
+               .find(button=>button.dataset.sub===requestedSub)
+             :null;
+
+            if(subButton)subButton.classList.add('selected');
+
+            positionListings(box,subButton);
+
+            browseCategoryMessage.textContent=box.dataset.name+
+             (subButton?' → '+requestedSub:': choose a subcategory below.');
+
+            browsePublicProducts({
+             category:requested,
+             ...(subButton?{subcategory:requestedSub}:{}),
+             view:browseView
+            });
+           }
+          }''',
+              'Direct category and subcategory navigation'
+          )
+
+          change(
+              '''function search(){
+           browsePublicProducts({term:browseQuery.value.trim(),view:browseView});
+          }''',
+              '''function search(){
+           positionListings();
+           browsePublicProducts({
+            term:browseQuery.value.trim(),
+            view:browseView
+           });
+          }''',
+              'Keep general search independent'
+          )
+
+          path.write_text(source,encoding='utf-8')
+
+          print('PASS: Main category results appear within expanded category')
+          print('PASS: Subcategory results appear directly below selected subcategory')
+          print('PASS: Existing product and photo connections preserved')
+          PY
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import subprocess
+
+          html=Path('public/categories.html').read_text(
+              encoding='utf-8'
+          )
+
+          scripts=re.findall(
+              r'<script(?:\s+[^>]*)?>([\s\S]*?)</script>',
+              html,re.I
+          )
+
+          if not scripts:
+              raise SystemExit('STOP: No JavaScript found')
+
+          for source in scripts:
+              subprocess.run(
+                  ['node','--check'],
+                  input=source,
+                  text=True,
+                  check=True
+              )
+
+          assert 'id="shopdropListingsPanel"' in html
+          assert "subButton.insertAdjacentElement(" in html
+          assert "'afterend',shopdropListingsPanel" in html
+          assert 'positionListings(box,button)' in html
+          assert 'positionListings(box,subButton)' in html
+          assert 'browseCard(p,images.get(p.id))' in html
+          assert "listing_status:'eq.active'" in html
+
+          print('PASS: JavaScript syntax and nested-listing checks')
+          PY
+
+          git diff --check
+
+      - name: Commit only category display correction
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add public/categories.html
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix47 display advertisements under their selected subcategory'
+
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload updated integration website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy corrected integration website
+        id: deployment
+        uses: actions/deploy-pages@v4
+
