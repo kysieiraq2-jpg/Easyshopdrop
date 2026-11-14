@@ -1,1 +1,350 @@
 
+name: ShopDrop Fix49 - Single Alphabetical Category Menu
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix49-category-menu.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  repair-navigation:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch only
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Correct category ordering and direct navigation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          guards = {
+              'public/index.html':
+                  'a86d2e912697621ddbdf2057ceb97f3146640c35',
+              'public/v26-consolidated.js':
+                  'ce412d2e2c5fadc41b2f041318d721bf48a2ef31',
+              'public/categories.html':
+                  'eb1bae1b3fbac4257199a3b7ef8810f9f3d453ac',
+              'public/category-results.html':
+                  '4a693f6ff9f7e3b59bdbf6850b8e5b18116388e2',
+          }
+
+          for filename, expected in guards.items():
+              actual = subprocess.check_output(
+                  ['git', 'hash-object', filename],
+                  text=True
+              ).strip()
+              if actual != expected:
+                  raise SystemExit(
+                      'STOP: Source changed: ' + filename
+                  )
+
+          def change(source, old, new, label):
+              if source.count(old) != 1:
+                  raise SystemExit(
+                      'STOP: Unexpected source at ' + label
+                  )
+              return source.replace(old, new, 1)
+
+          home_path = Path('public/index.html')
+          home = home_path.read_text(encoding='utf-8')
+
+          # The original homepage has several category renderers.
+          # Give the main menu one authoritative renderer.
+          home = change(
+              home,
+              '<div id="mainMenuCategories" data-v26-category-menu></div>',
+              '<div id="mainMenuCategories"></div>',
+              'single menu renderer'
+          )
+
+          duplicate_start = (
+              '<script id="V26_10_CATEGORY_RUNTIME_MOUNT">'
+          )
+
+          if home.count(duplicate_start) != 1:
+              raise SystemExit(
+                  'STOP: Duplicate menu script not uniquely found.'
+              )
+
+          start = home.index(duplicate_start)
+          end = home.find('</script>', start)
+
+          if end < 0:
+              raise SystemExit(
+                  'STOP: Duplicate menu script incomplete.'
+              )
+
+          old_block = home[start:end + len('</script>')]
+
+          if (
+              'renderMainMenuCategories' not in old_block
+              or 'data-v26-category-menu' not in old_block
+          ):
+              raise SystemExit(
+                  'STOP: Unexpected duplicate menu code.'
+              )
+
+          home = home[:start] + home[end + len('</script>'):]
+
+          # Load the new menu script instead of a cached copy.
+          home = change(
+              home,
+              '<script src="./v26-consolidated.js?v=26.22"></script>',
+              '<script src="./v26-consolidated.js?v=26.49"></script>',
+              'menu script cache version'
+          )
+
+          home_path.write_text(home, encoding='utf-8')
+
+          # Correct the authoritative category renderer.
+          menu_path = Path('public/v26-consolidated.js')
+          menu = menu_path.read_text(encoding='utf-8')
+
+          original = (
+              'const data=await shopdropLoadTaxonomy();'
+              'const cats=Array.isArray(data)?data:'
+              '(data.departments||data.categories||[]);'
+          )
+
+          replacement = (
+              original +
+              '\n const sortedCats=[...cats].sort((a,b)=>'
+              'String(a.name||a.label||"").localeCompare('
+              'String(b.name||b.label||""),"en",'
+              '{sensitivity:"base"}));'
+          )
+
+          menu = change(
+              menu,
+              original,
+              replacement,
+              'sort main categories alphabetically'
+          )
+
+          menu = change(
+              menu,
+              ' for(const c of cats){',
+              ' for(const c of sortedCats){',
+              'use alphabetical category list'
+          )
+
+          menu = change(
+              menu,
+              '  for(const sub of (c.subcategories||[])){',
+              '  for(const sub of [...(c.subcategories||[])].sort('
+              '(a,b)=>String(typeof a==="string"?a:'
+              '(a.name||a.label||"")).localeCompare('
+              'String(typeof b==="string"?b:'
+              '(b.name||b.label||"")),"en",'
+              '{sensitivity:"base"}))){',
+              'sort subcategories alphabetically'
+          )
+
+          old_link = (
+              'a.href=`./categories.html?category='
+              '${encodeURIComponent(categoryName)}'
+              '&subcategory=${encodeURIComponent(subName)}`;'
+          )
+
+          new_link = old_link.replace(
+              './categories.html?',
+              './category-results.html?'
+          )
+
+          menu = change(
+              menu,
+              old_link,
+              new_link,
+              'open product results directly'
+          )
+
+          menu_path.write_text(menu, encoding='utf-8')
+
+          # Remove the extra, duplicated category menu at the
+          # bottom of the categories page.
+          categories_path = Path('public/categories.html')
+          categories = categories_path.read_text(
+              encoding='utf-8'
+          )
+
+          duplicate_section = (
+              '<section id="v26CategoriesNestedNavigation" '
+              'aria-label="Category and subcategory navigation">'
+          )
+
+          if categories.count(duplicate_section) != 1:
+              raise SystemExit(
+                  'STOP: Duplicate category section changed.'
+              )
+
+          start = categories.index(duplicate_section)
+          end = categories.find('</section>', start)
+
+          if end < 0:
+              raise SystemExit(
+                  'STOP: Duplicate category section incomplete.'
+              )
+
+          old_section = categories[
+              start:end + len('</section>')
+          ]
+
+          if 'data-v26-category-menu' not in old_section:
+              raise SystemExit(
+                  'STOP: Unexpected category section.'
+              )
+
+          categories = (
+              categories[:start] +
+              categories[end + len('</section>'):]
+          )
+
+          categories = change(
+              categories,
+              '     ${d.subcategories.map(sc=>`',
+              '     ${[...d.subcategories].sort((a,b)=>'
+              'a.localeCompare(b,"en",{sensitivity:"base"}))'
+              '.map(sc=>`',
+              'alphabetical subcategories on browse page'
+          )
+
+          categories_path.write_text(
+              categories,
+              encoding='utf-8'
+          )
+
+          print('PASS: One authoritative main-menu renderer')
+          print('PASS: Main categories sorted alphabetically')
+          print('PASS: Subcategories sorted alphabetically')
+          print('PASS: Final subcategory opens product results')
+          print('PASS: Duplicate category menu removed')
+          PY
+
+          node --check public/v26-consolidated.js
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import subprocess
+          import json
+
+          for filename in (
+              'public/index.html',
+              'public/categories.html',
+              'public/category-results.html'
+          ):
+              html = Path(filename).read_text(
+                  encoding='utf-8'
+              )
+
+              scripts = re.findall(
+                  r'<script(?:\s+[^>]*)?>([\s\S]*?)</script>',
+                  html,
+                  re.I
+              )
+
+              for script in scripts:
+                  subprocess.run(
+                      ['node', '--check'],
+                      input=script,
+                      text=True,
+                      check=True
+                  )
+
+          home = Path('public/index.html').read_text(
+              encoding='utf-8'
+          )
+          menu = Path(
+              'public/v26-consolidated.js'
+          ).read_text(encoding='utf-8')
+          categories = Path(
+              'public/categories.html'
+          ).read_text(encoding='utf-8')
+          results = Path(
+              'public/category-results.html'
+          ).read_text(encoding='utf-8')
+
+          taxonomy = json.loads(
+              Path('public/taxonomy.json').read_text(
+                  encoding='utf-8'
+              )
+          )
+
+          names = [
+              d['name']
+              for d in taxonomy['departments']
+          ]
+
+          assert 'Arts, Crafts & Handmade' in names
+          assert '<div id="mainMenuCategories"></div>' in home
+          assert 'V26_10_CATEGORY_RUNTIME_MOUNT' not in home
+          assert 'v26-consolidated.js?v=26.49' in home
+          assert 'sortedCats' in menu
+          assert (
+              'a.href=`./category-results.html?category='
+              in menu
+          )
+          assert 'v26CategoriesNestedNavigation' not in categories
+          assert (
+              "subcategory:'eq.'+subcategory"
+              in results
+          )
+
+          print(
+              'PASS: Navigation, JavaScript and existing '
+              'results page verified'
+          )
+          PY
+
+          git diff --check
+
+      - name: Commit only the corrected navigation files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add public/index.html
+          git add public/v26-consolidated.js
+          git add public/categories.html
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix49 alphabetical categories and direct product results'
+
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure integrated website
+        uses: actions/configure-pages@v5
+
+      - name: Upload verified integration website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy corrected navigation
+        id: deployment
+        uses: actions/deploy-pages@v4
+
