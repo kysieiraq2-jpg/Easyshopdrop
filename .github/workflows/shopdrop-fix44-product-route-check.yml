@@ -1,1 +1,131 @@
 
+name: ShopDrop Fix44 - Product Page 404 Diagnosis
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix44-product-route-check.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose-product-page:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+
+      - name: Verify product page exists
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test "$GITHUB_REF_NAME" = "shopdrop-phase6-integration"
+
+          test -f public/index.html
+          test -f public/product.html
+          test -f public/sell-item.html
+          test -f public/shopdrop-product-detail-supabase.js
+
+          echo "PASS: All required product-viewing files exist."
+
+          echo "Repository CNAME:"
+          if test -f CNAME; then
+            cat CNAME
+          else
+            echo "Not present in repository root."
+          fi
+
+          echo "Published-folder CNAME:"
+          if test -f public/CNAME; then
+            cat public/CNAME
+          else
+            echo "Not present in public folder."
+          fi
+
+      - name: Check actual public website routes
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import urllib.request
+          import urllib.error
+          from pathlib import Path
+
+          base = 'https://shopadrop.co.za'
+          product_id = '57ca5974-1c1a-4657-a9b2-ffc3ee0cdd2b'
+
+          paths = [
+              '/',
+              '/sell-item.html',
+              '/product.html',
+              '/product.html?id=' + product_id,
+              '/categories.html',
+              '/public/product.html',
+          ]
+
+          def check(url):
+              request = urllib.request.Request(
+                  url,
+                  headers={
+                      'User-Agent': 'Mozilla/5.0 ShopDrop-RouteCheck',
+                      'Accept': 'text/html',
+                  }
+              )
+              try:
+                  with urllib.request.urlopen(
+                      request,
+                      timeout=20
+                  ) as response:
+                      body = response.read(350000).decode(
+                          'utf-8', 'replace'
+                      )
+                      code = response.status
+                      final = response.geturl()
+                      contains_bridge = (
+                          'shopdrop-product-detail-supabase.js'
+                          in body
+                      )
+                      return code, final, contains_bridge
+              except urllib.error.HTTPError as error:
+                  return error.code, url, False
+              except Exception as error:
+                  return 'NETWORK ERROR: ' + str(error), url, False
+
+          print('SHOPDROP PUBLIC ROUTE DIAGNOSIS')
+          print('=' * 65)
+
+          for path in paths:
+              code, final, bridge = check(base + path)
+              print('PATH:', path)
+              print('HTTP STATUS:', code)
+              print('FINAL URL:', final)
+              if 'product.html' in path:
+                  print('PRODUCT BRIDGE PRESENT:', bridge)
+              print('-' * 65)
+
+          print('SOURCE FILE CHECK')
+          html = Path('public/product.html').read_text(
+              encoding='utf-8'
+          )
+          print(
+              'Product page connects to Supabase:',
+              'shopdrop-product-detail-supabase.js' in html
+          )
+
+          seller = Path('public/sell-item.html').read_text(
+              encoding='utf-8'
+          )
+          print(
+              'Seller includes View Your Item link:',
+              "link.textContent=' View your item'" in seller
+          )
+
+          print('DIAGNOSIS COMPLETE - NO FILES MODIFIED')
+          PY
+
