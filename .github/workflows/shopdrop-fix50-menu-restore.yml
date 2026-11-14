@@ -1,1 +1,327 @@
 
+name: ShopDrop Fix50 - Restore Alphabetical Category Dropdown
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix50-menu-restore.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  restore-menu:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Repair category menu loading
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          filename = Path('public/index.html')
+
+          expected = (
+              '5a56c20c049f9518c2f4cde9c7de991476c13b0d'
+          )
+
+          actual = subprocess.check_output(
+              ['git', 'hash-object', str(filename)],
+              text=True
+          ).strip()
+
+          if actual != expected:
+              raise SystemExit(
+                  'STOP: Homepage source has changed.'
+              )
+
+          if not Path('public/category-results.html').exists():
+              raise SystemExit(
+                  'STOP: Dedicated results page is missing.'
+              )
+
+          if not Path('public/taxonomy.json').exists():
+              raise SystemExit(
+                  'STOP: Category taxonomy is missing.'
+              )
+
+          source = filename.read_text(encoding='utf-8')
+
+          old = """function setProductsCategories(open){
+           productsCategoriesPanel.hidden=!open;
+           productsCategoriesButton.setAttribute('aria-expanded',String(open));
+          }"""
+
+          if source.count(old) != 1:
+              raise SystemExit(
+                  'STOP: Category button handler has changed.'
+              )
+
+          replacement = """let shopdropCategoryMenuLoading=null;
+
+          async function shopdropPopulateCategoryMenu(){
+           const host=document.getElementById('mainMenuCategories');
+
+           if(!host)return;
+
+           if(host.dataset.shopdropReady==='true')return;
+
+           if(shopdropCategoryMenuLoading){
+            return shopdropCategoryMenuLoading;
+           }
+
+           const loading=document.createElement('p');
+           loading.textContent='Loading product categories…';
+           host.replaceChildren(loading);
+
+           shopdropCategoryMenuLoading=(async()=>{
+            try{
+             const response=await fetch(
+              './taxonomy.json',
+              {cache:'no-store'}
+             );
+
+             if(!response.ok){
+              throw Error('Categories unavailable');
+             }
+
+             const data=await response.json();
+
+             if(
+              !Array.isArray(data.departments) ||
+              !data.departments.length
+             ){
+              throw Error('Categories unavailable');
+             }
+
+             const departments=[...data.departments].sort(
+              (a,b)=>String(a.name||'').localeCompare(
+               String(b.name||''),
+               'en',
+               {sensitivity:'base'}
+              )
+             );
+
+             const list=document.createDocumentFragment();
+             let count=0;
+
+             for(const department of departments){
+              if(
+               typeof department.name!=='string' ||
+               !Array.isArray(department.subcategories)
+              )continue;
+
+              const item=document.createElement('details');
+              item.className='v26-menu-category';
+
+              const heading=document.createElement('summary');
+              heading.textContent=department.name;
+
+              item.append(heading);
+
+              const links=document.createElement('div');
+              links.className='v26-menu-subcategories';
+
+              const subs=department.subcategories
+               .filter(s=>typeof s==='string'&&s.trim())
+               .sort((a,b)=>a.localeCompare(
+                b,'en',{sensitivity:'base'}
+               ));
+
+              for(const sub of subs){
+               const link=document.createElement('a');
+
+               link.textContent=sub;
+
+               link.href='./category-results.html?'+
+                new URLSearchParams({
+                 category:department.name,
+                 subcategory:sub
+                }).toString();
+
+               links.append(link);
+              }
+
+              item.append(links);
+              list.append(item);
+              count++;
+             }
+
+             if(!count){
+              throw Error('Categories unavailable');
+             }
+
+             host.replaceChildren(list);
+             host.dataset.shopdropReady='true';
+
+            }catch(error){
+             host.replaceChildren();
+
+             const status=document.createElement('p');
+             status.textContent=
+              'Unable to load categories. Tap Products & Categories again to retry.';
+
+             host.append(status);
+
+             const browse=document.createElement('a');
+             browse.href='./categories.html';
+             browse.textContent='Browse all product categories';
+
+             host.append(browse);
+
+            }finally{
+             shopdropCategoryMenuLoading=null;
+            }
+           })();
+
+           return shopdropCategoryMenuLoading;
+          }
+
+          function setProductsCategories(open){
+           productsCategoriesPanel.hidden=!open;
+           productsCategoriesButton.setAttribute(
+            'aria-expanded',
+            String(open)
+           );
+
+           if(open){
+            shopdropPopulateCategoryMenu();
+           }
+          }"""
+
+          source = source.replace(old,replacement,1)
+
+          if source.count(
+              'async function shopdropPopulateCategoryMenu()'
+          ) != 1:
+              raise SystemExit(
+                  'STOP: Menu loader was not inserted correctly.'
+              )
+
+          filename.write_text(
+              source,
+              encoding='utf-8'
+          )
+
+          print('PASS: Category button loads its own menu')
+          print('PASS: Main categories sorted alphabetically')
+          print('PASS: Subcategories sorted alphabetically')
+          print('PASS: Final subcategory opens product results')
+          print('PASS: No database or other website files changed')
+          PY
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import subprocess
+          import json
+
+          html=Path('public/index.html').read_text(
+              encoding='utf-8'
+          )
+
+          scripts=re.findall(
+              r'<script(?:\s+[^>]*)?>([\s\S]*?)</script>',
+              html,
+              re.I
+          )
+
+          if not scripts:
+              raise SystemExit(
+                  'STOP: Homepage JavaScript not found.'
+              )
+
+          for script in scripts:
+              subprocess.run(
+                  ['node','--check'],
+                  input=script,
+                  text=True,
+                  check=True
+              )
+
+          taxonomy=json.loads(
+              Path('public/taxonomy.json').read_text(
+                  encoding='utf-8'
+              )
+          )
+
+          assert len(taxonomy['departments'])>=30
+
+          assert (
+              "if(open){\n  shopdropPopulateCategoryMenu();"
+              in html
+          )
+
+          assert (
+              "'./category-results.html?'"
+              in html
+          )
+
+          assert (
+              "document.createElement('details')"
+              in html
+          )
+
+          assert (
+              "document.createElement('summary')"
+              in html
+          )
+
+          assert (
+              "localeCompare("
+              in html
+          )
+
+          print(
+              'PASS: JavaScript syntax and dropdown checks'
+          )
+          PY
+
+          git diff --check
+
+      - name: Commit homepage menu correction only
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add public/index.html
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix50 restore reliable alphabetical category dropdown'
+
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure website deployment
+        uses: actions/configure-pages@v5
+
+      - name: Upload corrected integration website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy corrected category menu
+        id: deployment
+        uses: actions/deploy-pages@v4
+
