@@ -1,1 +1,329 @@
 
+name: ShopDrop Fix46 - Connect Seller Categories and Marketplace
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix46-category-reconciliation.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  connect-categories:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout integration branch only
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Guard and connect categories without touching photo or payment code
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          guards = {
+              'public/sell-item.html': 'd615969bd672c402c946fc9a8543525684f0296a',
+              'public/categories.html': 'e2505f0498dc6c996b46e0c1be5272ac2eab29e2',
+              'public/index.html': 'd0e1d8105aa1e0e61121c135734a2e0ca6a00679',
+              'public/taxonomy.json': '39566367b5a643458b941a45988280cf76b0335e',
+          }
+          for file, expected in guards.items():
+              actual = subprocess.check_output(['git','hash-object',file],text=True).strip()
+              if actual != expected:
+                  raise SystemExit('STOP: unexpected source change in '+file)
+
+          def replace(src,old,new,label):
+              if src.count(old)!=1:
+                  raise SystemExit('STOP: source anchor changed: '+label+' ('+str(src.count(old))+')')
+              return src.replace(old,new,1)
+
+          sell_path=Path('public/sell-item.html')
+          sell=sell_path.read_text(encoding='utf-8')
+          sell=replace(sell,
+              '<option value="">Choose a category</option>\n</select>',
+              '''<option value="">Choose a category</option>
+          </select>
+          <label for="subcat">Subcategory</label>
+          <select id="subcat" required disabled>
+          <option value="">Choose a main category first</option>
+          </select>''','seller subcategory dropdown')
+          sell=replace(sell,
+              'let pendingId=null,photosAttached=false,processing=false,recoveredListing=false;',
+              '''let pendingId=null,photosAttached=false,processing=false,recoveredListing=false;
+          const departmentSubs=new Map();
+          function fillSubcategories(selected=''){
+            const select=$('subcat');
+            const options=departmentSubs.get($('c').value)||[];
+            select.replaceChildren(new Option(
+              options.length?'Choose a subcategory':'Choose a main category first',''
+            ));
+            for(const name of options)select.add(new Option(name,name));
+            select.disabled=options.length===0;
+            select.value=options.includes(selected)?selected:'';
+          }
+          $('c').addEventListener('change',()=>fillSubcategories());''',
+              'category taxonomy selector')
+          sell=replace(sell,
+              ".select('id,title,description,category,condition,price,location,listing_reference,created_at')",
+              ".select('id,title,description,category,subcategory,condition,price,location,listing_reference,created_at')",
+              'recover subcategory query')
+          sell=replace(sell,
+              "    $('c').value=product.category||'';",
+              "    $('c').value=product.category||'';\n    fillSubcategories(product.subcategory||'');",
+              'recovery category selection')
+          sell=replace(sell,
+              '    if(user)await loadUnfinished(user);\n\n    const response=await fetch(',
+              '    const response=await fetch(',
+              'load saved items after taxonomy')
+          sell=replace(sell,
+              '''    const taxonomy=await response.json();
+
+              for(const department of taxonomy.departments||[]){''',
+              '''    const taxonomy=await response.json();
+              departmentSubs.clear();
+
+              for(const department of taxonomy.departments||[]){''',
+              'load canonical taxonomy')
+          sell=replace(sell,
+              '''        $('c').add(
+                    new Option(
+                      department.name,
+                      department.name
+                    )
+                  );''',
+              '''        $('c').add(
+                    new Option(
+                      department.name,
+                      department.name
+                    )
+                  );
+                  departmentSubs.set(department.name,
+                    Array.isArray(department.subcategories)
+                      ?department.subcategories.filter(x=>typeof x==='string'&&x.trim())
+                      :[]);''', 'match subcategories to chosen department')
+          sell=replace(sell,
+              '''      }
+              }
+            }catch(e){
+              $('accountStatus').textContent=''',
+              '''      }
+              }
+              fillSubcategories();
+              if(user)await loadUnfinished(user);
+            }catch(e){
+              $('accountStatus').textContent=''',
+              'prepare categories before listing recovery')
+          sell=replace(sell,
+              '''    const amount=Number($('p').value);
+
+              if(!Number.isFinite(amount)||amount<=0){''',
+              '''    const category=$('c').value;
+              const subcategory=$('subcat').value;
+              if(!departmentSubs.has(category) ||
+                 !(departmentSubs.get(category)||[]).includes(subcategory)){
+                throw Error('Please choose a main category and a matching subcategory.');
+              }
+
+              const amount=Number($('p').value);
+
+              if(!Number.isFinite(amount)||amount<=0){''',
+              'validate matching categories before saving')
+          sell=replace(sell,
+              '''          category:$('c').value,
+                    condition:$('condition').value,''',
+              '''          category,
+                    subcategory,
+                    condition:$('condition').value,''',
+              'insert product category and subcategory')
+          sell=replace(sell,
+              '''        category:$('c').value,
+                  condition:$('condition').value,''',
+              '''        category,
+                  subcategory,
+                  condition:$('condition').value,''',
+              'update saved draft category and subcategory')
+          sell_path.write_text(sell,encoding='utf-8')
+
+          browse_path=Path('public/categories.html')
+          browse=browse_path.read_text(encoding='utf-8')
+          browse=replace(browse,
+              '''<h2>Product departments A–Z</h2>
+          <div id="cats" class="cats"></div>
+          <p id="result" class="muted"></p>
+          <h2>Available advertisements</h2>
+          <div id="shopdropPublicProductResults" class="grid" aria-live="polite"></div>
+          <button id="shopdropLoadMore" class="btn" type="button" hidden>Load more products</button>''',
+              '''<h2>Available advertisements</h2>
+          <p id="shopdropCurrentSelection" class="muted" aria-live="polite"></p>
+          <div id="shopdropPublicProductResults" class="grid" aria-live="polite"></div>
+          <button id="shopdropLoadMore" class="btn" type="button" hidden>Load more products</button>
+          <h2>Browse product departments A–Z</h2>
+          <div id="cats" class="cats"></div>
+          <p id="result" class="muted"></p>''',
+              'show advertisements above long departments')
+          browse=replace(browse,
+              "  params.set('condition','eq.New');",
+              "  params.set('condition','ilike.new');",
+              'accept lowercase and uppercase new')
+          browse=replace(browse,
+              '''  params.set('condition','in.("Like New","Used / Pre-Owned","Refurbished")');''',
+              "  params.set('condition','not.ilike.new');",
+              'show pre-owned condition values')
+          browse=replace(browse,
+              " browseMore.hidden=true;\n browseMessage.textContent='Loading available advertisements…';",
+              ''' browseMore.hidden=true;
+           const selections=[browseFilters.category,browseFilters.subcategory].filter(Boolean);
+           if(browseFilters.view==='new')selections.push('New Products');
+           if(browseFilters.view==='preowned')selections.push('Second-Hand & Pre-Owned');
+           document.getElementById('shopdropCurrentSelection').textContent=
+             selections.length?'Showing: '+selections.join(' → '):'Showing all available products';
+           browseMessage.textContent='Loading available advertisements…';''',
+              'show selected category above advertisements')
+          browse=replace(browse,
+              "    browsePublicProducts({category:box.dataset.name,view:browseView});",
+              '''    browsePublicProducts({category:box.dataset.name,view:browseView});
+              browseResults.scrollIntoView({behavior:'smooth',block:'start'});''',
+              'jump to filtered department items')
+          browse=replace(browse,
+              "    requestAnimationFrame(()=>\n     box.scrollIntoView({behavior:'auto',block:'start'})\n    );",
+              "    requestAnimationFrame(()=>\n     browseResults.scrollIntoView({behavior:'auto',block:'start'})\n    );",
+              'direct department links show adverts, not category footer')
+          browse_path.write_text(browse,encoding='utf-8')
+
+          home_path=Path('public/index.html')
+          home=home_path.read_text(encoding='utf-8')
+          start='async function loadProducts(userInitiated=false){'
+          end='const mainMenuButton='
+          if home.count(start)!=1 or home.count(end)!=1:
+              raise SystemExit('STOP: homepage search section changed')
+          a,b=home.index(start),home.index(end)
+          if a>=b:raise SystemExit('STOP: homepage loader section order')
+          new_loader=r'''async function loadProducts(userInitiated=false){
+           const query=search.value.trim();
+           status.hidden=false;
+           status.textContent='Loading Shop&Drop advertisements…';
+           try{
+             const endpoint='https://dtkdvvxpwonywtsgqmdx.supabase.co';
+             const key='sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';
+             const headers={apikey:key,Accept:'application/json'};
+             const params=new URLSearchParams({
+               select:'id,title,price,currency,condition,quantity',
+               listing_status:'eq.active',quantity:'gt.0',country_code:'eq.ZA',
+               order:'created_at.desc',limit:'24'
+             });
+             const safe=query.replace(/[(),.*%]/g,' ').trim();
+             if(safe)params.set('or','(title.ilike.*'+safe+'*,description.ilike.*'+safe+'*)');
+             const response=await fetch(endpoint+'/rest/v1/products?'+params.toString(),{headers});
+             if(!response.ok)throw Error('Public advertisements are temporarily unavailable.');
+             const rows=await response.json();
+             if(!Array.isArray(rows))throw Error('Invalid marketplace response.');
+             const imageMap=new Map();
+             const ids=rows.map(x=>x.id).filter(x=>/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(String(x)));
+             if(ids.length){
+               try{
+                 const options=new URLSearchParams({
+                   select:'product_id,storage_bucket,storage_path,is_primary,image_position',
+                   product_id:'in.('+ids.join(',')+')',order:'image_position.asc'
+                 });
+                 const imageResponse=await fetch(endpoint+'/rest/v1/listing_images?'+options.toString(),{headers});
+                 if(imageResponse.ok){
+                   const images=await imageResponse.json();
+                   if(Array.isArray(images))for(const image of images){
+                     const path=String(image.storage_path||'');
+                     if(image.storage_bucket!=='listing-images'||!path||path.startsWith('/')||path.split('/').includes('..'))continue;
+                     if(imageMap.has(image.product_id)&&image.is_primary!==true)continue;
+                     imageMap.set(image.product_id,endpoint+'/storage/v1/object/public/listing-images/'+
+                       path.split('/').map(encodeURIComponent).join('/'));
+                   }
+                 }
+               }catch(e){console.warn('Product picture preview unavailable:',e);}
+             }
+             productGrid.innerHTML=rows.map(p=>card({
+               id:p.id,name:p.title,condition:p.condition,
+               stock:Number(p.quantity),currency_code:p.currency||'ZAR',
+               price_cents:Math.round(Number(p.price)*100),
+               image_url:imageMap.get(p.id)||null
+             })).join('')||'<p>No advertisements match your search.</p>';
+             status.hidden=true;
+             if(userInitiated){
+               searchFeedback.textContent=rows.length+' available advertisement(s).';
+               searchFeedback.hidden=false;
+               searchFeedback.scrollIntoView({behavior:'smooth',block:'start'});
+             }
+           }catch(e){
+             productGrid.innerHTML='';
+             status.hidden=false;
+             status.textContent=e?.message||'Unable to load marketplace products.';
+           }
+          }
+          '''
+          home=home[:a]+new_loader+home[b:]
+          home_path.write_text(home,encoding='utf-8')
+          print('PASS: V26.24 frontend layout retained with Supabase marketplace connection')
+          print('PASS: Future listings save a canonical subcategory')
+          print('PASS: Photographs, checkout, courier, payment and payout files untouched')
+          PY
+
+          python3 - <<'PY'
+          import re,subprocess
+          from pathlib import Path
+          for filename in ('public/sell-item.html','public/categories.html','public/index.html'):
+              source=Path(filename).read_text(encoding='utf-8')
+              for inline in re.findall(r'<script(?:\s+[^>]*)?>([\s\S]*?)</script>',source,re.I):
+                  subprocess.run(['node','--input-type=module','--check'],input=inline,text=True,check=True)
+          sell=Path('public/sell-item.html').read_text(encoding='utf-8')
+          cats=Path('public/categories.html').read_text(encoding='utf-8')
+          home=Path('public/index.html').read_text(encoding='utf-8')
+          assert 'id="subcat" required' in sell
+          assert 'departmentSubs.set(department.name' in sell
+          assert 'subcategory,' in sell
+          assert 'shopdrop-product-photos.js' in sell
+          assert cats.index('<h2>Available advertisements</h2>')<cats.index('<h2>Browse product departments A–Z</h2>')
+          assert "condition','ilike.new'" in cats
+          assert "condition','not.ilike.new'" in cats
+          assert "'/rest/v1/products?'" in home
+          assert "api('/api/products?" not in home
+          print('PASS: Syntax and catalogue linkage checks')
+          PY
+          git diff --check
+
+      - name: Commit only the three frontend files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add public/sell-item.html public/categories.html public/index.html
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix46 connect product subcategories and public marketplace'
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure integrated Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload corrected integration website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy corrected integration website
+        id: deployment
+        uses: actions/deploy-pages@v4
+
