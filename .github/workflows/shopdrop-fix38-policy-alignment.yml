@@ -1,1 +1,631 @@
 
+name: ShopDrop Fix38 - Align Five Policies
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix38-policy-alignment.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update-policies:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Preserve and revise five legal pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          expected = {
+            'public/terms.html':
+              '253539aed9c8bfcce674dd2ca9ff5a0a79d5149e',
+            'public/privacy.html':
+              'a3d468bc2a897a785b1f782c8dda75d91fbf6226',
+            'public/returns-policy.html':
+              'a1fc7352df76c6cf5ccd840c0ee96b48a8d83433',
+            'public/seller-provider-rules.html':
+              '081baab2d7009c53687eefe622ceffae22c8ff6c',
+            'public/restricted-listings.html':
+              '0377c4307ccc25bf880b7049f750ca858ee56ce7',
+          }
+
+          original = {}
+          revised = {}
+          changes = {}
+
+          for path, expected_sha in expected.items():
+            actual = subprocess.check_output(
+              ['git', 'hash-object', path],
+              text=True
+            ).strip()
+
+            if actual != expected_sha:
+              raise SystemExit(
+                'STOP: Protected source has changed: ' + path
+              )
+
+            original[path] = Path(path).read_text(
+              encoding='utf-8'
+            )
+            revised[path] = original[path]
+            changes[path] = 0
+
+          def replace(path, before, after):
+            if revised[path].count(before) != 1:
+              raise SystemExit(
+                'STOP: Expected policy wording not found uniquely: '
+                + path + ': ' + before[:60]
+              )
+
+            revised[path] = revised[path].replace(
+              before, after, 1
+            )
+            changes[path] += 1
+
+          def add_after_heading(path, heading, paragraph):
+            replace(
+              path,
+              heading,
+              heading + '\n<p>' + paragraph + '</p>'
+            )
+
+          terms = 'public/terms.html'
+          privacy = 'public/privacy.html'
+          returns = 'public/returns-policy.html'
+          rules = 'public/seller-provider-rules.html'
+          restricted = 'public/restricted-listings.html'
+
+          # 1. TERMS AND CONDITIONS
+
+          add_after_heading(
+            terms,
+            '<h2>3. Products and Advertisements</h2>',
+            'Sellers may supply one to six accurate product photographs '
+            'selected from a phone camera or gallery or existing '
+            'computer or laptop files. File uploads remain subject '
+            'to privacy, approval and technical verification.'
+          )
+
+          add_after_heading(
+            terms,
+            '<h2>6. Payments and Settlement</h2>',
+            'For physical goods, the intended checkout has one '
+            'coordinated buyer payment with two provider-managed '
+            'legs: the product amount plus Shop&amp;Drop marketplace '
+            'commission, and the courier fee allocated directly '
+            'to the authorized courier. Seller proceeds remain '
+            'under the approved payment provider until independently '
+            'verified courier collection. Shop&amp;Drop does not '
+            'receive the entire payment into its own bank account. '
+            'Actual operation remains subject to provider approval.'
+          )
+
+          add_after_heading(
+            terms,
+            '<h2>7. Orders and Inventory</h2>',
+            'Buyers may purchase multiple distinct products from '
+            'one seller in a single shopping bag and checkout. '
+            'Products from different sellers require separate '
+            'checkouts. Individual product references and stock '
+            'reservations remain applicable.'
+          )
+
+          replace(
+            terms,
+            '<li><strong>Courier-held collection PIN:</strong> '
+            'Shop&amp;Drop issues a six-digit code securely to the '
+            'authorized courier after confirmed buyer payment, '
+            'courier payment and booking. The courier gives it to '
+            'the seller or authorized handover person only after '
+            'taking the parcel, and the seller enters it securely '
+            'in Shop&amp;Drop.</li>',
+            '<li><strong>Courier company reference:</strong> '
+            'The seller obtains the actual courier booking, '
+            'tracking, waybill or collection reference at physical '
+            'handover and enters it in Shop&amp;Drop. The reference '
+            'may contain letters, numbers and permitted separators '
+            'of varying lengths. No special six-digit Shop&amp;Drop '
+            'courier collection PIN is required.</li>'
+          )
+
+          replace(
+            terms,
+            '<p><strong>SELLERS MUST ASK THE COURIER FOR THE '
+            'SIX-DIGIT COLLECTION PIN AT PICKUP.</strong> Submit '
+            'the code in My Account only after the parcel is '
+            'physically handed over, and keep the collection '
+            'receipt. Authenticated courier tracking, pickup '
+            'scanning or the courier-held PIN are alternative '
+            'verification methods; one accepted method is '
+            'sufficient, subject to security checks.</p>',
+            '<p><strong>SELLERS MUST ASK FOR THE COURIER '
+            'COMPANY&#39;S OWN REFERENCE AT PHYSICAL PICKUP.'
+            '</strong> Enter the genuine courier reference '
+            'in My Account after handing over the goods and '
+            'keep the collection receipt. Shop&amp;Drop must '
+            'match the reference to the paid order, correct '
+            'shipment and authorized courier, and independently '
+            'verify actual pickup through authenticated courier '
+            'tracking, an authorized pickup scan or another '
+            'approved verifiable handover record. '
+            '<strong>A matching reference alone does not '
+            'authorize seller payment.</strong></p>'
+          )
+
+          replace(
+            terms,
+            'The collection PIN is separate\n'
+            'from the buyer\'s later\n'
+            'delivery-confirmation PIN.',
+            'The courier reference follows the physical shipment '
+            'through collection and delivery. It is separate '
+            'from any buyer delivery-confirmation PIN.'
+          )
+
+          replace(
+            terms,
+            'Relevant evidence may include\n'
+            'completion photographs,\n'
+            'time and location information,\n'
+            'or an appropriate customer\n'
+            'completion PIN.',
+            'The routine completion method for Other Services '
+            'is one customer-held six-digit completion PIN '
+            'made available after verified payment. '
+            'Photographs and time or location records '
+            'are optional supporting evidence rather '
+            'than additional routine payout requirements.'
+          )
+
+          replace(
+            terms,
+            'A customer PIN may serve\n'
+            'as an alternative or\n'
+            'additional confirmation\n'
+            'when the customer is present.',
+            'The customer may keep the PIN until the work '
+            'is finished or share it with an authorized '
+            'recipient. After completing the agreed work, '
+            'the assigned provider must obtain and submit '
+            'the PIN through Shop&amp;Drop. '
+            'The PIN must not be requested or submitted '
+            'merely because the provider has arrived.'
+          )
+
+          add_after_heading(
+            terms,
+            '<h2>10. Dispatch and Equipment Completion</h2>',
+            'For ordinary dispatch bookings, the paying customer '
+            'receives one six-digit completion PIN after '
+            'verified payment and may provide it to an '
+            'authorized person at the destination. The '
+            'assigned transport provider obtains the PIN '
+            'only after completing the journey and required '
+            'handover, then submits it to Shop&amp;Drop. '
+            'GPS and tracking records may provide optional '
+            'supporting information. Paid equipment-working '
+            'periods remain subject to their agreed '
+            'completion milestones and safeguards.'
+          )
+
+          # 2. PRIVACY POLICY
+
+          replace(
+            privacy,
+            '<h2>7. Courier Collection and PIN Security</h2>',
+            '<h2>7. Courier Collection References and Security</h2>'
+          )
+
+          replace(
+            privacy,
+            '<li>A collection-specific six-digit handover PIN.</li>',
+            '<li>The actual courier company booking, tracking, '
+            'waybill or collection reference, which can vary '
+            'in length and format.</li>'
+          )
+
+          replace(
+            privacy,
+            'The collection PIN must remain separate\n'
+            'from any confirmation PIN used when\n'
+            'the buyer later receives the parcel.',
+            'The courier reference is connected with the '
+            'authorized booking and shipment and may be '
+            'used throughout tracking and delivery. '
+            'Any buyer delivery-confirmation PIN remains '
+            'separate from the courier reference.'
+          )
+
+          replace(
+            privacy,
+            'Collection PINs and related security\n'
+            'information must not be publicly\n'
+            'displayed or shared before the\n'
+            'authorized handover.',
+            'Courier references, collection receipts, '
+            'tracking events and any separate delivery '
+            'codes are transaction information. '
+            'Access should be restricted to authorized '
+            'participants for legitimate fulfilment, '
+            'security, dispute or financial purposes.'
+          )
+
+          add_after_heading(
+            privacy,
+            '<h2>8. Other Services Completion Evidence</h2>',
+            'After confirmed payment, the customer may access '
+            'a six-digit completion PIN privately and may '
+            'give it to an authorized representative. '
+            'The assigned provider submits it after '
+            'the agreed service has been completed. '
+            'Completion photographs remain optional '
+            'supporting evidence and must not reveal '
+            'unnecessary personal information. '
+            'PINs must never be published in advertisements.'
+          )
+
+          add_after_heading(
+            privacy,
+            '<h2>9. Dispatch and Equipment Evidence</h2>',
+            'The paying customer may share a six-digit '
+            'dispatch completion PIN with an authorized '
+            'receiver at the destination. The provider '
+            'must obtain and submit the code only after '
+            'the required delivery or handover is finished. '
+            'GPS and transport records are optional '
+            'supporting evidence rather than routine '
+            'additional payout conditions. '
+            'PIN verification records must be protected.'
+          )
+
+          # 3. RETURNS AND REFUNDS POLICY
+
+          replace(
+            returns,
+            'Evidence may include completion\n'
+            'photographs, relevant time or\n'
+            'location records and an appropriate\n'
+            'six-digit customer completion PIN.',
+            'For ordinary Other Services and Dispatching '
+            'bookings, the routine completion method '
+            'is the six-digit PIN provided privately '
+            'to the paying customer after payment. '
+            'After the job is finished, the assigned '
+            'provider obtains the PIN from the customer '
+            'or authorized recipient and submits it '
+            'through Shop&amp;Drop. Photographs and GPS '
+            'records remain optional supporting evidence.'
+          )
+
+          replace(
+            returns,
+            'However, a customer\'s failure\n'
+            'to respond should not indefinitely\n'
+            'prevent a provider\'s payment where\n'
+            'adequate independent completion\n'
+            'evidence exists and no qualifying\n'
+            'legal or financial hold applies.',
+            'If a customer or authorized receiver '
+            'cannot or will not supply the completion '
+            'PIN, the provider may report the problem '
+            'through Shop&amp;Drop for an appropriate '
+            'exception or dispute review. '
+            'A provider declaration or photograph '
+            'alone must not automatically bypass '
+            'the required completion verification. '
+            'Applicable consumer rights and lawful '
+            'financial safeguards remain in force.'
+          )
+
+          replace(
+            returns,
+            'The planned verification process\n'
+            'may use a seller-held collection\n'
+            'PIN, courier scanning, the\n'
+            'correct shipment reference\n'
+            'and an authenticated courier\n'
+            'collection confirmation.',
+            'At physical handover, the seller should '
+            'obtain the genuine reference supplied by '
+            'the courier company and enter it in '
+            'Shop&amp;Drop. Its letters, digits and '
+            'length depend on the courier concerned. '
+            'The reference must match the authorized '
+            'paid shipment and independently '
+            'authenticated pickup evidence, such '
+            'as a verified courier collection event '
+            'or pickup scan. A reference alone '
+            'cannot establish collection or '
+            'authorize seller payment.'
+          )
+
+          replace(
+            returns,
+            '<strong>Other Services:</strong>\n'
+            'Payout eligibility follows\n'
+            'verified completion of the\n'
+            'agreed service, supported by\n'
+            'appropriate authenticated\n'
+            'completion evidence or\n'
+            'confirmation PIN.',
+            '<strong>Other Services:</strong> '
+            'Routine payout eligibility follows '
+            'verified completion through the '
+            'customer-held six-digit completion PIN '
+            'submitted by the assigned provider '
+            'after finishing the agreed work. '
+            'Photographs are optional support '
+            'for complaints and disputes.'
+          )
+
+          replace(
+            returns,
+            '<strong>Dispatch and equipment:</strong>\n'
+            'Payout eligibility follows\n'
+            'verified destination handover,\n'
+            'transport completion or the\n'
+            'end of the agreed paid\n'
+            'equipment working period,\n'
+            'as applicable.',
+            '<strong>Dispatch and equipment:</strong> '
+            'For ordinary dispatch and transport, '
+            'the assigned provider submits the '
+            'six-digit completion PIN from the '
+            'paying customer or authorized receiver '
+            'after the agreed delivery is complete. '
+            'GPS records are optional supporting '
+            'evidence. Equipment hire remains '
+            'subject to the agreed completed '
+            'paid working period and safeguards.'
+          )
+
+          # 4. SELLER AND PROVIDER RULES
+
+          add_after_heading(
+            rules,
+            '<h2>3. Accurate Product Advertisements</h2>',
+            'Sellers may supply one to six genuine '
+            'product photographs selected from a '
+            'phone or existing computer or laptop '
+            'image files. Uploads are subject to '
+            'platform file validation, privacy '
+            'requirements and moderation. '
+            'The integrated upload function must '
+            'be verified before public launch.'
+          )
+
+          add_after_heading(
+            rules,
+            '<h2>9. Orders and Stock Availability</h2>',
+            'A buyer may check out several different '
+            'products belonging to the same seller '
+            'in one transaction. Goods belonging '
+            'to another seller require a separate '
+            'checkout. Every item retains its '
+            'own listing reference and stock rules.'
+          )
+
+          replace(
+            rules,
+            '<li><strong>Courier-held Shop&amp;Drop collection '
+            'PIN:</strong> Shop&amp;Drop sends a six-digit code '
+            'securely to the authorized courier after '
+            'confirmed payment and booking. The courier '
+            'gives it to the seller or handover person '
+            'when physically collecting the goods, and '
+            'the seller submits it through My Account.</li>',
+            '<li><strong>Courier company reference:</strong> '
+            'At physical pickup, the seller obtains '
+            'the actual courier booking, tracking, '
+            'waybill or collection reference and '
+            'enters it in My Account. The reference '
+            'can include letters, digits and valid '
+            'separators of different lengths; '
+            'no universal six-digit Shop&amp;Drop '
+            'courier code is required.</li>'
+          )
+
+          replace(
+            rules,
+            '<p><strong>SELLERS MUST REQUEST THE SIX-DIGIT '
+            'SHOP&amp;DROP COLLECTION PIN FROM THE COURIER '
+            'AT PHYSICAL PICKUP.</strong> Submit it securely '
+            'in My Account only after handing over the '
+            'parcel. Keep the collection receipt. '
+            'Verified courier tracking or scanning may '
+            'alternatively confirm pickup; the pickup '
+            'PIN is separate from the buyer\'s delivery '
+            'confirmation PIN.</p>',
+            '<p><strong>SELLERS MUST REQUEST THE COURIER '
+            'COMPANY&#39;S OWN REFERENCE AT PHYSICAL PICKUP.'
+            '</strong> After handing over the goods, '
+            'enter the genuine courier reference '
+            'in My Account and retain the receipt. '
+            'Shop&amp;Drop must confirm that the '
+            'reference belongs to the authorized '
+            'paid order and shipment and that '
+            'physical collection is independently '
+            'verified by an authenticated pickup '
+            'event, scan or another approved '
+            'reliable handover record. '
+            '<strong>The reference alone is not '
+            'proof of pickup and cannot release '
+            'seller funds.</strong></p>'
+          )
+
+          replace(
+            rules,
+            'The collection PIN must\n'
+            'remain separate from\n'
+            'a buyer\'s delivery PIN.',
+            'The courier company reference may '
+            'follow the shipment through delivery. '
+            'It is not a Shop&amp;Drop six-digit '
+            'collection PIN and remains separate '
+            'from any buyer delivery PIN.'
+          )
+
+          replace(
+            rules,
+            'A customer-supplied\n'
+            'six-digit completion PIN\n'
+            'may serve as an alternative\n'
+            'or additional confirmation.',
+            'For ordinary paid Other Services '
+            'and Dispatching bookings, the '
+            'customer-held six-digit completion '
+            'PIN is the routine verification '
+            'method. After completing the work '
+            'or delivery, the assigned provider '
+            'is responsible for obtaining the '
+            'PIN from the customer or authorized '
+            'recipient and submitting it '
+            'through Shop&amp;Drop. '
+            'Photographs and GPS information '
+            'may provide optional supporting '
+            'evidence and are not additional '
+            'routine payout requirements.'
+          )
+
+          # 5. RESTRICTED LISTINGS
+
+          replace(
+            restricted,
+            '<li>Fabricated tracking references, waybills '
+            'or courier scans.</li>',
+            '<li>Fabricated, altered or misappropriated '
+            'courier booking, tracking, waybill or '
+            'collection references, including false '
+            'pickup scans or handover claims.</li>'
+          )
+
+          replace(
+            restricted,
+            'Courier pickup codes,\n'
+            'completion PINs, GPS data\n'
+            'and private transaction\n'
+            'records must not be\n'
+            'published in advertisements.',
+            'Private courier booking, tracking, '
+            'waybill and pickup references, '
+            'customer-held service and dispatch '
+            'completion PINs, GPS information '
+            'and confidential transaction '
+            'records must not be published '
+            'in advertisements or disclosed '
+            'to unauthorized persons.'
+          )
+
+          replace(
+            restricted,
+            'A seller or provider must\n'
+            'not deliberately submit false\n'
+            'information to trigger\n'
+            'payment eligibility.',
+            'A seller or provider must '
+            'not present a reference from '
+            'another booking, claim pickup '
+            'merely because a courier '
+            'reference exists, request '
+            'a customer completion PIN '
+            'before finishing a job or '
+            'submit any false information '
+            'to trigger payment eligibility. '
+            'The courier reference alone '
+            'cannot prove physical collection.'
+          )
+
+          # FINAL PRESERVATION CHECKS
+
+          counts = {
+            'public/terms.html': 9,
+            'public/privacy.html': 6,
+            'public/returns-policy.html': 5,
+            'public/seller-provider-rules.html': 6,
+            'public/restricted-listings.html': 3,
+          }
+
+          for path in expected:
+            if changes[path] != counts[path]:
+              raise SystemExit(
+                'STOP: Incomplete policy changes: ' + path
+              )
+
+            if len(revised[path]) < len(original[path]):
+              raise SystemExit(
+                'STOP: Unexpected file shortening: ' + path
+              )
+
+            if '<!doctype html>' not in revised[path].lower():
+              raise SystemExit(
+                'STOP: HTML document structure missing: ' + path
+              )
+
+            if revised[path].count('<section') != original[path].count('<section'):
+              raise SystemExit(
+                'STOP: Original legal sections changed: ' + path
+              )
+
+            if revised[path].count('</section>') != original[path].count('</section>'):
+              raise SystemExit(
+                'STOP: Legal section endings changed: ' + path
+              )
+
+          for path in expected:
+            Path(path).write_text(
+              revised[path],
+              encoding='utf-8'
+            )
+
+            print(
+              'PASS:',
+              path,
+              'original characters:',
+              len(original[path]),
+              'new characters:',
+              len(revised[path]),
+              'replacements:',
+              changes[path]
+            )
+
+          print('PASS: Five original legal pages preserved.')
+          print('PASS: Courier company references replace product pickup PIN.')
+          print('PASS: Customer six-digit service and dispatch PINs retained.')
+          print('PASS: Reference alone cannot authorize seller payout.')
+          print('PASS: No payment or backend activation.')
+          PY
+
+      - name: Commit all five policy files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git diff --check
+
+          git add public/terms.html
+          git add public/privacy.html
+          git add public/returns-policy.html
+          git add public/seller-provider-rules.html
+          git add public/restricted-listings.html
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix38 align five legal policies with courier references and completion PINs'
+
+          git push origin HEAD:shopdrop-phase6-integration
+
