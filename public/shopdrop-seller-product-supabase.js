@@ -310,25 +310,95 @@
         payload.pickup_address_id=pickupAddressId;
       }
 
-      const {data,error}=await sb.from('products')
-        .insert(payload)
-        .select(
-          'id,listing_reference,listing_status'
-        )
-        .single();
+      // Fix40: Require 1–6 photos before saving.
+      const photos=window.ShopDropProductPhotos;
 
-      if(error){
+      if(
+        !photos ||
+        photos.count()<1 ||
+        photos.count()>6
+      ){
         throw Error(
-          'Listing could not be saved: '+
-          error.message
+          'Select one to six product photographs first.'
+        );
+      }
+
+      // Resume the same pending product after failed upload.
+      let data=photos.pendingProduct();
+
+      if(data){
+        const {
+          data:saved,
+          error:resumeError
+        }=await sb.from('products')
+          .select('id,listing_reference,listing_status')
+          .eq('id',data.id)
+          .eq('seller_id',user.id)
+          .single();
+
+        if(
+          resumeError ||
+          !saved ||
+          saved.listing_status!=='pending'
+        ){
+          throw Error(
+            'Cannot resume this product. '+
+            'Contact Shop&Drop support.'
+          );
+        }
+
+        data=saved;
+
+      }else{
+        const {
+          data:created,
+          error
+        }=await sb.from('products')
+          .insert(payload)
+          .select('id,listing_reference,listing_status')
+          .single();
+
+        if(error){
+          throw Error(
+            'Listing could not be saved: '+
+            error.message
+          );
+        }
+
+        data=created;
+        photos.setPending(data);
+      }
+
+      let photoCount;
+
+      try{
+        photoCount=await photos.attach(
+          sb,
+          user.id,
+          data,
+          text=>{
+            status.textContent=text;
+          }
+        );
+
+      }catch(photoError){
+        throw Error(
+          'Product '+
+          (data.listing_reference||data.id)+
+          ' is saved pending approval, '+
+          'but photos are incomplete: '+
+          (photoError?.message||'upload failed')+
+          '. Keep this page open and press Submit '+
+          'to retry the SAME product.'
         );
       }
 
       status.textContent=
-        'Product saved. Reference: '+
+        'Product saved with '+photoCount+
+        ' photos. Reference: '+
         (data.listing_reference||data.id)+
         '. Status: '+data.listing_status+
-        '. Seller asking price preserved.';
+        '. Awaiting approval.';
 
     }catch(e){
       status.textContent=
