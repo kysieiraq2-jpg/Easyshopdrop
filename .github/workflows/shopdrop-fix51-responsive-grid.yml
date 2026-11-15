@@ -1,1 +1,166 @@
 
+name: ShopDrop Fix51 - Responsive Product Grid
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix51-responsive-grid.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  product-grid:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch only
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Apply guarded responsive product layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import re
+
+          page = Path('public/category-results.html')
+          expected = '4a693f6ff9f7e3b59bdbf6850b8e5b18116388e2'
+          current = subprocess.check_output(
+              ['git', 'hash-object', str(page)], text=True
+          ).strip()
+          if current != expected:
+              raise SystemExit('STOP: Product results page changed; no overwrite.')
+
+          before = page.read_text(encoding='utf-8')
+          result = before
+          changes = [
+              (
+                  'main{max-width:1000px;margin:auto;padding:18px}',
+                  'main{max-width:1280px;margin:auto;padding:18px}',
+                  'four-column desktop space'
+              ),
+              (
+                  '.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:14px}',
+                  '.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:stretch}',
+                  'two product cards per mobile row'
+              ),
+              (
+                  '.item{display:block;border:1px solid #dae2e5;border-radius:11px;padding:15px;color:inherit;text-decoration:none}',
+                  '.item{display:flex;min-width:0;flex-direction:column;gap:7px;border:1px solid #dae2e5;border-radius:11px;padding:12px;color:inherit;text-decoration:none;background:#fff;overflow-wrap:anywhere}',
+                  'compact product cards'
+              ),
+              (
+                  '.item img,.image-empty{width:100%;height:215px;object-fit:contain;background:#f1f5f9;border-radius:8px}',
+                  '.item img,.image-empty{width:100%;height:auto;aspect-ratio:1/1;object-fit:contain;background:#f1f5f9;border-radius:8px}',
+                  'preserve full photograph inside square preview'
+              ),
+              (
+                  '.item h2{font-size:20px;margin:12px 0}',
+                  '.item h2{font-size:clamp(15px,2.4vw,20px);line-height:1.3;margin:7px 0 0}',
+                  'responsive product name'
+              ),
+              (
+                  '.price{font-size:23px;font-weight:700;color:#0f766e}',
+                  '.price{font-size:clamp(16px,2.5vw,23px);font-weight:700;color:#0f766e;margin:4px 0}',
+                  'responsive price'
+              ),
+              (
+                  '@media(max-width:600px){.grid{grid-template-columns:1fr}main{padding:12px}}',
+                  '@media(min-width:700px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}\n'
+                  '@media(min-width:1100px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}}\n'
+                  '@media(max-width:699px){main{padding:10px}.panel{padding:12px;margin:10px 0}'
+                  '.grid{gap:9px}.item{padding:9px}.item p{font-size:13px;margin:4px 0}'
+                  'header{padding:13px 10px}header a{font-size:14px;margin-right:10px}}',
+                  'two mobile, three tablet and four desktop columns'
+              ),
+              (
+                  'const pageSize=24;',
+                  'const pageSize=20;',
+                  'twenty advertisements per page'
+              ),
+              (
+                  '<button id="more" type="button" hidden>Show more products</button>',
+                  '<button id="more" type="button" hidden>Show More Products</button>',
+                  'clear pagination button'
+              ),
+          ]
+          for old, new, label in changes:
+              if result.count(old) != 1:
+                  raise SystemExit('STOP: Unexpected source at ' + label)
+              result = result.replace(old, new, 1)
+              print('PASS:', label)
+
+          page.write_text(result, encoding='utf-8')
+
+          old_js = re.search(r'<script>([\s\S]*?)</script>', before)
+          new_js = re.search(r'<script>([\s\S]*?)</script>', result)
+          if not old_js or not new_js:
+              raise SystemExit('STOP: Product results script missing.')
+          if new_js.group(1) != old_js.group(1).replace('const pageSize=24;', 'const pageSize=20;'):
+              raise SystemExit('STOP: Unexpected product functionality change.')
+          print('PASS: All product links, filters and upload logic preserved.')
+          PY
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import subprocess
+
+          html = Path('public/category-results.html').read_text(encoding='utf-8')
+          scripts = re.findall(r'<script(?:\s+[^>]*)?>([\s\S]*?)</script>', html, re.I)
+          if not scripts:
+              raise SystemExit('STOP: Product JavaScript missing.')
+          for script in scripts:
+              subprocess.run(['node', '--check'], input=script, text=True, check=True)
+          assert 'grid-template-columns:repeat(2,minmax(0,1fr))' in html
+          assert 'grid-template-columns:repeat(3,minmax(0,1fr))' in html
+          assert 'grid-template-columns:repeat(4,minmax(0,1fr))' in html
+          assert 'const pageSize=20;' in html
+          assert 'object-fit:contain' in html
+          assert "subcategory:'eq.'+subcategory" in html
+          assert "card.href='./product.html?id='" in html
+          assert "$('more').addEventListener('click',load);" in html
+          print('PASS: Responsive layout and JavaScript checks.')
+          PY
+          git diff --check
+
+      - name: Commit only product results layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add public/category-results.html
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix51 responsive marketplace grid for phone tablet and desktop'
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure integration website
+        uses: actions/configure-pages@v5
+
+      - name: Upload verified integration website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy responsive product grid
+        id: deployment
+        uses: actions/deploy-pages@v4
+
