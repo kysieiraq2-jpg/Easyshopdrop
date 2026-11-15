@@ -74,6 +74,53 @@ a{color:#0f766e}
 </section>
 
 <section>
+<h2>Packed parcel measurements</h2>
+<p class="muted">
+Measure the item after packing it securely.
+These measurements help calculate courier
+delivery charges. Enter the complete packed
+parcel size, not only the item's size.
+</p>
+
+<label for="shippingWeightKg">
+Packed weight (kg)</label>
+<input id="shippingWeightKg"
+       type="number"
+       min="0.01" max="10000"
+       step="any" inputmode="decimal"
+       required placeholder="e.g. 2.5">
+
+<label for="shippingLengthCm">
+Packed length (cm)</label>
+<input id="shippingLengthCm"
+       type="number"
+       min="0.1" max="10000"
+       step="any" inputmode="decimal"
+       required placeholder="e.g. 45">
+
+<label for="shippingWidthCm">
+Packed width (cm)</label>
+<input id="shippingWidthCm"
+       type="number"
+       min="0.1" max="10000"
+       step="any" inputmode="decimal"
+       required placeholder="e.g. 30">
+
+<label for="shippingHeightCm">
+Packed height (cm)</label>
+<input id="shippingHeightCm"
+       type="number"
+       min="0.1" max="10000"
+       step="any" inputmode="decimal"
+       required placeholder="e.g. 20">
+
+<p class="muted">
+The final courier quotation will be confirmed
+when approved courier services are activated.
+</p>
+</section>
+
+<section>
 <h2>Photos (1–6)</h2>
 <label for="photo">Choose pictures from your phone or computer</label>
 <input id="photo" type="file" accept="image/jpeg,image/png,image/webp" multiple>
@@ -138,7 +185,9 @@ function show(message,error=false){
 // Recovery is account-bound and uses existing Supabase RLS.
 async function loadUnfinished(user){
   const {data, error}=await sb.from('products')
-    .select('id,title,description,category,subcategory,condition,price,location,listing_reference,created_at')
+    .select('id,title,description,category,subcategory,condition,price,location,listing_reference,created_at,
+shipping_weight_kg,shipping_length_cm,
+shipping_width_cm,shipping_height_cm')
     .eq('seller_id',user.id)
     .eq('listing_status','pending')
     .order('created_at',{ascending:false})
@@ -177,6 +226,14 @@ async function resumeItem(product){
     fillSubcategories(product.subcategory||'');
     $('condition').value=product.condition||'used';
     $('town').value=product.location||'';
+    $('shippingWeightKg').value=
+      product.shipping_weight_kg??'';
+    $('shippingLengthCm').value=
+      product.shipping_length_cm??'';
+    $('shippingWidthCm').value=
+      product.shipping_width_cm??'';
+    $('shippingHeightCm').value=
+      product.shipping_height_cm??'';
     window.ShopDropProductPhotos.recover(product,images.length);
     const saved=$('savedPhotographs');
     saved.replaceChildren();
@@ -301,6 +358,35 @@ $('itemForm').addEventListener('submit',async event=>{
       throw Error('Enter a valid price.');
     }
 
+    const parcelFields=[
+      ['shippingWeightKg','Packed weight'],
+      ['shippingLengthCm','Packed length'],
+      ['shippingWidthCm','Packed width'],
+      ['shippingHeightCm','Packed height']
+    ];
+
+    const parcelValues={};
+    const parcelColumns=[
+      'shipping_weight_kg',
+      'shipping_length_cm',
+      'shipping_width_cm',
+      'shipping_height_cm'
+    ];
+
+    parcelFields.forEach(([id,label],index)=>{
+      const input=$(id);
+      const value=Number(input.value);
+      if(!input.value.trim() ||
+         !Number.isFinite(value) ||
+         value<=0 ||
+         value>Number(input.max)){
+        throw Error(
+          label+' must be a valid positive number.'
+        );
+      }
+      parcelValues[parcelColumns[index]]=value;
+    });
+
     if(!pendingId){
       show('Saving your advertisement…');
 
@@ -320,7 +406,8 @@ $('itemForm').addEventListener('submit',async event=>{
           country_code:'ZA',
           quantity:1,
           location:$('town').value.trim()||null,
-          listing_status:'pending'
+          listing_status:'pending',
+    ...parcelValues
         })
         .select(
           'id,listing_reference,listing_status'
@@ -346,7 +433,8 @@ $('itemForm').addEventListener('submit',async event=>{
         category,
         subcategory,
         condition:$('condition').value,
-        location:$('town').value.trim()||null
+        location:$('town').value.trim()||null,
+    ...parcelValues
       }).eq('id',pendingId).eq('seller_id',user.id).eq('listing_status','pending');
       if(updateError)throw Error('Unable to update your saved item: '+updateError.message);
     }
