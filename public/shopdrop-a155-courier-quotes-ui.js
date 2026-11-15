@@ -6,7 +6,10 @@
   const section=document.getElementById('phase6CourierSearch');
   if(!status||!results||!section)return;
   const button=document.createElement('button');
-  button.type='button';button.textContent='Get courier quotes for my order';
+  button.type='button';
+button.textContent='Get courier quotes for my order (not active)';
+button.disabled=true;
+button.title='Available only after approved courier providers are connected.';
   const quoteList=document.createElement('div');quoteList.setAttribute('role','status');
   section.append(button,quoteList);
   let chosen=null;

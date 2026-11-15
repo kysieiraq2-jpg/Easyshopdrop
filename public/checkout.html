@@ -19,7 +19,9 @@
   margin:12px 0;
 }
 
-.shopdrop-sa-courier-grid button {
+.shopdrop-sa-courier-grid a {
+  display:block;
+  text-decoration:none;
   width:100%;
   min-width:0;
   min-height:85px;
@@ -47,14 +49,21 @@
   color:#526273;
 }
 
-.shopdrop-sa-courier-grid button[aria-pressed="true"] {
+.shopdrop-sa-courier-grid a:hover {
   background:#ccf5e7;
   border:2px solid #0f766e;
 }
 
-.shopdrop-sa-courier-grid button:focus-visible {
+.shopdrop-sa-courier-grid a:focus-visible {
   outline:3px solid #0f766e;
   outline-offset:2px;
+}
+
+#phase6CourierSearch button:disabled {
+  background:#e2e8f0;
+  color:#64748b;
+  border-color:#cbd5e1;
+  cursor:not-allowed;
 }
 </style></head><body><header><a href="./index.html">Shop&Drop</a><a href="./checkout.html">Checkout</a><a href="./account.html">My Account</a></header><main><h1>Checkout</h1><section class="panel"><h2>Shopping bag</h2><div id="items"></div><h3 id="total"></h3><p id="quote" class="muted">Delivery fee: not quoted. Final payable total: unavailable.</p></section><section class="panel" id="deliveryAddressPanel">
 <h2>Where should we deliver?</h2>
@@ -102,10 +111,10 @@
 <p class="muted" id="phase6PaymentNotice" role="status">Select a method to see the available choices. Payments are not active. Instant EFT will use an approved secure provider, never a direct transfer to Shop&amp;Drop. Do not send money or enter banking details.</p>
 </section><section class="panel" id="phase6CourierSearch" aria-labelledby="phase6CourierSearchTitle">
 <h2 id="phase6CourierSearchTitle">Find a courier</h2>
-<p class="muted">Choose from three South African door-to-door courier companies. These options are for preview only until verified courier integrations are activated. Private buyer and seller addresses are not shared during this preview.</p>
+<p class="muted">These are the three South African door-to-door courier companies shortlisted by Shop&Drop. Their official websites are available for information only. Shop&Drop bookings, payments and verified pickup tracking are not active yet.</p>
 <div id="shopdropSaCourierPanel">
     <h3>Door-to-door courier options</h3>
-    <p class="muted">Choose a preferred courier company. No live quotation or booking will be created.</p>
+    <p class="muted">Tap a company to visit its official website. Do not book or pay directly, or enter buyer or seller details. Shop&Drop must arrange verified courier bookings after activation.</p>
     <div id="shopdropSaCourierGrid"
          class="shopdrop-sa-courier-grid"
          role="group"
@@ -115,10 +124,8 @@
        role="status"
        aria-live="polite"></p>
     </div>
-    <label for="phase6CourierQuery">Search approved couriers</label>
-<input id="phase6CourierQuery" type="search" placeholder="Search courier name" autocomplete="off">
 <div id="phase6CourierResults" role="status" aria-live="polite"></div>
-<p class="muted" id="phase6CourierSelection">No courier selected. Live quotations and bookings are not enabled.</p>
+<p class="muted" id="phase6CourierSelection">Courier quotations, bookings and pickup tracking will be available after approved provider activation.</p>
 </section><section class="panel"><h2>Order confirmation</h2><p>Preview checkout only: no payment or courier booking occurs on GitHub Pages. The live checkout will show the chosen seller items, eligible courier options and delivery charge, applicable taxes where required, the complete Shop&Drop order total and available payment methods before confirmation. One buyer payment is preferred where supported.</p><button id="previewOrderButton" onclick="place()">Preview order</button><div id="orderStatus" role="status" aria-live="polite"></div></section></main><script src="./common.js"></script>
 <script src="./v26-consolidated.js"></script><script src="./geo.js"></script><script src="./shopdrop-payment-selection.js"></script>
 <script src="./supabase-adapter.js"></script>
@@ -133,7 +140,6 @@
 </section>
 
 <section id="v262ReservationNote"><!-- V26_2_RESERVATION_NOTE --><p>Stock may be temporarily reserved while payment is pending. Unpaid reservations expire and stock is released automatically according to the configured backend reservation window.</p></section>
-<script src="./shopdrop-courier-search.js" defer></script>
-    <script src="./shopdrop-sa-courier-choices.js?v=62" defer></script>
+<script src="./shopdrop-sa-courier-choices.js?v=63" defer></script>
 <script src="./shopdrop-courier-quote-bridge.js" defer></script>
 <script src="./shopdrop-a155-courier-quotes-ui.js" defer></script><script src="./shopdrop-checkout-countdown.js" defer></script><script defer src="shopdrop-buyer-language.js"></script><script defer src="shopdrop-form-language.js"></script></body></html>

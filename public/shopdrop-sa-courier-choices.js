@@ -1,11 +1,12 @@
-/* Fix62: Display-only SA courier shortlist.
-       Does not request quotes, bookings or payments. */
+/* Fix63: Official courier information links.
+   No booking, payment or tracking is initiated here. */
 (()=>{
   'use strict';
 
   const grid=document.getElementById(
     'shopdropSaCourierGrid'
   );
+
   const message=document.getElementById(
     'shopdropSaCourierMessage'
   );
@@ -15,24 +16,32 @@
   const companies=[
     {
       name:'The Courier Guy',
-      service:'Direct door-to-door delivery'
+      service:'Direct door-to-door delivery',
+      url:'https://thecourierguy.co.za/direct-courier-services/'
     },
     {
       name:'Aramex',
-      service:'Click-Way door-to-door delivery'
+      service:'Click-Way door-to-door delivery',
+      url:'https://aramex.co.za/services/click-way-couriers/'
     },
     {
       name:'RAM Hand-to-Hand',
-      service:'Door collection and direct delivery'
+      service:'Door collection and direct delivery',
+      url:'https://www.ram.co.za/'
     }
   ];
 
-  const buttons=[];
-
   for(const company of companies){
-    const button=document.createElement('button');
-    button.type='button';
-    button.setAttribute('aria-pressed','false');
+    const link=document.createElement('a');
+
+    link.href=company.url;
+    link.target='_blank';
+    link.rel='noopener noreferrer';
+
+    link.setAttribute(
+      'aria-label',
+      company.name+' official website — information only'
+    );
 
     const title=document.createElement('strong');
     title.textContent=company.name;
@@ -40,28 +49,16 @@
     const detail=document.createElement('small');
     detail.textContent=company.service;
 
-    button.append(title,detail);
+    const note=document.createElement('small');
+    note.textContent='View official website — information only';
 
-    button.addEventListener('click',()=>{
-      for(const other of buttons){
-        other.setAttribute(
-          'aria-pressed',
-          String(other===button)
-        );
-      }
-
-      message.textContent=
-        'Preferred courier: '+company.name+
-        '. This is a preview only. '+
-        'No quotation, payment or booking '+
-        'has been requested.';
-    });
-
-    buttons.push(button);
-    grid.append(button);
+    link.append(title,detail,note);
+    grid.append(link);
   }
 
   message.textContent=
-    'Select a courier company to preview your preference. '+
-    'Live quotations and bookings are not active.';
+    'These links open the couriers official websites. '+
+    'Do not book, pay or disclose private buyer or seller '+
+    'details there. Shop&Drop will handle approved '+
+    'courier bookings and tracking when activated.';
 })();
