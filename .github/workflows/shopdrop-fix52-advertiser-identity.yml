@@ -1,1 +1,301 @@
 
+name: ShopDrop Fix52 - Shared Advertiser Identity and Cards
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix52-advertiser-identity.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  identity-cards:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Checkout integration branch only
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+      - name: Add shared public identity to all listing divisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          guards={
+            'public/index.html':'4703f45904cd0bcf4759c4269310053a118f2df2',
+            'public/categories.html':'6b088d848139a552d2dd88cfd7241291c97e9289',
+            'public/category-results.html':'35c87096dbffbafbea012a29dfad7afda4f2394c',
+            'public/services.html':'65314e27fd0c138a8b8e4ae907d136b62a449728',
+            'public/dispatching.html':'42537f63f2df1dff12989916026aa75c5a5a709b',
+            'public/product.html':'b0ad171b695dda1d33068ad9cc2f8bc42cf36fab',
+            'public/seller-products.html':'fa5567dd1ee22a91015281fe82fb29c36df3f8a3',
+            'public/register.html':'eeef369a09e2c97c51a347b576624a4abb0d5fe2',
+            'public/account.html':'f1698c84cd3d0283c1f287e07e1ba7137126b2fb',
+            'public/seller.html':'921b516a0fcab8a7544d5004eb786bd2d1354efd',
+            'public/shopdrop-seller-alias.js':'4cb01ee22be9a8ad7bd0e908c6545db7a5af2632',
+            'public/shopdrop-dispatch-offers.js':'519e866df14d9daa9c709937f27e5664337db03a',
+            'public/shopdrop-services-connector.js':'92b05cccd0580787e56c82ec7c54b95c97b94662',
+          }
+          for name,sha in guards.items():
+            if subprocess.check_output(['git','hash-object',name],text=True).strip()!=sha:
+              raise SystemExit('STOP: Source changed: '+name)
+          for name in ('public/shopdrop-public-advertiser-ui.js','public/shopdrop-unified-cards.css'):
+            if Path(name).exists():
+              raise SystemExit('STOP: New file already exists: '+name)
+          def change(name,old,new):
+            p=Path(name); source=p.read_text(encoding='utf-8')
+            if source.count(old)!=1:
+              raise SystemExit('STOP: Source anchor changed in '+name+': '+old[:55])
+            p.write_text(source.replace(old,new,1),encoding='utf-8')
+          # Registration: one optional unique name shared by all advertiser roles.
+          change('public/register.html',
+            '<label>Email</label><input id=email',
+            '<label>Public advertiser name (optional until you advertise)</label><input id=publicAlias maxlength="40" minlength="3" autocomplete="off" placeholder="e.g. Spooky One or Ferrari One"><p class="muted">Shown with your permanent public advertiser number on product, service and transport advertisements. Your private name and contacts stay hidden.</p><label>Email</label><input id=email')
+          change('public/register.html',
+            "  const {data,error}=await supabase.auth.signUp({email,password,options:{data:{full_name:fullName,mobile_number:mobileNumber}}});",
+            "  const publicAlias=document.getElementById('publicAlias').value.trim().replace(/\\s+/g,' ');\n  if(publicAlias && (publicAlias.length<3||publicAlias.length>40||!/^[\\p{L}\\p{N}][\\p{L}\\p{N} .'-]*$/u.test(publicAlias)||/(?:@|https?:|www\\.|[0-9]{6,}|\\b(?:ltd|limited|llc|inc|pty|gmbh|corp)\\b)/i.test(publicAlias)))throw Error('Choose a 3–40 character public name without contact details.');\n  const {data,error}=await supabase.auth.signUp({email,password,options:{data:{full_name:fullName,mobile_number:mobileNumber,shopdrop_public_alias:publicAlias}}});")
+          # Repair existing profile editor: one Shop&Drop account, no nonexistent role.
+          change('public/shopdrop-seller-alias.js',
+            ".select('id,role,seller_public_alias')",
+            ".select('id,seller_public_alias,advertiser_public_number')")
+          change('public/shopdrop-seller-alias.js',
+            "    if (result.data.role !== 'seller') throw Error('A seller account is required.');\n",'')
+          change('public/shopdrop-seller-alias.js',
+            "      status.textContent = profile.seller_public_alias\n        ? 'Current public seller name: ' + profile.seller_public_alias\n        : 'Choose your unique public seller name.';",
+            "      const ref='SD-ADV-'+String(profile.advertiser_public_number).padStart(8,'0');\n      status.textContent=(profile.seller_public_alias ? 'Current public name: '+profile.seller_public_alias : 'Choose your unique public advertiser name.')+' Your public reference: '+ref;")
+          change('public/shopdrop-seller-alias.js',
+            "      status.textContent = 'Public seller name saved. Product display integration follows in the next stage.';",
+            "      status.textContent = 'Public advertiser name saved. This name now identifies your products, services and transport offers.';")
+          change('public/seller.html',
+            'All your approved items will eventually appear under this name.',
+            'Your product, service and transport advertisements use this same public name and permanent advertiser reference.')
+          # All account types can set their chosen public name after sign-in.
+          change('public/account.html',
+            '<section class="panel" id="who">Loading…</section>',
+            '<section class="panel" id="who">Loading…</section>\n<section class="panel" id="shopdropPublicAdvertiserAccount"><h2>Your public advertiser name</h2><p class="muted">One unique name identifies all your products, second-hand items, services and vehicle offers. Your private account and contact details stay hidden.</p><label for="shopdropSellerAlias">Public advertiser name</label><input id="shopdropSellerAlias" type="text" maxlength="40" placeholder="e.g. Spooky One"><button id="shopdropSaveSellerAlias" type="button">Save public name</button><p id="shopdropSellerAliasStatus" role="status" class="muted">Sign in to choose your name and see your public reference.</p></section>')
+          change('public/account.html',
+            '<script defer src="shopdrop-seller-language.js"></script>',
+            '<script defer src="./shopdrop-seller-alias.js?v=52"></script>\n<script defer src="shopdrop-seller-language.js"></script>')
+          # Preserve existing product detail and public profile features.
+          change('public/product.html',
+            '<script src="./shopdrop-product-seller-alias.js" defer></script>',
+            '<script src="./shopdrop-public-advertiser-ui.js?v=52" defer></script>')
+          change('public/product.html',
+            '<h2>More from this seller</h2>',
+            '<h2>Public seller information</h2>')
+          # Add consistent listing identity display and responsive layout.
+          for name in (
+            'public/index.html','public/categories.html','public/category-results.html',
+            'public/services.html','public/dispatching.html','public/seller-products.html'
+          ):
+            change(name,'</head>',
+              '<link rel="stylesheet" href="./shopdrop-unified-cards.css?v=52">\n</head>')
+            change(name,'</body>',
+              '<script defer src="./shopdrop-public-advertiser-ui.js?v=52"></script>\n</body>')
+          # The service listing fields already include a public photo URL.
+          change('public/shopdrop-services-connector.js',
+            "'minimum_booking_units'",
+            "'minimum_booking_units,service_photo_url'")
+          change('public/shopdrop-services-connector.js',
+            '          id: row.id,\n          title: row.title,',
+            '          id: row.id,\n          photo_url: row.service_photo_url || null,\n          title: row.title,')
+          change('public/services.html',
+            "  const heading=document.createElement('h3');\n  heading.textContent=x.title||'Service';",
+            "  const heading=document.createElement('h3');\n  heading.textContent=x.title||'Service';\n  const photo=document.createElement('img');\n  let imageValid=false;\n  try{const u=new URL(x.photo_url);imageValid=u.origin==='https://dtkdvvxpwonywtsgqmdx.supabase.co'&&u.pathname.startsWith('/storage/v1/object/public/');}catch(_){ }\n  if(imageValid){photo.src=x.photo_url;photo.alt='Service advertisement photograph';photo.loading='lazy';photo.className='shopdrop-service-photo';}")
+          change('public/services.html',
+            '  el.append(heading,area,description,price,notice);',
+            '  el.append(heading);\n  if(imageValid)el.append(photo);\n  el.append(area,description,price,notice);')
+          # Add source-safe identifiers to dispatch offer cards; no booking changes.
+          change('public/shopdrop-dispatch-offers.js',
+            "      offers.forEach(offer => {\n        const card = createElement(\n          'div',\n          null,\n          'panel'\n        );",
+            "      const offerGrid=createElement('div',null,'shopdrop-dispatch-offer-grid');\n      offers.forEach(offer => {\n        const card = createElement(\n          'div',\n          null,\n          'panel'\n        );\n        card.dataset.shopdropOfferId=offer.offer_id;")
+          change('public/shopdrop-dispatch-offers.js',
+            '        section.append(card);\n      });\n\n      container.append(section);',
+            '        offerGrid.append(card);\n      });\n      section.append(offerGrid);\n\n      container.append(section);')
+          print('PASS: source guards, registration, aliases, public pages, service cards and dispatch cards')
+          PY
+          cat > public/shopdrop-unified-cards.css <<'CSS'
+          /* ShopDrop Fix52: visible listing cards only; forms and booking rules untouched. */
+          .shopdrop-public-identity{border-top:1px solid #e2e8f0;padding:9px 0 3px;margin-top:8px;font-size:12px;line-height:1.45;overflow-wrap:anywhere}
+          .shopdrop-public-identity strong{display:block;font-size:14px;font-weight:800;color:#17202a}
+          .shopdrop-public-identity small{display:block;color:#475569;font-size:11px;margin-top:3px}
+          .shopdrop-service-photo{width:100%;aspect-ratio:1/1;object-fit:contain;border-radius:9px;background:#f1f5f9}
+          #shopdropPublicProductResults.grid,#productGrid.grid,#sellerProducts.grid,#results.results,.shopdrop-dispatch-offer-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:stretch}
+          #results.results>.result,#shopdropPublicProductResults.grid>.card,#productGrid.grid>.card,#sellerProducts.grid>.item,.shopdrop-dispatch-offer-grid>.panel{min-width:0;overflow-wrap:anywhere}
+          .shopdrop-dispatch-offer-grid .panel{border:1px solid #dbe3ea;margin:0}
+          @media(min-width:700px){#shopdropPublicProductResults.grid,#productGrid.grid,#sellerProducts.grid,#results.results,.shopdrop-dispatch-offer-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+          @media(min-width:1100px){#shopdropPublicProductResults.grid,#productGrid.grid,#sellerProducts.grid,#results.results,.shopdrop-dispatch-offer-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+          @media(max-width:699px){#results.results>.result,#shopdropPublicProductResults.grid>.card,#productGrid.grid>.card,#sellerProducts.grid>.item,.shopdrop-dispatch-offer-grid>.panel{padding:9px;font-size:13px}#results.results h3,.shopdrop-dispatch-offer-grid h3{font-size:15px}.shopdrop-dispatch-offer-grid button{width:100%;font-size:13px;white-space:normal}}
+          CSS
+          cat > public/shopdrop-public-advertiser-ui.js <<'JS'
+          /* Fix52: public names and references only, never private profile fields. */
+          (()=>{
+           'use strict';
+           const endpoint='https://dtkdvvxpwonywtsgqmdx.supabase.co';
+           const key='sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';
+           const seen=new WeakSet();
+           let scheduled=false;
+           const valid=id=>/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(String(id||''));
+           function productId(card){
+            const a=card.matches('a[href*="product.html?id="]')?card:card.querySelector('a[href*="product.html?id="]');
+            if(!a)return '';
+            try{return new URL(a.href,location.href).searchParams.get('id')||'';}catch(_){return '';}
+           }
+           const candidates=[
+            {kind:'product',selector:'#items a.item, #shopdropPublicProductResults a.card, #productGrid article.card, #sellerProducts article.item',getId:productId},
+            {kind:'service',selector:'#results article.result[data-service-id]',getId:el=>el.dataset.serviceId},
+            {kind:'dispatch_offer',selector:'#shopdrop-dispatch-offers [data-shopdrop-offer-id]',getId:el=>el.dataset.shopdropOfferId}
+           ];
+           async function bearer(){
+            try{
+             const {createClient}=await import('https://esm.sh/@supabase/supabase-js@2');
+             const client=createClient(endpoint,key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+             const {data}=await client.auth.getSession();
+             return data?.session?.access_token||'';
+            }catch(_){return '';}
+           }
+           async function lookup(kind,ids){
+            const auth=kind==='dispatch_offer'?await bearer():'';
+            if(kind==='dispatch_offer'&&!auth)return [];
+            const headers={apikey:key,Accept:'application/json','Content-Type':'application/json'};
+            if(auth)headers.Authorization='Bearer '+auth;
+            const response=await fetch(endpoint+'/rest/v1/rpc/shopdrop_public_listing_identity',{
+             method:'POST',headers,body:JSON.stringify({p_kind:kind,p_listing_ids:ids})
+            });
+            if(!response.ok)throw Error('Public advertiser details unavailable');
+            const rows=await response.json();
+            return Array.isArray(rows)?rows:[];
+           }
+           function present(element,kind,row){
+            const box=document.createElement('div');
+            box.className='shopdrop-public-identity';
+            const name=document.createElement('strong');
+            const noun=kind==='service'?'Service provider':kind==='dispatch_offer'?'Transport provider':'Seller';
+            name.textContent=noun+': '+(row?.advertiser_alias||'Public name not yet set');
+            box.append(name);
+            if(row?.advertiser_reference){
+             const ref=document.createElement('small');
+             ref.textContent='Advertiser reference: '+row.advertiser_reference;
+             box.append(ref);
+            }
+            if(row?.listing_reference){
+             const item=document.createElement('small');
+             item.textContent=(kind==='product'?'Item':kind==='service'?'Service':'Transport offer')+' reference: '+row.listing_reference;
+             box.append(item);
+            }
+            if(!row){
+             const note=document.createElement('small');
+             note.textContent='Verified public advertiser information unavailable';
+             box.append(note);
+            }
+            if(kind==='product'&&element.id==='shopdropSellerAliasPanel'&&row?.advertiser_alias){
+             const link=document.createElement('a');
+             link.href='./seller-products.html?alias='+encodeURIComponent(row.advertiser_alias);
+             link.textContent='View more products from this seller';
+             box.append(link);
+            }
+            if(element.id==='shopdropSellerAliasPanel'){
+             const content=document.getElementById('shopdropSellerAliasContent');
+             if(content){content.replaceChildren(box);element.hidden=false;}
+            }else{
+             const heading=element.querySelector('h2,h3');
+             if(heading)heading.after(box);else element.append(box);
+            }
+           }
+           async function scan(){
+            const groups=new Map();
+            for(const c of candidates){
+             for(const node of document.querySelectorAll(c.selector)){
+              if(seen.has(node))continue;
+              const id=c.getId(node);
+              if(!valid(id))continue;
+              seen.add(node);
+              if(!groups.has(c.kind))groups.set(c.kind,[]);
+              groups.get(c.kind).push({node,id});
+             }
+            }
+            const detail=document.getElementById('shopdropSellerAliasPanel');
+            const product=new URLSearchParams(location.search).get('id');
+            if(detail&&valid(product)&&!seen.has(detail)){
+             seen.add(detail);
+             if(!groups.has('product'))groups.set('product',[]);
+             groups.get('product').push({node:detail,id:product});
+            }
+            for(const [kind,items] of groups){
+             for(let i=0;i<items.length;i+=50){
+              const batch=items.slice(i,i+50);
+              try{
+               const rows=await lookup(kind,[...new Set(batch.map(x=>x.id))]);
+               const byId=new Map(rows.map(row=>[row.listing_id,row]));
+               for(const item of batch)present(item.node,kind,byId.get(item.id));
+              }catch(error){
+               console.warn('ShopDrop advertiser display:',error);
+               for(const item of batch)present(item.node,kind,null);
+              }
+             }
+            }
+           }
+           function schedule(){
+            if(scheduled)return;
+            scheduled=true;
+            queueMicrotask(()=>{scheduled=false;scan().catch(console.error);});
+           }
+           function start(){
+            const observer=new MutationObserver(schedule);
+            observer.observe(document.body,{subtree:true,childList:true});
+            schedule();
+           }
+           if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
+           else start();
+          })();
+          JS
+          node --check public/shopdrop-public-advertiser-ui.js
+          node --check public/shopdrop-dispatch-offers.js
+          node --check public/shopdrop-services-connector.js
+          node --check public/shopdrop-seller-alias.js
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,subprocess
+          for path in ('public/index.html','public/categories.html','public/category-results.html','public/services.html','public/dispatching.html','public/product.html','public/seller-products.html','public/register.html','public/account.html','public/seller.html'):
+            html=Path(path).read_text(encoding='utf-8')
+            for s in re.findall(r'<script(?:\s+[^>]*)?>([\s\S]*?)</script>',html,re.I):
+              if s.strip():subprocess.run(['node','--check'],input=s,text=True,check=True)
+          assert 'shopdrop-public-advertiser-ui.js' in Path('public/services.html').read_text()
+          assert 'shopdrop-public-advertiser-ui.js' in Path('public/dispatching.html').read_text()
+          assert 'data-shopdrop-offer-id' in Path('public/shopdrop-public-advertiser-ui.js').read_text()
+          print('PASS: HTML scripts, shared references, mobile grids and protected booking logic')
+          PY
+          git diff --check
+      - name: Commit only targeted frontend corrections
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add public/index.html public/categories.html public/category-results.html public/services.html public/dispatching.html public/product.html public/seller-products.html public/register.html public/account.html public/seller.html public/shopdrop-seller-alias.js public/shopdrop-dispatch-offers.js public/shopdrop-services-connector.js public/shopdrop-public-advertiser-ui.js public/shopdrop-unified-cards.css
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Fix52 unify public advertiser identity and responsive listing cards'
+          git push origin HEAD:shopdrop-phase6-integration
+      - name: Configure integrated website
+        uses: actions/configure-pages@v5
+      - name: Upload integrated website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+      - name: Deploy shared advertiser listing presentation
+        id: deploy
+        uses: actions/deploy-pages@v4
+
