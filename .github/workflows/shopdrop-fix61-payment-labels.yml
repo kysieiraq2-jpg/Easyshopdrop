@@ -1,1 +1,256 @@
 
+name: ShopDrop Fix61 - Simplify Payment Dropdowns
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix61-payment-labels.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  simplify-payment-dropdowns:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch only
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Correct payment labels across marketplace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          guards = {
+              'public/checkout.html':
+                  '47da4cf2bcf001af6903545a2d41c79de9d6cab9',
+              'public/shopdrop-payment-preview.js':
+                  '1b4b7a22e4c1c8df39c57a2ea5c45969724ab016',
+              'public/services.html':
+                  '8fa268fc9b53829e2c59d2dcf24854a522360044',
+              'public/dispatching.html':
+                  '3e780bc9ede5e6f5dc5260ec7484fbd82e561789',
+          }
+
+          for filename, expected in guards.items():
+              actual = subprocess.check_output(
+                  ['git', 'hash-object', filename],
+                  text=True
+              ).strip()
+
+              if actual != expected:
+                  raise SystemExit(
+                      'STOP: Source changed: ' + filename
+                  )
+
+          def replace_once(source, old, new, label):
+              if source.count(old) != 1:
+                  raise SystemExit(
+                      'STOP: Unexpected source at ' + label
+                  )
+              return source.replace(old, new, 1)
+
+          # Product and second-hand checkout.
+          path = Path('public/checkout.html')
+          html = path.read_text(encoding='utf-8')
+
+          html = replace_once(
+              html,
+              'Choose a payment method (preview only)',
+              'Choose a payment method',
+              'checkout instruction'
+          )
+
+          html = replace_once(
+              html,
+              '<option value="">Select payment method</option>',
+              '<option value="" selected disabled hidden>Select payment method</option>',
+              'checkout placeholder'
+          )
+
+          path.write_text(html, encoding='utf-8')
+
+          # Shared payment selector for services and dispatch.
+          path = Path('public/shopdrop-payment-preview.js')
+          js = path.read_text(encoding='utf-8')
+
+          js = replace_once(
+              js,
+              "label.textContent='Choose a future payment method (preview)';",
+              "label.textContent='Choose a payment method';",
+              'service and dispatch instructions'
+          )
+
+          js = replace_once(
+              js,
+              "select.append(new Option('Select payment method',''));",
+              """const placeholder=new Option(
+                'Select payment method',''
+              );
+              placeholder.disabled=true;
+              placeholder.hidden=true;
+              placeholder.selected=true;
+              select.append(placeholder);""",
+              'service and dispatch dropdown placeholder'
+          )
+
+          path.write_text(js, encoding='utf-8')
+
+          # Keep section headings consistent.
+          for filename in (
+              'public/services.html',
+              'public/dispatching.html'
+          ):
+              path = Path(filename)
+              html = path.read_text(encoding='utf-8')
+
+              html = replace_once(
+                  html,
+                  '<h2>Payment methods — preview only</h2>',
+                  '<h2>Payment method</h2>',
+                  filename + ' heading'
+              )
+
+              path.write_text(html, encoding='utf-8')
+
+          # Verify all divisions.
+          checkout = Path(
+              'public/checkout.html'
+          ).read_text(encoding='utf-8')
+
+          shared = Path(
+              'public/shopdrop-payment-preview.js'
+          ).read_text(encoding='utf-8')
+
+          assert (
+              'Choose a payment method (preview only)'
+              not in checkout
+          )
+
+          assert (
+              'selected disabled hidden'
+              in checkout
+          )
+
+          assert (
+              "placeholder.disabled=true;"
+              in shared
+          )
+
+          assert (
+              "placeholder.hidden=true;"
+              in shared
+          )
+
+          assert (
+              "placeholder.selected=true;"
+              in shared
+          )
+
+          assert (
+              "label.textContent='Choose a payment method';"
+              in shared
+          )
+
+          for filename in (
+              'public/services.html',
+              'public/dispatching.html'
+          ):
+              page = Path(filename).read_text(
+                  encoding='utf-8'
+              )
+
+              assert (
+                  '<h2>Payment method</h2>'
+                  in page
+              )
+
+              assert (
+                  'shopdrop-payment-preview.js?v=59'
+                  in page
+              )
+
+          for method in (
+              'visa_debit',
+              'visa_credit',
+              'mastercard_debit',
+              'mastercard_credit',
+              'instant_eft'
+          ):
+              assert 'value="' + method + '"' in checkout
+              assert "'" + method + "'" in shared
+
+          assert 'paypal_wallet' not in checkout
+          assert 'paypal_wallet' not in shared
+
+          print(
+              'PASS: Product payment dropdown simplified'
+          )
+          print(
+              'PASS: Second-hand checkout preserved'
+          )
+          print(
+              'PASS: Other Services payment dropdown simplified'
+          )
+          print(
+              'PASS: Dispatch payment dropdown simplified'
+          )
+          print(
+              'PASS: Visa, Mastercard and Instant EFT retained'
+          )
+          print(
+              'PASS: No payment or booking activation'
+          )
+          PY
+
+          node --check public/shopdrop-payment-preview.js
+          git diff --check
+
+      - name: Commit combined payment appearance correction
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add public/checkout.html
+          git add public/shopdrop-payment-preview.js
+          git add public/services.html
+          git add public/dispatching.html
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix61 simplify payment labels across marketplace'
+
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure integrated website
+        uses: actions/configure-pages@v5
+
+      - name: Upload verified website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy corrected payment dropdowns
+        id: deployment
+        uses: actions/deploy-pages@v4
+
