@@ -1,1 +1,116 @@
 
+name: ShopDrop Fix52B - Repair Advertiser Identity Deployment
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix52b-identity-repair.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  repair-identity:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch only
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Safely rerun Fix52 with corrected browser module verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          original = Path('.github/workflows/shopdrop-fix52-advertiser-identity.yml')
+          expected = '4089ee8fec20890033e416f524c947c2340df389'
+          actual = subprocess.check_output(
+              ['git', 'hash-object', str(original)], text=True
+          ).strip()
+          if actual != expected:
+              raise SystemExit('STOP: Original Fix52 workflow changed.')
+
+          source = original.read_text(encoding='utf-8')
+          start = (
+              '      - name: Add shared public identity to all listing divisions\n'
+              '        shell: bash\n'
+              '        run: |\n'
+          )
+          finish = '      - name: Commit only targeted frontend corrections\n'
+          if source.count(start) != 1 or source.count(finish) != 1:
+              raise SystemExit('STOP: Original workflow layout changed.')
+          body = source.split(start, 1)[1].split(finish, 1)[0]
+          if any(line and not line.startswith('          ')
+                 for line in body.splitlines()):
+              raise SystemExit('STOP: Original code indentation changed.')
+          script = '\n'.join(
+              line[10:] if line else '' for line in body.splitlines()
+          ) + '\n'
+
+          old = "if s.strip():subprocess.run(['node','--check'],input=s,text=True,check=True)"
+          new = (
+              "if s.strip():subprocess.run("
+              "(['node','--input-type=module','--check'] "
+              "if re.search(r'(?m)^\\s*(?:import\\s|export\\s)',s) "
+              "else ['node','--check']),input=s,text=True,check=True)"
+          )
+          if script.count(old) != 1:
+              raise SystemExit('STOP: Module validation line changed.')
+          script = script.replace(old, new, 1)
+          target = Path('/tmp/shopdrop-fix52b-verified.sh')
+          target.write_text(script, encoding='utf-8')
+          print('PASS: Original Fix52 recovered without changing protected files.')
+          print('PASS: Browser module syntax check corrected.')
+          PY
+          bash /tmp/shopdrop-fix52b-verified.sh
+
+      - name: Commit only the approved Fix52 frontend files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add public/index.html public/categories.html public/category-results.html
+          git add public/services.html public/dispatching.html public/product.html
+          git add public/seller-products.html public/register.html public/account.html
+          git add public/seller.html public/shopdrop-seller-alias.js
+          git add public/shopdrop-dispatch-offers.js public/shopdrop-services-connector.js
+          git add public/shopdrop-public-advertiser-ui.js public/shopdrop-unified-cards.css
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'STOP: No verified Fix52 changes to commit.'
+            exit 1
+          fi
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix52B public advertiser identities across marketplace divisions'
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure integrated website
+        uses: actions/configure-pages@v5
+
+      - name: Upload verified website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy shared advertiser identities
+        id: deployment
+        uses: actions/deploy-pages@v4
+
