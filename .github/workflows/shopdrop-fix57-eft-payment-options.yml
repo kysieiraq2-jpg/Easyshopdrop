@@ -1,1 +1,132 @@
 
+name: ShopDrop Fix57 - Instant EFT Preview (No Live Payments)
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix57-eft-payment-options.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  update-payment-methods:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch only
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Replace PayPal with disabled Instant EFT preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          guards = {
+              'public/checkout.html': 'fb9571da91f5ee19ea13678bba9dccc23bc38b12',
+              'public/shopdrop-payment-selection.js': 'e25e097fb61a800279d452602e0059ab03d29e1e',
+          }
+          for path, expected in guards.items():
+              current = subprocess.check_output(
+                  ['git', 'hash-object', path], text=True
+              ).strip()
+              if current != expected:
+                  raise SystemExit('STOP: Source changed: ' + path)
+
+          def replace_once(source, old, new, label):
+              if source.count(old) != 1:
+                  raise SystemExit('STOP: Source differs at ' + label)
+              return source.replace(old, new, 1)
+
+          page = Path('public/checkout.html')
+          html = page.read_text(encoding='utf-8')
+          html = replace_once(
+              html,
+              '<option value="paypal_wallet">PayPal</option>',
+              '<option value="instant_eft">Instant EFT (secure bank payment)</option>',
+              'PayPal option'
+          )
+          html = replace_once(
+              html,
+              '<select id="phase6PaymentMethod" name="payment_method" autocomplete="off">',
+              '<select id="phase6PaymentMethod" name="payment_method" autocomplete="off" disabled aria-describedby="phase6PaymentNotice">',
+              'inactive selector'
+          )
+          html = replace_once(
+              html,
+              'Payment methods are being integrated. No provider is active and no payment will be collected on this page.',
+              'Payment choices are shown for information only. Instant EFT, Visa and Mastercard are not yet enabled. After provider approval, Instant EFT will use a secure payment provider, not a transfer to a Shop&amp;Drop bank account. Do not send any money now.',
+              'payment notice'
+          )
+          page.write_text(html, encoding='utf-8')
+
+          script = Path('public/shopdrop-payment-selection.js')
+          js = script.read_text(encoding='utf-8')
+          js = replace_once(
+              js,
+              "'mastercard_credit','paypal_wallet'",
+              "'mastercard_credit','instant_eft'",
+              'allowed payment choices'
+          )
+          js = replace_once(
+              js,
+              "    const el=document.getElementById('phase6PaymentMethod');",
+              "    const el=document.getElementById('phase6PaymentMethod');\n    if (!el || el.disabled) return null;",
+              'inactive payments guard'
+          )
+          script.write_text(js, encoding='utf-8')
+
+          assert 'paypal_wallet' not in js
+          assert 'paypal_wallet' not in html
+          assert html.count('value="instant_eft"') == 1
+          assert 'disabled aria-describedby="phase6PaymentNotice"' in html
+          assert "if (!el || el.disabled) return null;" in js
+          assert 'id="previewOrderButton"' in html
+          print('PASS: Instant EFT replaces PayPal')
+          print('PASS: Visa/Mastercard preserved')
+          print('PASS: All methods disabled pending provider activation')
+          print('PASS: No payment or checkout backend was changed')
+          PY
+          node --check public/shopdrop-payment-selection.js
+          git diff --check
+
+      - name: Commit only payment-choice preview files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add public/checkout.html public/shopdrop-payment-selection.js
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix57 replace PayPal with inactive provider-managed Instant EFT'
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure integrated website
+        uses: actions/configure-pages@v5
+
+      - name: Upload verified website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy corrected payment methods
+        id: deployment
+        uses: actions/deploy-pages@v4
+
