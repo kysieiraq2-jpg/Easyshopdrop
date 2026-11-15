@@ -19,7 +19,7 @@ button{background:#0f766e;color:#fff;border:0}
 .muted{color:#64748b}
 .flow{line-height:1.7}
 </style>
-<link rel="stylesheet" href="./shopdrop-unified-cards.css?v=52">
+<link rel="stylesheet" href="./shopdrop-unified-cards.css?v=59">
 </head>
 <body>
 <header>
@@ -120,6 +120,11 @@ button{background:#0f766e;color:#fff;border:0}
 <div id="shopdrop-dispatch-offers"></div>
 </section>
 
+<section class="panel shopdrop-payment-preview" data-shopdrop-payment-preview="dispatch">
+<h2>Payment methods — preview only</h2>
+<p>Visa, Mastercard and Instant EFT are planned for this division. Payment is not active, and no banking details or money are required.</p>
+<div class="shopdrop-preview-controls"></div>
+</section>
 <section class="panel">
 <h2>How the transaction works</h2>
 <p><strong>Transport providers:</strong> After completing your paid dispatch job, <a href="./shopdrop-provider-completion.html?booking_type=dispatch">submit the customer's six-digit Completion PIN here</a>.</p>
@@ -427,6 +432,7 @@ preview.onclick=()=>{
 })();
 </script>
 
-<script defer src="./shopdrop-public-advertiser-ui.js?v=52"></script>
+<script defer src="./shopdrop-public-advertiser-ui.js?v=59"></script>
+<script defer src="./shopdrop-payment-preview.js?v=59"></script>
 </body>
 </html>

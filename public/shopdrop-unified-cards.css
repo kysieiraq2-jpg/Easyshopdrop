@@ -9,3 +9,38 @@
 @media(min-width:700px){#shopdropPublicProductResults.grid,#productGrid.grid,#sellerProducts.grid,#results.results,.shopdrop-dispatch-offer-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(min-width:1100px){#shopdropPublicProductResults.grid,#productGrid.grid,#sellerProducts.grid,#results.results,.shopdrop-dispatch-offer-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(max-width:699px){#results.results>.result,#shopdropPublicProductResults.grid>.card,#productGrid.grid>.card,#sellerProducts.grid>.item,.shopdrop-dispatch-offer-grid>.panel{padding:9px;font-size:13px}#results.results h3,.shopdrop-dispatch-offer-grid h3{font-size:15px}.shopdrop-dispatch-offer-grid button{width:100%;font-size:13px;white-space:normal}}
+
+/* Fix58: same identity-first treatment across marketplace cards. */
+.shopdrop-public-identity.shopdrop-identity-top,
+.shopdrop-dispatch-offer-grid .shopdrop-public-identity,
+#results .shopdrop-public-identity,
+#items .shopdrop-public-identity,
+#productGrid .shopdrop-public-identity,
+#shopdropPublicProductResults .shopdrop-public-identity,
+#sellerProducts .shopdrop-public-identity{
+  background:#f0fdfa;
+  border:1px solid #99f6e4;
+  border-radius:8px;
+  margin:0 0 9px;
+  padding:8px;
+  overflow-wrap:anywhere;
+}
+.shopdrop-public-identity strong{font-weight:800}
+#detail .shopdrop-detail-advertiser{margin:12px 0}
+.shopdrop-payment-preview label{
+  display:block;
+  font-weight:700;
+  margin:12px 0 6px;
+}
+.shopdrop-payment-preview select{
+  width:100%;
+  min-height:45px;
+  padding:10px;
+  border:1px solid #cbd5e1;
+  border-radius:8px;
+  background:#fff;
+}
+.shopdrop-payment-preview .shopdrop-preview-status{
+  font-weight:600;
+  color:#0f766e;
+}

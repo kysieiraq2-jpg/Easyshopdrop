@@ -45,7 +45,7 @@ main{max-width:1100px;margin:auto;padding:18px}
 .search input,.search button{width:100%;margin:5px 0}
 }
 </style>
-<link rel="stylesheet" href="./shopdrop-unified-cards.css?v=52">
+<link rel="stylesheet" href="./shopdrop-unified-cards.css?v=59">
 </head>
 <body>
 <header>
@@ -107,6 +107,11 @@ Provider contact and banking details remain private.
 </div>
 </section>
 
+<section class="panel shopdrop-payment-preview" data-shopdrop-payment-preview="service">
+<h2>Payment methods — preview only</h2>
+<p>Visa, Mastercard and Instant EFT are planned for this division. Payment is not active, and no banking details or money are required.</p>
+<div class="shopdrop-preview-controls"></div>
+</section>
 <section class="panel">
 <h2>How an Other Service booking works</h2>
 <p>Choose service → agree on date, time, location and price → pay through Shop&amp;Drop → receive a private six-digit Completion PIN → provider completes the work → customer or authorized recipient gives PIN to provider → provider submits PIN through Shop&amp;Drop → verified completion prepares held proceeds for automatic release, subject to provider approval and safeguards → feedback. Photographs are optional supporting evidence.</p>
@@ -435,6 +440,7 @@ search('');
 })();
 </script>
 
-<script defer src="./shopdrop-public-advertiser-ui.js?v=52"></script>
+<script defer src="./shopdrop-public-advertiser-ui.js?v=59"></script>
+<script defer src="./shopdrop-payment-preview.js?v=59"></script>
 </body>
 </html>

@@ -36,7 +36,16 @@
   const rows=await response.json();
   return Array.isArray(rows)?rows:[];
  }
- function present(element,kind,row){
+ function syncProductDetailIdentity(){
+      const detail=document.getElementById('detail');
+      const gallery=detail?.querySelector('section[aria-label="Product photographs"]');
+      const source=document.getElementById('shopdropSellerAliasContent')?.querySelector('.shopdrop-public-identity');
+      if(!gallery||!source||detail.querySelector('.shopdrop-detail-advertiser'))return;
+      const banner=source.cloneNode(true);
+      banner.classList.add('shopdrop-detail-advertiser','shopdrop-identity-top');
+      gallery.before(banner);
+    }
+    function present(element,kind,row){
   const box=document.createElement('div');
   box.className='shopdrop-public-identity';
   const name=document.createElement('strong');
@@ -66,10 +75,10 @@
   }
   if(element.id==='shopdropSellerAliasPanel'){
    const content=document.getElementById('shopdropSellerAliasContent');
-   if(content){content.replaceChildren(box);element.hidden=false;}
+   if(content){content.replaceChildren(box);element.hidden=false;syncProductDetailIdentity();}
   }else{
    const heading=element.querySelector('h2,h3');
-   if(heading)heading.after(box);else element.append(box);
+   element.prepend(box);
   }
  }
  async function scan(){
@@ -104,6 +113,7 @@
     }
    }
   }
+  syncProductDetailIdentity();
  }
  function schedule(){
   if(scheduled)return;
