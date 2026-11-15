@@ -1,1 +1,323 @@
 
+name: ShopDrop Fix59 - Stage Selective Automated Photo Screening
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix59-photo-screening.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: shopdrop-photo-screening-preparation
+  cancel-in-progress: false
+
+jobs:
+  stage-photo-screening:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Stage budget-aware server-side screening (inactive)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import subprocess
+          guarded = {
+            'public/shopdrop-product-photos.js': '8ed1f80f67814b9ffdc78ec827ea9293ad5ce7ea',
+            'public/shopdrop-seller-product-supabase.js': '59ad7026288a44a9bc686d811c305e8a06d35fb2',
+            'public/shopdrop-services-connector.js': 'e94a19aca99529cb345f53ad1c5277526fc51130',
+            'supabase/functions/create-signed-upload/index.ts': 'adffcd153e09cd04397a43e1587a03fc5cbc7ae2',
+          }
+          for name, sha in guarded.items():
+            current = subprocess.check_output(['git','hash-object',name],text=True).strip()
+            if current != sha:
+              raise SystemExit('STOP: Existing upload code changed: ' + name)
+          print('PASS: Existing photo and service upload code preserved')
+          PY
+          mkdir -p supabase/functions/_shared supabase/functions/shopdrop-photo-screen docs tests
+          for file in \
+            supabase/functions/_shared/shopdrop-photo-policy.mjs \
+            supabase/functions/shopdrop-photo-screen/index.ts \
+            docs/SHOPDROP_FIX59_PHOTO_STORAGE_PREPARATION.sql \
+            docs/SHOPDROP_FIX59_PHOTO_PROTECTION.md \
+            tests/shopdrop-photo-policy.test.mjs; do
+            if [ -e "$file" ]; then echo "STOP: Already exists: $file"; exit 1; fi
+          done
+          cat > supabase/functions/_shared/shopdrop-photo-policy.mjs <<'PHOTO59'
+          /* Fix59: server-side decisions. Screening never directly publishes photos. */
+          export const PHOTO_POLICY_VERSION = 'fix59-selective-v1';
+          const result = (action, reason, advanced = false) =>
+            Object.freeze({ action, reason, advanced, policyVersion: PHOTO_POLICY_VERSION });
+
+          export function evaluateBasic({ text = '', textRegions = 0, lowConfidence = false, barcodeDetected = false } = {}) {
+            const raw = String(text ?? '').normalize('NFKC');
+            const normalized = raw.replace(/[\s().-]+/g, ' ');
+            if (barcodeDetected) return result('reject', 'qr_or_barcode');
+            if (/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(raw)) return result('reject', 'email_address');
+            if (/(?:https?:\/\/|www\.|\b[a-z0-9-]+\.(?:co\.za|com|net|org|biz|info)\b)/i.test(raw)) return result('reject', 'website');
+            if (/(?:\+\s?27|\b0)[\s().-]*(?:\d[\s().-]*){9}(?!\d)/.test(raw) || /\+\s?\d{1,3}[\s().-]*(?:\d[\s().-]*){8,12}(?!\d)/.test(raw)) return result('reject', 'telephone_number');
+            if (/\b(?:whatsapp|call\s+me|phone\s+me|contact\s+us|dm\s+me|instagram|facebook|tiktok|telegram|snapchat)\b/i.test(normalized)) return result('reject', 'direct_contact');
+            if (/(?:^|\s)@[a-z][a-z0-9_.]{3,}/i.test(raw)) return result('reject', 'social_handle');
+            if (/\b\d{1,5}\s+(?:[a-z]+\s+){1,4}(?:street|road|avenue|drive|lane|boulevard|close|crescent|highway)\b/i.test(normalized)) return result('reject', 'street_address');
+            const words = raw.match(/[\p{L}\p{N}]{2,}/gu) || [];
+            if (words.length >= 3 || raw.trim().length >= 20) return result('reject', 'advertising_or_extended_text');
+            // These signals trigger a second paid Vision request, not administrator review.
+            if (lowConfidence || textRegions > 0 || raw.trim()) return result('advanced', 'ambiguous_or_short_text', true);
+            return result('basic_pass', 'no_text_detected');
+          }
+
+          export function evaluateAdvanced({ text = '', logos = [], unreadable = false, barcodeDetected = false } = {}) {
+            if (barcodeDetected) return result('reject', 'qr_or_barcode', true);
+            const repeat = evaluateBasic({ text, textRegions: 0, lowConfidence: false });
+            if (repeat.action === 'reject') return result('reject', repeat.reason, true);
+            if (!Array.isArray(logos) || logos.some(x => String(x || '').trim()))
+              return result('reject', 'logo_or_promotional_mark', true);
+            // Strict default: ambiguous writing cannot bypass screening.
+            if (unreadable || repeat.action === 'advanced') return result('reject', 'unverified_or_hidden_writing', true);
+            return result('advanced_pass', 'advanced_check_clear', true);
+          }
+          PHOTO59
+          cat > supabase/functions/shopdrop-photo-screen/index.ts <<'PHOTO59'
+          /* Fix59 PREPARATION ONLY. No deployment or live photo changes.
+             Requires a private upload bucket, independent barcode scan,
+             and a verified server-only publication gate before activation. */
+          import { evaluateBasic, evaluateAdvanced } from '../_shared/shopdrop-photo-policy.mjs';
+
+          const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), {
+            status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' }
+          });
+          const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          const imagePath = /^[0-9a-f-]{36}\/[A-Za-z0-9_-]{1,120}\/[0-9a-f-]{36}\.(jpg|jpeg|png|webp)$/i;
+
+          async function equalSecret(actual: string, expected: string) {
+            if (!actual || !expected) return false;
+            const encoder = new TextEncoder();
+            const [a, b] = await Promise.all([actual, expected].map(async x =>
+              new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(x)))));
+            let mismatch = 0;
+            for (let i = 0; i < a.length; i++) mismatch |= a[i] ^ b[i];
+            return mismatch === 0;
+          }
+          function base64(bytes: Uint8Array) {
+            let str = '';
+            for (let i = 0; i < bytes.length; i += 8192)
+              str += String.fromCharCode(...bytes.subarray(i, i + 8192));
+            return btoa(str);
+          }
+          async function vision(key: string, bytes: Uint8Array, features: string[]) {
+            const response = await fetch('https://vision.googleapis.com/v1/images:annotate', {
+              method: 'POST',
+              headers: { 'content-type':'application/json', 'x-goog-api-key':key },
+              body: JSON.stringify({ requests: [{
+                image: { content: base64(bytes) },
+                features: features.map(type => ({ type }))
+              }] })
+            });
+            if (!response.ok) throw Error('vision_unavailable');
+            const data = await response.json();
+            const scan = data?.responses?.[0];
+            if (!scan || scan.error) throw Error('vision_error');
+            return scan;
+          }
+          function scanText(scan: any) {
+            return String(scan?.fullTextAnnotation?.text || scan?.textAnnotations?.[0]?.description || '');
+          }
+          function lowConfidence(scan: any) {
+            const blocks = (scan?.fullTextAnnotation?.pages || []).flatMap((p: any) => p.blocks || []);
+            return blocks.some((b: any) => typeof b.confidence === 'number' && b.confidence < 0.70);
+          }
+          Deno.serve(async req => {
+            if (req.method !== 'POST') return json({error:'method_not_allowed'},405);
+            const secret = Deno.env.get('SHOPDROP_PHOTO_WORKER_SECRET') || '';
+            if (!await equalSecret(req.headers.get('x-shopdrop-photo-worker-secret') || '',secret))
+              return json({error:'unauthorized'},401);
+            if (Deno.env.get('SHOPDROP_PHOTO_SCANNING_ENABLED') !== 'true')
+              return json({error:'screening_not_activated'},503);
+
+            const url = Deno.env.get('SUPABASE_URL') || '';
+            const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+            const googleKey = Deno.env.get('SHOPDROP_GOOGLE_VISION_API_KEY') || '';
+            if (!url || !serviceKey || !googleKey) return json({error:'scanner_not_configured'},503);
+
+            let body: any;
+            try { body = await req.json(); } catch { return json({error:'bad_json'},400); }
+            const owner = String(body?.owner_id || '').toLowerCase();
+            const path = String(body?.storage_path || '');
+            const listingType = String(body?.listing_type || '');
+            if (!uuid.test(owner) || !imagePath.test(path) || !path.toLowerCase().startsWith(owner + '/') ||
+                !['product','service','dispatch'].includes(listingType))
+              return json({error:'invalid_scan_job'},400);
+            const auth = { apikey: serviceKey, authorization: 'Bearer ' + serviceKey };
+            const storageUrl = new URL('/storage/v1/object/authenticated/shopdrop-photo-pending/' +
+              path.split('/').map(encodeURIComponent).join('/'), url);
+
+            let bytes: Uint8Array;
+            try {
+              const response = await fetch(storageUrl, { headers: auth });
+              if (!response.ok) return json({error:'staged_photo_unavailable'},503);
+              const declared = Number(response.headers.get('content-length') || 0);
+              if (declared > 6*1024*1024) return json({error:'photo_requires_resizing'},422);
+              bytes = new Uint8Array(await response.arrayBuffer());
+              if (!bytes.length || bytes.length > 6*1024*1024)
+                return json({error:'photo_requires_resizing'},422);
+            } catch { return json({error:'photo_read_failed'},503); }
+
+            let preliminary: any;
+            let advancedResult: any = null;
+            try {
+              // Lower-cost screening: every image receives TEXT_DETECTION only.
+              const first = await vision(googleKey, bytes, ['TEXT_DETECTION']);
+              preliminary = evaluateBasic({
+                text: scanText(first),
+                textRegions: Array.isArray(first.textAnnotations) ? Math.max(0, first.textAnnotations.length - 1) : 0,
+                lowConfidence: lowConfidence(first)
+              });
+              if (preliminary.action === 'advanced') {
+                // Only the ambiguous subset incurs these additional features.
+                const deep = await vision(googleKey, bytes, ['DOCUMENT_TEXT_DETECTION','LOGO_DETECTION']);
+                advancedResult = evaluateAdvanced({
+                  text: scanText(deep),
+                  logos: (deep.logoAnnotations || []).map((x: any) => x.description || ''),
+                  unreadable: lowConfidence(deep)
+                });
+              }
+            } catch { return json({error:'scanning_unavailable',decision:'hold_private'},503); }
+
+            const finalResult = advancedResult || preliminary;
+            const verdict = finalResult.action === 'reject' ? 'reject' : 'pending_barcode';
+            // An independent barcode/QR test AND a server-side publication
+            // authorization gate are not installed. No accepted public uploads.
+            const row = {
+              owner_id: owner,
+              storage_bucket: 'shopdrop-photo-pending',
+              storage_path: path,
+              listing_type: listingType,
+              scan_decision: verdict,
+              reason_code: finalResult.reason,
+              policy_version: finalResult.policyVersion,
+              advanced_used: Boolean(advancedResult),
+              barcode_verified: false,
+              scanned_at: new Date().toISOString()
+            };
+            try {
+              const response = await fetch(new URL('/rest/v1/shopdrop_photo_scan_results?on_conflict=storage_bucket,storage_path',url),{
+                method:'POST',
+                headers:{...auth,'content-type':'application/json','prefer':'resolution=merge-duplicates,return=minimal'},
+                body:JSON.stringify(row)
+              });
+              if (!response.ok) return json({error:'scan_record_not_saved'},503);
+            } catch { return json({error:'scan_record_not_saved'},503); }
+            return json({
+              decision: verdict === 'reject' ? 'replace_photo' : 'pending_barcode_check',
+              reason: finalResult.reason,
+              advanced_ai_used: Boolean(advancedResult)
+            });
+          });
+          PHOTO59
+          cat > docs/SHOPDROP_FIX59_PHOTO_STORAGE_PREPARATION.sql <<'PHOTO59'
+          -- FOR FUTURE REVIEW ONLY. DO NOT RUN BEFORE FULL ACTIVATION DESIGN.
+          INSERT INTO storage.buckets (id,name,public,file_size_limit,allowed_mime_types)
+          VALUES ('shopdrop-photo-pending','shopdrop-photo-pending',false,10485760,
+             ARRAY['image/jpeg','image/png','image/webp']::text[])
+          ON CONFLICT (id) DO NOTHING;
+
+          CREATE TABLE IF NOT EXISTS public.shopdrop_photo_scan_results (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            owner_id uuid NOT NULL,
+            storage_bucket text NOT NULL CHECK (storage_bucket='shopdrop-photo-pending'),
+            storage_path text NOT NULL,
+            listing_type text NOT NULL CHECK (listing_type IN ('product','service','dispatch')),
+            scan_decision text NOT NULL CHECK (scan_decision IN ('reject','pending_barcode')),
+            reason_code text NOT NULL,
+            policy_version text NOT NULL,
+            advanced_used boolean NOT NULL DEFAULT false,
+            barcode_verified boolean NOT NULL DEFAULT false,
+            scanned_at timestamptz NOT NULL DEFAULT now(),
+            UNIQUE (storage_bucket,storage_path)
+          );
+          ALTER TABLE public.shopdrop_photo_scan_results ENABLE ROW LEVEL SECURITY;
+          REVOKE ALL ON public.shopdrop_photo_scan_results FROM PUBLIC,anon,authenticated;
+          GRANT ALL ON public.shopdrop_photo_scan_results TO service_role;
+          -- No publication permission, no public read access, no user upload policy.
+          PHOTO59
+          cat > docs/SHOPDROP_FIX59_PHOTO_PROTECTION.md <<'PHOTO59'
+          # Fix59 — automatic selective image screening (STAGED, NOT LIVE)
+
+          Website selects images for more expensive analysis automatically.
+          - All new images: file validation and baseline OCR text check.
+          - Obvious contact details, websites, promotional text: immediate rejection.
+          - Ambiguous, short or low-confidence writing: advanced document OCR and logo detection.
+          - Clearly clean images: skip advanced request and save money.
+          - Every image needs an independent QR/barcode check before publication.
+          - Scanner failure, unrecognized text or barcode unavailable: hold private.
+          - No routine administrator approval. Sellers replace rejected photographs.
+
+          This is code preparation only. It does NOT scan real live uploads.
+          Do not deploy or set SHOPDROP_PHOTO_SCANNING_ENABLED=true yet.
+          Existing product photos, Supabase public bucket and user pages are unchanged.
+
+          Required later as one coordinated activation:
+          1. Choose OCR provider, verify fees and obtain consent/privacy notices.
+          2. Add a secure, private staging-bucket upload for every product/service/dispatch image.
+          3. Remove unverified external service_photo_url links.
+          4. Add QR/barcode detection for every image (not optional or AI-selected).
+          5. Add backend-only, scan-verified promotion from private to public storage.
+          6. Enforce moderation on new and changed listings, including service auto-approval.
+          7. Add retries, quota limits, billing alerts, deduplication with verified hashes,
+             and regression tests for changed, rotated and obscured contact details.
+          8. Test all divisions without altering legacy approved photos.
+          9. Only then turn on screening; leave payments disabled.
+          PHOTO59
+          cat > tests/shopdrop-photo-policy.test.mjs <<'PHOTO59'
+          import assert from 'node:assert/strict';
+          import { test } from 'node:test';
+          import { evaluateBasic, evaluateAdvanced } from '../supabase/functions/_shared/shopdrop-photo-policy.mjs';
+          test('clean photo skips expensive examination',()=>assert.equal(evaluateBasic({text:''}).action,'basic_pass'));
+          test('email rejected at low-cost stage',()=>assert.equal(evaluateBasic({text:'test@example.com'}).reason,'email_address'));
+          test('telephone rejected at low-cost stage',()=>assert.equal(evaluateBasic({text:'Call 082 123 4567'}).reason,'telephone_number'));
+          test('international telephone rejected',()=>assert.equal(evaluateBasic({text:'Call +27 82 123 4567'}).reason,'telephone_number'));
+          test('URL rejected at low-cost stage',()=>assert.equal(evaluateBasic({text:'www.shop.co.za'}).reason,'website'));
+          test('address rejected',()=>assert.equal(evaluateBasic({text:'10 Long Street'}).reason,'street_address'));
+          test('social media rejected',()=>assert.equal(evaluateBasic({text:'@directseller'}).reason,'social_handle'));
+          test('promotional text rejected',()=>assert.equal(evaluateBasic({text:'Best furniture sales direct'}).reason,'advertising_or_extended_text'));
+          test('short writing flagged for expensive check',()=>assert.equal(evaluateBasic({text:'TOYOTA'}).action,'advanced'));
+          test('low confidence flagged for expensive check',()=>assert.equal(evaluateBasic({lowConfidence:true}).action,'advanced'));
+          test('image text regions flagged for expensive check',()=>assert.equal(evaluateBasic({textRegions:1}).action,'advanced'));
+          test('advanced clear accepted provisionally',()=>assert.equal(evaluateAdvanced({text:'',logos:[]}).action,'advanced_pass'));
+          test('advanced ambiguous rejected',()=>assert.equal(evaluateAdvanced({text:'call me'}).action,'reject'));
+          test('advanced business logo rejected',()=>assert.equal(evaluateAdvanced({logos:['Plumbing Inc']}).action,'reject'));
+          test('QR/barcode rejected',()=>assert.equal(evaluateBasic({barcodeDetected:true}).action,'reject'));
+          PHOTO59
+          node --test tests/shopdrop-photo-policy.test.mjs
+          git add -N supabase/functions/_shared/shopdrop-photo-policy.mjs
+          git add -N supabase/functions/shopdrop-photo-screen/index.ts
+          git add -N docs/SHOPDROP_FIX59_PHOTO_STORAGE_PREPARATION.sql
+          git add -N docs/SHOPDROP_FIX59_PHOTO_PROTECTION.md
+          git add -N tests/shopdrop-photo-policy.test.mjs
+          git diff --check
+          echo 'PASS: Scanner prepared; no public, banking or upload functions modified.'
+
+      - name: Commit staged screening files to integration branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add supabase/functions/_shared/shopdrop-photo-policy.mjs
+          git add supabase/functions/shopdrop-photo-screen/index.ts
+          git add docs/SHOPDROP_FIX59_PHOTO_STORAGE_PREPARATION.sql
+          git add docs/SHOPDROP_FIX59_PHOTO_PROTECTION.md
+          git add tests/shopdrop-photo-policy.test.mjs
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix59 stage selective photo screening without activation'
+          git push origin HEAD:shopdrop-phase6-integration
+
