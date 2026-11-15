@@ -1,1 +1,108 @@
 
+name: ShopDrop Fix65 - Deploy Parcel Measurements
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix65-deploy-parcel-measurements.yml'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy-fix65:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: false
+
+      - name: Verify Fix64 before deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          page=Path("public/sell-item.html")
+          assert page.is_file(), "Seller page missing"
+
+          code=page.read_text(encoding="utf-8")
+
+          fields={
+              "shippingWeightKg":"shipping_weight_kg",
+              "shippingLengthCm":"shipping_length_cm",
+              "shippingWidthCm":"shipping_width_cm",
+              "shippingHeightCm":"shipping_height_cm"
+          }
+
+          for field,column in fields.items():
+              assert code.count('id="'+field+'"')==1, (
+                  "Missing or duplicate field: "+field
+              )
+              assert column in code, (
+                  "Missing database mapping: "+column
+              )
+
+          required=[
+              "shopdrop-product-photos.js",
+              "shopdrop-quick-publish",
+              "photos.attach(",
+              "resumeItem(product)",
+              "loadUnfinished(user)",
+              "...parcelValues"
+          ]
+
+          for token in required:
+              assert token in code, (
+                  "Existing functionality missing: "+token
+              )
+
+          assert code.index(
+              'id="shippingWeightKg"'
+          ) < code.index(
+              '<h2>Photos (1–6)</h2>'
+          )
+
+          print("PASS: Four parcel fields present")
+          print("PASS: Supabase mappings present")
+          print("PASS: Existing listing functions preserved")
+          print("PASS: Ready for website deployment")
+          PY
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload complete existing website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy Fix65
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Confirm deployment
+        shell: bash
+        run: |
+          echo "Fix65 deployment completed."
+          echo "No website source files were modified."
+          echo "Parcel measurements are included."
+
