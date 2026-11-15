@@ -32,7 +32,7 @@ jobs:
           ref: shopdrop-phase6-integration
           persist-credentials: true
 
-      - name: Add three door-to-door courier previews
+      - name: Install safe courier choice cards
         shell: bash
         run: |
           set -euo pipefail
@@ -41,103 +41,111 @@ jobs:
           from pathlib import Path
           import subprocess
 
-          guards = {
+          expected = {
               'public/checkout.html':
                   '0a461bc12d5c037042798d31cf7ac71e46142c91',
               'public/shopdrop-courier-search.js':
-                  '93a0c925c4cce35449e5585d3f92809111e1f873',
+                  '93a0c925c4cce35449e5585d3f92809111e1f873'
           }
 
-          for filename, expected in guards.items():
+          for filename, sha in expected.items():
               actual = subprocess.check_output(
                   ['git', 'hash-object', filename],
                   text=True
               ).strip()
-
-              if actual != expected:
+              if actual != sha:
                   raise SystemExit(
                       'STOP: Source changed: ' + filename
                   )
 
-          def replace_once(source, old, new, label):
-              if source.count(old) != 1:
-                  raise SystemExit(
-                      'STOP: Unexpected source at ' + label
-                  )
-              return source.replace(old, new, 1)
+          new_script = Path(
+              'public/shopdrop-sa-courier-choices.js'
+          )
+
+          if new_script.exists():
+              raise SystemExit(
+                  'STOP: Courier choices script already exists'
+              )
 
           page = Path('public/checkout.html')
           html = page.read_text(encoding='utf-8')
 
-          html = replace_once(
-              html,
+          def change(old, new, label):
+              global html
+              if html.count(old) != 1:
+                  raise SystemExit(
+                      'STOP: Unexpected checkout source at ' + label
+                  )
+              html = html.replace(old, new, 1)
+
+          change(
               'Search supported local or international couriers. Only verified couriers with a real quotation can be booked. No private addresses are shared during search.',
-              'Shop&Drop uses door-to-door courier services in South Africa. Choose a preferred company below. Courier collection, coverage and quotations will be confirmed after provider activation. No private addresses are shared during this preview.',
-              'South African delivery wording'
+              'Choose from three South African door-to-door courier companies. These options are for preview only until verified courier integrations are activated. Private buyer and seller addresses are not shared during this preview.',
+              'courier description'
           )
 
-          html = replace_once(
-              html,
+          change(
               '<label for="phase6CourierQuery">Courier company</label>',
-              '''<div id="shopdropSaCourierChoices">
+              '''<div id="shopdropSaCourierPanel">
               <h3>Door-to-door courier options</h3>
-              <p class="muted">These companies are shortlisted for South African deliveries. Select one to preview your preference. This does not book a courier.</p>
+              <p class="muted">Choose a preferred courier company. No live quotation or booking will be created.</p>
               <div id="shopdropSaCourierGrid"
                    class="shopdrop-sa-courier-grid"
                    role="group"
-                   aria-label="Door-to-door courier companies"></div>
+                   aria-label="South African door-to-door couriers"></div>
               <p id="shopdropSaCourierMessage"
                  class="muted"
                  role="status"
                  aria-live="polite"></p>
               </div>
               <label for="phase6CourierQuery">Search approved couriers</label>''',
-              'three courier options'
+              'courier cards'
           )
 
-          html = replace_once(
-              html,
+          change(
               '<script src="./shopdrop-courier-search.js" defer></script>',
-              '<script src="./shopdrop-courier-search.js?v=62" defer></script>',
-              'refresh courier selection script'
+              '''<script src="./shopdrop-courier-search.js" defer></script>
+              <script src="./shopdrop-sa-courier-choices.js?v=62" defer></script>''',
+              'new independent courier script'
           )
 
           style = '''
-          /* Fix62: SA door-to-door courier preview */
+          /* Fix62: Three door-to-door courier choices */
           .shopdrop-sa-courier-grid {
             display:grid;
             grid-template-columns:repeat(
-              auto-fit,minmax(150px,1fr)
+              auto-fit,minmax(145px,1fr)
             );
-            gap:12px;
-            margin:14px 0;
+            gap:10px;
+            margin:12px 0;
           }
 
           .shopdrop-sa-courier-grid button {
             width:100%;
-            min-height:86px;
+            min-width:0;
+            min-height:85px;
             margin:0;
-            padding:13px;
+            padding:12px;
             background:#f0fdfa;
             color:#134e4a;
             border:1px solid #99d9cc;
             border-radius:10px;
             text-align:left;
             white-space:normal;
+            overflow-wrap:anywhere;
           }
 
           .shopdrop-sa-courier-grid strong {
             display:block;
             font-size:15px;
-            line-height:1.35;
           }
 
           .shopdrop-sa-courier-grid small {
             display:block;
             margin-top:7px;
-            color:#526273;
             font-size:12px;
             line-height:1.4;
+            color:#526273;
           }
 
           .shopdrop-sa-courier-grid button[aria-pressed="true"] {
@@ -149,200 +157,168 @@ jobs:
             outline:3px solid #0f766e;
             outline-offset:2px;
           }
-
-          #shopdropSaCourierMessage {
-            font-weight:600;
-            line-height:1.5;
-          }
           '''
 
-          html = replace_once(
-              html,
+          change(
               '</style></head>',
               style + '</style></head>',
-              'courier card layout'
+              'courier layout'
           )
 
           page.write_text(html, encoding='utf-8')
 
-          path = Path('public/shopdrop-courier-search.js')
-          js = path.read_text(encoding='utf-8')
+          new_script.write_text(
+              """/* Fix62: Display-only SA courier shortlist.
+                 Does not request quotes, bookings or payments. */
+          (()=>{
+            'use strict';
 
-          js = replace_once(
-              js,
-              "  if(!input||!results||!selection)return;",
-              """  if(!input||!results||!selection)return;
-              const grid=document.getElementById(
-                'shopdropSaCourierGrid'
-              );
-              const previewMessage=document.getElementById(
-                'shopdropSaCourierMessage'
-              );""",
-              'courier preview controls'
-          )
+            const grid=document.getElementById(
+              'shopdropSaCourierGrid'
+            );
+            const message=document.getElementById(
+              'shopdropSaCourierMessage'
+            );
 
-          old_footer = """  input.addEventListener('input',()=>searchDirectory(input.value.trim()));
-            render();
-            })();"""
+            if(!grid||!message)return;
 
-          old_footer = old_footer.replace(
-              "            render();\n            })();",
-              "  render();\n})();"
-          )
+            const companies=[
+              {
+                name:'The Courier Guy',
+                service:'Direct door-to-door delivery'
+              },
+              {
+                name:'Aramex',
+                service:'Click-Way door-to-door delivery'
+              },
+              {
+                name:'RAM Hand-to-Hand',
+                service:'Door collection and direct delivery'
+              }
+            ];
 
-          new_footer = """  function mountSouthAfricanCouriers(){
-                if(!grid || !previewMessage)return;
+            const buttons=[];
 
-                const companies=[
-                  {
-                    name:'The Courier Guy',
-                    service:'Direct door-to-door delivery'
-                  },
-                  {
-                    name:'Aramex',
-                    service:'Click-Way door-to-door delivery'
-                  },
-                  {
-                    name:'RAM Hand-to-Hand',
-                    service:'Door collection and direct delivery'
-                  }
-                ];
+            for(const company of companies){
+              const button=document.createElement('button');
+              button.type='button';
+              button.setAttribute('aria-pressed','false');
 
-                const buttons=[];
+              const title=document.createElement('strong');
+              title.textContent=company.name;
 
-                for(const company of companies){
-                  const button=document.createElement('button');
-                  button.type='button';
-                  button.setAttribute('aria-pressed','false');
+              const detail=document.createElement('small');
+              detail.textContent=company.service;
 
-                  const title=document.createElement('strong');
-                  title.textContent=company.name;
+              button.append(title,detail);
 
-                  const detail=document.createElement('small');
-                  detail.textContent=company.service;
-
-                  button.append(title,detail);
-
-                  button.addEventListener('click',()=>{
-                    for(const other of buttons){
-                      other.setAttribute(
-                        'aria-pressed',
-                        String(other===button)
-                      );
-                    }
-
-                    // Preview preference only.
-                    // Never create a real booking or quote.
-                    // Never share customer or seller addresses.
-                    previewMessage.textContent=
-                      'Preferred courier: '+company.name+
-                      '. This is only a preview. '+
-                      'No live quote, collection or booking '+
-                      'has been requested.';
-
-                    // Important: Do not change the trusted
-                    // courier quote selection or payment state.
-                  });
-
-                  buttons.push(button);
-                  grid.append(button);
+              button.addEventListener('click',()=>{
+                for(const other of buttons){
+                  other.setAttribute(
+                    'aria-pressed',
+                    String(other===button)
+                  );
                 }
 
-                previewMessage.textContent=
-                  'Choose one of the three companies. '+
-                  'Door-to-door bookings and live prices '+
-                  'will become available only after '+
-                  'approved integrations are connected.';
-              }
+                message.textContent=
+                  'Preferred courier: '+company.name+
+                  '. This is a preview only. '+
+                  'No quotation, payment or booking '+
+                  'has been requested.';
+              });
 
-              input.addEventListener(
-                'input',
-                ()=>searchDirectory(input.value.trim())
-              );
+              buttons.push(button);
+              grid.append(button);
+            }
 
-              mountSouthAfricanCouriers();
-              render();
-              })();"""
-
-          new_footer = new_footer.replace(
-              "              })();",
-              "})();"
+            message.textContent=
+              'Select a courier company to preview your preference. '+
+              'Live quotations and bookings are not active.';
+          })();
+          """,
+              encoding='utf-8'
           )
 
-          js = replace_once(
-              js,
-              old_footer,
-              new_footer,
-              'SA courier shortlist'
+          updated = page.read_text(encoding='utf-8')
+          script = new_script.read_text(encoding='utf-8')
+
+          assert updated.count(
+              'id="shopdropSaCourierGrid"'
+          ) == 1
+
+          assert (
+              'shopdrop-sa-courier-choices.js?v=62'
+              in updated
           )
 
-          path.write_text(js, encoding='utf-8')
+          assert (
+              'local or international couriers'
+              not in updated
+          )
 
-          assert js.count("name:'The Courier Guy'") == 1
-          assert js.count("name:'Aramex'") == 1
-          assert js.count("name:'RAM Hand-to-Hand'") == 1
+          for company in (
+              'The Courier Guy',
+              'Aramex',
+              'RAM Hand-to-Hand'
+          ):
+              assert script.count(
+                  "name:'" + company + "'"
+              ) == 1
 
           for excluded in (
               'Pargo',
               'PAXI',
               'PostNet',
-              'Bob Go',
-              'DPD South Africa'
+              'Bob Go'
           ):
-              assert excluded not in js
+              assert excluded not in script
 
-          assert 'isBookingEnabled:()=>false' in js
-          assert 'b.disabled=true;' in js
+          for element in (
+              'phase6CourierQuery',
+              'phase6CourierResults',
+              'phase6CourierSelection',
+              'deliveryAddressPanel',
+              'phase6PaymentMethod'
+          ):
+              assert 'id="' + element + '"' in updated
 
-          html = Path(
-              'public/checkout.html'
-          ).read_text(encoding='utf-8')
+          assert 'fetch(' not in script
+          assert 'createOrder' not in script
+          assert 'requestQuotes' not in script
+          assert 'selectQuote' not in script
 
-          assert 'id="shopdropSaCourierGrid"' in html
-          assert 'shopdrop-courier-search.js?v=62' in html
-          assert 'local or international couriers' not in html
-
-          assert 'id="phase6CourierQuery"' in html
-          assert 'id="phase6CourierResults"' in html
-          assert 'id="phase6CourierSelection"' in html
-          assert 'id="deliveryAddressPanel"' in html
-          assert 'id="phase6PaymentMethod"' in html
-
-          print('PASS: The Courier Guy included')
-          print('PASS: Aramex door-to-door included')
-          print('PASS: RAM Hand-to-Hand included')
-          print('PASS: Counter and locker options excluded')
-          print('PASS: Existing search retained')
-          print('PASS: Actual courier bookings remain inactive')
-          print('PASS: Payment and address files preserved')
+          print('PASS: Three SA courier choices')
+          print('PASS: Existing courier search untouched')
+          print('PASS: Checkout and address preserved')
+          print('PASS: No booking or payment activation')
           PY
 
-          node --check public/shopdrop-courier-search.js
+          node --check public/shopdrop-sa-courier-choices.js
+          git add -N public/shopdrop-sa-courier-choices.js
           git diff --check
 
-      - name: Commit corrected courier selection
+      - name: Commit corrected Fix62
         shell: bash
         run: |
           set -euo pipefail
 
           git add public/checkout.html
-          git add public/shopdrop-courier-search.js
+          git add public/shopdrop-sa-courier-choices.js
 
           git -c user.name='github-actions[bot]' \
               -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-              commit -m 'Fix62 show three SA door-to-door courier choices'
+              commit -m 'Fix62 add three SA door-to-door courier previews'
 
           git push origin HEAD:shopdrop-phase6-integration
 
       - name: Configure integrated website
         uses: actions/configure-pages@v5
 
-      - name: Upload verified website
+      - name: Upload website
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./public
 
-      - name: Deploy corrected courier choices
+      - name: Deploy corrected Fix62
         id: deployment
         uses: actions/deploy-pages@v4
-
