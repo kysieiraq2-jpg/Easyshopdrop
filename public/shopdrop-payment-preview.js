@@ -23,13 +23,19 @@
       controls.dataset.ready='yes';
 
       const label=document.createElement('label');
-      label.textContent='Choose a future payment method (preview)';
+      label.textContent='Choose a payment method';
 
       const select=document.createElement('select');
       select.setAttribute(
         'aria-label','Payment method preview only'
       );
-      select.append(new Option('Select payment method',''));
+      const placeholder=new Option(
+      'Select payment method',''
+    );
+    placeholder.disabled=true;
+    placeholder.hidden=true;
+    placeholder.selected=true;
+    select.append(placeholder);
 
       for(const [code,name] of methods){
         select.add(new Option(name,code));
