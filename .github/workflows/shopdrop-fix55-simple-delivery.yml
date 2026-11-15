@@ -1,1 +1,238 @@
 
+name: ShopDrop Fix55 - Simple Delivery Address
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix55-simple-delivery.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  simple-address:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout integration branch only
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Simplify the delivery address experience
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          guards = {
+              'public/checkout.html': '6a4f56c55b4011dc0db5be2f611f0c049a5dd6ac',
+              'public/shopdrop-cart-address-bridge.js': '433683b4735864a2de4270ae190aabdd8a559382',
+          }
+          for path, expected in guards.items():
+              actual = subprocess.check_output(['git', 'hash-object', path], text=True).strip()
+              if actual != expected:
+                  raise SystemExit('STOP: Source changed; do not overwrite '+path)
+
+          def following_right(text, spaces):
+              lines=text.split('\n')
+              return lines[0]+'\n'+'\n'.join((' '*spaces)+line for line in lines[1:])
+
+          def replace_once(text, old, new, label):
+              if text.count(old) != 1:
+                  raise SystemExit('STOP: Checkout source changed at '+label)
+              return text.replace(old, new, 1)
+
+          page = Path('public/checkout.html')
+          html = page.read_text(encoding='utf-8')
+          start_tag = '<section class="panel"><h2>Delivery address</h2>'
+          if html.count(start_tag) != 1:
+              raise SystemExit('STOP: Delivery section not uniquely found')
+          start = html.index(start_tag)
+          end = html.find('</section>', start)
+          if end < 0:
+              raise SystemExit('STOP: Delivery section incomplete')
+          old_section = html[start:end + len('</section>')]
+          for required in ('id="addresses"','id="recipient"','id="line1"','id="country"','onclick="saveAddress()"'):
+              if required not in old_section:
+                  raise SystemExit('STOP: Missing required address control '+required)
+          new_section = '''<section class="panel" id="deliveryAddressPanel">
+          <h2>Where should we deliver?</h2>
+          <p class="muted">Enter the address where you want to receive the parcel.</p>
+          <div id="savedAddressArea" hidden>
+            <p id="selectedAddressSummary" role="status" aria-live="polite"></p>
+            <div id="savedAddressPicker" hidden>
+              <label for="addresses">Choose a saved delivery address</label>
+              <select id="addresses" aria-label="Choose a saved delivery address"></select>
+            </div>
+            <button id="addAnotherAddressButton" type="button">Add another delivery address</button>
+          </div>
+          <div id="newAddressFields">
+            <h3>Add your delivery address</h3>
+            <label for="label">Address type</label>
+            <select id="label"><option value="Home">Home</option><option value="Other">Other delivery address</option></select>
+            <label for="recipient">Person receiving the parcel</label>
+            <input id="recipient" autocomplete="shipping name" placeholder="Full name">
+            <label for="line1">House number and street</label>
+            <input id="line1" autocomplete="shipping address-line1" placeholder="Street address">
+            <label for="city">Town or city</label>
+            <input id="city" autocomplete="shipping address-level2" placeholder="Town or city">
+            <label for="region">Province (optional)</label>
+            <input id="region" autocomplete="shipping address-level1" placeholder="Province">
+            <label for="postal">Postal code (optional)</label>
+            <input id="postal" autocomplete="shipping postal-code" placeholder="Postal code">
+            <label for="country">Country</label>
+            <select id="country" disabled aria-label="South Africa"></select>
+            <button id="saveDeliveryAddressButton" type="button" onclick="saveAddress()">Save delivery address</button>
+            <button id="cancelAddAddress" type="button" hidden>Cancel</button>
+          </div>
+          <p id="addressStatus" role="status" aria-live="polite"></p>
+          <p class="muted">Delivery options and the full payable price will appear before payment. Courier booking and payment are not yet active.</p>
+          </section>'''
+          html = html[:start] + new_section + html[end + len('</section>'):]
+          styles = '''
+          /* Fix55: clear delivery address controls, no empty select for new buyers */
+          #deliveryAddressPanel label{display:block;margin:12px 0 5px;font-weight:700}
+          #deliveryAddressPanel input,#deliveryAddressPanel select{display:block;width:100%;min-height:46px;padding:11px;border:1px solid #cbd5e1;border-radius:9px;box-sizing:border-box;background:#fff}
+          #deliveryAddressPanel select:disabled{background:#f1f5f9;color:#334155;opacity:1}
+          #deliveryAddressPanel button{margin:12px 9px 0 0;min-height:45px}
+          #deliveryAddressPanel #addAnotherAddressButton,#deliveryAddressPanel #cancelAddAddress{background:#e2e8f0;color:#17202a}
+          #deliveryAddressPanel #selectedAddressSummary{padding:12px;background:#f0fdfa;border:1px solid #99f6e4;border-radius:9px;font-weight:700}
+          #deliveryAddressPanel #addressStatus{color:#0f766e;font-weight:600}
+          #deliveryAddressPanel [hidden]{display:none!important}
+          '''
+          html = replace_once(html, '</style>', styles + '</style>', 'delivery styling')
+          page.write_text(html, encoding='utf-8')
+
+          bridge = Path('public/shopdrop-cart-address-bridge.js')
+          js = bridge.read_text(encoding='utf-8')
+          js = replace_once(js, '  async function load() {', "  async function load(preferredAddressId = '') {", 'load signature')
+          old = '''      const select=$('addresses');select.replaceChildren(new Option('Choose delivery address',''));
+          for(const addr of a.data||[]){
+            select.add(new Option([addr.address_label,addr.address_line_1,addr.city,addr.country_code].filter(Boolean).join(' — '),addr.id));
+            if(addr.is_default) select.value=addr.id;
+          }'''
+          new = '''      const saved=a.data||[];
+          const select=$('addresses');
+          const previous=preferredAddressId||select.value||'';
+          select.replaceChildren();
+          for(const addr of saved){
+            const shortLabel=[addr.address_label||'Delivery',addr.city].filter(Boolean).join(' — ');
+            select.add(new Option(shortLabel,addr.id));
+          }
+          const chosen=saved.find(x=>x.id===previous)||saved.find(x=>x.is_default)||saved[0];
+          select.value=chosen?.id||'';
+          $('savedAddressArea').hidden=!chosen;
+          $('savedAddressPicker').hidden=saved.length<2;
+          $('selectedAddressSummary').textContent=chosen
+            ?'Deliver to: '+[chosen.address_label||'Delivery',chosen.city].filter(Boolean).join(' — ')
+            :'';
+          $('newAddressFields').hidden=Boolean(chosen);
+          $('cancelAddAddress').hidden=true;
+          $('previewOrderButton').disabled=!chosen;
+          $('addressStatus').textContent=chosen?'Your delivery address is selected.':'Enter your delivery address below, then tap Save delivery address.';'''
+          js = replace_once(js, following_right(old,6), following_right(new,6), 'saved address picker')
+          old = '''  async function saveAddress(){
+            try{'''
+          new = '''  async function saveAddress(){
+            const saveButton=$('saveDeliveryAddressButton');
+            if(saveButton.disabled)return;
+            saveButton.disabled=true;
+            try{'''
+          js = replace_once(js, following_right(old,2), following_right(new,2), 'save button lock')
+          old = '''      const {error}=await db.from('addresses').insert(data);
+            if(error)throw error;
+            window.ShopDropReservationCountdown?.clear?.();
+            await load();say('Delivery address saved. Payment remains disabled.');
+          }catch(e){say('Address save failed: '+e.message);}'''
+          new = '''      const {data:saved,error}=await db.from('addresses').insert(data).select('id').single();
+            if(error)throw error;
+            if(!saved?.id)throw Error('Address save confirmation unavailable. Refresh before trying again.');
+            window.ShopDropReservationCountdown?.clear?.();
+            await load(saved.id);
+            $('addressStatus').textContent='Address saved and selected.';
+            say('Delivery address saved. Payment remains disabled.');
+          }catch(e){
+            $('addressStatus').textContent='Address not saved: '+e.message;
+            say('Address save failed: '+e.message);
+          }finally{saveButton.disabled=false;}'''
+          js = replace_once(js, following_right(old,4), following_right(new,4), 'save and auto-select')
+          old = '''  const button=$('previewOrderButton');
+            if(button) button.textContent='Create secure order';'''
+          new = '''  const button=$('previewOrderButton');
+            if(button) button.textContent='Create secure order';
+            $('addAnotherAddressButton').addEventListener('click',()=>{
+              $('newAddressFields').hidden=false;
+              $('cancelAddAddress').hidden=false;
+              if(button)button.disabled=true;
+              $('addressStatus').textContent='Enter another address, then tap Save delivery address.';
+            });
+            $('cancelAddAddress').addEventListener('click',()=>{
+              $('newAddressFields').hidden=true;
+              $('cancelAddAddress').hidden=true;
+              if(button)button.disabled=!$('addresses').value;
+              $('addressStatus').textContent='Your saved delivery address is selected.';
+            });
+            $('addresses').addEventListener('change',()=>{
+              const option=$('addresses').selectedOptions[0];
+              $('selectedAddressSummary').textContent=option?.value?'Deliver to: '+option.textContent:'Choose a delivery address';
+            });'''
+          js = replace_once(js, following_right(old,0), following_right(new,0), 'address buttons')
+          bridge.write_text(js, encoding='utf-8')
+          print('PASS: First-time buyers see address form, not an empty dropdown')
+          print('PASS: Saved address selected automatically after save')
+          print('PASS: Existing addresses remain available; payment code unchanged')
+          PY
+          node --check public/shopdrop-cart-address-bridge.js
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,subprocess
+          html=Path('public/checkout.html').read_text(encoding='utf-8')
+          js=Path('public/shopdrop-cart-address-bridge.js').read_text(encoding='utf-8')
+          for id in ('addresses','savedAddressArea','savedAddressPicker','newAddressFields','addressStatus','saveDeliveryAddressButton','addAnotherAddressButton','cancelAddAddress','label','recipient','line1','city','region','postal','country'):
+            assert len(re.findall(r'\bid="'+id+r'"',html))==1,id
+          for code in re.findall(r'<script(?:\s+[^>]*)?>([\s\S]*?)</script>',html,re.I):
+            if code.strip():subprocess.run(['node','--check'],input=code,text=True,check=True)
+          assert "await load(saved.id);" in js
+          assert "if (!$('addresses').value) throw Error('Select a delivery address first.')" in js
+          assert 'createPaymentSession' in js
+          assert "!chosen" in js
+          print('PASS: Unique field IDs, JavaScript syntax, checkout safety checks')
+          PY
+          git diff --check
+
+      - name: Commit only checkout presentation and address selector
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add public/checkout.html public/shopdrop-cart-address-bridge.js
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix55 simplify delivery address for first-time buyers'
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure integrated website
+        uses: actions/configure-pages@v5
+
+      - name: Upload verified website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy simple delivery address
+        id: deployment
+        uses: actions/deploy-pages@v4
+
