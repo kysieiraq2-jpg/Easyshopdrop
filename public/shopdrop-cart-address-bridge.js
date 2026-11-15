@@ -131,7 +131,7 @@
       $('newAddressFields').hidden=Boolean(chosen);
       $('cancelAddAddress').hidden=true;
       $('previewOrderButton').disabled=!chosen;
-      $('addressStatus').textContent=chosen?'Your delivery address is selected.':'Enter your delivery address below, then tap Save delivery address.';
+      $('addressStatus').textContent=chosen?'Your delivery address is selected.':'Complete the address fields above, then tap Save delivery address.';
       say('One seller per checkout. You may purchase multiple items from this seller. Payment is not yet enabled.');
     } catch(e) {say('Cannot load cart/addresses: '+e.message);}
   }
@@ -254,7 +254,7 @@
     $('newAddressFields').hidden=false;
     $('cancelAddAddress').hidden=false;
     if(button)button.disabled=true;
-    $('addressStatus').textContent='Enter another address, then tap Save delivery address.';
+    $('addressStatus').textContent='Complete the new address fields above, then tap Save delivery address.';
   });
   $('cancelAddAddress').addEventListener('click',()=>{
     $('newAddressFields').hidden=true;
