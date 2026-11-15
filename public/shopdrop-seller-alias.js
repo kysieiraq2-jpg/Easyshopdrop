@@ -19,18 +19,16 @@
   async function sellerProfile(sb) {
     const {data:{user},error} = await sb.auth.getUser();
     if (error || !user) throw Error('Please sign in first.');
-    const result = await sb.from('profiles').select('id,role,seller_public_alias').eq('id',user.id).single();
+    const result = await sb.from('profiles').select('id,seller_public_alias,advertiser_public_number').eq('id',user.id).single();
     if (result.error) throw result.error;
-    if (result.data.role !== 'seller') throw Error('A seller account is required.');
     return result.data;
   }
   async function load() {
     try {
       const profile = await sellerProfile(await client());
       input.value = profile.seller_public_alias || '';
-      status.textContent = profile.seller_public_alias
-        ? 'Current public seller name: ' + profile.seller_public_alias
-        : 'Choose your unique public seller name.';
+      const ref='SD-ADV-'+String(profile.advertiser_public_number).padStart(8,'0');
+      status.textContent=(profile.seller_public_alias ? 'Current public name: '+profile.seller_public_alias : 'Choose your unique public advertiser name.')+' Your public reference: '+ref;
     } catch (error) {status.textContent = explain(error);}
   }
   save.addEventListener('click', async () => {
@@ -48,7 +46,7 @@
         .eq('id',profile.id).select('seller_public_alias').single();
       if (result.error) throw result.error;
       input.value = result.data.seller_public_alias;
-      status.textContent = 'Public seller name saved. Product display integration follows in the next stage.';
+      status.textContent = 'Public advertiser name saved. This name now identifies your products, services and transport offers.';
     } catch(error) {status.textContent = explain(error);}
     finally {save.disabled = false;}
   });

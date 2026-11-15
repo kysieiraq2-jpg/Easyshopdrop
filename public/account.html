@@ -28,6 +28,7 @@ a{color:#0f766e}
 <h1>My account</h1><p><a href="./sell-item.html"><strong>Sell an Item — take photos and post</strong></a></p>
 
 <section class="panel" id="who">Loading…</section>
+<section class="panel" id="shopdropPublicAdvertiserAccount"><h2>Your public advertiser name</h2><p class="muted">One unique name identifies all your products, second-hand items, services and vehicle offers. Your private account and contact details stay hidden.</p><label for="shopdropSellerAlias">Public advertiser name</label><input id="shopdropSellerAlias" type="text" maxlength="40" placeholder="e.g. Spooky One"><button id="shopdropSaveSellerAlias" type="button">Save public name</button><p id="shopdropSellerAliasStatus" role="status" class="muted">Sign in to choose your name and see your public reference.</p></section>
 
 <section class="panel">
 <h2>My orders</h2>
@@ -579,6 +580,7 @@ pickupForm.addEventListener('submit',async event=>{
 </p>
 </section>
 
+<script defer src="./shopdrop-seller-alias.js?v=52"></script>
 <script defer src="shopdrop-seller-language.js"></script>
 </body>
 </html>

@@ -107,7 +107,7 @@
       'pricing_unit,price,currency,country_code,' +
       'location,listing_status,base_town,' +
       'base_province,coverage_mode,covered_areas,' +
-      'minimum_booking_units'
+      'minimum_booking_units,service_photo_url'
     );
 
     query.set('listing_status', 'eq.approved');
@@ -203,6 +203,7 @@
 
         return {
           id: row.id,
+          photo_url: row.service_photo_url || null,
           title: row.title,
           description: row.description,
           category: row.category,

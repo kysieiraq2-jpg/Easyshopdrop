@@ -45,6 +45,7 @@ main{max-width:1100px;margin:auto;padding:18px}
 .search input,.search button{width:100%;margin:5px 0}
 }
 </style>
+<link rel="stylesheet" href="./shopdrop-unified-cards.css?v=52">
 </head>
 <body>
 <header>
@@ -158,6 +159,10 @@ function render(list,term=''){
 
   const heading=document.createElement('h3');
   heading.textContent=x.title||'Service';
+  const photo=document.createElement('img');
+  let imageValid=false;
+  try{const u=new URL(x.photo_url);imageValid=u.origin==='https://dtkdvvxpwonywtsgqmdx.supabase.co'&&u.pathname.startsWith('/storage/v1/object/public/');}catch(_){ }
+  if(imageValid){photo.src=x.photo_url;photo.alt='Service advertisement photograph';photo.loading='lazy';photo.className='shopdrop-service-photo';}
 
   const area=document.createElement('p');
   area.className='muted';
@@ -181,7 +186,9 @@ function render(list,term=''){
   notice.className='muted';
   notice.textContent='Published customer price includes the disclosed Shop&Drop marketplace service fee.';
 
-  el.append(heading,area,description,price,notice);
+  el.append(heading);
+  if(imageValid)el.append(photo);
+  el.append(area,description,price,notice);
   serviceResults.append(el);
  });
 }
@@ -428,5 +435,6 @@ search('');
 })();
 </script>
 
+<script defer src="./shopdrop-public-advertiser-ui.js?v=52"></script>
 </body>
 </html>

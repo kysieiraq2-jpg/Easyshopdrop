@@ -221,12 +221,14 @@
         );
       }
 
+      const offerGrid=createElement('div',null,'shopdrop-dispatch-offer-grid');
       offers.forEach(offer => {
         const card = createElement(
           'div',
           null,
           'panel'
         );
+        card.dataset.shopdropOfferId=offer.offer_id;
 
         card.append(
           createElement(
@@ -407,8 +409,9 @@
           status
         );
 
-        section.append(card);
+        offerGrid.append(card);
       });
+      section.append(offerGrid);
 
       container.append(section);
     });
