@@ -1,4 +1,46 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Checkout | Shop&Drop</title><style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;background:#f3f5f8;color:#17202a}header{background:#101827;color:white;padding:18px}header a{color:white;margin-right:20px}main{max-width:980px;margin:25px auto;padding:0 16px}.panel{background:white;padding:22px;border-radius:12px;margin:15px 0}button,input,select{padding:10px;margin:5px 0;border-radius:6px;border:1px solid #cbd5e1;max-width:100%}.panel input,.panel select{width:100%}.panel label{display:block;margin-top:6px}button{cursor:pointer;background:#0f766e;color:white}.muted{color:#64748b}.item{border-bottom:1px solid #eee;padding:12px 0}a{color:#0f766e}</style></head><body><header><a href="./index.html">Shop&Drop</a><a href="./checkout.html">Checkout</a><a href="./account.html">My Account</a></header><main><h1>Checkout</h1><section class="panel"><h2>Shopping bag</h2><div id="items"></div><h3 id="total"></h3><p id="quote" class="muted">Delivery fee: not quoted. Final payable total: unavailable.</p></section><section class="panel"><h2>Delivery address</h2><select id="addresses"><option value="">Choose address</option></select><p class="muted">Delivery: Shop&Drop will show courier options that are both supported from the seller origin and eligible for your destination. You choose the available service/price before payment. Seller-arranged courier remains a fallback where no integration exists.</p><input id="label" placeholder="Address label"><input id="recipient" placeholder="Recipient name"><input id="line1" placeholder="Street address"><input id="city" placeholder="City"><input id="region" placeholder="State / Province / Region"><input id="postal" placeholder="Postal / ZIP code"><label for="country">Country</label><select id="country"></select><p class="muted">For international purchases, Shop&Drop will use the item's physical dispatch origin plus your delivery country to determine eligible couriers, cross-border status, delivery cost and customs/import information before payment.</p><button onclick="saveAddress()">Save address</button></section><section class="panel" id="phase6PaymentMethods" aria-labelledby="phase6PaymentTitle">
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Checkout | Shop&Drop</title><style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;background:#f3f5f8;color:#17202a}header{background:#101827;color:white;padding:18px}header a{color:white;margin-right:20px}main{max-width:980px;margin:25px auto;padding:0 16px}.panel{background:white;padding:22px;border-radius:12px;margin:15px 0}button,input,select{padding:10px;margin:5px 0;border-radius:6px;border:1px solid #cbd5e1;max-width:100%}.panel input,.panel select{width:100%}.panel label{display:block;margin-top:6px}button{cursor:pointer;background:#0f766e;color:white}.muted{color:#64748b}.item{border-bottom:1px solid #eee;padding:12px 0}a{color:#0f766e}
+/* Fix55: clear delivery address controls, no empty select for new buyers */
+#deliveryAddressPanel label{display:block;margin:12px 0 5px;font-weight:700}
+#deliveryAddressPanel input,#deliveryAddressPanel select{display:block;width:100%;min-height:46px;padding:11px;border:1px solid #cbd5e1;border-radius:9px;box-sizing:border-box;background:#fff}
+#deliveryAddressPanel select:disabled{background:#f1f5f9;color:#334155;opacity:1}
+#deliveryAddressPanel button{margin:12px 9px 0 0;min-height:45px}
+#deliveryAddressPanel #addAnotherAddressButton,#deliveryAddressPanel #cancelAddAddress{background:#e2e8f0;color:#17202a}
+#deliveryAddressPanel #selectedAddressSummary{padding:12px;background:#f0fdfa;border:1px solid #99f6e4;border-radius:9px;font-weight:700}
+#deliveryAddressPanel #addressStatus{color:#0f766e;font-weight:600}
+#deliveryAddressPanel [hidden]{display:none!important}
+</style></head><body><header><a href="./index.html">Shop&Drop</a><a href="./checkout.html">Checkout</a><a href="./account.html">My Account</a></header><main><h1>Checkout</h1><section class="panel"><h2>Shopping bag</h2><div id="items"></div><h3 id="total"></h3><p id="quote" class="muted">Delivery fee: not quoted. Final payable total: unavailable.</p></section><section class="panel" id="deliveryAddressPanel">
+<h2>Where should we deliver?</h2>
+<p class="muted">Enter the address where you want to receive the parcel.</p>
+<div id="savedAddressArea" hidden>
+  <p id="selectedAddressSummary" role="status" aria-live="polite"></p>
+  <div id="savedAddressPicker" hidden>
+    <label for="addresses">Choose a saved delivery address</label>
+    <select id="addresses" aria-label="Choose a saved delivery address"></select>
+  </div>
+  <button id="addAnotherAddressButton" type="button">Add another delivery address</button>
+</div>
+<div id="newAddressFields">
+  <h3>Add your delivery address</h3>
+  <label for="label">Address type</label>
+  <select id="label"><option value="Home">Home</option><option value="Other">Other delivery address</option></select>
+  <label for="recipient">Person receiving the parcel</label>
+  <input id="recipient" autocomplete="shipping name" placeholder="Full name">
+  <label for="line1">House number and street</label>
+  <input id="line1" autocomplete="shipping address-line1" placeholder="Street address">
+  <label for="city">Town or city</label>
+  <input id="city" autocomplete="shipping address-level2" placeholder="Town or city">
+  <label for="region">Province (optional)</label>
+  <input id="region" autocomplete="shipping address-level1" placeholder="Province">
+  <label for="postal">Postal code (optional)</label>
+  <input id="postal" autocomplete="shipping postal-code" placeholder="Postal code">
+  <label for="country">Country</label>
+  <select id="country" disabled aria-label="South Africa"></select>
+  <button id="saveDeliveryAddressButton" type="button" onclick="saveAddress()">Save delivery address</button>
+  <button id="cancelAddAddress" type="button" hidden>Cancel</button>
+</div>
+<p id="addressStatus" role="status" aria-live="polite"></p>
+<p class="muted">Delivery options and the full payable price will appear before payment. Courier booking and payment are not yet active.</p>
+</section><section class="panel" id="phase6PaymentMethods" aria-labelledby="phase6PaymentTitle">
 <h2 id="phase6PaymentTitle">Payment method</h2>
 <label for="phase6PaymentMethod">Choose how you would like to pay</label>
 <select id="phase6PaymentMethod" name="payment_method" autocomplete="off">

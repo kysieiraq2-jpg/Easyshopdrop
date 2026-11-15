@@ -18,7 +18,7 @@
     if (error || !data?.user?.id) throw new Error('Sign in to view your shopping bag and addresses.');
     return {db, uid:data.user.id};
   }
-  async function load() {
+  async function load(preferredAddressId = '') {
     try {
       const {db,uid} = await current();
       const [c,a] = await Promise.all([
@@ -113,11 +113,25 @@
         ? 'Indicative product subtotal: ' + new Intl.NumberFormat(undefined,{style:'currency',currency:subtotalCurrency}).format(subtotal)
         : 'Product subtotal unavailable; check item availability and currency.';
       $('quote').textContent='Delivery fee and final payable total: not yet quoted.';
-      const select=$('addresses');select.replaceChildren(new Option('Choose delivery address',''));
-      for(const addr of a.data||[]){
-        select.add(new Option([addr.address_label,addr.address_line_1,addr.city,addr.country_code].filter(Boolean).join(' — '),addr.id));
-        if(addr.is_default) select.value=addr.id;
+      const saved=a.data||[];
+      const select=$('addresses');
+      const previous=preferredAddressId||select.value||'';
+      select.replaceChildren();
+      for(const addr of saved){
+        const shortLabel=[addr.address_label||'Delivery',addr.city].filter(Boolean).join(' — ');
+        select.add(new Option(shortLabel,addr.id));
       }
+      const chosen=saved.find(x=>x.id===previous)||saved.find(x=>x.is_default)||saved[0];
+      select.value=chosen?.id||'';
+      $('savedAddressArea').hidden=!chosen;
+      $('savedAddressPicker').hidden=saved.length<2;
+      $('selectedAddressSummary').textContent=chosen
+        ?'Deliver to: '+[chosen.address_label||'Delivery',chosen.city].filter(Boolean).join(' — ')
+        :'';
+      $('newAddressFields').hidden=Boolean(chosen);
+      $('cancelAddAddress').hidden=true;
+      $('previewOrderButton').disabled=!chosen;
+      $('addressStatus').textContent=chosen?'Your delivery address is selected.':'Enter your delivery address below, then tap Save delivery address.';
       say('One seller per checkout. You may purchase multiple items from this seller. Payment is not yet enabled.');
     } catch(e) {say('Cannot load cart/addresses: '+e.message);}
   }
@@ -133,16 +147,25 @@
     }catch(e){say('Cart update failed: '+e.message);}
   }
   async function saveAddress(){
+    const saveButton=$('saveDeliveryAddressButton');
+    if(saveButton.disabled)return;
+    saveButton.disabled=true;
     try{
       const {db,uid}=await current();
       const required=['recipient','line1','city','country'];
       if(required.some(id=>!$(id).value.trim()))throw new Error('Enter recipient, street, city and country.');
       const data={user_id:uid,address_label:$('label').value.trim()||'Delivery',recipient_name:$('recipient').value.trim(),address_line_1:$('line1').value.trim(),city:$('city').value.trim(),state_province:$('region').value.trim()||null,postal_code:$('postal').value.trim()||null,country_code:$('country').value.trim().toUpperCase(),is_default:false};
-      const {error}=await db.from('addresses').insert(data);
+      const {data:saved,error}=await db.from('addresses').insert(data).select('id').single();
       if(error)throw error;
+      if(!saved?.id)throw Error('Address save confirmation unavailable. Refresh before trying again.');
       window.ShopDropReservationCountdown?.clear?.();
-      await load();say('Delivery address saved. Payment remains disabled.');
-    }catch(e){say('Address save failed: '+e.message);}
+      await load(saved.id);
+      $('addressStatus').textContent='Address saved and selected.';
+      say('Delivery address saved. Payment remains disabled.');
+    }catch(e){
+      $('addressStatus').textContent='Address not saved: '+e.message;
+      say('Address save failed: '+e.message);
+    }finally{saveButton.disabled=false;}
   }
   let creatingOrder = false;
   let pendingOrderId = null;
@@ -227,6 +250,22 @@
   }
   const button=$('previewOrderButton');
   if(button) button.textContent='Create secure order';
+  $('addAnotherAddressButton').addEventListener('click',()=>{
+    $('newAddressFields').hidden=false;
+    $('cancelAddAddress').hidden=false;
+    if(button)button.disabled=true;
+    $('addressStatus').textContent='Enter another address, then tap Save delivery address.';
+  });
+  $('cancelAddAddress').addEventListener('click',()=>{
+    $('newAddressFields').hidden=true;
+    $('cancelAddAddress').hidden=true;
+    if(button)button.disabled=!$('addresses').value;
+    $('addressStatus').textContent='Your saved delivery address is selected.';
+  });
+  $('addresses').addEventListener('change',()=>{
+    const option=$('addresses').selectedOptions[0];
+    $('selectedAddressSummary').textContent=option?.value?'Deliver to: '+option.textContent:'Choose a delivery address';
+  });
   window.saveAddress=saveAddress;
   window.place=place;
   window.ShopDropPhase6CartAddress=Object.freeze({load,getPendingOrderId:()=>pendingOrderId});
