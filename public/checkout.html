@@ -8,6 +8,54 @@
 #deliveryAddressPanel #selectedAddressSummary{padding:12px;background:#f0fdfa;border:1px solid #99f6e4;border-radius:9px;font-weight:700}
 #deliveryAddressPanel #addressStatus{color:#0f766e;font-weight:600}
 #deliveryAddressPanel [hidden]{display:none!important}
+
+/* Fix62: Three door-to-door courier choices */
+.shopdrop-sa-courier-grid {
+  display:grid;
+  grid-template-columns:repeat(
+    auto-fit,minmax(145px,1fr)
+  );
+  gap:10px;
+  margin:12px 0;
+}
+
+.shopdrop-sa-courier-grid button {
+  width:100%;
+  min-width:0;
+  min-height:85px;
+  margin:0;
+  padding:12px;
+  background:#f0fdfa;
+  color:#134e4a;
+  border:1px solid #99d9cc;
+  border-radius:10px;
+  text-align:left;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+
+.shopdrop-sa-courier-grid strong {
+  display:block;
+  font-size:15px;
+}
+
+.shopdrop-sa-courier-grid small {
+  display:block;
+  margin-top:7px;
+  font-size:12px;
+  line-height:1.4;
+  color:#526273;
+}
+
+.shopdrop-sa-courier-grid button[aria-pressed="true"] {
+  background:#ccf5e7;
+  border:2px solid #0f766e;
+}
+
+.shopdrop-sa-courier-grid button:focus-visible {
+  outline:3px solid #0f766e;
+  outline-offset:2px;
+}
 </style></head><body><header><a href="./index.html">Shop&Drop</a><a href="./checkout.html">Checkout</a><a href="./account.html">My Account</a></header><main><h1>Checkout</h1><section class="panel"><h2>Shopping bag</h2><div id="items"></div><h3 id="total"></h3><p id="quote" class="muted">Delivery fee: not quoted. Final payable total: unavailable.</p></section><section class="panel" id="deliveryAddressPanel">
 <h2>Where should we deliver?</h2>
 <p class="muted">Enter the address where you want to receive the parcel.</p>
@@ -54,8 +102,20 @@
 <p class="muted" id="phase6PaymentNotice" role="status">Select a method to see the available choices. Payments are not active. Instant EFT will use an approved secure provider, never a direct transfer to Shop&amp;Drop. Do not send money or enter banking details.</p>
 </section><section class="panel" id="phase6CourierSearch" aria-labelledby="phase6CourierSearchTitle">
 <h2 id="phase6CourierSearchTitle">Find a courier</h2>
-<p class="muted">Search supported local or international couriers. Only verified couriers with a real quotation can be booked. No private addresses are shared during search.</p>
-<label for="phase6CourierQuery">Courier company</label>
+<p class="muted">Choose from three South African door-to-door courier companies. These options are for preview only until verified courier integrations are activated. Private buyer and seller addresses are not shared during this preview.</p>
+<div id="shopdropSaCourierPanel">
+    <h3>Door-to-door courier options</h3>
+    <p class="muted">Choose a preferred courier company. No live quotation or booking will be created.</p>
+    <div id="shopdropSaCourierGrid"
+         class="shopdrop-sa-courier-grid"
+         role="group"
+         aria-label="South African door-to-door couriers"></div>
+    <p id="shopdropSaCourierMessage"
+       class="muted"
+       role="status"
+       aria-live="polite"></p>
+    </div>
+    <label for="phase6CourierQuery">Search approved couriers</label>
 <input id="phase6CourierQuery" type="search" placeholder="Search courier name" autocomplete="off">
 <div id="phase6CourierResults" role="status" aria-live="polite"></div>
 <p class="muted" id="phase6CourierSelection">No courier selected. Live quotations and bookings are not enabled.</p>
@@ -74,5 +134,6 @@
 
 <section id="v262ReservationNote"><!-- V26_2_RESERVATION_NOTE --><p>Stock may be temporarily reserved while payment is pending. Unpaid reservations expire and stock is released automatically according to the configured backend reservation window.</p></section>
 <script src="./shopdrop-courier-search.js" defer></script>
+    <script src="./shopdrop-sa-courier-choices.js?v=62" defer></script>
 <script src="./shopdrop-courier-quote-bridge.js" defer></script>
 <script src="./shopdrop-a155-courier-quotes-ui.js" defer></script><script src="./shopdrop-checkout-countdown.js" defer></script><script defer src="shopdrop-buyer-language.js"></script><script defer src="shopdrop-form-language.js"></script></body></html>
