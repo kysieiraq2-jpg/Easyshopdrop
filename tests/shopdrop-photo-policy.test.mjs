@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { evaluateBasic, evaluateAdvanced } from '../supabase/functions/_shared/shopdrop-photo-policy.mjs';
+test('clean photo skips expensive examination',()=>assert.equal(evaluateBasic({text:''}).action,'basic_pass'));
+test('email rejected at low-cost stage',()=>assert.equal(evaluateBasic({text:'test@example.com'}).reason,'email_address'));
+test('telephone rejected at low-cost stage',()=>assert.equal(evaluateBasic({text:'Call 082 123 4567'}).reason,'telephone_number'));
+test('international telephone rejected',()=>assert.equal(evaluateBasic({text:'Call +27 82 123 4567'}).reason,'telephone_number'));
+test('URL rejected at low-cost stage',()=>assert.equal(evaluateBasic({text:'www.shop.co.za'}).reason,'website'));
+test('address rejected',()=>assert.equal(evaluateBasic({text:'10 Long Street'}).reason,'street_address'));
+test('social media rejected',()=>assert.equal(evaluateBasic({text:'@directseller'}).reason,'social_handle'));
+test('promotional text rejected',()=>assert.equal(evaluateBasic({text:'Best furniture sales direct'}).reason,'advertising_or_extended_text'));
+test('short writing flagged for expensive check',()=>assert.equal(evaluateBasic({text:'TOYOTA'}).action,'advanced'));
+test('low confidence flagged for expensive check',()=>assert.equal(evaluateBasic({lowConfidence:true}).action,'advanced'));
+test('image text regions flagged for expensive check',()=>assert.equal(evaluateBasic({textRegions:1}).action,'advanced'));
+test('advanced clear accepted provisionally',()=>assert.equal(evaluateAdvanced({text:'',logos:[]}).action,'advanced_pass'));
+test('advanced ambiguous rejected',()=>assert.equal(evaluateAdvanced({text:'call me'}).action,'reject'));
+test('advanced business logo rejected',()=>assert.equal(evaluateAdvanced({logos:['Plumbing Inc']}).action,'reject'));
+test('QR/barcode rejected',()=>assert.equal(evaluateBasic({barcodeDetected:true}).action,'reject'));
