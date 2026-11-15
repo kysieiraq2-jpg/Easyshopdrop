@@ -1,9 +1,10 @@
 // Shop&Drop Phase 6C A72 — payment selection boundary. No live payments.
 (function(){
   'use strict';
-  const allowed = new Set(['visa_debit','visa_credit','mastercard_debit','mastercard_credit','paypal_wallet']);
+  const allowed = new Set(['visa_debit','visa_credit','mastercard_debit','mastercard_credit','instant_eft']);
   function read(){
     const el=document.getElementById('phase6PaymentMethod');
+    if (!el || el.disabled) return null;
     const method_code=el?.value || '';
     if(!allowed.has(method_code)) return null;
     const country_code=String(document.getElementById('country')?.value || '').trim().toUpperCase();

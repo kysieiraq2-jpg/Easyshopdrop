@@ -43,15 +43,15 @@
 </section><section class="panel" id="phase6PaymentMethods" aria-labelledby="phase6PaymentTitle">
 <h2 id="phase6PaymentTitle">Payment method</h2>
 <label for="phase6PaymentMethod">Choose how you would like to pay</label>
-<select id="phase6PaymentMethod" name="payment_method" autocomplete="off">
+<select id="phase6PaymentMethod" name="payment_method" autocomplete="off" disabled aria-describedby="phase6PaymentNotice">
 <option value="">Select payment method</option>
 <option value="visa_debit">Visa debit card</option>
 <option value="visa_credit">Visa credit card</option>
 <option value="mastercard_debit">Mastercard debit card</option>
 <option value="mastercard_credit">Mastercard credit card</option>
-<option value="paypal_wallet">PayPal</option>
+<option value="instant_eft">Instant EFT (secure bank payment)</option>
 </select>
-<p class="muted" id="phase6PaymentNotice" role="status">Payment methods are being integrated. No provider is active and no payment will be collected on this page.</p>
+<p class="muted" id="phase6PaymentNotice" role="status">Payment choices are shown for information only. Instant EFT, Visa and Mastercard are not yet enabled. After provider approval, Instant EFT will use a secure payment provider, not a transfer to a Shop&amp;Drop bank account. Do not send any money now.</p>
 </section><section class="panel" id="phase6CourierSearch" aria-labelledby="phase6CourierSearchTitle">
 <h2 id="phase6CourierSearchTitle">Find a courier</h2>
 <p class="muted">Search supported local or international couriers. Only verified couriers with a real quotation can be booked. No private addresses are shared during search.</p>
