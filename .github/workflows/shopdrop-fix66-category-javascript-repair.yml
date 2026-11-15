@@ -1,1 +1,172 @@
 
+name: ShopDrop Fix66 - Repair Seller Categories
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix66-category-javascript-repair.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  repair-and-deploy:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Repair broken JavaScript string
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path=Path("public/sell-item.html")
+          code=path.read_text(encoding="utf-8")
+
+          broken="""listing_reference,created_at,
+          shipping_weight_kg,shipping_length_cm,
+          shipping_width_cm,shipping_height_cm'"""
+
+          fixed="""listing_reference,created_at,shipping_weight_kg,shipping_length_cm,shipping_width_cm,shipping_height_cm'"""
+
+          if code.count(broken)!=1:
+              raise SystemExit(
+                  "SAFETY STOP: expected broken query not found exactly once"
+              )
+
+          code=code.replace(broken,fixed,1)
+
+          required=[
+              "fetch(",
+              "./taxonomy.json",
+              "fillSubcategories(",
+              "departmentSubs.set(",
+              "shopdrop-product-photos.js",
+              "shopdrop-quick-publish",
+              "resumeItem(product)",
+              "photos.attach(",
+              "shippingWeightKg",
+              "shippingLengthCm",
+              "shippingWidthCm",
+              "shippingHeightCm"
+          ]
+
+          for token in required:
+              if token not in code:
+                  raise SystemExit(
+                      "SAFETY STOP: missing existing code: "+token
+                  )
+
+          path.write_text(code,encoding="utf-8")
+
+          print("PASS: Broken JavaScript string repaired")
+          print("PASS: Existing functions retained")
+          PY
+
+      - name: Verify JavaScript and categories
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          import re
+
+          page=Path("public/sell-item.html").read_text(
+              encoding="utf-8"
+          )
+
+          scripts=re.findall(
+              r'<script\b[^>]*>(.*?)</script\s*>',
+              page,
+              flags=re.S|re.I
+          )
+
+          assert len(scripts)==1, (
+              "Unexpected inline script count"
+          )
+
+          Path("/tmp/shopdrop-fix66-check.mjs").write_text(
+              scripts[0],encoding="utf-8"
+          )
+
+          taxonomy=json.loads(
+              Path("public/taxonomy.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+
+          assert taxonomy.get("departments"), (
+              "Category data missing"
+          )
+
+          assert any(
+              d.get("subcategories")
+              for d in taxonomy["departments"]
+          ), "Subcategories missing"
+
+          assert page.count(
+              "shipping_weight_kg"
+          )>=1
+
+          print("PASS: Category data exists")
+          print("PASS: Subcategory data exists")
+          PY
+
+          node --check /tmp/shopdrop-fix66-check.mjs
+
+          git diff --check
+
+          changed="$(git diff --name-only)"
+          test "$changed" = "public/sell-item.html"
+
+          echo "PASS: JavaScript syntax valid"
+          echo "PASS: Only seller page modified"
+
+      - name: Commit repair
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add public/sell-item.html
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "Fix66 repair seller category JavaScript"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload complete website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy repaired website
+        id: deployment
+        uses: actions/deploy-pages@v4
+
