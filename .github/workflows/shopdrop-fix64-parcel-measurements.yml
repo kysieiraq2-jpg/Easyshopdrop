@@ -1,1 +1,261 @@
 
+name: ShopDrop Fix64 - Packed Parcel Measurements
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix64-parcel-measurements.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: shopdrop-fix64
+  cancel-in-progress: false
+
+jobs:
+  fix-parcel-measurements:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Preserve existing code and apply Fix64
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("public/sell-item.html")
+          original = path.read_text(encoding="utf-8")
+          code = original
+
+          def replace_once(old, new):
+              global code
+              count = code.count(old)
+              if count != 1:
+                  raise SystemExit(
+                      "SAFETY STOP: expected exactly one "
+                      "matching section, found " + str(count)
+                  )
+              code = code.replace(old, new, 1)
+
+          # Never apply the same patch twice.
+          if 'id="shippingWeightKg"' in code:
+              raise SystemExit(
+                  "SAFETY STOP: parcel fields already exist"
+              )
+
+          # Preserve existing form and photo controls.
+          replace_once(
+              '<h2>Photos (1–6)</h2>',
+              '''<h2>Packed parcel measurements</h2>
+          <p class="muted">
+          Measure the item after packing it securely.
+          These measurements help calculate courier
+          delivery charges. Enter the complete packed
+          parcel size, not only the item's size.
+          </p>
+
+          <label for="shippingWeightKg">
+          Packed weight (kg)</label>
+          <input id="shippingWeightKg"
+                 type="number"
+                 min="0.01" max="10000"
+                 step="any" inputmode="decimal"
+                 required placeholder="e.g. 2.5">
+
+          <label for="shippingLengthCm">
+          Packed length (cm)</label>
+          <input id="shippingLengthCm"
+                 type="number"
+                 min="0.1" max="10000"
+                 step="any" inputmode="decimal"
+                 required placeholder="e.g. 45">
+
+          <label for="shippingWidthCm">
+          Packed width (cm)</label>
+          <input id="shippingWidthCm"
+                 type="number"
+                 min="0.1" max="10000"
+                 step="any" inputmode="decimal"
+                 required placeholder="e.g. 30">
+
+          <label for="shippingHeightCm">
+          Packed height (cm)</label>
+          <input id="shippingHeightCm"
+                 type="number"
+                 min="0.1" max="10000"
+                 step="any" inputmode="decimal"
+                 required placeholder="e.g. 20">
+
+          <p class="muted">
+          The final courier quotation will be confirmed
+          when approved courier services are activated.
+          </p>
+          </section>
+
+          <section>
+          <h2>Photos (1–6)</h2>'''
+          )
+
+          # Recover measurements with unfinished listings.
+          replace_once(
+              'listing_reference,created_at',
+              '''listing_reference,created_at,
+          shipping_weight_kg,shipping_length_cm,
+          shipping_width_cm,shipping_height_cm'''
+          )
+
+          replace_once(
+              "$('town').value=product.location||'';",
+              """$('town').value=product.location||'';
+              $('shippingWeightKg').value=
+                product.shipping_weight_kg??'';
+              $('shippingLengthCm').value=
+                product.shipping_length_cm??'';
+              $('shippingWidthCm').value=
+                product.shipping_width_cm??'';
+              $('shippingHeightCm').value=
+                product.shipping_height_cm??'';"""
+          )
+
+          # Validate values before saving a product.
+          replace_once(
+              'if(!pendingId){',
+              '''const parcelFields=[
+                ['shippingWeightKg','Packed weight'],
+                ['shippingLengthCm','Packed length'],
+                ['shippingWidthCm','Packed width'],
+                ['shippingHeightCm','Packed height']
+              ];
+
+              const parcelValues={};
+              const parcelColumns=[
+                'shipping_weight_kg',
+                'shipping_length_cm',
+                'shipping_width_cm',
+                'shipping_height_cm'
+              ];
+
+              parcelFields.forEach(([id,label],index)=>{
+                const input=$(id);
+                const value=Number(input.value);
+                if(!input.value.trim() ||
+                   !Number.isFinite(value) ||
+                   value<=0 ||
+                   value>Number(input.max)){
+                  throw Error(
+                    label+' must be a valid positive number.'
+                  );
+                }
+                parcelValues[parcelColumns[index]]=value;
+              });
+
+              if(!pendingId){'''
+          )
+
+          # Save measurements with a new listing.
+          replace_once(
+              "listing_status:'pending'\n",
+              """listing_status:'pending',
+              ...parcelValues
+          """
+          )
+
+          # Preserve existing recovery/update functionality.
+          replace_once(
+              "location:$('town').value.trim()||null\n",
+              """location:$('town').value.trim()||null,
+              ...parcelValues
+          """
+          )
+
+          # Ensure the patch did not remove existing functions.
+          required = [
+              "shopdrop-product-photos.js",
+              "shopdrop-quick-publish",
+              "listing_images",
+              "photos.attach(",
+              "photos.setPending(",
+              "loadUnfinished(user)",
+              "resumeItem(product)",
+              "shipping_weight_kg",
+              "shipping_length_cm",
+              "shipping_width_cm",
+              "shipping_height_cm",
+              "listing_reference"
+          ]
+
+          for token in required:
+              if token not in code:
+                  raise SystemExit(
+                      "SAFETY STOP: missing " + token
+                  )
+
+          if original == code:
+              raise SystemExit("No changes detected")
+
+          path.write_text(code, encoding="utf-8")
+          print("PASS: Fix64 applied to active seller form")
+          print("PASS: Existing photo and recovery code kept")
+          PY
+
+          git diff --check
+
+      - name: Verify only approved file changed
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          changed="$(git diff --name-only)"
+          test "$changed" = "public/sell-item.html"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          code=Path(
+              "public/sell-item.html"
+          ).read_text(encoding="utf-8")
+
+          fields=[
+              "shippingWeightKg",
+              "shippingLengthCm",
+              "shippingWidthCm",
+              "shippingHeightCm"
+          ]
+
+          for field in fields:
+              assert 'id="'+field+'"' in code
+              assert code.count('id="'+field+'"')==1
+
+          assert "shopdrop-quick-publish" in code
+          assert "photos.attach(" in code
+          assert "resumeItem(product)" in code
+
+          print("PASS: All four measurements present")
+          print("PASS: Publication and recovery preserved")
+          PY
+
+      - name: Commit Fix64
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add public/sell-item.html
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "Fix64 add packed parcel measurements"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
