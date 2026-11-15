@@ -1,1 +1,105 @@
 
+name: ShopDrop Fix56 - Delivery Address Wording
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix56-address-wording.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  correct-wording:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch only
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Correct delivery address wording only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          path = Path('public/shopdrop-cart-address-bridge.js')
+          expected = 'adf0325159ea237f15c8d189778afcd3306fb80a'
+
+          actual = subprocess.check_output(
+              ['git', 'hash-object', str(path)],
+              text=True
+          ).strip()
+
+          if actual != expected:
+              raise SystemExit('STOP: Address script has changed.')
+
+          content = path.read_text(encoding='utf-8')
+
+          corrections = [
+              (
+                  'Enter your delivery address below, then tap Save delivery address.',
+                  'Complete the address fields above, then tap Save delivery address.'
+              ),
+              (
+                  'Enter another address, then tap Save delivery address.',
+                  'Complete the new address fields above, then tap Save delivery address.'
+              )
+          ]
+
+          for old, new in corrections:
+              if content.count(old) != 1:
+                  raise SystemExit('STOP: Expected wording changed.')
+              content = content.replace(old, new, 1)
+
+          assert "Address saved and selected." in content
+          assert "await load(saved.id);" in content
+          assert "ShopDropCheckoutConnector.createOrder" in content
+
+          path.write_text(content, encoding='utf-8')
+          print('PASS: Address instructions corrected.')
+          print('PASS: Address saving and checkout preserved.')
+          PY
+
+          node --check public/shopdrop-cart-address-bridge.js
+          git diff --check
+
+      - name: Commit wording correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add public/shopdrop-cart-address-bridge.js
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix56 clarify delivery address instructions'
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure website
+        uses: actions/configure-pages@v5
+
+      - name: Upload website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy corrected wording
+        id: deployment
+        uses: actions/deploy-pages@v4
+
