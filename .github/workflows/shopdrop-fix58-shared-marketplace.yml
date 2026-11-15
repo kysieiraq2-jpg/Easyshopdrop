@@ -1,1 +1,424 @@
 
+name: ShopDrop Fix58 - Consistent Listings and Payment Preview
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix58-shared-marketplace.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  update-shared-marketplace:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch only
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Apply guarded common layout and payment preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          guards = {
+              'public/checkout.html':'a9b08cb3e1f5fe99104bf7aa88cc92bf026feaf0',
+              'public/shopdrop-payment-selection.js':'b69f2f78b0048031ca3294a6612d92f6030cad0e',
+              'public/services.html':'d1116b8014a25bc236009fdf8cb6434f72eb4cfc',
+              'public/dispatching.html':'49ce1d362e5237c9e2fc6b4e284c70c7a553501e',
+              'public/shopdrop-public-advertiser-ui.js':'431aba49e128ce8c4cedfc3e23a6805137282d8a',
+              'public/shopdrop-unified-cards.css':'d22f77025a91be116270fb1e2caf8d78661f4ba2',
+              'public/index.html':'593f40afb798d200c893da8d60aa5aff4cfaa302',
+              'public/categories.html':'f1def589d0498efeb37cc408e3abd119b84b7401',
+              'public/category-results.html':'68ac8910c7487b77be9bf32f080b194ee41e28fd',
+              'public/seller-products.html':'2ea40464702354aa380fb2eca195eb756127963d',
+              'public/product.html':'8a48940ae02a4722a6629e1ed1464481cb6b05f5',
+          }
+
+          for filename, expected in guards.items():
+              sha = subprocess.check_output(
+                  ['git','hash-object',filename],text=True
+              ).strip()
+              if sha != expected:
+                  raise SystemExit('STOP: File changed: '+filename)
+
+          new_file = Path('public/shopdrop-payment-preview.js')
+          if new_file.exists():
+              raise SystemExit('STOP: Shared payment preview already exists')
+
+          def change(s, old, new, label):
+              if s.count(old) != 1:
+                  raise SystemExit('STOP: Changed source at '+label)
+              return s.replace(old, new, 1)
+
+          checkout = Path('public/checkout.html')
+          s = checkout.read_text(encoding='utf-8')
+
+          s = change(s,
+              '<select id="phase6PaymentMethod" name="payment_method" autocomplete="off" disabled aria-describedby="phase6PaymentNotice">',
+              '<select id="phase6PaymentMethod" name="payment_method" autocomplete="off" aria-describedby="phase6PaymentNotice">',
+              'product payment dropdown')
+
+          s = change(s,
+              'Choose how you would like to pay',
+              'Choose a payment method (preview only)',
+              'payment label')
+
+          s = change(s,
+              'Payment choices are shown for information only. Instant EFT, Visa and Mastercard are not yet enabled. After provider approval, Instant EFT will use a secure payment provider, not a transfer to a Shop&amp;Drop bank account. Do not send any money now.',
+              'Select a method to see the available choices. Payments are not active. Instant EFT will use an approved secure provider, never a direct transfer to Shop&amp;Drop. Do not send money or enter banking details.',
+              'inactive checkout wording')
+
+          checkout.write_text(s,encoding='utf-8')
+
+          selector = Path('public/shopdrop-payment-selection.js')
+          s = selector.read_text(encoding='utf-8')
+
+          s = change(s,
+              '  function read(){',
+              '  const PAYMENTS_ENABLED = false;\n  function read(){',
+              'preview payment gate')
+
+          s = change(s,
+              '    if (!el || el.disabled) return null;',
+              '    if (!el || el.disabled || !PAYMENTS_ENABLED) return null;',
+              'prevent live payment selection')
+
+          s = change(s,
+              '  window.ShopDropPaymentSelection=Object.freeze({read});',
+              '''  window.ShopDropPaymentSelection=Object.freeze({read});
+              function mountPreview(){
+                const select=document.getElementById('phase6PaymentMethod');
+                const note=document.getElementById('phase6PaymentNotice');
+                if(!select||!note)return;
+                select.addEventListener('change',()=>{
+                  const name=select.selectedOptions[0]?.textContent||'';
+                  note.textContent=select.value
+                    ?'Selected for preview: '+name+'. No payment can be made yet. Do not transfer money.'
+                    :'Select a method to preview. Payments are not active.';
+                });
+              }
+              if(document.readyState==='loading')
+                document.addEventListener('DOMContentLoaded',mountPreview,{once:true});
+              else mountPreview();''',
+              'safe product payment preview')
+
+          selector.write_text(s,encoding='utf-8')
+
+          payment_panel = '''<section class="panel shopdrop-payment-preview" data-shopdrop-payment-preview="DIVISION">
+          <h2>Payment methods — preview only</h2>
+          <p>Visa, Mastercard and Instant EFT are planned for this division. Payment is not active, and no banking details or money are required.</p>
+          <div class="shopdrop-preview-controls"></div>
+          </section>
+          '''
+
+          for filename,division,anchor in (
+              (
+                  'public/services.html',
+                  'service',
+                  '<section class="panel">\n<h2>How an Other Service booking works</h2>'
+              ),
+              (
+                  'public/dispatching.html',
+                  'dispatch',
+                  '<section class="panel">\n<h2>How the transaction works</h2>'
+              )
+          ):
+              p=Path(filename)
+              html=p.read_text(encoding='utf-8')
+              html=change(
+                  html,
+                  anchor,
+                  payment_panel.replace('DIVISION',division)+anchor,
+                  division+' booking preview placement'
+              )
+              html=change(
+                  html,
+                  '</body>',
+                  '<script defer src="./shopdrop-payment-preview.js?v=59"></script>\n</body>',
+                  division+' shared payment preview'
+              )
+              p.write_text(html,encoding='utf-8')
+
+          shared=Path('public/shopdrop-public-advertiser-ui.js')
+          s=shared.read_text(encoding='utf-8')
+
+          s=change(
+              s,
+              ' function present(element,kind,row){',
+              ''' function syncProductDetailIdentity(){
+                const detail=document.getElementById('detail');
+                const gallery=detail?.querySelector('section[aria-label="Product photographs"]');
+                const source=document.getElementById('shopdropSellerAliasContent')?.querySelector('.shopdrop-public-identity');
+                if(!gallery||!source||detail.querySelector('.shopdrop-detail-advertiser'))return;
+                const banner=source.cloneNode(true);
+                banner.classList.add('shopdrop-detail-advertiser','shopdrop-identity-top');
+                gallery.before(banner);
+              }
+              function present(element,kind,row){''',
+              'seller name above full product gallery'
+          )
+
+          s=change(
+              s,
+              '   if(content){content.replaceChildren(box);element.hidden=false;}',
+              '   if(content){content.replaceChildren(box);element.hidden=false;syncProductDetailIdentity();}',
+              'seller name detail link'
+          )
+
+          s=change(
+              s,
+              '   if(heading)heading.after(box);else element.append(box);',
+              '   element.prepend(box);',
+              'seller or provider name first on every card'
+          )
+
+          s=change(
+              s,
+              '  }\n }\n function schedule(){',
+              '  }\n  syncProductDetailIdentity();\n }\n function schedule(){',
+              'handle asynchronous gallery loading'
+          )
+
+          shared.write_text(s,encoding='utf-8')
+
+          css=Path('public/shopdrop-unified-cards.css')
+          s=css.read_text(encoding='utf-8')
+
+          s+='''
+          /* Fix58: same identity-first treatment across marketplace cards. */
+          .shopdrop-public-identity.shopdrop-identity-top,
+          .shopdrop-dispatch-offer-grid .shopdrop-public-identity,
+          #results .shopdrop-public-identity,
+          #items .shopdrop-public-identity,
+          #productGrid .shopdrop-public-identity,
+          #shopdropPublicProductResults .shopdrop-public-identity,
+          #sellerProducts .shopdrop-public-identity{
+            background:#f0fdfa;
+            border:1px solid #99f6e4;
+            border-radius:8px;
+            margin:0 0 9px;
+            padding:8px;
+            overflow-wrap:anywhere;
+          }
+          .shopdrop-public-identity strong{font-weight:800}
+          #detail .shopdrop-detail-advertiser{margin:12px 0}
+          .shopdrop-payment-preview label{
+            display:block;
+            font-weight:700;
+            margin:12px 0 6px;
+          }
+          .shopdrop-payment-preview select{
+            width:100%;
+            min-height:45px;
+            padding:10px;
+            border:1px solid #cbd5e1;
+            border-radius:8px;
+            background:#fff;
+          }
+          .shopdrop-payment-preview .shopdrop-preview-status{
+            font-weight:600;
+            color:#0f766e;
+          }
+          '''
+
+          css.write_text(s,encoding='utf-8')
+
+          for filename in (
+              'index','categories','category-results',
+              'seller-products','services','dispatching','product'
+          ):
+              p=Path('public/'+filename+'.html')
+              h=p.read_text(encoding='utf-8')
+
+              h=change(
+                  h,
+                  'shopdrop-public-advertiser-ui.js?v=52',
+                  'shopdrop-public-advertiser-ui.js?v=59',
+                  filename+' identity cache'
+              )
+
+              if filename=='product':
+                  h=change(
+                      h,
+                      '</style></head>',
+                      '</style><link rel="stylesheet" href="./shopdrop-unified-cards.css?v=59"></head>',
+                      'product detail styling'
+                  )
+              else:
+                  h=change(
+                      h,
+                      'shopdrop-unified-cards.css?v=52',
+                      'shopdrop-unified-cards.css?v=59',
+                      filename+' style cache'
+                  )
+
+              p.write_text(h,encoding='utf-8')
+
+          print('PASS: Shared payment previews and listing identities patched')
+          PY
+
+          cat > public/shopdrop-payment-preview.js <<'JS'
+          /* Shared payment preview for services and dispatch.
+             Never submits booking, payment, card or bank information. */
+          (()=>{
+            'use strict';
+
+            const methods=[
+              ['visa_debit','Visa debit card'],
+              ['visa_credit','Visa credit card'],
+              ['mastercard_debit','Mastercard debit card'],
+              ['mastercard_credit','Mastercard credit card'],
+              ['instant_eft','Instant EFT (secure bank payment)']
+            ];
+
+            function mount(){
+              document.querySelectorAll(
+                '[data-shopdrop-payment-preview]'
+              ).forEach(panel=>{
+                const controls=panel.querySelector(
+                  '.shopdrop-preview-controls'
+                );
+
+                if(!controls||controls.dataset.ready==='yes')return;
+                controls.dataset.ready='yes';
+
+                const label=document.createElement('label');
+                label.textContent='Choose a future payment method (preview)';
+
+                const select=document.createElement('select');
+                select.setAttribute(
+                  'aria-label','Payment method preview only'
+                );
+                select.append(new Option('Select payment method',''));
+
+                for(const [code,name] of methods){
+                  select.add(new Option(name,code));
+                }
+
+                const status=document.createElement('p');
+                status.className='shopdrop-preview-status';
+                status.setAttribute('role','status');
+                status.textContent='Payment is not enabled. Do not transfer money.';
+
+                select.addEventListener('change',()=>{
+                  status.textContent=select.value
+                    ?'Preview: '+select.selectedOptions[0].textContent+
+                     '. No payment will be collected.'
+                    :'Payment is not enabled. Do not transfer money.';
+                });
+
+                controls.append(label,select,status);
+              });
+            }
+
+            if(document.readyState==='loading'){
+              document.addEventListener(
+                'DOMContentLoaded',mount,{once:true}
+              );
+            }else{
+              mount();
+            }
+          })();
+          JS
+
+          node --check public/shopdrop-payment-selection.js
+          node --check public/shopdrop-public-advertiser-ui.js
+          node --check public/shopdrop-payment-preview.js
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,subprocess
+
+          for name in ('checkout','services','dispatching','product'):
+              text=Path('public/'+name+'.html').read_text(encoding='utf-8')
+              for script in re.findall(
+                  r'<script(?:\s+[^>]*)?>([\s\S]*?)</script>',
+                  text,re.I
+              ):
+                  if script.strip():
+                      subprocess.run(
+                          (
+                              ['node','--input-type=module','--check']
+                              if re.search(
+                                  r'(?m)^\s*(?:import\s|export\s)',script
+                              )
+                              else ['node','--check']
+                          ),
+                          input=script,text=True,check=True
+                      )
+
+          payment=Path('public/shopdrop-payment-selection.js').read_text()
+          assert 'PAYMENTS_ENABLED = false' in payment
+          assert '!PAYMENTS_ENABLED' in payment
+          assert 'paypal_wallet' not in payment
+          assert 'instant_eft' in payment
+
+          ui=Path('public/shopdrop-public-advertiser-ui.js').read_text()
+          assert 'syncProductDetailIdentity' in ui
+          assert 'element.prepend(box);' in ui
+
+          for division in ('services','dispatching'):
+              page=Path('public/'+division+'.html').read_text()
+              assert 'shopdrop-payment-preview.js?v=59' in page
+              assert 'data-shopdrop-payment-preview' in page
+
+          assert Path('public/category-results.html').read_text().count(
+              'shopdrop-public-advertiser-ui.js?v=59'
+          )==1
+
+          print('PASS: Shared identity, inactive payment previews and page checks')
+          PY
+
+          git diff --check
+
+      - name: Commit only shared frontend corrections
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add public/checkout.html public/shopdrop-payment-selection.js
+          git add public/services.html public/dispatching.html
+          git add public/shopdrop-public-advertiser-ui.js
+          git add public/shopdrop-unified-cards.css
+          git add public/shopdrop-payment-preview.js
+          git add public/index.html public/categories.html
+          git add public/category-results.html public/seller-products.html
+          git add public/product.html
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix58 align listing identities and inactive payment previews'
+
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure integrated website
+        uses: actions/configure-pages@v5
+
+      - name: Upload verified website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy shared marketplace experience
+        id: deployment
+        uses: actions/deploy-pages@v4
+
