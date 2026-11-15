@@ -1,1 +1,356 @@
 
+name: ShopDrop Fix63 - Courier Links and Parcel Instructions
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix63-courier-links.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  correct-courier-interface:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Update courier links and seller instructions
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          expected = {
+            'public/checkout.html':
+              '3295e6e4cbf57c34ec2118208317ae2583c3126d',
+            'public/shopdrop-sa-courier-choices.js':
+              'c118df440cda6a15c96bc0e6659df379052e56f7',
+            'public/shopdrop-a155-courier-quotes-ui.js':
+              '7007fca642258a87008eee3337b7ab985577a2d1',
+            'public/seller.html':
+              'dbb23182f6b0f81f7f424342562dcefcdda5bf2a',
+          }
+
+          for filename, sha in expected.items():
+            actual = subprocess.check_output(
+              ['git', 'hash-object', filename],
+              text=True
+            ).strip()
+
+            if actual != sha:
+              raise SystemExit(
+                'STOP: Source changed: ' + filename
+              )
+
+          def replace_once(source, old, new, label):
+            if source.count(old) != 1:
+              raise SystemExit(
+                'STOP: Unexpected source at ' + label
+              )
+            return source.replace(old, new, 1)
+
+          # Checkout: only the three approved shortlist cards.
+          page = Path('public/checkout.html')
+          html = page.read_text(encoding='utf-8')
+
+          html = replace_once(
+            html,
+            'Choose from three South African door-to-door courier companies. These options are for preview only until verified courier integrations are activated. Private buyer and seller addresses are not shared during this preview.',
+            'These are the three South African door-to-door courier companies shortlisted by Shop&Drop. Their official websites are available for information only. Shop&Drop bookings, payments and verified pickup tracking are not active yet.',
+            'courier explanation'
+          )
+
+          html = replace_once(
+            html,
+            'Choose a preferred courier company. No live quotation or booking will be created.',
+            'Tap a company to visit its official website. Do not book or pay directly, or enter buyer or seller details. Shop&Drop must arrange verified courier bookings after activation.',
+            'courier link instructions'
+          )
+
+          html = replace_once(
+            html,
+            '    <label for="phase6CourierQuery">Search approved couriers</label>\n<input id="phase6CourierQuery" type="search" placeholder="Search courier name" autocomplete="off">\n',
+            '',
+            'remove unrestricted courier search'
+          )
+
+          html = replace_once(
+            html,
+            '<script src="./shopdrop-courier-search.js" defer></script>\n    <script src="./shopdrop-sa-courier-choices.js?v=62" defer></script>',
+            '<script src="./shopdrop-sa-courier-choices.js?v=63" defer></script>',
+            'courier script references'
+          )
+
+          html = replace_once(
+            html,
+            'No courier selected. Live quotations and bookings are not enabled.',
+            'Courier quotations, bookings and pickup tracking will be available after approved provider activation.',
+            'inactive courier explanation'
+          )
+
+          html = replace_once(
+            html,
+            '.shopdrop-sa-courier-grid button {',
+            '.shopdrop-sa-courier-grid a {',
+            'courier cards as links'
+          )
+
+          html = replace_once(
+            html,
+            '.shopdrop-sa-courier-grid button[aria-pressed="true"] {',
+            '.shopdrop-sa-courier-grid a:hover {',
+            'link hover style'
+          )
+
+          html = replace_once(
+            html,
+            '.shopdrop-sa-courier-grid button:focus-visible {',
+            '.shopdrop-sa-courier-grid a:focus-visible {',
+            'link focus style'
+          )
+
+          html = replace_once(
+            html,
+            '.shopdrop-sa-courier-grid a {\n  width:100%;',
+            '.shopdrop-sa-courier-grid a {\n  display:block;\n  text-decoration:none;\n  width:100%;',
+            'full courier link card'
+          )
+
+          html = replace_once(
+            html,
+            '</style></head>',
+            '''
+          #phase6CourierSearch button:disabled {
+            background:#e2e8f0;
+            color:#64748b;
+            border-color:#cbd5e1;
+            cursor:not-allowed;
+          }
+          </style></head>''',
+            'disabled quotation appearance'
+          )
+
+          page.write_text(html, encoding='utf-8')
+
+          # Existing courier quotation function retained,
+          # but unavailable while providers are inactive.
+          quote = Path(
+            'public/shopdrop-a155-courier-quotes-ui.js'
+          )
+
+          script = quote.read_text(encoding='utf-8')
+
+          script = replace_once(
+            script,
+            "button.type='button';button.textContent='Get courier quotes for my order';",
+            """button.type='button';
+          button.textContent='Get courier quotes for my order (not active)';
+          button.disabled=true;
+          button.title='Available only after approved courier providers are connected.';""",
+            'inactive live courier quotations'
+          )
+
+          quote.write_text(script, encoding='utf-8')
+
+          # Seller parcel measurements are already connected
+          # to Supabase. Correct outdated helper wording.
+          seller = Path('public/seller.html')
+          seller_html = seller.read_text(encoding='utf-8')
+
+          seller_html = replace_once(
+            seller_html,
+            'Measure the item after packing. Values are in kilograms and centimetres. The listing submission includes these measurements, but the legacy API must be connected to Supabase before they can be saved. Courier quotations remain disabled until verified.',
+            'Enter the weight, length, width and height of the packed parcel. Weight is in kilograms; all dimensions are in centimetres. Shop&Drop saves these measurements with the product listing and uses them when calculating verified courier quotations after provider activation.',
+            'parcel measurement instructions'
+          )
+
+          seller.write_text(
+            seller_html, encoding='utf-8'
+          )
+
+          # Protect existing checkout and measurement fields.
+          updated = page.read_text(encoding='utf-8')
+
+          assert 'id="shopdropSaCourierGrid"' in updated
+          assert 'id="phase6CourierQuery"' not in updated
+          assert 'shopdrop-courier-search.js" defer' not in updated
+          assert 'shopdrop-sa-courier-choices.js?v=63' in updated
+
+          for element in (
+            'phase6CourierResults',
+            'phase6CourierSelection',
+            'deliveryAddressPanel',
+            'phase6PaymentMethod'
+          ):
+            assert 'id="' + element + '"' in updated
+
+          for element in (
+            'shippingWeightKg',
+            'shippingLengthCm',
+            'shippingWidthCm',
+            'shippingHeightCm'
+          ):
+            assert 'id="' + element + '"' in seller_html
+
+          assert 'button.disabled=true;' in script
+          assert 'isBookingEnabled:()=>false' in script
+
+          print('PASS: Courier search removed from checkout')
+          print('PASS: Three official website cards preserved')
+          print('PASS: Live quotation button disabled')
+          print('PASS: All four seller parcel fields preserved')
+          print('PASS: Payment and order functions unchanged')
+          PY
+
+          cat > public/shopdrop-sa-courier-choices.js <<'JS'
+          /* Fix63: Official courier information links.
+             No booking, payment or tracking is initiated here. */
+          (()=>{
+            'use strict';
+
+            const grid=document.getElementById(
+              'shopdropSaCourierGrid'
+            );
+
+            const message=document.getElementById(
+              'shopdropSaCourierMessage'
+            );
+
+            if(!grid||!message)return;
+
+            const companies=[
+              {
+                name:'The Courier Guy',
+                service:'Direct door-to-door delivery',
+                url:'https://thecourierguy.co.za/direct-courier-services/'
+              },
+              {
+                name:'Aramex',
+                service:'Click-Way door-to-door delivery',
+                url:'https://aramex.co.za/services/click-way-couriers/'
+              },
+              {
+                name:'RAM Hand-to-Hand',
+                service:'Door collection and direct delivery',
+                url:'https://www.ram.co.za/'
+              }
+            ];
+
+            for(const company of companies){
+              const link=document.createElement('a');
+
+              link.href=company.url;
+              link.target='_blank';
+              link.rel='noopener noreferrer';
+
+              link.setAttribute(
+                'aria-label',
+                company.name+' official website — information only'
+              );
+
+              const title=document.createElement('strong');
+              title.textContent=company.name;
+
+              const detail=document.createElement('small');
+              detail.textContent=company.service;
+
+              const note=document.createElement('small');
+              note.textContent='View official website — information only';
+
+              link.append(title,detail,note);
+              grid.append(link);
+            }
+
+            message.textContent=
+              'These links open the couriers official websites. '+
+              'Do not book, pay or disclose private buyer or seller '+
+              'details there. Shop&Drop will handle approved '+
+              'courier bookings and tracking when activated.';
+          })();
+          JS
+
+          node --check public/shopdrop-sa-courier-choices.js
+          node --check public/shopdrop-a155-courier-quotes-ui.js
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          courier=Path(
+            'public/shopdrop-sa-courier-choices.js'
+          ).read_text(encoding='utf-8')
+
+          for company in (
+            'The Courier Guy',
+            'Aramex',
+            'RAM Hand-to-Hand'
+          ):
+            assert company in courier
+
+          for domain in (
+            'thecourierguy.co.za',
+            'aramex.co.za',
+            'www.ram.co.za'
+          ):
+            assert domain in courier
+
+          assert "link.target='_blank'" in courier
+          assert "link.rel='noopener noreferrer'" in courier
+          assert 'fetch(' not in courier
+          assert 'createOrder' not in courier
+          assert 'requestQuotes' not in courier
+
+          print('PASS: Three official HTTPS links')
+          print('PASS: No external booking data submitted')
+          PY
+
+          git diff --check
+
+      - name: Commit courier and seller wording update
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add public/checkout.html
+          git add public/shopdrop-sa-courier-choices.js
+          git add public/shopdrop-a155-courier-quotes-ui.js
+          git add public/seller.html
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix63 link three official couriers and clarify parcel fields'
+
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure website deployment
+        uses: actions/configure-pages@v5
+
+      - name: Upload website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy Fix63
+        id: deployment
+        uses: actions/deploy-pages@v4
+
