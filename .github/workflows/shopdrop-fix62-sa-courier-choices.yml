@@ -1,1 +1,348 @@
 
+name: ShopDrop Fix62 - Three SA Door-to-Door Couriers
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix62-sa-courier-choices.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  show-sa-couriers:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Add three door-to-door courier previews
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          guards = {
+              'public/checkout.html':
+                  '0a461bc12d5c037042798d31cf7ac71e46142c91',
+              'public/shopdrop-courier-search.js':
+                  '93a0c925c4cce35449e5585d3f92809111e1f873',
+          }
+
+          for filename, expected in guards.items():
+              actual = subprocess.check_output(
+                  ['git', 'hash-object', filename],
+                  text=True
+              ).strip()
+
+              if actual != expected:
+                  raise SystemExit(
+                      'STOP: Source changed: ' + filename
+                  )
+
+          def replace_once(source, old, new, label):
+              if source.count(old) != 1:
+                  raise SystemExit(
+                      'STOP: Unexpected source at ' + label
+                  )
+              return source.replace(old, new, 1)
+
+          page = Path('public/checkout.html')
+          html = page.read_text(encoding='utf-8')
+
+          html = replace_once(
+              html,
+              'Search supported local or international couriers. Only verified couriers with a real quotation can be booked. No private addresses are shared during search.',
+              'Shop&Drop uses door-to-door courier services in South Africa. Choose a preferred company below. Courier collection, coverage and quotations will be confirmed after provider activation. No private addresses are shared during this preview.',
+              'South African delivery wording'
+          )
+
+          html = replace_once(
+              html,
+              '<label for="phase6CourierQuery">Courier company</label>',
+              '''<div id="shopdropSaCourierChoices">
+              <h3>Door-to-door courier options</h3>
+              <p class="muted">These companies are shortlisted for South African deliveries. Select one to preview your preference. This does not book a courier.</p>
+              <div id="shopdropSaCourierGrid"
+                   class="shopdrop-sa-courier-grid"
+                   role="group"
+                   aria-label="Door-to-door courier companies"></div>
+              <p id="shopdropSaCourierMessage"
+                 class="muted"
+                 role="status"
+                 aria-live="polite"></p>
+              </div>
+              <label for="phase6CourierQuery">Search approved couriers</label>''',
+              'three courier options'
+          )
+
+          html = replace_once(
+              html,
+              '<script src="./shopdrop-courier-search.js" defer></script>',
+              '<script src="./shopdrop-courier-search.js?v=62" defer></script>',
+              'refresh courier selection script'
+          )
+
+          style = '''
+          /* Fix62: SA door-to-door courier preview */
+          .shopdrop-sa-courier-grid {
+            display:grid;
+            grid-template-columns:repeat(
+              auto-fit,minmax(150px,1fr)
+            );
+            gap:12px;
+            margin:14px 0;
+          }
+
+          .shopdrop-sa-courier-grid button {
+            width:100%;
+            min-height:86px;
+            margin:0;
+            padding:13px;
+            background:#f0fdfa;
+            color:#134e4a;
+            border:1px solid #99d9cc;
+            border-radius:10px;
+            text-align:left;
+            white-space:normal;
+          }
+
+          .shopdrop-sa-courier-grid strong {
+            display:block;
+            font-size:15px;
+            line-height:1.35;
+          }
+
+          .shopdrop-sa-courier-grid small {
+            display:block;
+            margin-top:7px;
+            color:#526273;
+            font-size:12px;
+            line-height:1.4;
+          }
+
+          .shopdrop-sa-courier-grid button[aria-pressed="true"] {
+            background:#ccf5e7;
+            border:2px solid #0f766e;
+          }
+
+          .shopdrop-sa-courier-grid button:focus-visible {
+            outline:3px solid #0f766e;
+            outline-offset:2px;
+          }
+
+          #shopdropSaCourierMessage {
+            font-weight:600;
+            line-height:1.5;
+          }
+          '''
+
+          html = replace_once(
+              html,
+              '</style></head>',
+              style + '</style></head>',
+              'courier card layout'
+          )
+
+          page.write_text(html, encoding='utf-8')
+
+          path = Path('public/shopdrop-courier-search.js')
+          js = path.read_text(encoding='utf-8')
+
+          js = replace_once(
+              js,
+              "  if(!input||!results||!selection)return;",
+              """  if(!input||!results||!selection)return;
+              const grid=document.getElementById(
+                'shopdropSaCourierGrid'
+              );
+              const previewMessage=document.getElementById(
+                'shopdropSaCourierMessage'
+              );""",
+              'courier preview controls'
+          )
+
+          old_footer = """  input.addEventListener('input',()=>searchDirectory(input.value.trim()));
+            render();
+            })();"""
+
+          old_footer = old_footer.replace(
+              "            render();\n            })();",
+              "  render();\n})();"
+          )
+
+          new_footer = """  function mountSouthAfricanCouriers(){
+                if(!grid || !previewMessage)return;
+
+                const companies=[
+                  {
+                    name:'The Courier Guy',
+                    service:'Direct door-to-door delivery'
+                  },
+                  {
+                    name:'Aramex',
+                    service:'Click-Way door-to-door delivery'
+                  },
+                  {
+                    name:'RAM Hand-to-Hand',
+                    service:'Door collection and direct delivery'
+                  }
+                ];
+
+                const buttons=[];
+
+                for(const company of companies){
+                  const button=document.createElement('button');
+                  button.type='button';
+                  button.setAttribute('aria-pressed','false');
+
+                  const title=document.createElement('strong');
+                  title.textContent=company.name;
+
+                  const detail=document.createElement('small');
+                  detail.textContent=company.service;
+
+                  button.append(title,detail);
+
+                  button.addEventListener('click',()=>{
+                    for(const other of buttons){
+                      other.setAttribute(
+                        'aria-pressed',
+                        String(other===button)
+                      );
+                    }
+
+                    // Preview preference only.
+                    // Never create a real booking or quote.
+                    // Never share customer or seller addresses.
+                    previewMessage.textContent=
+                      'Preferred courier: '+company.name+
+                      '. This is only a preview. '+
+                      'No live quote, collection or booking '+
+                      'has been requested.';
+
+                    // Important: Do not change the trusted
+                    // courier quote selection or payment state.
+                  });
+
+                  buttons.push(button);
+                  grid.append(button);
+                }
+
+                previewMessage.textContent=
+                  'Choose one of the three companies. '+
+                  'Door-to-door bookings and live prices '+
+                  'will become available only after '+
+                  'approved integrations are connected.';
+              }
+
+              input.addEventListener(
+                'input',
+                ()=>searchDirectory(input.value.trim())
+              );
+
+              mountSouthAfricanCouriers();
+              render();
+              })();"""
+
+          new_footer = new_footer.replace(
+              "              })();",
+              "})();"
+          )
+
+          js = replace_once(
+              js,
+              old_footer,
+              new_footer,
+              'SA courier shortlist'
+          )
+
+          path.write_text(js, encoding='utf-8')
+
+          assert js.count("name:'The Courier Guy'") == 1
+          assert js.count("name:'Aramex'") == 1
+          assert js.count("name:'RAM Hand-to-Hand'") == 1
+
+          for excluded in (
+              'Pargo',
+              'PAXI',
+              'PostNet',
+              'Bob Go',
+              'DPD South Africa'
+          ):
+              assert excluded not in js
+
+          assert 'isBookingEnabled:()=>false' in js
+          assert 'b.disabled=true;' in js
+
+          html = Path(
+              'public/checkout.html'
+          ).read_text(encoding='utf-8')
+
+          assert 'id="shopdropSaCourierGrid"' in html
+          assert 'shopdrop-courier-search.js?v=62' in html
+          assert 'local or international couriers' not in html
+
+          assert 'id="phase6CourierQuery"' in html
+          assert 'id="phase6CourierResults"' in html
+          assert 'id="phase6CourierSelection"' in html
+          assert 'id="deliveryAddressPanel"' in html
+          assert 'id="phase6PaymentMethod"' in html
+
+          print('PASS: The Courier Guy included')
+          print('PASS: Aramex door-to-door included')
+          print('PASS: RAM Hand-to-Hand included')
+          print('PASS: Counter and locker options excluded')
+          print('PASS: Existing search retained')
+          print('PASS: Actual courier bookings remain inactive')
+          print('PASS: Payment and address files preserved')
+          PY
+
+          node --check public/shopdrop-courier-search.js
+          git diff --check
+
+      - name: Commit corrected courier selection
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add public/checkout.html
+          git add public/shopdrop-courier-search.js
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Fix62 show three SA door-to-door courier choices'
+
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure integrated website
+        uses: actions/configure-pages@v5
+
+      - name: Upload verified website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy corrected courier choices
+        id: deployment
+        uses: actions/deploy-pages@v4
+
