@@ -1,1 +1,155 @@
 
+name: ShopDrop Fix69 - Remove Dropdown Placeholders
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix69-dropdown-placeholders.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  fix69:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+
+      - name: Apply minimal dropdown correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path=Path("public/sell-item.html")
+          code=path.read_text(encoding="utf-8")
+
+          def patch(old,new):
+              global code
+              if code.count(old)!=1:
+                  raise SystemExit(
+                      "SAFETY STOP: source mismatch"
+                  )
+              code=code.replace(old,new,1)
+
+          patch(
+              '<option value="">Choose a category</option>',
+              ''
+          )
+
+          patch(
+              '<option value="">Choose a main category first</option>',
+              ''
+          )
+
+          patch(
+              """  select.replaceChildren(new Option(
+              options.length?'Choose a subcategory':'Choose a main category first',''
+            ));""",
+              """  select.replaceChildren();"""
+          )
+
+          patch(
+              """  select.value=options.includes(selected)?selected:'';""",
+              """  if(options.includes(selected)){
+                select.value=selected;
+              }else{
+                select.selectedIndex=-1;
+              }"""
+          )
+
+          patch(
+              """    fillSubcategories();
+                if(user)await loadUnfinished(user);""",
+              """    $('c').selectedIndex=-1;
+                fillSubcategories();
+                if(user)await loadUnfinished(user);"""
+          )
+
+          required=[
+              "departmentSubs.set(",
+              "fillSubcategories(",
+              "shopdrop-product-photos.js",
+              "photos.attach(",
+              "shopdrop-quick-publish",
+              "shipping_weight_kg",
+              "shipping_length_cm",
+              "shipping_width_cm",
+              "shipping_height_cm",
+              '<option value="used">'
+          ]
+
+          for item in required:
+              assert item in code, (
+                  "SAFETY STOP: missing "+item
+              )
+
+          scripts=re.findall(
+              r'<script\b[^>]*>(.*?)</script\s*>',
+              code,flags=re.S|re.I
+          )
+
+          modules=[
+              s for s in scripts
+              if "import {createClient}" in s
+          ]
+
+          assert len(modules)==1
+
+          Path("/tmp/fix69.mjs").write_text(
+              modules[0],encoding="utf-8"
+          )
+
+          path.write_text(code,encoding="utf-8")
+          print("PASS: Placeholders removed")
+          print("PASS: Existing dropdown logic preserved")
+          PY
+
+          node --check /tmp/fix69.mjs
+          git diff --check
+
+          test "$(git diff --name-only)" = \
+            "public/sell-item.html"
+
+      - name: Commit correction
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add public/sell-item.html
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "Fix69 remove category placeholders"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
+
