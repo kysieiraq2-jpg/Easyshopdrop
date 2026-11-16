@@ -185,9 +185,7 @@ function show(message,error=false){
 // Recovery is account-bound and uses existing Supabase RLS.
 async function loadUnfinished(user){
   const {data, error}=await sb.from('products')
-    .select('id,title,description,category,subcategory,condition,price,location,listing_reference,created_at,
-shipping_weight_kg,shipping_length_cm,
-shipping_width_cm,shipping_height_cm')
+    .select('id,title,description,category,subcategory,condition,price,location,listing_reference,created_at,shipping_weight_kg,shipping_length_cm,shipping_width_cm,shipping_height_cm')
     .eq('seller_id',user.id)
     .eq('listing_status','pending')
     .order('created_at',{ascending:false})
