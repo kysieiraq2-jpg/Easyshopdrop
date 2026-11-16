@@ -1,1 +1,151 @@
 
+name: ShopDrop Fix67 - Seller Script Repair
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix67-seller-script-repair.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  repair-and-deploy:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Repair and verify seller script
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import json
+
+          path=Path("public/sell-item.html")
+          original=path.read_text(encoding="utf-8")
+
+          broken="""listing_reference,created_at,
+          shipping_weight_kg,shipping_length_cm,
+          shipping_width_cm,shipping_height_cm'"""
+
+          fixed="""listing_reference,created_at,shipping_weight_kg,shipping_length_cm,shipping_width_cm,shipping_height_cm'"""
+
+          if original.count(broken)!=1:
+              raise SystemExit(
+                  "SAFETY STOP: original query changed"
+              )
+
+          code=original.replace(broken,fixed,1)
+
+          required=[
+              "./taxonomy.json",
+              "fillSubcategories(",
+              "departmentSubs.set(",
+              "shopdrop-product-photos.js",
+              "photos.attach(",
+              "resumeItem(product)",
+              "shopdrop-quick-publish",
+              "shippingWeightKg",
+              "shippingLengthCm",
+              "shippingWidthCm",
+              "shippingHeightCm"
+          ]
+
+          for token in required:
+              assert token in code, (
+                  "Missing existing function: "+token
+              )
+
+          scripts=re.findall(
+              r'<script\b[^>]*>(.*?)</script\s*>',
+              code,
+              flags=re.S|re.I
+          )
+
+          modules=[
+              script for script in scripts
+              if "import {createClient}" in script
+          ]
+
+          assert len(modules)==1, (
+              "Expected seller module not found"
+          )
+
+          Path("/tmp/seller-check.mjs").write_text(
+              modules[0],encoding="utf-8"
+          )
+
+          taxonomy=json.loads(
+              Path("public/taxonomy.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+
+          assert taxonomy.get("departments")
+          assert any(
+              d.get("subcategories")
+              for d in taxonomy["departments"]
+          )
+
+          path.write_text(code,encoding="utf-8")
+
+          print("PASS: Broken query corrected")
+          print("PASS: Seller module identified")
+          print("PASS: Categories and subcategories retained")
+          print("PASS: Parcel fields retained")
+          PY
+
+          node --check /tmp/seller-check.mjs
+          git diff --check
+
+          test "$(git diff --name-only)" = \
+            "public/sell-item.html"
+
+          echo "PASS: JavaScript syntax valid"
+
+      - name: Commit verified repair
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add public/sell-item.html
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "Fix67 repair seller JavaScript syntax"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy corrected website
+        id: deployment
+        uses: actions/deploy-pages@v4
+
