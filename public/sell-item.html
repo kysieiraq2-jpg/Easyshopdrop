@@ -54,11 +54,11 @@ a{color:#0f766e}
 
 <label for="c">Category</label>
 <select id="c" required>
-<option value="">Choose a category</option>
+
 </select>
 <label for="subcat">Subcategory</label>
 <select id="subcat" required disabled>
-<option value="">Choose a main category first</option>
+
 </select>
 
 <label for="condition">Condition</label>
@@ -165,12 +165,14 @@ const departmentSubs=new Map();
 function fillSubcategories(selected=''){
   const select=$('subcat');
   const options=departmentSubs.get($('c').value)||[];
-  select.replaceChildren(new Option(
-    options.length?'Choose a subcategory':'Choose a main category first',''
-  ));
+  select.replaceChildren();
   for(const name of options)select.add(new Option(name,name));
   select.disabled=options.length===0;
-  select.value=options.includes(selected)?selected:'';
+  if(options.includes(selected)){
+    select.value=selected;
+  }else{
+    select.selectedIndex=-1;
+  }
 }
 $('c').addEventListener('change',()=>fillSubcategories());
 
@@ -286,6 +288,7 @@ async function setup(){
             :[]);
       }
     }
+    $('c').selectedIndex=-1;
     fillSubcategories();
     if(user)await loadUnfinished(user);
   }catch(e){
