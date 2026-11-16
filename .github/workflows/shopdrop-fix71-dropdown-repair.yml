@@ -1,1 +1,153 @@
 
+name: ShopDrop Fix71 - Dropdown Repair
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix71-dropdown-repair.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+
+      - name: Apply and verify targeted repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import json
+
+          path=Path("public/sell-item.html")
+          original=path.read_text(encoding="utf-8")
+          code=original
+
+          def patch(old,new):
+              global code
+              if code.count(old)!=1:
+                  raise SystemExit(
+                      "SAFETY STOP: source mismatch: "+old[:65]
+                  )
+              code=code.replace(old,new,1)
+
+          patch(
+              '<option value="">Choose a category</option>',
+              ''
+          )
+          patch(
+              '<option value="">Choose a main category first</option>',
+              ''
+          )
+          patch(
+              """  select.replaceChildren(new Option(
+    options.length?'Choose a subcategory':'Choose a main category first',''
+  ));""",
+              "  select.replaceChildren();"
+          )
+          patch(
+              "  select.value=options.includes(selected)?selected:'';",
+              """  if(options.includes(selected)){
+    select.value=selected;
+  }else{
+    select.selectedIndex=-1;
+  }"""
+          )
+          patch(
+              """    fillSubcategories();
+    if(user)await loadUnfinished(user);""",
+              """    $('c').selectedIndex=-1;
+    fillSubcategories();
+    if(user)await loadUnfinished(user);"""
+          )
+
+          required=[
+              "departmentSubs.set(",
+              "fillSubcategories(",
+              "photos.attach(",
+              "resumeItem(product)",
+              "shopdrop-quick-publish",
+              "shipping_weight_kg",
+              "shipping_length_cm",
+              "shipping_width_cm",
+              "shipping_height_cm",
+              '<option value="used">',
+              '<option value="new">',
+              '<option value="like_new">',
+              '<option value="refurbished">'
+          ]
+          for token in required:
+              assert token in code, token
+
+          assert "Choose a subcategory" not in code
+          assert '<option value="">Choose a category' not in code
+
+          taxonomy=json.loads(
+              Path("public/taxonomy.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          assert taxonomy["departments"]
+
+          modules=re.findall(
+              r'<script\s+type="module">(.*?)</script>',
+              code,re.S
+          )
+          assert len(modules)==1
+          Path("/tmp/fix71.mjs").write_text(
+              modules[0],encoding="utf-8"
+          )
+
+          path.write_text(code,encoding="utf-8")
+          print("PASS: Dropdown placeholders removed")
+          print("PASS: Existing functions preserved")
+          PY
+
+          node --check /tmp/fix71.mjs
+          git diff --check
+          test "$(git diff --name-only)" = \
+            "public/sell-item.html"
+
+      - name: Commit verified correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add public/sell-item.html
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "Fix71 remove dropdown placeholders"
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy website
+        id: deployment
+        uses: actions/deploy-pages@v4
+
