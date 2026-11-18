@@ -1,1 +1,261 @@
 
+name: ShopDrop Fix76 - House Pet Sitting and CBD
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix76-house-pet-sitting-cbd.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  update-categories:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Apply minimal category changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          pp=Path("public/taxonomy.json")
+          sp=Path("public/service-taxonomy.js")
+          hp=Path("public/services.html")
+
+          ptext=pp.read_text(encoding="utf-8")
+          stext=sp.read_text(encoding="utf-8")
+          htext=hp.read_text(encoding="utf-8")
+
+          product=json.loads(ptext)
+          prefix="window.ShopDropServiceTaxonomy="
+          assert stext.startswith(prefix)
+          services=json.loads(
+              stext[len(prefix):].strip().rstrip(";")
+          )
+
+          # Verify the expected existing structure.
+          assert len(product["departments"])==33
+          assert len(services)==23
+
+          health=[
+              d for d in product["departments"]
+              if d["name"]=="Health & Wellness"
+          ]
+          assert len(health)==1
+
+          cbd="CBD Oils & Wellness Products"
+          assert cbd not in health[0]["subcategories"]
+
+          assert "House Sitting" in services[
+              "Childcare & Household Services"
+          ]
+          assert "Pet Sitting" in services["Pet Services"]
+
+          new_group="House & Pet Sitting Services"
+          assert new_group not in services
+
+          # Add only one product subcategory.
+          health[0]["subcategories"].append(cbd)
+
+          # Move two existing service entries.
+          services["Childcare & Household Services"].remove(
+              "House Sitting"
+          )
+          services["Pet Services"].remove("Pet Sitting")
+
+          services[new_group]=[
+              "House Sitting",
+              "Pet Sitting"
+          ]
+
+          services=dict(sorted(
+              services.items(),
+              key=lambda x:x[0].casefold()
+          ))
+
+          # Insert one new visible category button.
+          anchor=(
+              '<button class="card service-card" '
+              'data-category="Lessons, Training & Tutoring">'
+          )
+
+          assert htext.count(anchor)==1
+
+          new_button=(
+              '<button class="card service-card" '
+              'data-category="House & Pet Sitting Services">'
+              '<b>House & Pet Sitting Services</b>'
+              '<p>House sitting and pet sitting services.</p>'
+              '</button>\n'
+          )
+
+          assert new_button not in htext
+
+          updated_html=htext.replace(
+              anchor,new_button+anchor,1
+          )
+
+          # Verify no other HTML was changed.
+          assert updated_html.replace(
+              new_button,"",1
+          )==htext
+
+          names=re.findall(
+              r'<button class="card service-card" '
+              r'data-category="([^"]+)"',
+              updated_html
+          )
+
+          assert len(names)==24
+          assert len(names)==len(set(names))
+          assert set(names)==set(services)
+          assert names==sorted(names,key=str.casefold)
+
+          # Verify original product entries preserved.
+          old_product=json.loads(ptext)
+          for old in old_product["departments"]:
+              new=next(
+                  d for d in product["departments"]
+                  if d["name"]==old["name"]
+              )
+              assert set(old["subcategories"]).issubset(
+                  new["subcategories"]
+              )
+
+          # Verify original service entries preserved
+          # except for their two approved moves.
+          old_services=json.loads(
+              stext[len(prefix):].strip().rstrip(";")
+          )
+
+          for name,items in old_services.items():
+              assert name in services
+              for item in items:
+                  if (
+                      name=="Childcare & Household Services"
+                      and item=="House Sitting"
+                  ):
+                      assert item in services[new_group]
+                  elif (
+                      name=="Pet Services"
+                      and item=="Pet Sitting"
+                  ):
+                      assert item in services[new_group]
+                  else:
+                      assert item in services[name]
+
+          assert services[new_group]==[
+              "House Sitting","Pet Sitting"
+          ]
+
+          pp.write_text(
+              json.dumps(
+                  product,ensure_ascii=False,indent=2
+              )+"\n",
+              encoding="utf-8"
+          )
+
+          sp.write_text(
+              prefix+json.dumps(
+                  services,ensure_ascii=False,
+                  separators=(",",":")
+              )+";\n",
+              encoding="utf-8"
+          )
+
+          hp.write_text(
+              updated_html,encoding="utf-8"
+          )
+
+          print("PASS: All original product entries preserved")
+          print("PASS: House Sitting moved")
+          print("PASS: Pet Sitting moved")
+          print("PASS: New category visible alphabetically")
+          print("PASS: CBD subcategory added")
+          print("PASS: Existing HTML otherwise unchanged")
+          PY
+
+      - name: Verify only approved files changed
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 -m json.tool \
+            public/taxonomy.json >/dev/null
+
+          node --check public/service-taxonomy.js
+
+          git diff --check
+
+          python3 - <<'PY'
+          import subprocess
+
+          changed=set(
+              subprocess.check_output(
+                  ["git","diff","--name-only"],
+                  text=True
+              ).splitlines()
+          )
+
+          expected={
+              "public/taxonomy.json",
+              "public/service-taxonomy.js",
+              "public/services.html"
+          }
+
+          assert changed==expected, (
+              "SAFETY STOP: unexpected files changed"
+          )
+
+          print("PASS: Only 3 approved files modified")
+          PY
+
+      - name: Commit verified update
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add public/taxonomy.json
+          git add public/service-taxonomy.js
+          git add public/services.html
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "Fix76 add house pet sitting and CBD category"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy website
+        id: deployment
+        uses: actions/deploy-pages@v4
+
