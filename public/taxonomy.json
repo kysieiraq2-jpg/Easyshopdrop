@@ -120,7 +120,14 @@
         "Electronic Accessories",
         "Security Cameras & Systems",
         "Drones",
-        "Calculators & Translators"
+        "Calculators & Translators",
+        "Solar Panels",
+        "Solar Inverters",
+        "Solar Batteries",
+        "Portable Power Stations",
+        "Solar Charge Controllers",
+        "Solar Cables & Accessories",
+        "Used Solar Equipment"
       ]
     },
     {
@@ -178,7 +185,10 @@
         "Lighting",
         "Storage & Organisation",
         "Cleaning Supplies",
-        "Laundry & Home Care"
+        "Laundry & Home Care",
+        "Second-hand Furniture",
+        "Furniture Parts & Components",
+        "Refurbished Home Furniture"
       ]
     },
     {
@@ -208,7 +218,12 @@
         "Irrigation & Watering",
         "Lawn Care",
         "Outdoor Lighting",
-        "Pest & Weed Control Products"
+        "Pest & Weed Control Products",
+        "Irrigation Pumps",
+        "Greenhouse Equipment",
+        "Small Farming Implements",
+        "Farming Hand Tools",
+        "Agricultural Irrigation Equipment"
       ]
     },
     {
@@ -364,7 +379,11 @@
         "Painting & Drawing",
         "Craft Materials",
         "Personalised Gifts",
-        "Print-on-Demand"
+        "Print-on-Demand",
+        "Restored Furniture",
+        "Upcycled Furniture",
+        "Reclaimed Wood Products",
+        "Handmade Furniture Components"
       ]
     },
     {
@@ -378,7 +397,17 @@
         "Restaurant & Catering Equipment",
         "Retail & POS Equipment",
         "Office & Business Equipment",
-        "Agricultural Supplies"
+        "Agricultural Supplies",
+        "Used Shop Equipment",
+        "Shop Shelving & Displays",
+        "Commercial Refrigeration",
+        "Bakery Equipment",
+        "Salon & Barber Equipment",
+        "Workshop Equipment",
+        "Used Business Furniture",
+        "Farming Equipment",
+        "Agricultural Machinery",
+        "Small Farming Implements"
       ]
     },
     {
@@ -417,7 +446,11 @@
         "Model Trains",
         "Memorabilia",
         "Antiques & Vintage",
-        "Hobby Tools & Supplies"
+        "Hobby Tools & Supplies",
+        "Vinyl Records",
+        "Music CDs",
+        "DVDs & Blu-rays",
+        "Vintage Physical Media"
       ]
     },
     {
