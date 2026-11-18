@@ -1,1 +1,381 @@
 
+name: ShopDrop Fix73 - Additive Taxonomy Expansion
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix73-taxonomy-expansion.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  expand-taxonomy:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Add categories without replacing existing entries
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          product_path=Path("public/taxonomy.json")
+          service_path=Path("public/service-taxonomy.js")
+
+          original_product=product_path.read_text(
+              encoding="utf-8"
+          )
+          original_service=service_path.read_text(
+              encoding="utf-8"
+          )
+
+          product=json.loads(original_product)
+
+          prefix="window.ShopDropServiceTaxonomy="
+          if not original_service.startswith(prefix):
+              raise SystemExit(
+                  "SAFETY STOP: service format changed"
+              )
+
+          service=json.loads(
+              original_service[len(prefix):].strip().rstrip(";")
+          )
+
+          old_product=json.loads(original_product)
+          old_service=json.loads(
+              original_service[len(prefix):].strip().rstrip(";")
+          )
+
+          # Existing product categories receive additions only.
+          product_additions={
+            "Electronics":[
+              "Solar Panels",
+              "Solar Inverters",
+              "Solar Batteries",
+              "Portable Power Stations",
+              "Solar Charge Controllers",
+              "Solar Cables & Accessories",
+              "Used Solar Equipment"
+            ],
+            "Industrial & Business Supplies":[
+              "Used Shop Equipment",
+              "Shop Shelving & Displays",
+              "Commercial Refrigeration",
+              "Bakery Equipment",
+              "Salon & Barber Equipment",
+              "Workshop Equipment",
+              "Used Business Furniture"
+            ],
+            "Garden, Pool & Patio":[
+              "Irrigation Pumps",
+              "Greenhouse Equipment",
+              "Small Farming Implements",
+              "Farming Hand Tools",
+              "Agricultural Irrigation Equipment"
+            ],
+            "Arts, Crafts & Handmade":[
+              "Restored Furniture",
+              "Upcycled Furniture",
+              "Reclaimed Wood Products",
+              "Handmade Furniture Components"
+            ],
+            "Collectibles & Hobbies":[
+              "Vinyl Records",
+              "Music CDs",
+              "DVDs & Blu-rays",
+              "Vintage Physical Media"
+            ],
+            "Home & Kitchen":[
+              "Second-hand Furniture",
+              "Furniture Parts & Components",
+              "Refurbished Home Furniture"
+            ],
+            "Industrial & Business Supplies":[
+              "Used Shop Equipment",
+              "Shop Shelving & Displays",
+              "Commercial Refrigeration",
+              "Bakery Equipment",
+              "Salon & Barber Equipment",
+              "Workshop Equipment",
+              "Used Business Furniture",
+              "Farming Equipment",
+              "Agricultural Machinery",
+              "Small Farming Implements"
+            ]
+          }
+
+          # New service groups, without altering existing groups.
+          service_additions={
+            "Moving & Removals Services":[
+              "Furniture Moving",
+              "Small Load Removals",
+              "Packing Assistance",
+              "Storage Assistance",
+              "Household Removals"
+            ],
+            "Computer & IT Services":[
+              "Computer Repairs",
+              "Wi-Fi & Network Setup",
+              "Software Assistance",
+              "Website Design",
+              "IT Support"
+            ],
+            "Sewing & Clothing Services":[
+              "Clothing Alterations",
+              "Dressmaking",
+              "Upholstery",
+              "Embroidery",
+              "Clothing Repairs"
+            ],
+            "Catering & Food Services":[
+              "Home Catering",
+              "Baking Orders",
+              "Event Catering",
+              "Meal Preparation"
+            ],
+            "Childcare & Household Services":[
+              "Babysitting",
+              "Childcare",
+              "Domestic Assistance",
+              "House Sitting"
+            ],
+            "Furniture & Woodwork Services":[
+              "Furniture Repairs",
+              "Furniture Restoration",
+              "Furniture Assembly",
+              "Custom Woodwork",
+              "Cabinet Making"
+            ],
+            "Solar & Backup Power Services":[
+              "Solar Equipment Installation",
+              "Inverter Repairs",
+              "Battery Maintenance",
+              "Backup Power Maintenance"
+            ],
+            "Event & Party Services":[
+              "Party Planning",
+              "Venue Decoration",
+              "Event Equipment Setup",
+              "Event Coordination"
+            ],
+            "Financial Administration Services":[
+              "Bookkeeping Assistance",
+              "Invoicing Administration",
+              "Payroll Administration",
+              "Financial Recordkeeping",
+              "Business Budget Preparation"
+            ]
+          }
+
+          departments=product.get("departments")
+          if not isinstance(departments,list):
+              raise SystemExit(
+                  "SAFETY STOP: product taxonomy invalid"
+              )
+
+          names=[d["name"] for d in departments]
+          if len(names)!=len(set(names)):
+              raise SystemExit(
+                  "SAFETY STOP: duplicate existing categories"
+              )
+
+          product_added=0
+          for name,additions in product_additions.items():
+              matches=[
+                  d for d in departments
+                  if d["name"]==name
+              ]
+              if len(matches)!=1:
+                  raise SystemExit(
+                      "SAFETY STOP: category missing: "+name
+                  )
+              existing=matches[0]["subcategories"]
+              for item in additions:
+                  if item not in existing:
+                      existing.append(item)
+                      product_added+=1
+
+          service_added=0
+          for name,additions in service_additions.items():
+              if name not in service:
+                  service[name]=[]
+              for item in additions:
+                  if item not in service[name]:
+                      service[name].append(item)
+                      service_added+=1
+
+          # Preserve every original product category.
+          new_map={
+              d["name"]:d["subcategories"]
+              for d in product["departments"]
+          }
+
+          for old in old_product["departments"]:
+              name=old["name"]
+              if name not in new_map:
+                  raise SystemExit(
+                      "SAFETY STOP: category removed"
+                  )
+              for item in old["subcategories"]:
+                  if item not in new_map[name]:
+                      raise SystemExit(
+                          "SAFETY STOP: subcategory removed"
+                      )
+
+          # Preserve every original service.
+          for name,items in old_service.items():
+              if name not in service:
+                  raise SystemExit(
+                      "SAFETY STOP: service group removed"
+                  )
+              for item in items:
+                  if item not in service[name]:
+                      raise SystemExit(
+                          "SAFETY STOP: service removed"
+                      )
+
+          # No duplicate product or service entries.
+          for d in product["departments"]:
+              items=d["subcategories"]
+              assert len(items)==len(set(items))
+
+          for items in service.values():
+              assert len(items)==len(set(items))
+
+          # Wine must remain exactly as before.
+          old_wine=next(
+              d["subcategories"]
+              for d in old_product["departments"]
+              if d["name"]=="Wine"
+          )
+          assert new_map["Wine"]==old_wine
+
+          # Keep existing taxonomy version and metadata.
+          assert product["version"]==old_product["version"]
+
+          product_path.write_text(
+              json.dumps(
+                  product,ensure_ascii=False,indent=2
+              )+"\n",
+              encoding="utf-8"
+          )
+
+          service_path.write_text(
+              prefix+json.dumps(
+                  service,ensure_ascii=False,
+                  separators=(",",":")
+              )+";\n",
+              encoding="utf-8"
+          )
+
+          print("PASS: Existing product entries preserved")
+          print("PASS: Existing service entries preserved")
+          print("PASS: Wine preserved")
+          print("PASS: No duplicate entries")
+          print("Added product subcategories:",product_added)
+          print("Added service subcategories:",service_added)
+          PY
+
+      - name: Verify taxonomy and file scope
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 -m json.tool \
+            public/taxonomy.json > /dev/null
+
+          node --check public/service-taxonomy.js
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+
+          data=json.loads(
+              Path("public/taxonomy.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+
+          assert len(data["departments"])==31
+
+          names=[d["name"] for d in data["departments"]]
+          assert len(names)==len(set(names))
+          assert "Wine" in names
+          assert "Pet Supplies" in names
+
+          print("PASS: All original product groups retained")
+          PY
+
+          git diff --check
+
+          python3 - <<'PY'
+          import subprocess
+
+          changed=set(
+              subprocess.check_output(
+                  ["git","diff","--name-only"],
+                  text=True
+              ).splitlines()
+          )
+
+          allowed={
+              "public/taxonomy.json",
+              "public/service-taxonomy.js"
+          }
+
+          if not changed or not changed.issubset(allowed):
+              raise SystemExit(
+                  "SAFETY STOP: unexpected files modified"
+              )
+
+          print("PASS: Only taxonomy data files changed")
+          PY
+
+      - name: Commit additive taxonomy
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add public/taxonomy.json
+          git add public/service-taxonomy.js
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "Fix73 add marketplace taxonomy entries"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload existing website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy taxonomy update
+        id: deployment
+        uses: actions/deploy-pages@v4
+
