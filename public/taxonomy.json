@@ -120,14 +120,7 @@
         "Electronic Accessories",
         "Security Cameras & Systems",
         "Drones",
-        "Calculators & Translators",
-        "Solar Panels",
-        "Solar Inverters",
-        "Solar Batteries",
-        "Portable Power Stations",
-        "Solar Charge Controllers",
-        "Solar Cables & Accessories",
-        "Used Solar Equipment"
+        "Calculators & Translators"
       ]
     },
     {
@@ -218,12 +211,7 @@
         "Irrigation & Watering",
         "Lawn Care",
         "Outdoor Lighting",
-        "Pest & Weed Control Products",
-        "Irrigation Pumps",
-        "Greenhouse Equipment",
-        "Small Farming Implements",
-        "Farming Hand Tools",
-        "Agricultural Irrigation Equipment"
+        "Pest & Weed Control Products"
       ]
     },
     {
@@ -354,7 +342,11 @@
         "Microphones",
         "Studio & Recording",
         "Instrument Accessories",
-        "Sheet Music"
+        "Sheet Music",
+        "Vinyl Records",
+        "Music CDs",
+        "DVDs & Blu-rays",
+        "Vintage Physical Media"
       ]
     },
     {
@@ -404,10 +396,7 @@
         "Bakery Equipment",
         "Salon & Barber Equipment",
         "Workshop Equipment",
-        "Used Business Furniture",
-        "Farming Equipment",
-        "Agricultural Machinery",
-        "Small Farming Implements"
+        "Used Business Furniture"
       ]
     },
     {
@@ -446,11 +435,7 @@
         "Model Trains",
         "Memorabilia",
         "Antiques & Vintage",
-        "Hobby Tools & Supplies",
-        "Vinyl Records",
-        "Music CDs",
-        "DVDs & Blu-rays",
-        "Vintage Physical Media"
+        "Hobby Tools & Supplies"
       ]
     },
     {
@@ -474,6 +459,30 @@
         "Sparkling Wine",
         "Dessert & Fortified Wine",
         "Other Wine"
+      ]
+    },
+    {
+      "name": "Farming & Agriculture",
+      "subcategories": [
+        "Irrigation Pumps",
+        "Greenhouse Equipment",
+        "Small Farming Implements",
+        "Farming Hand Tools",
+        "Agricultural Irrigation Equipment",
+        "Farming Equipment",
+        "Agricultural Machinery"
+      ]
+    },
+    {
+      "name": "Solar & Backup Power",
+      "subcategories": [
+        "Solar Panels",
+        "Solar Inverters",
+        "Solar Batteries",
+        "Portable Power Stations",
+        "Solar Charge Controllers",
+        "Solar Cables & Accessories",
+        "Used Solar Equipment"
       ]
     }
   ]
