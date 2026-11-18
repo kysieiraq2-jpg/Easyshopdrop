@@ -1,1 +1,188 @@
 
+name: ShopDrop Fix74 - Service Category Display
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix74-service-category-display.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  fix-service-display:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Add missing service category buttons
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          page=Path("public/services.html")
+          taxonomy=Path("public/service-taxonomy.js")
+
+          original=page.read_text(encoding="utf-8")
+          raw=taxonomy.read_text(encoding="utf-8")
+
+          prefix="window.ShopDropServiceTaxonomy="
+          assert raw.startswith(prefix), "SAFETY STOP: taxonomy format"
+
+          groups=json.loads(raw[len(prefix):].strip().rstrip(";"))
+
+          additions={
+            "Moving & Removals Services":
+              "Furniture moving, small loads and removals.",
+            "Computer & IT Services":
+              "Computer repairs, networking and IT support.",
+            "Sewing & Clothing Services":
+              "Alterations, dressmaking and upholstery.",
+            "Catering & Food Services":
+              "Home catering, baking and event catering.",
+            "Childcare & Household Services":
+              "Childcare and household assistance.",
+            "Furniture & Woodwork Services":
+              "Furniture repairs, restoration and woodwork.",
+            "Solar & Backup Power Services":
+              "Solar and backup-power maintenance services.",
+            "Event & Party Services":
+              "Party planning, decoration and event setup.",
+            "Financial Administration Services":
+              "Bookkeeping and financial administration."
+          }
+
+          for name in additions:
+              assert name in groups, (
+                "SAFETY STOP: missing taxonomy group: "+name
+              )
+
+          pattern=r'data-category="([^"]+)"'
+          existing=re.findall(pattern,original)
+
+          assert len(existing)==14, (
+            "SAFETY STOP: unexpected existing button count"
+          )
+          assert len(existing)==len(set(existing)), (
+            "SAFETY STOP: duplicate existing buttons"
+          )
+
+          assert set(existing).issubset(set(groups)), (
+            "SAFETY STOP: original taxonomy mismatch"
+          )
+
+          marker=(
+            '<button class="card service-card" '
+            'data-category="Other Service — requires approval">'
+          )
+
+          assert original.count(marker)==1, (
+            "SAFETY STOP: insertion anchor changed"
+          )
+
+          missing=[
+            name for name in additions
+            if name not in existing
+          ]
+
+          assert len(missing)==9, (
+            "SAFETY STOP: unexpected category state"
+          )
+
+          new_buttons="".join(
+            '<button class="card service-card" '
+            'data-category="'+name+'">'
+            '<b>'+name+'</b><p>'+additions[name]+
+            '</p></button>\n'
+            for name in missing
+          )
+
+          updated=original.replace(
+            marker,new_buttons+marker,1
+          )
+
+          # Strictly additive: removing the inserted
+          # text must reproduce the original page exactly.
+          assert updated.replace(new_buttons,"",1)==original
+
+          updated_names=re.findall(pattern,updated)
+
+          assert len(updated_names)==23
+          assert len(updated_names)==len(set(updated_names))
+          assert set(updated_names)==set(groups)
+
+          page.write_text(updated,encoding="utf-8")
+
+          print("PASS: 14 original buttons preserved")
+          print("PASS: 9 new buttons added")
+          print("PASS: All 23 service groups represented")
+          print("PASS: Original page otherwise unchanged")
+          PY
+
+      - name: Verify only services page changed
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git diff --check
+
+          python3 - <<'PY'
+          import subprocess
+
+          changed=subprocess.check_output(
+            ["git","diff","--name-only"],
+            text=True
+          ).splitlines()
+
+          assert changed==["public/services.html"], (
+            "SAFETY STOP: unexpected files changed"
+          )
+
+          print("PASS: Only public/services.html changed")
+          PY
+
+      - name: Commit verified addition
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add public/services.html
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "Fix74 display missing service categories"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy website
+        id: deployment
+        uses: actions/deploy-pages@v4
+
