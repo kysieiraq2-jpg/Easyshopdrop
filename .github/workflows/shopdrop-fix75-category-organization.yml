@@ -1,1 +1,343 @@
 
+name: ShopDrop Fix75 - Category Organization
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix75-category-organization.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  organize:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Organize taxonomy and service buttons
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          pp=Path("public/taxonomy.json")
+          sp=Path("public/service-taxonomy.js")
+          hp=Path("public/services.html")
+
+          original_product=pp.read_text(encoding="utf-8")
+          original_service=sp.read_text(encoding="utf-8")
+          original_html=hp.read_text(encoding="utf-8")
+
+          product=json.loads(original_product)
+          prefix="window.ShopDropServiceTaxonomy="
+          assert original_service.startswith(prefix)
+          service=json.loads(
+              original_service[len(prefix):].strip().rstrip(";")
+          )
+
+          departments=product["departments"]
+          assert len(departments)==31
+          assert len(service)==23
+
+          by_name={d["name"]:d for d in departments}
+          assert len(by_name)==31
+
+          original_names=set(by_name)
+          original_entries={
+              d["name"]:list(d["subcategories"])
+              for d in departments
+          }
+
+          # Only these Fix73 additions are relocated.
+          moves={
+            "Electronics":{
+              "Solar & Backup Power":[
+                "Solar Panels",
+                "Solar Inverters",
+                "Solar Batteries",
+                "Portable Power Stations",
+                "Solar Charge Controllers",
+                "Solar Cables & Accessories",
+                "Used Solar Equipment"
+              ]
+            },
+            "Garden, Pool & Patio":{
+              "Farming & Agriculture":[
+                "Irrigation Pumps",
+                "Greenhouse Equipment",
+                "Small Farming Implements",
+                "Farming Hand Tools",
+                "Agricultural Irrigation Equipment"
+              ]
+            },
+            "Industrial & Business Supplies":{
+              "Farming & Agriculture":[
+                "Farming Equipment",
+                "Agricultural Machinery",
+                "Small Farming Implements"
+              ]
+            },
+            "Collectibles & Hobbies":{
+              "Music & Musical Instruments":[
+                "Vinyl Records",
+                "Music CDs",
+                "DVDs & Blu-rays",
+                "Vintage Physical Media"
+              ]
+            }
+          }
+
+          new_names={
+              "Solar & Backup Power",
+              "Farming & Agriculture"
+          }
+          assert not (new_names & original_names)
+
+          for name in sorted(new_names):
+              d={"name":name,"subcategories":[]}
+              departments.append(d)
+              by_name[name]=d
+
+          for source,destinations in moves.items():
+              assert source in original_names
+              for target,items in destinations.items():
+                  assert target in by_name
+                  for item in items:
+                      assert item in by_name[source]["subcategories"], (
+                          "SAFETY STOP: source entry missing: "+item
+                      )
+                      by_name[source]["subcategories"].remove(item)
+                      if item not in by_name[target]["subcategories"]:
+                          by_name[target]["subcategories"].append(item)
+
+          assert len(departments)==33
+          assert set(original_names).issubset(by_name)
+
+          # Every original entry must still exist somewhere.
+          all_new={
+              item
+              for d in departments
+              for item in d["subcategories"]
+          }
+          all_old={
+              item
+              for items in original_entries.values()
+              for item in items
+          }
+          assert all_old.issubset(all_new), (
+              "SAFETY STOP: a product entry disappeared"
+          )
+
+          # Unaffected original entries stay in their departments.
+          relocated={
+              (source,item)
+              for source,targets in moves.items()
+              for items in targets.values()
+              for item in items
+          }
+          for source,items in original_entries.items():
+              for item in items:
+                  if (source,item) not in relocated:
+                      assert item in by_name[source]["subcategories"]
+
+          assert (
+              by_name["Wine"]["subcategories"]
+              ==original_entries["Wine"]
+          )
+
+          # Event catering belongs under Events.
+          catering=service["Catering & Food Services"]
+          events=service["Event & Party Services"]
+
+          assert "Event Catering" in catering
+          assert "Event Catering" not in events
+
+          catering.remove("Event Catering")
+          events.append("Event Catering")
+
+          # General catering remains under Catering.
+          if "General Catering" not in catering:
+              catering.append("General Catering")
+
+          # Preserve every original service subcategory,
+          # either in its original category or Events.
+          old_service=json.loads(
+              original_service[len(prefix):].strip().rstrip(";")
+          )
+          for name,items in old_service.items():
+              assert name in service
+              for item in items:
+                  if name=="Catering & Food Services" and item=="Event Catering":
+                      assert item in service["Event & Party Services"]
+                  else:
+                      assert item in service[name]
+
+          for name,items in service.items():
+              assert len(items)==len(set(items))
+              items.sort(key=str.casefold)
+
+          # Alphabetize the service category data.
+          service=dict(sorted(
+              service.items(),
+              key=lambda pair:pair[0].casefold()
+          ))
+
+          # Reorder only the 23 existing service buttons.
+          start_marker='<div class="grid">\n'
+          end_marker='\n</div>\n</section>'
+
+          assert original_html.count(start_marker)==1
+
+          start=original_html.index(start_marker)+len(start_marker)
+          end=original_html.index(end_marker,start)
+          block=original_html[start:end]
+
+          pattern=(
+              r'<button class="card service-card" '
+              r'data-category="([^"]+)">.*?</button>'
+          )
+          matches=list(re.finditer(
+              pattern,block,re.DOTALL
+          ))
+
+          assert len(matches)==23
+          assert set(m.group(1) for m in matches)==set(service)
+
+          # Ensure the grid contains only the expected buttons.
+          leftover=re.sub(pattern,"",block,flags=re.DOTALL)
+          assert not leftover.strip(), (
+              "SAFETY STOP: unexpected grid content"
+          )
+
+          buttons={
+              m.group(1):m.group(0)
+              for m in matches
+          }
+
+          ordered="\n".join(
+              buttons[name]
+              for name in service
+          )
+
+          # Correct the Catering description only.
+          old_desc=(
+              "Home catering, baking and event catering."
+          )
+          new_desc=(
+              "General catering, home catering and baking."
+          )
+          assert ordered.count(old_desc)==1
+          ordered=ordered.replace(old_desc,new_desc,1)
+
+          updated_html=(
+              original_html[:start]
+              +ordered
+              +original_html[end:]
+          )
+
+          # No HTML outside the category grid changes.
+          assert updated_html[:start]==original_html[:start]
+          assert (
+              updated_html[start+len(ordered):]
+              ==original_html[end:]
+          )
+
+          pp.write_text(
+              json.dumps(
+                  product,ensure_ascii=False,indent=2
+              )+"\n",
+              encoding="utf-8"
+          )
+          sp.write_text(
+              prefix+json.dumps(
+                  service,ensure_ascii=False,
+                  separators=(",",":")
+              )+";\n",
+              encoding="utf-8"
+          )
+          hp.write_text(updated_html,encoding="utf-8")
+
+          print("PASS: 31 original product categories preserved")
+          print("PASS: 2 new product categories added")
+          print("PASS: No product subcategories lost")
+          print("PASS: Wine unchanged")
+          print("PASS: Event Catering moved under Events")
+          print("PASS: All 23 service buttons alphabetized")
+          print("PASS: Existing service buttons preserved")
+          print("PASS: Operational JavaScript unchanged")
+          PY
+
+      - name: Verify files and syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m json.tool public/taxonomy.json >/dev/null
+          node --check public/service-taxonomy.js
+          git diff --check
+
+          python3 - <<'PY'
+          import subprocess
+
+          changed=set(
+              subprocess.check_output(
+                  ["git","diff","--name-only"],
+                  text=True
+              ).splitlines()
+          )
+          allowed={
+              "public/taxonomy.json",
+              "public/service-taxonomy.js",
+              "public/services.html"
+          }
+          assert changed==allowed, (
+              "SAFETY STOP: unexpected file changes"
+          )
+          print("PASS: Only 3 approved files changed")
+          PY
+
+      - name: Commit verified changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add public/taxonomy.json
+          git add public/service-taxonomy.js
+          git add public/services.html
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "Fix75 organize product and service categories"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy website
+        id: deployment
+        uses: actions/deploy-pages@v4
+
