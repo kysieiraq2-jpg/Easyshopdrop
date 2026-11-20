@@ -1,1 +1,288 @@
 
+
+name: ShopDrop Fix117 - Dispatch Photo Reliability
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix117-dispatch-photo-reliability.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix-dispatch-photos:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Reuse existing photograph reader
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          target=Path(
+            "public/shopdrop-vehicle-draft-private.html"
+          )
+
+          expected=(
+            "1c3e654bed7d719460810386744d0b9229b2deef"
+          )
+
+          actual=subprocess.check_output(
+            ["git","hash-object",str(target)],
+            text=True
+          ).strip()
+
+          if actual!=expected:
+              raise SystemExit(
+                "SAFETY STOP: Vehicle form changed."
+              )
+
+          original=target.read_text(encoding="utf-8")
+
+          start="const cameraPhotos=[];"
+          end="const form=document.getElementById('draftForm');"
+
+          if original.count(start)!=1 or original.count(end)!=1:
+              raise SystemExit(
+                "SAFETY STOP: Photo controls changed."
+              )
+
+          before,remaining=original.split(start,1)
+          old_section,after=remaining.split(end,1)
+
+          required=[
+            "vehicleCamera",
+            "vehiclePhotos",
+            "cameraPhotos.push",
+            "cameraInput.value=''",
+            "updatePhotoCount"
+          ]
+
+          if not all(x in old_section for x in required):
+              raise SystemExit(
+                "SAFETY STOP: Unexpected photo controls."
+              )
+
+          replacement="""const cameraPhotos=[];
+          const galleryPhotos=[];
+          const cameraInput=
+            document.getElementById('vehicleCamera');
+          const galleryInput=
+            document.getElementById('vehiclePhotos');
+          const photoCount=
+            document.getElementById('vehiclePhotoCount');
+
+          let photosReading=false;
+
+          function selectedPhotos(){
+            return [
+              ...galleryPhotos,
+              ...cameraPhotos
+            ];
+          }
+
+          function updatePhotoCount(){
+            const total=selectedPhotos().length;
+
+            photoCount.textContent=total
+              ?total+' of 6 photographs selected.'
+              :'No photographs selected yet.';
+          }
+
+          async function preparePhotos(files){
+            const reader=
+              window.ShopDropSharedPhotoReader;
+
+            if(!reader?.readOriginal){
+              throw Error(
+                'Picture reader unavailable. Please try again.'
+              );
+            }
+
+            const prepared=await Promise.all(
+              files.map(file=>reader.readOriginal(file))
+            );
+
+            return prepared.map((photo,index)=>
+              new File(
+                [photo.blob],
+                'vehicle-photo-'+index+'.'+photo.extension,
+                {type:photo.mime}
+              )
+            );
+          }
+
+          async function addPhotos(input,destination){
+            if(photosReading)return;
+
+            photosReading=true;
+            const submit=document.getElementById('submit');
+            const wasDisabled=submit.disabled;
+            submit.disabled=true;
+
+            try{
+              const files=Array.from(input.files||[]);
+
+              if(selectedPhotos().length+files.length>6){
+                throw Error(
+                  'Maximum 6 pictures. Please choose fewer.'
+                );
+              }
+
+              if(!files.length)return;
+
+              photoCount.textContent=
+                'Preparing your pictures...';
+
+              const saved=await preparePhotos(files);
+
+              destination.push(...saved);
+              updatePhotoCount();
+
+            }catch(error){
+              photoCount.textContent=
+                error?.message||
+                'Please choose your pictures again.';
+            }finally{
+              input.value='';
+              photosReading=false;
+              submit.disabled=wasDisabled;
+            }
+          }
+
+          galleryInput.addEventListener(
+            'change',
+            ()=>addPhotos(galleryInput,galleryPhotos)
+          );
+
+          cameraInput.addEventListener(
+            'change',
+            ()=>addPhotos(cameraInput,cameraPhotos)
+          );
+
+          """
+
+          updated=before+replacement+end+after
+
+          old_files="""    const photos=[
+                ...Array.from(galleryInput.files||[]),
+                ...cameraPhotos
+              ];"""
+
+          actual_files=(
+            "    const photos=[\n"
+            "      ...Array.from(galleryInput.files||[]),\n"
+            "      ...cameraPhotos\n"
+            "    ];"
+          )
+
+          new_files=(
+            "    if(photosReading){\n"
+            "      throw Error('Please wait for your pictures.');\n"
+            "    }\n"
+            "\n"
+            "    const photos=selectedPhotos();"
+          )
+
+          if updated.count(actual_files)!=1:
+              raise SystemExit(
+                "SAFETY STOP: Submission photo list changed."
+              )
+
+          updated=updated.replace(
+            actual_files,new_files,1
+          )
+
+          if updated.count("files:photos")!=1:
+              raise SystemExit(
+                "SAFETY STOP: Existing upload call changed."
+              )
+
+          if updated.count(
+            "kind:'vehicle'"
+          )!=1:
+              raise SystemExit(
+                "SAFETY STOP: Vehicle storage connection changed."
+              )
+
+          target.write_text(
+            updated,encoding="utf-8"
+          )
+
+          print("PASS: Phone photos prepared immediately")
+          print("PASS: Gallery photos prepared immediately")
+          print("PASS: Existing upload function retained")
+          print("PASS: Product and service files unchanged")
+          PY
+
+      - name: Verify changes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git diff --check
+
+          python3 - <<'PY'
+          import subprocess
+
+          changed=set(
+            subprocess.check_output(
+              ["git","diff","--name-only"],
+              text=True
+            ).splitlines()
+          )
+
+          if changed!={
+            "public/shopdrop-vehicle-draft-private.html"
+          }:
+              raise SystemExit(
+                "SAFETY STOP: Unexpected files modified."
+              )
+
+          protected={
+            "public/shopdrop-product-photos.js":
+              "8ed1f80f67814b9ffdc78ec827ea9293ad5ce7ea",
+            "public/shopdrop-ad-gallery-uploader.js":
+              "df15f7e665f0b292c613d92f6a7269340a6e8b5f"
+          }
+
+          for name,expected in protected.items():
+              actual=subprocess.check_output(
+                ["git","hash-object",name],
+                text=True
+              ).strip()
+
+              if actual!=expected:
+                  raise SystemExit(
+                    "SAFETY STOP: Protected uploader changed."
+                  )
+
+          print("PASS: Existing uploaders preserved")
+          PY
+
+      - name: Commit
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add \
+            public/shopdrop-vehicle-draft-private.html
+
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Fix117 preserve dispatch photographs"
+
+          git push origin HEAD:shopdrop-phase6-integration
