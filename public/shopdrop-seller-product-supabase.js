@@ -354,7 +354,7 @@ async function verifySeller(sb,userId){
         throw Error(
           'Product '+
           (data.listing_reference||data.id)+
-          ' is saved pending approval, '+
+          ' has been saved, '+
           'but photos are incomplete: '+
           (photoError?.message||'upload failed')+
           '. Keep this page open and press Submit '+
@@ -367,7 +367,7 @@ async function verifySeller(sb,userId){
         ' photos. Reference: '+
         (data.listing_reference||data.id)+
         '. Status: '+data.listing_status+
-        '. Awaiting approval.';
+        '. Publication follows the existing automated checks.';
 
     }catch(e){
       status.textContent=
