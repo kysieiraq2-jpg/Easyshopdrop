@@ -1,5 +1,5 @@
 
-name: ShopDrop Fix116 - Service Gallery Reliability
+name: ShopDrop Fix116 - Service Photo Reliability Corrected
 
 on:
   push:
@@ -22,7 +22,7 @@ jobs:
           ref: shopdrop-phase6-integration
           persist-credentials: true
 
-      - name: Preserve selected service photographs
+      - name: Correct existing service photo selection
         shell: bash
         run: |
           set -euo pipefail
@@ -31,7 +31,7 @@ jobs:
           from pathlib import Path
           import subprocess
 
-          target=Path(
+          path=Path(
             "public/shopdrop-seller-product-supabase.js"
           )
 
@@ -40,35 +40,44 @@ jobs:
           )
 
           actual=subprocess.check_output(
-            ["git","hash-object",str(target)],
+            ["git","hash-object",str(path)],
             text=True
           ).strip()
 
           if actual!=expected:
               raise SystemExit(
-                "SAFETY STOP: Service code has changed."
+                "SAFETY STOP: Service file version changed."
               )
 
-          original=target.read_text(
-            encoding="utf-8"
-          )
+          original=path.read_text(encoding="utf-8")
 
-          old_selection="""  const serviceCameraPhotos=[];
-          let serviceCameraBusy=false;
+          start="const serviceCameraPhotos=[];"
+          end="  async function submitService(){"
 
-          function serviceSelectedPhotos(){
-            const gallery=document.getElementById(
-              'serviceGalleryPhotos'
-            );
+          if original.count(start)!=1 or original.count(end)!=1:
+              raise SystemExit(
+                "SAFETY STOP: Service photo section changed."
+              )
 
-            return [
-              ...Array.from(gallery?.files||[]),
-              ...serviceCameraPhotos
-            ];
-          }"""
+          before,remaining=original.split(start,1)
+          previous,after=remaining.split(end,1)
 
-          new_selection="""  const serviceCameraPhotos=[];
-          let serviceGalleryPhotos=[];
+          required=[
+            "function serviceSelectedPhotos()",
+            "function servicePhotoCount()",
+            "function initServicePhotos()",
+            "serviceCameraBusy",
+            "serviceCameraPhoto",
+            "serviceGalleryPhotos"
+          ]
+
+          if not all(item in previous for item in required):
+              raise SystemExit(
+                "SAFETY STOP: Unexpected service photo code."
+              )
+
+          replacement="""const serviceCameraPhotos=[];
+          const serviceGalleryPhotos=[];
           let serviceCameraBusy=false;
           let serviceGalleryBusy=false;
 
@@ -79,14 +88,26 @@ jobs:
             ];
           }
 
+          function servicePhotoCount(){
+            const count=serviceSelectedPhotos().length;
+            const label=document.getElementById(
+              'servicePhotoCount'
+            );
+
+            if(label){
+              label.textContent=count
+                ?count+' of 6 photographs selected.'
+                :'No photographs selected yet.';
+            }
+          }
+
           async function preserveServicePhotos(files){
             const reader=
               window.ShopDropSharedPhotoReader;
 
             if(!reader?.readOriginal){
               throw Error(
-                'Picture reader unavailable. '+
-                'Please try again.'
+                'Picture reader unavailable. Please try again.'
               );
             }
 
@@ -101,161 +122,175 @@ jobs:
                 {type:photo.mime}
               )
             );
-          }"""
+          }
 
-          if original.count(old_selection)!=1:
-              raise SystemExit(
-                "SAFETY STOP: Service selection changed."
-              )
+          function initServicePhotos(){
+            const gallery=document.getElementById(
+              'serviceGalleryPhotos'
+            );
+            const camera=document.getElementById(
+              'serviceCameraPhoto'
+            );
 
-          updated=original.replace(
-            old_selection,new_selection,1
-          )
+            if(!gallery||!camera)return;
 
-          old_gallery="""    gallery.addEventListener(
-              'change',servicePhotoCount
-            );"""
+            gallery.addEventListener('change',async()=>{
+              if(serviceGalleryBusy)return;
+              serviceGalleryBusy=true;
 
-          new_gallery="""    gallery.addEventListener(
-              'change',async()=>{
-                if(serviceGalleryBusy)return;
+              const label=document.getElementById(
+                'servicePhotoCount'
+              );
 
-                serviceGalleryBusy=true;
+              try{
+                const files=Array.from(gallery.files||[]);
 
-                const label=document.getElementById(
-                  'servicePhotoCount'
-                );
-
-                try{
-                  const files=Array.from(
-                    gallery.files||[]
+                if(
+                  serviceSelectedPhotos().length+
+                  files.length>6
+                ){
+                  throw Error(
+                    'Maximum 6 pictures. Please choose fewer.'
                   );
-
-                  if(
-                    files.length+
-                    serviceCameraPhotos.length>6
-                  ){
-                    throw Error(
-                      'Maximum 6 photographs.'
-                    );
-                  }
-
-                  if(label){
-                    label.textContent=
-                      'Preparing your pictures...';
-                  }
-
-                  const saved=
-                    await preserveServicePhotos(files);
-
-                  serviceGalleryPhotos=saved;
-                  servicePhotoCount();
-
-                }catch(error){
-                  serviceGalleryPhotos=[];
-
-                  if(label){
-                    label.textContent=
-                      error?.message||
-                      'Please choose your pictures again.';
-                  }
-                }finally{
-                  gallery.value='';
-                  serviceGalleryBusy=false;
                 }
+
+                if(label){
+                  label.textContent='Preparing your pictures...';
+                }
+
+                const saved=await preserveServicePhotos(files);
+                serviceGalleryPhotos.push(...saved);
+                servicePhotoCount();
+
+              }catch(error){
+                if(label){
+                  label.textContent=
+                    error?.message||
+                    'Please choose your pictures again.';
+                }
+              }finally{
+                gallery.value='';
+                serviceGalleryBusy=false;
               }
-            );"""
+            });
 
-          if updated.count(old_gallery)!=1:
-              raise SystemExit(
-                "SAFETY STOP: Gallery handler changed."
-              )
+            camera.addEventListener('change',async()=>{
+              if(serviceCameraBusy)return;
+              serviceCameraBusy=true;
 
-          updated=updated.replace(
-            old_gallery,new_gallery,1
-          )
+              const label=document.getElementById(
+                'servicePhotoCount'
+              );
 
-          old_camera="""          const prepared=await Promise.all(
-                    files.map(f=>reader.readOriginal(f))
+              try{
+                const files=Array.from(camera.files||[]);
+
+                if(
+                  serviceSelectedPhotos().length+
+                  files.length>6
+                ){
+                  throw Error(
+                    'Maximum 6 pictures. Please choose fewer.'
                   );
+                }
 
-                  for(const photo of prepared){
-                    serviceCameraPhotos.push(
-                      new File(
-                        [photo.blob],
-                        'service-photo.'+photo.extension,
-                        {type:photo.mime}
-                      )
-                    );
-                  }"""
+                if(label){
+                  label.textContent='Preparing your picture...';
+                }
 
-          new_camera="""          const saved=
-                    await preserveServicePhotos(files);
+                const saved=await preserveServicePhotos(files);
+                serviceCameraPhotos.push(...saved);
+                servicePhotoCount();
 
-                  serviceCameraPhotos.push(...saved);"""
+              }catch(error){
+                if(label){
+                  label.textContent=
+                    error?.message||
+                    'Please try that picture again.';
+                }
+              }finally{
+                camera.value='';
+                serviceCameraBusy=false;
+              }
+            });
+          }
 
-          if updated.count(old_camera)!=1:
-              raise SystemExit(
-                "SAFETY STOP: Camera handler changed."
-              )
+          """
 
-          updated=updated.replace(
-            old_camera,new_camera,1
-          )
+          updated=before+replacement+end+after
 
-          old_busy="""      if(serviceCameraBusy){
+          old_guard="""      if(serviceCameraBusy){
                 throw Error('Please wait for your picture.');
               }"""
 
-          new_busy="""      if(serviceCameraBusy||serviceGalleryBusy){
-                throw Error(
-                  'Please wait while your pictures are prepared.'
-                );
-              }"""
+          # Match the actual original formatting.
+          old_guard=(
+            "      if(serviceCameraBusy){\n"
+            "        throw Error('Please wait for your picture.');\n"
+            "      }"
+          )
 
-          if updated.count(old_busy)!=1:
+          new_guard=(
+            "      if(serviceCameraBusy||serviceGalleryBusy){\n"
+            "        throw Error('Please wait for your pictures.');\n"
+            "      }"
+          )
+
+          if updated.count(old_guard)!=1:
               raise SystemExit(
                 "SAFETY STOP: Submission guard changed."
               )
 
           updated=updated.replace(
-            old_busy,new_busy,1
+            old_guard,new_guard,1
           )
 
-          old_reset="""      el('sn').value='';
-                el('sp').value='';
+          old_reset=(
+            "      el('sn').value='';\n"
+            "      el('sp').value='';\n"
+            "\n"
+            "      serviceFeePreviewLive();"
+          )
 
-                serviceFeePreviewLive();"""
-
-          new_reset="""      el('sn').value='';
-                el('sp').value='';
-
-                serviceGalleryPhotos=[];
-                serviceCameraPhotos.length=0;
-                servicePhotoCount();
-
-                serviceFeePreviewLive();"""
+          new_reset=(
+            "      el('sn').value='';\n"
+            "      el('sp').value='';\n"
+            "      serviceGalleryPhotos.length=0;\n"
+            "      serviceCameraPhotos.length=0;\n"
+            "      servicePhotoCount();\n"
+            "\n"
+            "      serviceFeePreviewLive();"
+          )
 
           if updated.count(old_reset)!=1:
               raise SystemExit(
-                "SAFETY STOP: Submission reset changed."
+                "SAFETY STOP: Service completion changed."
               )
 
           updated=updated.replace(
             old_reset,new_reset,1
           )
 
-          target.write_text(
+          # Preserve the rest of the service code exactly.
+          if not updated.startswith(before):
+              raise SystemExit("SAFETY STOP: Prefix changed.")
+
+          if "kind:'service'" not in updated:
+              raise SystemExit(
+                "SAFETY STOP: Existing upload call missing."
+              )
+
+          path.write_text(
             updated,encoding="utf-8"
           )
 
-          print("PASS: Gallery photos read immediately")
-          print("PASS: Camera photos still preserved")
-          print("PASS: Existing service upload retained")
-          print("PASS: No product code changed")
+          print("PASS: Gallery photos preserved immediately")
+          print("PASS: Phone camera photos preserved")
+          print("PASS: Existing uploader reused")
+          print("PASS: Existing service submission retained")
           PY
 
-      - name: Verify JavaScript and changes
+      - name: Verify JavaScript and unchanged product files
         shell: bash
         run: |
           set -euo pipefail
@@ -282,7 +317,25 @@ jobs:
                 "SAFETY STOP: Unexpected files modified."
               )
 
-          print("PASS: Only service submission file changed")
+          protected={
+            "public/shopdrop-product-photos.js":
+              "8ed1f80f67814b9ffdc78ec827ea9293ad5ce7ea",
+            "public/shopdrop-ad-gallery-uploader.js":
+              "df15f7e665f0b292c613d92f6a7269340a6e8b5f"
+          }
+
+          for name,expected in protected.items():
+              actual=subprocess.check_output(
+                ["git","hash-object",name],
+                text=True
+              ).strip()
+
+              if actual!=expected:
+                  raise SystemExit(
+                    "SAFETY STOP: Protected uploader changed."
+                  )
+
+          print("PASS: Only service photograph selection changed")
           PY
 
       - name: Commit
@@ -295,7 +348,6 @@ jobs:
 
           git -c user.name='github-actions[bot]' \
             -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-            commit -m "Fix116 preserve service gallery photos"
+            commit -m "Fix116 correct service photo selection"
 
           git push origin HEAD:shopdrop-phase6-integration
-
