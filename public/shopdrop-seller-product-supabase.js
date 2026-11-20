@@ -528,15 +528,13 @@ async function verifySeller(sb,userId){
   // Shared photo selection for Other Services.
 // Uses the same original-byte reader as Dispatch.
 const serviceCameraPhotos=[];
+const serviceGalleryPhotos=[];
 let serviceCameraBusy=false;
+let serviceGalleryBusy=false;
 
 function serviceSelectedPhotos(){
-  const gallery=document.getElementById(
-    'serviceGalleryPhotos'
-  );
-
   return [
-    ...Array.from(gallery?.files||[]),
+    ...serviceGalleryPhotos,
     ...serviceCameraPhotos
   ];
 }
@@ -554,6 +552,29 @@ function servicePhotoCount(){
   }
 }
 
+async function preserveServicePhotos(files){
+  const reader=
+    window.ShopDropSharedPhotoReader;
+
+  if(!reader?.readOriginal){
+    throw Error(
+      'Picture reader unavailable. Please try again.'
+    );
+  }
+
+  const prepared=await Promise.all(
+    files.map(file=>reader.readOriginal(file))
+  );
+
+  return prepared.map((photo,index)=>
+    new File(
+      [photo.blob],
+      'service-photo-'+index+'.'+photo.extension,
+      {type:photo.mime}
+    )
+  );
+}
+
 function initServicePhotos(){
   const gallery=document.getElementById(
     'serviceGalleryPhotos'
@@ -564,69 +585,85 @@ function initServicePhotos(){
 
   if(!gallery||!camera)return;
 
-  gallery.addEventListener(
-    'change',servicePhotoCount
-  );
+  gallery.addEventListener('change',async()=>{
+    if(serviceGalleryBusy)return;
+    serviceGalleryBusy=true;
 
-  camera.addEventListener(
-    'change',async()=>{
-      if(serviceCameraBusy)return;
-      serviceCameraBusy=true;
+    const label=document.getElementById(
+      'servicePhotoCount'
+    );
 
-      try{
-        const files=Array.from(
-          camera.files||[]
+    try{
+      const files=Array.from(gallery.files||[]);
+
+      if(
+        serviceSelectedPhotos().length+
+        files.length>6
+      ){
+        throw Error(
+          'Maximum 6 pictures. Please choose fewer.'
         );
-
-        if(
-          serviceSelectedPhotos().length+
-          files.length>6
-        ){
-          throw Error(
-            'Maximum 6 photographs.'
-          );
-        }
-
-        const reader=
-          window.ShopDropSharedPhotoReader;
-
-        if(!reader?.readOriginal){
-          throw Error(
-            'Photograph reader unavailable.'
-          );
-        }
-
-        const prepared=await Promise.all(
-          files.map(f=>reader.readOriginal(f))
-        );
-
-        for(const photo of prepared){
-          serviceCameraPhotos.push(
-            new File(
-              [photo.blob],
-              'service-photo.'+photo.extension,
-              {type:photo.mime}
-            )
-          );
-        }
-
-        servicePhotoCount();
-      }catch(error){
-        const label=document.getElementById(
-          'servicePhotoCount'
-        );
-
-        if(label){
-          label.textContent=
-            error?.message||
-            'Please try that picture again.';
-        }
-      }finally{
-        camera.value='';
-        serviceCameraBusy=false;
       }
+
+      if(label){
+        label.textContent='Preparing your pictures...';
+      }
+
+      const saved=await preserveServicePhotos(files);
+      serviceGalleryPhotos.push(...saved);
+      servicePhotoCount();
+
+    }catch(error){
+      if(label){
+        label.textContent=
+          error?.message||
+          'Please choose your pictures again.';
+      }
+    }finally{
+      gallery.value='';
+      serviceGalleryBusy=false;
     }
-  );
+  });
+
+  camera.addEventListener('change',async()=>{
+    if(serviceCameraBusy)return;
+    serviceCameraBusy=true;
+
+    const label=document.getElementById(
+      'servicePhotoCount'
+    );
+
+    try{
+      const files=Array.from(camera.files||[]);
+
+      if(
+        serviceSelectedPhotos().length+
+        files.length>6
+      ){
+        throw Error(
+          'Maximum 6 pictures. Please choose fewer.'
+        );
+      }
+
+      if(label){
+        label.textContent='Preparing your picture...';
+      }
+
+      const saved=await preserveServicePhotos(files);
+      serviceCameraPhotos.push(...saved);
+      servicePhotoCount();
+
+    }catch(error){
+      if(label){
+        label.textContent=
+          error?.message||
+          'Please try that picture again.';
+      }
+    }finally{
+      camera.value='';
+      serviceCameraBusy=false;
+    }
+  });
 }
 
   async function submitService(){
@@ -772,8 +809,8 @@ function initServicePhotos(){
         );
       }
 
-      if(serviceCameraBusy){
-        throw Error('Please wait for your picture.');
+      if(serviceCameraBusy||serviceGalleryBusy){
+        throw Error('Please wait for your pictures.');
       }
 
       const servicePhotos=serviceSelectedPhotos();
@@ -864,6 +901,9 @@ function initServicePhotos(){
 
       el('sn').value='';
       el('sp').value='';
+      serviceGalleryPhotos.length=0;
+      serviceCameraPhotos.length=0;
+      servicePhotoCount();
 
       serviceFeePreviewLive();
 
