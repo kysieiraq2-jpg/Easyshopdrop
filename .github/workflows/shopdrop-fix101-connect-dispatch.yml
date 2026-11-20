@@ -1,1 +1,176 @@
 
+
+name: ShopDrop Fix101 - Connect Dispatch Browsing
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix101-connect-dispatch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  connect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Connect dispatch to existing browse
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path=Path("public/categories.html")
+          original=path.read_text(encoding="utf-8")
+
+          anchor='<h2>Browse product departments A–Z</h2>'
+          script_anchor='<script src="v26-bridge.js"></script>'
+
+          if original.count(anchor)!=1 or original.count(script_anchor)!=1:
+              raise SystemExit("SAFETY STOP: browsing page changed")
+
+          if 'shopdropVehicleBrowsePanel' in original:
+              raise SystemExit("SAFETY STOP: already connected")
+
+          if 'shopdropCombinedServicesPanel' not in original:
+              raise SystemExit("SAFETY STOP: existing services missing")
+
+          section="""<div id="shopdropVehicleBrowsePanel"
+          style="margin-top:24px">
+          <h2>Dispatching &amp; Transport advertisements</h2>
+          <p id="shopdropVehicleBrowseStatus"
+             class="muted" aria-live="polite">
+          Loading vehicle advertisements...
+          </p>
+          <div id="shopdropVehicleBrowseResults"
+               class="grid" aria-live="polite"></div>
+          <p><a class="btn" href="./dispatching.html">
+          Browse Dispatching &amp; Transport
+          </a></p>
+          </div>
+          """
+
+          script="""<script>
+          /* Fix101: Public approved vehicle advertisements.
+             Existing products and services are unchanged. */
+          (async function(){
+            const results=document.getElementById(
+              'shopdropVehicleBrowseResults'
+            );
+            const status=document.getElementById(
+              'shopdropVehicleBrowseStatus'
+            );
+            if(!results||!status)return;
+
+            try{
+              const endpoint=
+                'https://dtkdvvxpwonywtsgqmdx.supabase.co' +
+                '/rest/v1/shopdrop_public_vehicle_adverts' +
+                '?select=id,vehicle_title,vehicle_description,' +
+                'vehicle_type,base_town,base_province,' +
+                'coverage_mode,created_at' +
+                '&order=created_at.desc&limit=50';
+
+              const response=await fetch(endpoint,{
+                headers:{
+                  apikey:
+                    'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q',
+                  Accept:'application/json'
+                }
+              });
+
+              if(!response.ok)throw Error('Request failed');
+
+              const items=await response.json();
+              if(!Array.isArray(items)){
+                throw Error('Invalid response');
+              }
+
+              const fragment=document.createDocumentFragment();
+
+              items.forEach(item=>{
+                const card=document.createElement('article');
+                card.className='result';
+
+                const type=document.createElement('small');
+                type.textContent='DISPATCHING & TRANSPORT';
+
+                const title=document.createElement('h3');
+                title.textContent=
+                  item.vehicle_title||'Vehicle advertisement';
+
+                const area=document.createElement('p');
+                area.className='muted';
+                area.textContent=[
+                  item.vehicle_type,
+                  item.base_town,
+                  item.base_province
+                ].filter(Boolean).join(' · ');
+
+                const description=document.createElement('p');
+                description.textContent=
+                  item.vehicle_description||'';
+
+                const link=document.createElement('a');
+                link.className='btn';
+                link.href='./dispatching.html';
+                link.textContent='View dispatch options';
+
+                card.append(
+                  type,title,area,description,link
+                );
+                fragment.append(card);
+              });
+
+              results.replaceChildren(fragment);
+              status.textContent=items.length
+                ?items.length+' vehicle advertisement(s) available.'
+                :'No vehicle advertisements yet.';
+
+            }catch(_){
+              status.textContent=
+                'Vehicle advertisements temporarily unavailable.';
+            }
+          })();
+          </script>
+          """
+
+          updated=original.replace(anchor,section+anchor,1)
+          updated=updated.replace(
+            script_anchor,script+script_anchor,1
+          )
+
+          restored=updated.replace(section+anchor,anchor,1)
+          restored=restored.replace(
+            script+script_anchor,script_anchor,1
+          )
+
+          if restored!=original:
+              raise SystemExit("SAFETY STOP: original code altered")
+
+          path.write_text(updated,encoding="utf-8")
+          print("PASS: Dispatch section connected")
+          print("PASS: Existing browsing code preserved")
+          PY
+
+      - name: Verify and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          test "$(git diff --name-only)" = "public/categories.html"
+
+          git add public/categories.html
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "Fix101 connect dispatch to existing browsing"
+
+          git push origin HEAD:shopdrop-phase6-integration
