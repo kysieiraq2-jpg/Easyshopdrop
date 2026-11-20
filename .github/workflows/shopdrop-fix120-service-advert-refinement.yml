@@ -1,1 +1,253 @@
 
+name: ShopDrop Fix120 - Service Advert Refinement
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix120-service-advert-refinement.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  refine-advertising:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Apply minimal advertising refinements
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          import subprocess
+
+          expected={
+            "public/service-taxonomy.js":
+              "5864b3254c99238765243fd4d4d1800fbe5d96da",
+            "public/seller.html":
+              "6856f4de545e198d2a73e7274a58bd0efb90ff92",
+            "public/shopdrop-vehicle-draft-private.html":
+              "38e8c6607d64481c7f1dbe6c9fefc6434dc3f4fa"
+          }
+
+          for name,sha in expected.items():
+            actual=subprocess.check_output(
+              ["git","hash-object",name],
+              text=True
+            ).strip()
+            if actual!=sha:
+              raise SystemExit(
+                "SAFETY STOP: Existing file changed: "+name
+              )
+
+          # Preserve the existing service taxonomy.
+          taxonomy=Path("public/service-taxonomy.js")
+          original=taxonomy.read_text(encoding="utf-8")
+          prefix="window.ShopDropServiceTaxonomy="
+
+          if not original.startswith(prefix):
+            raise SystemExit("Unexpected taxonomy format")
+
+          data=json.loads(
+            original[len(prefix):].strip().rstrip(";")
+          )
+
+          category="Childcare & Household Services"
+          if category not in data:
+            raise SystemExit("Childcare category missing")
+
+          additions=[
+            "Nanny Services",
+            "Evening Babysitting",
+            "Overnight Childcare",
+            "Live-in Nanny Services"
+          ]
+
+          for item in additions:
+            if item not in data[category]:
+              data[category].append(item)
+
+          data[category].sort()
+
+          taxonomy.write_text(
+            prefix+json.dumps(
+              data,ensure_ascii=False,
+              separators=(",",":")
+            )+";\n",
+            encoding="utf-8"
+          )
+
+          # Expand the EXISTING Other Services
+          # pricing dropdown, not the booking system.
+          seller=Path("public/seller.html")
+          source=seller.read_text(encoding="utf-8")
+
+          old=(
+            "<select id=su>"
+            "<option value=hour>Per hour</option>"
+            "<option value=day>Per day</option>"
+            "<option value=kilometre>Per kilometre</option>"
+            "<option value=gig>Per gig</option>"
+            "<option value=event>Per event</option>"
+            "<option value=job>Per job</option>"
+            "<option value=treatment>Per treatment</option>"
+            "</select>"
+          )
+
+          new=(
+            "<select id=su>"
+            "<option value=hour>Per hour</option>"
+            "<option value=half_day>Per half-day</option>"
+            "<option value=day>Per day</option>"
+            "<option value=night>Per night</option>"
+            "<option value=week>Per week</option>"
+            "<option value=month>Per month</option>"
+            "<option value=visit>Per visit</option>"
+            "<option value=kilometre>Per kilometre</option>"
+            "<option value=trip>Per trip</option>"
+            "<option value=load>Per load</option>"
+            "<option value=square_metre>Per square metre</option>"
+            "<option value=gig>Per gig</option>"
+            "<option value=event>Per event</option>"
+            "<option value=job>Per completed job</option>"
+            "<option value=treatment>Per treatment</option>"
+            "</select>"
+          )
+
+          if source.count(old)!=1:
+            raise SystemExit(
+              "SAFETY STOP: Pricing dropdown changed"
+            )
+
+          seller.write_text(
+            source.replace(old,new,1),
+            encoding="utf-8"
+          )
+
+          # Dispatching advertises SERVICES FOR HIRE.
+          # Correct wording without changing
+          # its existing photograph uploader.
+          dispatch=Path(
+            "public/shopdrop-vehicle-draft-private.html"
+          )
+          source=dispatch.read_text(encoding="utf-8")
+
+          replacements={
+            "<title>Vehicle Advertisement Draft | Shop&Drop</title>":
+              "<title>Dispatching Services for Hire | Shop&Drop</title>",
+            "<div>Vehicle Advertisement Submission</div>":
+              "<div>Dispatching Service Advertisement</div>",
+            "<h1>Advertise your vehicle</h1>":
+              "<h1>Advertise your transport or equipment service</h1>",
+            "Development-only form. This page is not":
+              "This service advertisement form is not yet",
+            "  connected to public browsing or bookings.":
+              "  connected to the complete booking and checkout journey.",
+            "Vehicle advertisement title":
+              "Transport or equipment service title",
+            "Vehicle type":
+              "Vehicle or equipment used for the service",
+            "Vehicle base town":
+              "Service provider base town",
+            "Vehicle base province":
+              "Service provider base province",
+            "Submit vehicle advertisement":
+              "Submit dispatching service advertisement"
+          }
+
+          for before,after in replacements.items():
+            if source.count(before)!=1:
+              raise SystemExit(
+                "SAFETY STOP: Dispatch wording changed: "+
+                before
+              )
+            source=source.replace(before,after,1)
+
+          dispatch.write_text(
+            source,encoding="utf-8"
+          )
+
+          print("PASS: Existing categories preserved")
+          print("PASS: Childcare options added")
+          print("PASS: Service pricing choices expanded")
+          print("PASS: Dispatching described as service hire")
+          print("PASS: Uploaders and bookings untouched")
+          PY
+
+      - name: Verify files and scope
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node --check public/service-taxonomy.js
+          git diff --check
+
+          python3 - <<'PY'
+          import subprocess
+
+          expected={
+            "public/service-taxonomy.js",
+            "public/seller.html",
+            "public/shopdrop-vehicle-draft-private.html"
+          }
+
+          changed=set(
+            subprocess.check_output(
+              ["git","diff","--name-only"],
+              text=True
+            ).splitlines()
+          )
+
+          if changed!=expected:
+            raise SystemExit(
+              "SAFETY STOP: Unexpected changed files"
+            )
+
+          protected={
+            "public/shopdrop-product-photos.js":
+              "8ed1f80f67814b9ffdc78ec827ea9293ad5ce7ea",
+            "public/shopdrop-ad-gallery-uploader.js":
+              "df15f7e665f0b292c613d92f6a7269340a6e8b5f"
+          }
+
+          for name,sha in protected.items():
+            actual=subprocess.check_output(
+              ["git","hash-object",name],
+              text=True
+            ).strip()
+
+            if actual!=sha:
+              raise SystemExit(
+                "SAFETY STOP: Protected uploader changed"
+              )
+
+          print("PASS: Only three intended files changed")
+          PY
+
+      - name: Commit to integration branch
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add \
+            public/service-taxonomy.js \
+            public/seller.html \
+            public/shopdrop-vehicle-draft-private.html
+
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Fix120 refine service advertising options"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
