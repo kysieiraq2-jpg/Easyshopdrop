@@ -1,5 +1,5 @@
 
-name: ShopDrop Fix130 - Visible Photograph Scan
+name: ShopDrop Fix131 - Visible Photo Scan Status
 
 on:
   push:
@@ -12,15 +12,14 @@ permissions:
   contents: write
 
 jobs:
-  install:
+  fix-scan-display:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
         with:
           ref: shopdrop-phase6-integration
 
-      - name: Connect scanner without changing uploader
+      - name: Install reliable scan display
         shell: bash
         run: |
           set -euo pipefail
@@ -29,11 +28,9 @@ jobs:
           from pathlib import Path
           import subprocess
 
-          page=Path('public/seller.html')
-
           expected={
             'public/seller.html':
-              '970976a26f3db38d88285eb7f487fa4f29e2ffa6',
+              '6db7246341e1a67ad54e47a32e480100dfbe7ff7',
             'public/shopdrop-product-photos.js':
               '8ed1f80f67814b9ffdc78ec827ea9293ad5ce7ea',
             'public/shopdrop-free-photo-screen.mjs':
@@ -45,181 +42,192 @@ jobs:
               ['git','hash-object',name],
               text=True
             ).strip()
-
             if actual!=sha:
               raise SystemExit(
-                'SAFETY STOP: File changed: '+name
+                'SAFETY STOP: Changed file '+name
               )
 
-          js=Path(
-            'public/shopdrop-photo-scan-visible.mjs'
-          )
-
-          if js.exists():
-            raise SystemExit(
-              'SAFETY STOP: Scanner connection exists'
-            )
-
-          js.write_text(r"""
-          import {scanPhotos} from
-            './shopdrop-free-photo-screen.mjs';
-
-          const ids=[
-            'photo',
-            'shopdropPhotoCamera'
-          ];
-
-          let sequence=0;
-
-          function createStatus(){
-            let box=document.getElementById(
-              'shopdropVisibleScanStatus'
-            );
-
-            if(box)return box;
-
-            const anchor=document.getElementById(
-              'uploadStatus'
-            );
-
-            if(!anchor)return null;
-
-            box=document.createElement('div');
-            box.id='shopdropVisibleScanStatus';
-            box.setAttribute('role','status');
-            box.setAttribute('aria-live','polite');
-            box.style.cssText=
-              'margin:12px 0;padding:12px;'+
-              'border:1px solid #cbd5e1;'+
-              'border-radius:8px;'+
-              'background:#f8fafc;'+
-              'white-space:pre-line';
-
-            box.textContent=
-              'Photograph scanning ready.';
-
-            anchor.after(box);
-            return box;
-          }
-
-          async function inspect(files){
-            const box=createStatus();
-            if(!box||!files.length)return;
-
-            const current=++sequence;
-
-            box.textContent=
-              'Scanning photographs… Please wait.';
-
-            try{
-              const results=await scanPhotos(
-                files,
-                progress=>{
-                  if(current!==sequence)return;
-
-                  if(progress?.state==='finished')return;
-
-                  box.textContent=
-                    'Scanning photographs… '+
-                    String(progress?.current||0)+
-                    ' of '+files.length;
-                }
-              );
-
-              if(current!==sequence)return;
-
-              const lines=results.map((result,index)=>{
-                const state=
-                  result.status==='reject'
-                    ?'Potential problem'
-                    :result.status==='review'
-                      ?'Could not confirm'
-                      :'No issue detected';
-
-                return (
-                  'Photo '+(index+1)+': '+state+
-                  (result.reason
-                    ?' — '+result.reason
-                    :'')
-                );
-              });
-
-              box.textContent=
-                'Photograph scan results:\n'+
-                lines.join('\n')+
-                '\n\nThis is a preliminary test. '+
-                'The existing upload process is unchanged.';
-
-            }catch(error){
-              if(current!==sequence)return;
-
-              box.textContent=
-                'Scanning could not finish. '+
-                'Photograph selection still works normally.';
-            }
-          }
-
-          function start(){
-            createStatus();
-
-            for(const id of ids){
-              const input=document.getElementById(id);
-              if(!input)continue;
-
-              // Capture files before the existing uploader
-              // clears its file input.
-              input.addEventListener(
-                'change',
-                event=>{
-                  const files=Array.from(
-                    event.target.files||[]
-                  );
-
-                  if(files.length){
-                    void inspect(files);
-                  }
-                },
-                true
-              );
-            }
-          }
-
-          if(document.readyState==='loading'){
-            document.addEventListener(
-              'DOMContentLoaded',start,{once:true}
-            );
-          }else{
-            start();
-          }
-          """.lstrip(),encoding='utf-8')
-
+          page=Path('public/seller.html')
           source=page.read_text(encoding='utf-8')
 
-          anchor=(
-            '<script src="./shopdrop-product-photos.js" defer>'
+          old=(
+            '<script type="module" '
+            'src="./shopdrop-photo-scan-visible.mjs">'
             '</script>'
           )
 
-          if source.count(anchor)!=1:
+          new=(
+            '<script defer '
+            'src="./shopdrop-photo-scan-status.js">'
+            '</script>'
+          )
+
+          if source.count(old)!=1:
             raise SystemExit(
-              'SAFETY STOP: Photograph script changed'
+              'SAFETY STOP: Scanner script changed'
             )
 
-          source=source.replace(
-            anchor,
-            anchor+
-            '<script type="module" '+
-            'src="./shopdrop-photo-scan-visible.mjs">'
-            '</script>',
-            1
-          )
+          source=source.replace(old,new,1)
 
           page.write_text(
             source,encoding='utf-8'
           )
 
-          print('PASS: Scanner connected to item form')
-          print('PASS: Original uploader untouched')
+          js=Path('public/shopdrop-photo-scan-status.js')
+
+          if js.exists():
+            raise SystemExit(
+              'SAFETY STOP: Status component exists'
+            )
+
+          js.write_text(r"""
+          (() => {
+            'use strict';
+
+            let sequence=0;
+
+            function statusBox(){
+              let box=document.getElementById(
+                'shopdropVisibleScanStatus'
+              );
+
+              if(box)return box;
+
+              const anchor=document.getElementById(
+                'uploadStatus'
+              );
+
+              if(!anchor)return null;
+
+              box=document.createElement('div');
+              box.id='shopdropVisibleScanStatus';
+              box.setAttribute('role','status');
+              box.setAttribute('aria-live','polite');
+              box.style.cssText=
+                'display:block;margin:12px 0;'+
+                'padding:14px;border-radius:9px;'+
+                'border:2px solid #0f766e;'+
+                'background:#effcf8;color:#123b32;'+
+                'white-space:pre-line;'+
+                'font-weight:600';
+
+              box.textContent=
+                'Photograph scanner ready. '+
+                'Choose a picture to test.';
+
+              anchor.after(box);
+              return box;
+            }
+
+            async function scan(files){
+              const box=statusBox();
+              if(!box||!files.length)return;
+
+              const run=++sequence;
+
+              box.textContent=
+                'Scanning '+files.length+
+                ' photograph(s)… Please wait.';
+
+              try{
+                const module=await import(
+                  './shopdrop-free-photo-screen.mjs'
+                );
+
+                if(run!==sequence)return;
+
+                if(typeof module.scanPhotos!=='function'){
+                  throw Error('Scanner unavailable');
+                }
+
+                const results=await module.scanPhotos(
+                  files,
+                  progress=>{
+                    if(run!==sequence)return;
+
+                    if(progress?.state==='scanning'){
+                      box.textContent=
+                        'Scanning photograph '+
+                        progress.current+
+                        ' of '+progress.total+'…';
+                    }
+                  }
+                );
+
+                if(run!==sequence)return;
+
+                const lines=results.map((result,i)=>{
+                  let outcome='No issue detected';
+
+                  if(result.status==='reject'){
+                    outcome='Potential problem';
+                  }else if(result.status==='review'){
+                    outcome='Needs further checking';
+                  }
+
+                  return (
+                    'Photograph '+(i+1)+': '+
+                    outcome+
+                    (result.reason
+                      ?' — '+result.reason
+                      :'')
+                  );
+                });
+
+                box.textContent=
+                  'Scan completed.\n'+
+                  lines.join('\n')+
+                  '\n\nPreliminary test only. '+
+                  'Photograph uploads are unchanged.';
+
+              }catch(error){
+                if(run!==sequence)return;
+
+                box.textContent=
+                  'Photograph scanning could not finish. '+
+                  'The normal photograph uploader '+
+                  'still works. Please send a screenshot.';
+              }
+            }
+
+            function init(){
+              statusBox();
+
+              for(const id of [
+                'photo',
+                'shopdropPhotoCamera'
+              ]){
+                const input=document.getElementById(id);
+                if(!input)continue;
+
+                input.addEventListener(
+                  'change',
+                  event=>{
+                    const files=Array.from(
+                      event.target.files||[]
+                    );
+
+                    if(files.length){
+                      void scan(files);
+                    }
+                  },
+                  true
+                );
+              }
+            }
+
+            if(document.readyState==='loading'){
+              document.addEventListener(
+                'DOMContentLoaded',init,{once:true}
+              );
+            }else{
+              init();
+            }
+          })();
+          """.lstrip(),encoding='utf-8')
+
+          print('PASS: Visible scanner status installed')
+          print('PASS: Original uploader unchanged')
           PY
 
       - name: Verify and commit
@@ -228,20 +236,19 @@ jobs:
           set -euo pipefail
 
           node --check \
-            public/shopdrop-photo-scan-visible.mjs
+            public/shopdrop-photo-scan-status.js
 
           git diff --check
 
           test "$(git diff --name-only)" = "public/seller.html"
-          test -f public/shopdrop-photo-scan-visible.mjs
+          test -f public/shopdrop-photo-scan-status.js
 
           git add \
             public/seller.html \
-            public/shopdrop-photo-scan-visible.mjs
+            public/shopdrop-photo-scan-status.js
 
           git -c user.name='github-actions[bot]' \
             -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-            commit -m "Fix130 show preliminary photo scanning on item form"
+            commit -m "Fix131 make photograph scan status visible"
 
           git push origin HEAD:shopdrop-phase6-integration
-
