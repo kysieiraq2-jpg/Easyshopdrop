@@ -1,10 +1,12 @@
 /*
- Shop&Drop Fix111
- Shared original-photo reader for future
- Other Services and Dispatch integration.
+ Shop&Drop Fix112 corrected photo preparation.
 
- Does not alter or activate any uploader.
- Does not publish or screen photographs.
+ Preserves original supported photographs.
+ Attempts automatic browser conversion for
+ other common camera photograph formats.
+
+ Does not change product uploads, storage,
+ screening, publication or payment rules.
 */
 (() => {
   'use strict';
@@ -20,9 +22,10 @@
     )return 'image/jpeg';
 
     const png=[137,80,78,71,13,10,26,10];
+
     if(
       bytes.length>=8 &&
-      png.every((value,i)=>bytes[i]===value)
+      png.every((v,i)=>bytes[i]===v)
     )return 'image/png';
 
     if(
@@ -44,7 +47,8 @@
     }catch(_){
       if(typeof FileReader==='undefined'){
         throw Error(
-          'Photograph could not be read.'
+          'We could not read this picture. '+
+          'Please choose it again.'
         );
       }
 
@@ -52,15 +56,14 @@
         (resolve,reject)=>{
           const reader=new FileReader();
 
-          reader.onload=()=>{
+          reader.onload=()=>
             resolve(reader.result);
-          };
 
-          reader.onerror=()=>{
+          reader.onerror=()=>
             reject(Error(
-              'Photograph could not be read.'
+              'We could not read this picture. '+
+              'Please choose it again.'
             ));
-          };
 
           reader.readAsArrayBuffer(file);
         }
@@ -68,15 +71,116 @@
     }
   }
 
+  async function convertPhoto(file){
+    let picture=null;
+    let objectUrl=null;
+
+    try{
+      if(
+        typeof createImageBitmap==='function'
+      ){
+        try{
+          picture=await createImageBitmap(file);
+        }catch(_){}
+      }
+
+      if(!picture){
+        if(
+          typeof Image==='undefined' ||
+          !URL?.createObjectURL
+        ){
+          throw Error('Decoder unavailable');
+        }
+
+        objectUrl=URL.createObjectURL(file);
+
+        picture=await new Promise(
+          (resolve,reject)=>{
+            const img=new Image();
+
+            img.onload=()=>resolve(img);
+            img.onerror=()=>reject(
+              Error('Picture could not be opened')
+            );
+
+            img.src=objectUrl;
+          }
+        );
+      }
+
+      const width=
+        picture.naturalWidth||picture.width;
+      const height=
+        picture.naturalHeight||picture.height;
+
+      if(
+        !width || !height ||
+        width*height>40000000
+      ){
+        throw Error('Invalid picture dimensions');
+      }
+
+      const canvas=
+        document.createElement('canvas');
+
+      canvas.width=width;
+      canvas.height=height;
+
+      const ctx=canvas.getContext('2d');
+
+      if(!ctx){
+        throw Error('Picture processing unavailable');
+      }
+
+      ctx.drawImage(
+        picture,0,0,width,height
+      );
+
+      const converted=await new Promise(
+        (resolve,reject)=>{
+          canvas.toBlob(
+            blob=>blob
+              ?resolve(blob)
+              :reject(Error('Conversion failed')),
+            'image/jpeg',
+            0.88
+          );
+        }
+      );
+
+      if(
+        !converted.size ||
+        converted.size>MAX_BYTES
+      ){
+        throw Error('Converted picture too large');
+      }
+
+      return converted;
+    }finally{
+      if(
+        picture &&
+        typeof picture.close==='function'
+      ){
+        picture.close();
+      }
+
+      if(objectUrl){
+        URL.revokeObjectURL(objectUrl);
+      }
+    }
+  }
+
   async function readOriginal(file){
-    if(
-      !file ||
-      !file.size ||
-      file.size>MAX_BYTES
-    ){
+    if(!file || !file.size){
       throw Error(
-        'Photograph must be between 1 byte '+
-        'and 10 MB.'
+        'Please choose a photograph.'
+      );
+    }
+
+    if(file.size>MAX_BYTES){
+      throw Error(
+        'This picture is too large. '+
+        'Please choose a smaller picture.'
       );
     }
 
@@ -85,23 +189,47 @@
 
     if(
       bytes.length!==file.size ||
-      !bytes.length ||
-      bytes.length>MAX_BYTES
+      !bytes.length
     ){
       throw Error(
-        'Photograph data is incomplete.'
+        'We could not read this picture. '+
+        'Please choose it again.'
       );
     }
 
-    const mime=detectMime(
+    let mime=detectMime(
       bytes.subarray(0,24)
     );
 
-    if(!mime){
-      throw Error(
-        'Only JPEG, PNG and WebP '+
-        'photographs are supported.'
+    let blob;
+
+    if(mime){
+      blob=new Blob(
+        [bytes],{type:mime}
       );
+    }else{
+      const name=String(file.name||'');
+      const cameraFormat=
+        /^image\//i.test(file.type||'') ||
+        /\.(heic|heif|avif|jpg|jpeg|png|webp|bmp|gif)$/i
+          .test(name);
+
+      if(!cameraFormat){
+        throw Error(
+          'This file is not a supported picture. '+
+          'Please choose a photograph.'
+        );
+      }
+
+      try{
+        blob=await convertPhoto(file);
+        mime='image/jpeg';
+      }catch(_){
+        throw Error(
+          'This picture could not be opened. '+
+          'Please try another picture.'
+        );
+      }
     }
 
     const extension={
@@ -109,10 +237,6 @@
       'image/png':'png',
       'image/webp':'webp'
     }[mime];
-
-    const blob=new Blob(
-      [bytes],{type:mime}
-    );
 
     return Object.freeze({
       blob,
@@ -133,11 +257,11 @@
       selected.length>6
     ){
       throw Error(
-        'Select between 1 and 6 photographs.'
+        'Please select between 1 and 6 pictures.'
       );
     }
 
-    return await Promise.all(
+    return Promise.all(
       selected.map(readOriginal)
     );
   }

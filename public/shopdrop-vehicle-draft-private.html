@@ -118,7 +118,7 @@ button:disabled{opacity:.5}
   Vehicle photographs (1 to 6)
   <input id="vehiclePhotos"
          type="file"
-         accept="image/jpeg,image/png,image/webp"
+         accept="image/*,.heic,.heif,.avif"
          multiple required>
 </label>
 <p class="muted">
@@ -207,14 +207,9 @@ form.addEventListener('submit',async event=>{
     }
 
     for(const photo of photos){
-      if(
-        !['image/jpeg','image/png','image/webp']
-          .includes(photo.type)||
-        photo.size<1||
-        photo.size>10485760
-      ){
+      if(photo.size<1 || photo.size>10485760){
         throw Error(
-          'Use JPEG, PNG or WebP photographs, maximum 10 MB each.'
+          'Please choose a picture smaller than 10 MB.'
         );
       }
     }
