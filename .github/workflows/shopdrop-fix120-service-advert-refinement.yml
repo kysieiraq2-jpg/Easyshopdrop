@@ -1,5 +1,5 @@
 
-name: ShopDrop Fix120 - Service Advert Refinement
+name: ShopDrop Fix120 - Service Advert Refinement Corrected
 
 on:
   push:
@@ -22,7 +22,7 @@ jobs:
           ref: shopdrop-phase6-integration
           persist-credentials: true
 
-      - name: Apply minimal advertising refinements
+      - name: Apply verified minimal corrections
         shell: bash
         run: |
           set -euo pipefail
@@ -48,10 +48,10 @@ jobs:
             ).strip()
             if actual!=sha:
               raise SystemExit(
-                "SAFETY STOP: Existing file changed: "+name
+                "SAFETY STOP: File version changed: "+name
               )
 
-          # Preserve the existing service taxonomy.
+          # Existing categories: add only missing childcare.
           taxonomy=Path("public/service-taxonomy.js")
           original=taxonomy.read_text(encoding="utf-8")
           prefix="window.ShopDropServiceTaxonomy="
@@ -67,14 +67,12 @@ jobs:
           if category not in data:
             raise SystemExit("Childcare category missing")
 
-          additions=[
+          for item in [
             "Nanny Services",
             "Evening Babysitting",
             "Overnight Childcare",
             "Live-in Nanny Services"
-          ]
-
-          for item in additions:
+          ]:
             if item not in data[category]:
               data[category].append(item)
 
@@ -82,14 +80,14 @@ jobs:
 
           taxonomy.write_text(
             prefix+json.dumps(
-              data,ensure_ascii=False,
+              data,
+              ensure_ascii=False,
               separators=(",",":")
             )+";\n",
             encoding="utf-8"
           )
 
-          # Expand the EXISTING Other Services
-          # pricing dropdown, not the booking system.
+          # Expand existing service pricing dropdown.
           seller=Path("public/seller.html")
           source=seller.read_text(encoding="utf-8")
 
@@ -127,7 +125,7 @@ jobs:
 
           if source.count(old)!=1:
             raise SystemExit(
-              "SAFETY STOP: Pricing dropdown changed"
+              "SAFETY STOP: Service pricing changed"
             )
 
           seller.write_text(
@@ -135,42 +133,61 @@ jobs:
             encoding="utf-8"
           )
 
-          # Dispatching advertises SERVICES FOR HIRE.
-          # Correct wording without changing
-          # its existing photograph uploader.
+          # Correct customer-facing Dispatching wording.
+          # Do not modify JS identifiers or uploader code.
           dispatch=Path(
             "public/shopdrop-vehicle-draft-private.html"
           )
           source=dispatch.read_text(encoding="utf-8")
 
-          replacements={
-            "<title>Vehicle Advertisement Draft | Shop&Drop</title>":
-              "<title>Dispatching Services for Hire | Shop&Drop</title>",
-            "<div>Vehicle Advertisement Submission</div>":
-              "<div>Dispatching Service Advertisement</div>",
-            "<h1>Advertise your vehicle</h1>":
-              "<h1>Advertise your transport or equipment service</h1>",
-            "Development-only form. This page is not":
-              "This service advertisement form is not yet",
-            "  connected to public browsing or bookings.":
-              "  connected to the complete booking and checkout journey.",
-            "Vehicle advertisement title":
-              "Transport or equipment service title",
-            "Vehicle type":
-              "Vehicle or equipment used for the service",
-            "Vehicle base town":
-              "Service provider base town",
-            "Vehicle base province":
-              "Service provider base province",
-            "Submit vehicle advertisement":
-              "Submit dispatching service advertisement"
-          }
+          replacements=[
+            (
+              "<title>Vehicle Advertisement Draft | Shop&Drop</title>",
+              "<title>Dispatching Services for Hire | Shop&Drop</title>"
+            ),
+            (
+              "<div>Vehicle Advertisement Submission</div>",
+              "<div>Dispatching Service Advertisement</div>"
+            ),
+            (
+              "<h1>Advertise your vehicle</h1>",
+              "<h1>Advertise your transport or equipment service</h1>"
+            ),
+            (
+              "Development-only form. This page is not",
+              "This service advertisement form is not yet"
+            ),
+            (
+              "  connected to public browsing or bookings.",
+              "  connected to the complete booking and checkout journey."
+            ),
+            (
+              "    Vehicle advertisement title\n",
+              "    Transport or equipment service title\n"
+            ),
+            (
+              "    Vehicle type\n",
+              "    Vehicle or equipment used for the service\n"
+            ),
+            (
+              "    Vehicle base town\n",
+              "    Service provider base town\n"
+            ),
+            (
+              "    Vehicle base province\n",
+              "    Service provider base province\n"
+            ),
+            (
+              "    Submit vehicle advertisement\n",
+              "    Submit dispatching service advertisement\n"
+            )
+          ]
 
-          for before,after in replacements.items():
+          for before,after in replacements:
             if source.count(before)!=1:
               raise SystemExit(
-                "SAFETY STOP: Dispatch wording changed: "+
-                before
+                "SAFETY STOP: Wording changed: "+
+                repr(before)
               )
             source=source.replace(before,after,1)
 
@@ -178,14 +195,13 @@ jobs:
             source,encoding="utf-8"
           )
 
-          print("PASS: Existing categories preserved")
           print("PASS: Childcare options added")
-          print("PASS: Service pricing choices expanded")
-          print("PASS: Dispatching described as service hire")
-          print("PASS: Uploaders and bookings untouched")
+          print("PASS: Pricing choices expanded")
+          print("PASS: Dispatching wording corrected")
+          print("PASS: Existing JS and uploaders preserved")
           PY
 
-      - name: Verify files and scope
+      - name: Verify changes
         shell: bash
         run: |
           set -euo pipefail
@@ -211,7 +227,7 @@ jobs:
 
           if changed!=expected:
             raise SystemExit(
-              "SAFETY STOP: Unexpected changed files"
+              "SAFETY STOP: Unexpected file changes"
             )
 
           protected={
@@ -226,16 +242,15 @@ jobs:
               ["git","hash-object",name],
               text=True
             ).strip()
-
             if actual!=sha:
               raise SystemExit(
                 "SAFETY STOP: Protected uploader changed"
               )
 
-          print("PASS: Only three intended files changed")
+          print("PASS: Protected uploaders unchanged")
           PY
 
-      - name: Commit to integration branch
+      - name: Commit
         shell: bash
         run: |
           set -euo pipefail
@@ -247,6 +262,6 @@ jobs:
 
           git -c user.name='github-actions[bot]' \
             -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-            commit -m "Fix120 refine service advertising options"
+            commit -m "Fix120 correct service advert refinements"
 
           git push origin HEAD:shopdrop-phase6-integration
