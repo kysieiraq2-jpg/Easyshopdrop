@@ -1,1 +1,233 @@
 
+
+name: ShopDrop Fix96 - Connect Services to Existing Browse
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix96-connect-services-browsing.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  connect-services:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Add isolated services section
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path=Path("public/categories.html")
+          original=path.read_text(encoding="utf-8")
+
+          # Confirm the previously verified page.
+          if original.count(
+            '<section class="panel" id="browse-all-items">'
+          )!=1:
+              raise SystemExit("SAFETY STOP: browse section changed")
+
+          old_grid=(
+            '<div id="shopdropPublicProductResults" '
+            'class="grid" aria-live="polite"></div>'
+          )
+
+          old_more=(
+            '<button id="shopdropLoadMore" '
+            'class="btn" type="button" hidden>'
+            'Load more products</button>'
+          )
+
+          old_heading='<h2>Browse product departments A–Z</h2>'
+          old_script='<script src="v26-bridge.js"></script>'
+
+          for marker in [
+              old_grid,old_more,old_heading,old_script
+          ]:
+              if original.count(marker)!=1:
+                  raise SystemExit(
+                      "SAFETY STOP: original structure changed"
+                  )
+
+          if "shopdropCombinedServices" in original:
+              raise SystemExit(
+                  "SAFETY STOP: services already connected"
+              )
+
+          for required in [
+              "public/shopdrop-services-connector.js",
+              "public/shopdrop-combined-service-cards.js"
+          ]:
+              if not Path(required).exists():
+                  raise SystemExit(
+                      "SAFETY STOP: missing "+required
+                  )
+
+          # Only insert a separate service area.
+          new_section="""<div id="shopdropCombinedServicesPanel"
+          style="margin-top:24px">
+          <h2>Other Services advertisements</h2>
+          <p id="shopdropCombinedServicesStatus"
+             class="muted" aria-live="polite">
+          Loading approved services...
+          </p>
+          <div id="shopdropCombinedServices"
+               class="grid" aria-live="polite"></div>
+          <p>
+          <a class="btn" href="./services.html">
+          Browse all Other Services
+          </a>
+          </p>
+          </div>
+          """
+
+          updated=original.replace(
+              old_heading,
+              new_section+old_heading,
+              1
+          )
+
+          # Existing service connector and Fix95 card
+          # component are loaded without modifying them.
+          new_scripts="""<script src="./shopdrop-services-connector.js"></script>
+          <script src="./shopdrop-combined-service-cards.js"></script>
+          <script>
+          /* Fix96: isolated services display.
+             Existing product browsing remains unchanged. */
+          (function(){
+            const container=document.getElementById(
+              'shopdropCombinedServices'
+            );
+            const status=document.getElementById(
+              'shopdropCombinedServicesStatus'
+            );
+
+            if(!container||!status)return;
+
+            const component=window.ShopDropCombinedServiceCards;
+
+            if(!component||typeof component.render!=='function'){
+              status.textContent=
+                'Service advertisements are temporarily unavailable.';
+              return;
+            }
+
+            component.render(container)
+              .then(count=>{
+                status.textContent=count
+                  ?count+' approved service advertisement(s).'
+                  :'No approved service advertisements yet.';
+              })
+              .catch(()=>{
+                status.textContent=
+                  'Service advertisements are temporarily unavailable.';
+              });
+          })();
+          </script>
+          """
+
+          updated=updated.replace(
+              old_script,
+              new_scripts+old_script,
+              1
+          )
+
+          # Exact reversibility check.
+          restored=updated.replace(
+              new_section+old_heading,
+              old_heading,1
+          ).replace(
+              new_scripts+old_script,
+              old_script,1
+          )
+
+          if restored!=original:
+              raise SystemExit(
+                  "SAFETY STOP: existing code was altered"
+              )
+
+          for token in [
+              "browsePublicProducts({view:browseView})",
+              "shopdropPublicProductResults",
+              "shopdropLoadMore",
+              "browseProductImages",
+              "browse-all-items"
+          ]:
+              if token not in updated:
+                  raise SystemExit(
+                      "SAFETY STOP: product browsing missing"
+                  )
+
+          path.write_text(updated,encoding="utf-8")
+
+          print("PASS: Existing product code preserved")
+          print("PASS: Separate service area connected")
+          print("PASS: Main-menu navigation unchanged")
+          PY
+
+      - name: Verify exact scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+
+          python3 - <<'PY'
+          import subprocess
+
+          changed=subprocess.check_output(
+              ["git","diff","--name-only"],
+              text=True
+          ).splitlines()
+
+          assert changed==["public/categories.html"], (
+              "SAFETY STOP: unexpected files changed"
+          )
+
+          print("PASS: Only categories.html changed")
+          PY
+
+      - name: Commit controlled connection
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add public/categories.html
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "Fix96 connect approved services to existing browse"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload existing website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy website
+        id: deployment
+        uses: actions/deploy-pages@v4
