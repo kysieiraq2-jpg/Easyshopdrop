@@ -434,6 +434,57 @@ country.value='ZA';
 country.disabled=true;
 currencyHint.textContent='South African marketplace — prices shown in the listing currency.';
 </script>
+<script>
+/* Fix79: navigation only; existing product
+   retrieval and photo code remains unchanged. */
+(function(){
+  if(location.hash!=='#browse-all-items')return;
+
+  const section=document.getElementById(
+    'browse-all-items'
+  );
+  const results=document.getElementById(
+    'shopdropPublicProductResults'
+  );
+
+  if(!section||!results)return;
+
+  function jump(){
+    requestAnimationFrame(()=>{
+      requestAnimationFrame(()=>{
+        section.scrollIntoView({
+          behavior:'auto',
+          block:'start'
+        });
+      });
+    });
+  }
+
+  // Position at advertisements immediately.
+  jump();
+
+  // Reposition once the asynchronous
+  // product cards have been rendered.
+  if(results.children.length){
+    jump();
+  }else{
+    const observer=new MutationObserver(()=>{
+      if(results.children.length){
+        observer.disconnect();
+        jump();
+      }
+    });
+
+    observer.observe(results,{
+      childList:true
+    });
+  }
+
+  window.addEventListener('load',jump,{
+    once:true
+  });
+})();
+</script>
 <script src="v26-bridge.js"></script>
 
 <script defer src="shopdrop-buyer-language.js"></script>
