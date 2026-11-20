@@ -1,1 +1,259 @@
 
+name: ShopDrop Fix112 - Connect Shared Photo Reader
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix112-connect-photo-reader.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  connect-photo-reader:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Apply minimal compatible connection
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          protected={
+            "public/shopdrop-product-photos.js":
+              "8ed1f80f67814b9ffdc78ec827ea9293ad5ce7ea",
+            "public/shopdrop-shared-photo-reader.js":
+              "7ddd6863e2f75373da9df1f0f38a6b353cce5c30",
+            "public/shopdrop-ad-gallery-uploader.js":
+              "7d855aca7d4dee92ed5d07e5424a5aa9cac214ee",
+            "public/shopdrop-vehicle-draft-private.html":
+              "1b10236bc3781f437b4f200f576ddc6c7cf14542"
+          }
+
+          for filename,expected in protected.items():
+              actual=subprocess.check_output(
+                ["git","hash-object",filename],
+                text=True
+              ).strip()
+
+              if actual!=expected:
+                  raise SystemExit(
+                    "SAFETY STOP: Unexpected file version: "+
+                    filename
+                  )
+
+          uploader=Path(
+            "public/shopdrop-ad-gallery-uploader.js"
+          )
+
+          original=uploader.read_text(
+            encoding="utf-8"
+          )
+
+          old_validation="""    for(const file of selected){
+                if(!MIME[file.type] ||
+                   file.size<1 ||
+                   file.size>10485760){
+                  throw Error(
+                    'JPEG, PNG or WebP required; maximum 10 MB each.'
+                  );
+                }
+              }"""
+
+          actual_validation=(
+            "    for(const file of selected){\n"
+            "      if(!MIME[file.type] ||\n"
+            "         file.size<1 ||\n"
+            "         file.size>10485760){\n"
+            "        throw Error(\n"
+            "          'JPEG, PNG or WebP required; maximum 10 MB each.'\n"
+            "        );\n"
+            "      }\n"
+            "    }"
+          )
+
+          new_validation=(
+            "    // Fix112: Use original-byte reading when available.\n"
+            "    // Preserve the previous uploader when it is absent.\n"
+            "    const reader=window.ShopDropSharedPhotoReader;\n"
+            "    const prepared=reader?.readSelection\n"
+            "      ?await reader.readSelection(selected)\n"
+            "      :null;\n"
+            "\n"
+            "    if(!prepared){\n"
+            +actual_validation+
+            "\n    }"
+          )
+
+          old_upload=(
+            "      const file=selected[i];\n"
+            "      const position=available[i];\n"
+            "      const filename=\n"
+            "        crypto.randomUUID()+'.'+MIME[file.type];"
+          )
+
+          new_upload=(
+            "      const file=selected[i];\n"
+            "      const originalPhoto=prepared?.[i];\n"
+            "      const uploadBody=originalPhoto?.blob||file;\n"
+            "      const uploadMime=originalPhoto?.mime||file.type;\n"
+            "      const position=available[i];\n"
+            "      const filename=\n"
+            "        crypto.randomUUID()+'.'+MIME[uploadMime];"
+          )
+
+          old_storage=(
+            "          .upload(path,file,{\n"
+            "            contentType:file.type,\n"
+            "            upsert:false\n"
+            "          });"
+          )
+
+          new_storage=(
+            "          .upload(path,uploadBody,{\n"
+            "            contentType:uploadMime,\n"
+            "            upsert:false\n"
+            "          });"
+          )
+
+          replacements=[
+            (actual_validation,new_validation),
+            (old_upload,new_upload),
+            (old_storage,new_storage)
+          ]
+
+          updated=original
+
+          for old,new in replacements:
+              if updated.count(old)!=1:
+                  raise SystemExit(
+                    "SAFETY STOP: Uploader structure changed"
+                  )
+              updated=updated.replace(old,new,1)
+
+          restored=updated
+
+          for old,new in reversed(replacements):
+              if restored.count(new)!=1:
+                  raise SystemExit(
+                    "SAFETY STOP: Replacement mismatch"
+                  )
+              restored=restored.replace(new,old,1)
+
+          if restored!=original:
+              raise SystemExit(
+                "SAFETY STOP: Unrelated uploader code changed"
+              )
+
+          form=Path(
+            "public/shopdrop-vehicle-draft-private.html"
+          )
+
+          form_original=form.read_text(
+            encoding="utf-8"
+          )
+
+          old_script=(
+            '<script src="./shopdrop-ad-gallery-uploader.js">'
+            '</script>'
+          )
+
+          new_script=(
+            '<script src="./shopdrop-shared-photo-reader.js">'
+            '</script>\n'
+            +old_script
+          )
+
+          if form_original.count(old_script)!=1:
+              raise SystemExit(
+                "SAFETY STOP: Vehicle script changed"
+              )
+
+          form_updated=form_original.replace(
+            old_script,new_script,1
+          )
+
+          if form_updated.replace(
+            new_script,old_script,1
+          )!=form_original:
+              raise SystemExit(
+                "SAFETY STOP: Vehicle form changed unexpectedly"
+              )
+
+          uploader.write_text(
+            updated,encoding="utf-8"
+          )
+
+          form.write_text(
+            form_updated,encoding="utf-8"
+          )
+
+          print("PASS: Shared reader connected")
+          print("PASS: Existing fallback retained")
+          print("PASS: Vehicle form loads reader")
+          print("PASS: Product uploader unchanged")
+          PY
+
+      - name: Verify files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node --check \
+            public/shopdrop-ad-gallery-uploader.js
+
+          node --check \
+            public/shopdrop-shared-photo-reader.js
+
+          git diff --check
+
+          python3 - <<'PY'
+          import subprocess
+
+          expected={
+            "public/shopdrop-ad-gallery-uploader.js",
+            "public/shopdrop-vehicle-draft-private.html"
+          }
+
+          actual=set(
+            subprocess.check_output(
+              ["git","diff","--name-only"],
+              text=True
+            ).splitlines()
+          )
+
+          if actual!=expected:
+              raise SystemExit(
+                "SAFETY STOP: Unexpected files modified"
+              )
+
+          print("PASS: Only two intended files changed")
+          PY
+
+      - name: Commit verified connection
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add \
+            public/shopdrop-ad-gallery-uploader.js \
+            public/shopdrop-vehicle-draft-private.html
+
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Fix112 connect shared photo reader safely"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
