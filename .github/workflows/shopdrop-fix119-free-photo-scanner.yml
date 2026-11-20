@@ -1,1 +1,435 @@
 
+name: ShopDrop Fix119 - Free Photo Scanner
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix119-free-photo-scanner.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  install-scanner:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Install scanner and testing page
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test ! -e public/shopdrop-free-photo-screen.mjs
+          test ! -e public/shopdrop-photo-scan-test.html
+
+          cat > public/shopdrop-free-photo-screen.mjs <<'JS'
+          /*
+           * Shop&Drop Fix119
+           * Free preliminary photograph screening.
+           *
+           * Tesseract.js: text recognition
+           * ZXing: QR and barcode recognition
+           *
+           * Does not authorize public publication.
+           * Does not change existing uploaders.
+           */
+
+          let workerPromise;
+          let barcodeReaderPromise;
+
+          const patterns = [
+            [
+              'Email address',
+              /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i
+            ],
+            [
+              'Website',
+              /https?:\/\/|www\.|[a-z0-9-]+\.(?:co\.za|com|net|org)\b/i
+            ],
+            [
+              'Telephone number',
+              /(?:\+27|0)[\s().-]*(?:\d[\s().-]*){9}(?!\d)/
+            ],
+            [
+              'Contact information',
+              /\b(?:whatsapp|call me|contact us|dm me|instagram|facebook|telegram)\b/i
+            ],
+            [
+              'Street address',
+              /\b\d{1,5}\s+(?:[a-z]+\s+){1,4}(?:street|road|avenue|drive|lane|close|crescent)\b/i
+            ]
+          ];
+
+          async function getOCRWorker() {
+            if (!workerPromise) {
+              workerPromise = import(
+                'https://esm.sh/tesseract.js@5'
+              ).then(({createWorker}) =>
+                createWorker('eng')
+              ).catch(error => {
+                workerPromise = null;
+                throw error;
+              });
+            }
+
+            return workerPromise;
+          }
+
+          async function getBarcodeReader() {
+            if (!barcodeReaderPromise) {
+              barcodeReaderPromise = import(
+                'https://esm.sh/@zxing/browser@0.1.5'
+              ).then(({BrowserMultiFormatReader}) =>
+                new BrowserMultiFormatReader()
+              ).catch(error => {
+                barcodeReaderPromise = null;
+                throw error;
+              });
+            }
+
+            return barcodeReaderPromise;
+          }
+
+          async function detectBarcode(file) {
+            const reader = await getBarcodeReader();
+            const url = URL.createObjectURL(file);
+
+            try {
+              try {
+                const result =
+                  await reader.decodeFromImageUrl(url);
+
+                return Boolean(result);
+              } catch (error) {
+                if (
+                  error?.name === 'NotFoundException' ||
+                  error?.constructor?.name ===
+                    'NotFoundException'
+                ) {
+                  return false;
+                }
+
+                throw error;
+              }
+            } finally {
+              URL.revokeObjectURL(url);
+            }
+          }
+
+          function inspectText(text) {
+            const normalized =
+              String(text || '').normalize('NFKC');
+
+            for (const [reason, pattern] of patterns) {
+              if (pattern.test(normalized)) {
+                return {
+                  status: 'reject',
+                  reason
+                };
+              }
+            }
+
+            if (normalized.trim()) {
+              return {
+                status: 'review',
+                reason: 'Other writing detected'
+              };
+            }
+
+            return {
+              status: 'preliminary_pass',
+              reason: 'No prohibited writing detected'
+            };
+          }
+
+          export async function scanPhotos(
+            files,
+            onProgress = () => {}
+          ) {
+            const selected = Array.from(files || []);
+
+            if (
+              selected.length < 1 ||
+              selected.length > 6
+            ) {
+              throw Error(
+                'Choose between 1 and 6 photographs.'
+              );
+            }
+
+            const results = [];
+
+            for (
+              let i = 0;
+              i < selected.length;
+              i++
+            ) {
+              const file = selected[i];
+              const started = performance.now();
+
+              onProgress({
+                state: 'scanning',
+                current: i + 1,
+                total: selected.length
+              });
+
+              if (
+                !file.type.startsWith('image/') ||
+                !file.size ||
+                file.size > 10485760
+              ) {
+                results.push({
+                  name: file.name,
+                  status: 'review',
+                  reason: 'Invalid or oversized photograph',
+                  seconds: 0
+                });
+
+                continue;
+              }
+
+              try {
+                const [ocr, barcode] =
+                  await Promise.all([
+                    getOCRWorker().then(worker =>
+                      worker.recognize(file)
+                    ),
+                    detectBarcode(file)
+                  ]);
+
+                const decision = barcode
+                  ? {
+                      status: 'reject',
+                      reason: 'QR code or barcode'
+                    }
+                  : inspectText(ocr.data?.text);
+
+                results.push({
+                  name: file.name,
+                  ...decision,
+                  seconds: Number(
+                    (
+                      (performance.now() - started) /
+                      1000
+                    ).toFixed(1)
+                  )
+                });
+
+              } catch (error) {
+                results.push({
+                  name: file.name,
+                  status: 'review',
+                  reason:
+                    'Scanning unavailable or inconclusive',
+                  seconds: Number(
+                    (
+                      (performance.now() - started) /
+                      1000
+                    ).toFixed(1)
+                  )
+                });
+              }
+            }
+
+            onProgress({
+              state: 'finished',
+              current: selected.length,
+              total: selected.length
+            });
+
+            return results;
+          }
+          JS
+
+          cat > public/shopdrop-photo-scan-test.html <<'HTML'
+          <!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport"
+                  content="width=device-width,initial-scale=1">
+
+            <title>
+              Shop&Drop Photograph Screening Test
+            </title>
+
+            <style>
+              body {
+                font: 16px system-ui, sans-serif;
+                max-width: 680px;
+                margin: 24px auto;
+                padding: 16px;
+                line-height: 1.5;
+              }
+
+              button, input {
+                font: inherit;
+                margin: 12px 0;
+              }
+
+              button {
+                padding: 12px 20px;
+              }
+
+              li {
+                margin: 12px 0;
+              }
+            </style>
+          </head>
+
+          <body>
+            <h1>
+              Shop&Drop Photograph Screening Test
+            </h1>
+
+            <p>
+              Select up to six photographs from your
+              phone, tablet, laptop or computer.
+            </p>
+
+            <p>
+              Photographs are checked locally in
+              your browser. They are not uploaded
+              or published by this test.
+            </p>
+
+            <input
+              id="photos"
+              type="file"
+              accept="image/*"
+              multiple
+            >
+
+            <div>
+              <button id="start" type="button">
+                Scan photographs
+              </button>
+            </div>
+
+            <p
+              id="status"
+              role="status"
+              aria-live="polite"
+            >
+              Ready to test.
+            </p>
+
+            <ol id="results"></ol>
+
+            <script type="module">
+              import {scanPhotos} from
+                './shopdrop-free-photo-screen.mjs';
+
+              const input =
+                document.getElementById('photos');
+
+              const button =
+                document.getElementById('start');
+
+              const status =
+                document.getElementById('status');
+
+              const list =
+                document.getElementById('results');
+
+              button.addEventListener(
+                'click',
+                async () => {
+                  button.disabled = true;
+                  list.replaceChildren();
+
+                  const started = performance.now();
+
+                  try {
+                    const results =
+                      await scanPhotos(
+                        input.files,
+                        progress => {
+                          status.textContent =
+                            progress.state === 'scanning'
+                              ? 'Scanning photograph ' +
+                                progress.current +
+                                ' of ' +
+                                progress.total + '...'
+                              : 'Scanning completed.';
+                        }
+                      );
+
+                    for (const result of results) {
+                      const item =
+                        document.createElement('li');
+
+                      item.textContent =
+                        result.name + ' — ' +
+                        result.status + ' — ' +
+                        result.reason + ' — ' +
+                        result.seconds + ' seconds';
+
+                      list.append(item);
+                    }
+
+                    const seconds = (
+                      (performance.now() - started) /
+                      1000
+                    ).toFixed(1);
+
+                    status.textContent =
+                      'Finished ' +
+                      results.length +
+                      ' photographs in ' +
+                      seconds +
+                      ' seconds.';
+
+                  } catch (error) {
+                    status.textContent =
+                      error.message ||
+                      'Scanning failed.';
+                  } finally {
+                    button.disabled = false;
+                  }
+                }
+              );
+            </script>
+          </body>
+          </html>
+          HTML
+
+      - name: Verify installed files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node --check \
+            public/shopdrop-free-photo-screen.mjs
+
+          git diff --check
+
+          test -s \
+            public/shopdrop-free-photo-screen.mjs
+
+          test -s \
+            public/shopdrop-photo-scan-test.html
+
+      - name: Commit scanner files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add \
+            public/shopdrop-free-photo-screen.mjs \
+            public/shopdrop-photo-scan-test.html
+
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Fix119 install free photo scanner test"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
