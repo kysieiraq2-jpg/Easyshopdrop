@@ -1,1 +1,255 @@
 
+name: ShopDrop Fix113 - Vehicle Camera Selection
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix113-vehicle-camera.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  add-camera:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Add camera option without changing uploader
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          target=Path(
+            "public/shopdrop-vehicle-draft-private.html"
+          )
+
+          expected=(
+            "9943dfe01af131b5121b9fbe6769437cf559910a"
+          )
+
+          actual=subprocess.check_output(
+            ["git","hash-object",str(target)],
+            text=True
+          ).strip()
+
+          if actual!=expected:
+              raise SystemExit(
+                "SAFETY STOP: Vehicle form has changed."
+              )
+
+          original=target.read_text(encoding="utf-8")
+
+          old_label=(
+            "  Vehicle photographs (1 to 6)\n"
+            '  <input id="vehiclePhotos"'
+          )
+
+          new_label=(
+            "  Choose photographs from your phone "
+            "or computer (up to 6)\n"
+            '  <input id="vehiclePhotos"'
+          )
+
+          if original.count(old_label)!=1:
+              raise SystemExit(
+                "SAFETY STOP: Photo picker not found."
+              )
+
+          updated=original.replace(
+            old_label,new_label,1
+          )
+
+          old_end=(
+            "         multiple required>\n"
+            "</label>\n"
+            '<p class="muted">'
+          )
+
+          new_end=(
+            "         multiple>\n"
+            "</label>\n"
+            '<label for="vehicleCamera">\n'
+            "  Or take a photograph with your phone\n"
+            '  <input id="vehicleCamera"\n'
+            '         type="file"\n'
+            '         accept="image/*"\n'
+            '         capture="environment">\n'
+            "</label>\n"
+            '<p id="vehiclePhotoCount" class="muted" '
+            'role="status">\n'
+            "  No photographs selected yet.\n"
+            "</p>\n"
+            '<p class="muted">'
+          )
+
+          if updated.count(old_end)!=1:
+              raise SystemExit(
+                "SAFETY STOP: Photo input changed."
+              )
+
+          updated=updated.replace(
+            old_end,new_end,1
+          )
+
+          old_script=(
+            "const form=document.getElementById('draftForm');"
+          )
+
+          new_script="""const cameraPhotos=[];
+          const cameraInput=
+            document.getElementById('vehicleCamera');
+          const galleryInput=
+            document.getElementById('vehiclePhotos');
+          const photoCount=
+            document.getElementById('vehiclePhotoCount');
+
+          function updatePhotoCount(){
+            const total=
+              Array.from(galleryInput.files||[]).length+
+              cameraPhotos.length;
+
+            photoCount.textContent=
+              total===0
+                ?'No photographs selected yet.'
+                :total+' of 6 photographs selected.';
+          }
+
+          galleryInput.addEventListener(
+            'change',updatePhotoCount
+          );
+
+          cameraInput.addEventListener('change',()=>{
+            const newPhotos=
+              Array.from(cameraInput.files||[]);
+
+            const galleryCount=
+              Array.from(galleryInput.files||[]).length;
+
+            if(
+              galleryCount+
+              cameraPhotos.length+
+              newPhotos.length>6
+            ){
+              photoCount.textContent=
+                'Maximum 6 photographs. '+
+                'Please remove some before adding more.';
+            }else{
+              cameraPhotos.push(...newPhotos);
+              updatePhotoCount();
+            }
+
+            cameraInput.value='';
+          });
+
+          const form=document.getElementById('draftForm');"""
+
+          if updated.count(old_script)!=1:
+              raise SystemExit(
+                "SAFETY STOP: Form initialization changed."
+              )
+
+          updated=updated.replace(
+            old_script,new_script,1
+          )
+
+          old_files="""    const photos=Array.from(
+                document.getElementById(
+                  'vehiclePhotos'
+                ).files||[]
+              );"""
+
+          actual_files=(
+            "    const photos=Array.from(\n"
+            "      document.getElementById(\n"
+            "        'vehiclePhotos'\n"
+            "      ).files||[]\n"
+            "    );"
+          )
+
+          new_files=(
+            "    const photos=[\n"
+            "      ...Array.from(galleryInput.files||[]),\n"
+            "      ...cameraPhotos\n"
+            "    ];"
+          )
+
+          if updated.count(actual_files)!=1:
+              raise SystemExit(
+                "SAFETY STOP: Existing photo collection changed."
+              )
+
+          updated=updated.replace(
+            actual_files,new_files,1
+          )
+
+          if updated.count(
+            "files:photos"
+          )!=1:
+              raise SystemExit(
+                "SAFETY STOP: Upload call changed."
+              )
+
+          target.write_text(
+            updated,encoding="utf-8"
+          )
+
+          print("PASS: Camera input added")
+          print("PASS: Existing gallery input retained")
+          print("PASS: Same uploadGallery call retained")
+          print("PASS: Maximum six photos retained")
+          PY
+
+      - name: Verify only intended form changed
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git diff --check
+
+          python3 - <<'PY'
+          import subprocess
+
+          changed=set(
+            subprocess.check_output(
+              ["git","diff","--name-only"],
+              text=True
+            ).splitlines()
+          )
+
+          expected={
+            "public/shopdrop-vehicle-draft-private.html"
+          }
+
+          if changed!=expected:
+              raise SystemExit(
+                "SAFETY STOP: Unexpected files changed."
+              )
+
+          print("PASS: Only vehicle form modified")
+          PY
+
+      - name: Commit correction
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add \
+            public/shopdrop-vehicle-draft-private.html
+
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Fix113 add simple vehicle camera option"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
