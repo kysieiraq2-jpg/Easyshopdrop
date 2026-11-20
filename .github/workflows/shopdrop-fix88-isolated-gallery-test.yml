@@ -1,1 +1,290 @@
 
+name: ShopDrop Fix88 - Isolated Gallery Test
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix88-isolated-gallery-test.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  create-test-page:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Create separate test page
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          target=Path(
+            "public/shopdrop-ad-gallery-private-test.html"
+          )
+
+          if target.exists():
+              raise SystemExit(
+                "SAFETY STOP: test page already exists"
+              )
+
+          uploader=Path(
+            "public/shopdrop-ad-gallery-uploader.js"
+          )
+
+          if not uploader.exists():
+              raise SystemExit(
+                "SAFETY STOP: Fix87 uploader missing"
+              )
+
+          page=r'''<!doctype html>
+          <html lang="en">
+          <head>
+          <meta charset="utf-8">
+          <meta name="viewport"
+                content="width=device-width,initial-scale=1">
+          <title>Shop&Drop Gallery Test</title>
+          <style>
+          *{box-sizing:border-box}
+          body{
+            margin:0;
+            font:16px Arial,sans-serif;
+            background:#f4f6f8;
+            color:#17202a;
+          }
+          main{
+            max-width:760px;
+            margin:auto;
+            padding:16px;
+          }
+          section{
+            background:white;
+            padding:20px;
+            border-radius:12px;
+          }
+          label{
+            display:block;
+            margin:16px 0;
+          }
+          input,select,button{
+            width:100%;
+            padding:12px;
+            font:inherit;
+            margin-top:6px;
+          }
+          button{
+            background:#0f766e;
+            color:white;
+            border:0;
+            border-radius:8px;
+          }
+          button:disabled{
+            opacity:.5;
+          }
+          #status{
+            white-space:pre-wrap;
+            margin-top:18px;
+          }
+          .notice{
+            color:#64748b;
+          }
+          </style>
+          </head>
+          <body>
+          <main>
+          <section>
+          <h1>Advertisement Gallery Test</h1>
+
+          <p class="notice">
+            Restricted development test.
+            This page is not linked from the
+            Shop&Drop website.
+          </p>
+
+          <p>
+            Upload up to six photographs to
+            an advertisement you own.
+          </p>
+
+          <p class="notice">
+            Photographs remain private.
+            They are not automatically approved
+            or published.
+          </p>
+
+          <label for="kind">
+            Advertisement type
+          </label>
+          <select id="kind">
+            <option value="service">
+              Other Services
+            </option>
+            <option value="vehicle">
+              Dispatch vehicle
+            </option>
+          </select>
+
+          <label for="advertisement">
+            Existing advertisement ID
+          </label>
+          <input
+            id="advertisement"
+            type="text"
+            autocomplete="off"
+            placeholder="Advertisement UUID"
+          >
+
+          <label for="photos">
+            Choose photographs
+          </label>
+          <input
+            id="photos"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+          >
+
+          <button id="upload" type="button">
+            Upload photographs privately
+          </button>
+
+          <p id="status" role="status"
+             aria-live="polite">
+            No upload started.
+          </p>
+          </section>
+          </main>
+
+          <script src="./shopdrop-ad-gallery-uploader.js"></script>
+
+          <script type="module">
+          import {createClient} from
+            'https://esm.sh/@supabase/supabase-js@2';
+
+          const client=createClient(
+            'https://dtkdvvxpwonywtsgqmdx.supabase.co',
+            'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q',
+            {
+              auth:{
+                persistSession:true,
+                autoRefreshToken:true,
+                detectSessionInUrl:true
+              }
+            }
+          );
+
+          const button=document.getElementById('upload');
+          const status=document.getElementById('status');
+          const photos=document.getElementById('photos');
+          const advertisement=
+            document.getElementById('advertisement');
+          const kind=document.getElementById('kind');
+
+          const uuid=
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+          button.addEventListener('click',async()=>{
+            if(button.disabled)return;
+
+            const id=advertisement.value.trim();
+            const files=Array.from(photos.files||[]);
+
+            if(!uuid.test(id)){
+              status.textContent=
+                'Enter a valid advertisement ID.';
+              return;
+            }
+
+            if(files.length<1 || files.length>6){
+              status.textContent=
+                'Choose between one and six photographs.';
+              return;
+            }
+
+            button.disabled=true;
+            status.textContent=
+              'Checking ownership and uploading privately...';
+
+            try{
+              const uploader=
+                window.ShopDropAdGalleryUploader;
+
+              if(!uploader?.uploadGallery){
+                throw Error('Uploader unavailable.');
+              }
+
+              const result=await uploader.uploadGallery({
+                client,
+                kind:kind.value,
+                advertisementId:id,
+                files
+              });
+
+              status.textContent=
+                result.savedCount+
+                ' photograph(s) saved privately. '+
+                'Not publicly published.';
+
+              photos.value='';
+            }catch(error){
+              status.textContent=
+                error?.message||
+                'Upload failed.';
+            }finally{
+              button.disabled=false;
+            }
+          });
+          </script>
+          </body>
+          </html>'''
+
+          target.write_text(page,encoding="utf-8")
+
+          print("PASS: New private test page prepared")
+          PY
+
+      - name: Verify no tested files changed
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add public/shopdrop-ad-gallery-private-test.html
+          git diff --cached --check
+
+          python3 - <<'PY'
+          import subprocess
+
+          changed=subprocess.check_output(
+            ["git","diff","--cached","--name-only"],
+            text=True
+          ).splitlines()
+
+          assert changed==[
+            "public/shopdrop-ad-gallery-private-test.html"
+          ], "SAFETY STOP: unexpected file changed"
+
+          print("PASS: Existing website files untouched")
+          PY
+
+      - name: Commit isolated test page
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "Fix88 add isolated gallery upload test"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
