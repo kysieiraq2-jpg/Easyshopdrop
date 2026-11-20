@@ -1,1 +1,226 @@
 
+name: ShopDrop Fix107 - Approval Wording Only
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix107-approval-wording.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  wording-only:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Correct wording without changing functions
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          changes = {
+            "public/seller.html": {
+              "sha": "62d26b388eac318212663e26a6687bdb894a92e6",
+              "replacements": [
+                (
+                  "Edits require fresh admin approval.",
+                  "Changes are processed under the existing automated listing rules."
+                ),
+                (
+                  '<option value="Other Service — requires approval">Other Service — requires approval</option>',
+                  '<option value="Other Service — requires approval">Other Service — additional category</option>'
+                ),
+                (
+                  "Other Service details look ready and will require Shop&Drop approval. ",
+                  "Other Service details are ready for automated processing. "
+                )
+              ]
+            },
+            "public/shopdrop-seller-product-supabase.js": {
+              "sha": "59ad7026288a44a9bc686d811c305e8a06d35fb2",
+              "replacements": [
+                (
+                  " is saved pending approval, ",
+                  " has been saved, "
+                ),
+                (
+                  ". Awaiting approval.",
+                  ". Publication follows the existing automated checks."
+                )
+              ]
+            },
+            "public/services.html": {
+              "sha": "8644cdf39ac089bd9af0815578f723db09589f4b",
+              "replacements": [
+                (
+                  '<b>Other Service — requires approval</b>',
+                  '<b>Other Service — additional category</b>'
+                ),
+                (
+                  "Shop&Drop approval is required; physical-goods advertising is not allowed here.",
+                  "Automated listing rules apply; physical-goods advertising is not allowed here."
+                )
+              ]
+            }
+          }
+
+          updates = {}
+
+          for filename, config in changes.items():
+              path = Path(filename)
+
+              if not path.is_file():
+                  raise SystemExit(
+                      "SAFETY STOP: Missing " + filename
+                  )
+
+              current_sha = subprocess.check_output(
+                  ["git", "hash-object", filename],
+                  text=True
+              ).strip()
+
+              if current_sha != config["sha"]:
+                  raise SystemExit(
+                      "SAFETY STOP: File changed since inspection: "
+                      + filename
+                  )
+
+              original = path.read_text(
+                  encoding="utf-8"
+              )
+
+              updated = original
+
+              for old, new in config["replacements"]:
+                  count = updated.count(old)
+
+                  if count != 1:
+                      raise SystemExit(
+                          "SAFETY STOP: Expected exactly one match "
+                          + "in " + filename
+                          + " but found " + str(count)
+                      )
+
+                  updated = updated.replace(
+                      old, new, 1
+                  )
+
+              # Reconstruct the original from the
+              # replacement strings. Any unexpected
+              # modification causes a safety stop.
+              restored = updated
+
+              for old, new in reversed(
+                  config["replacements"]
+              ):
+                  if restored.count(new) != 1:
+                      raise SystemExit(
+                          "SAFETY STOP: Replacement mismatch "
+                          + filename
+                      )
+
+                  restored = restored.replace(
+                      new, old, 1
+                  )
+
+              if restored != original:
+                  raise SystemExit(
+                      "SAFETY STOP: Unrelated code modified "
+                      + filename
+                  )
+
+              updates[filename] = updated
+
+          # Protect the original internal service
+          # category and JavaScript comparison.
+          seller = updates["public/seller.html"]
+
+          if (
+              'value="Other Service — requires approval"'
+              not in seller
+              or
+              "sc.value==='Other Service — requires approval'"
+              not in seller
+          ):
+              raise SystemExit(
+                  "SAFETY STOP: Service category logic changed"
+              )
+
+          services = updates["public/services.html"]
+
+          if (
+              'data-category="Other Service — requires approval"'
+              not in services
+          ):
+              raise SystemExit(
+                  "SAFETY STOP: Service filtering changed"
+              )
+
+          # Write only after every check passes.
+          for filename, content in updates.items():
+              Path(filename).write_text(
+                  content, encoding="utf-8"
+              )
+
+          print("PASS: Three files updated")
+          print("PASS: Only displayed text changed")
+          print("PASS: Service category values preserved")
+          print("PASS: JavaScript comparisons preserved")
+          print("PASS: No Supabase changes")
+          PY
+
+      - name: Verify and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git diff --check
+
+          python3 - <<'PY'
+          import subprocess
+
+          expected = {
+            "public/seller.html",
+            "public/services.html",
+            "public/shopdrop-seller-product-supabase.js"
+          }
+
+          actual = set(
+            subprocess.check_output(
+              ["git", "diff", "--name-only"],
+              text=True
+            ).splitlines()
+          )
+
+          if actual != expected:
+              raise SystemExit(
+                "SAFETY STOP: Unexpected files changed"
+              )
+
+          print("PASS: Only three approved files changed")
+          PY
+
+          git add \
+            public/seller.html \
+            public/services.html \
+            public/shopdrop-seller-product-supabase.js
+
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Fix107 correct approval wording only"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
