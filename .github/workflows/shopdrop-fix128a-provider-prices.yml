@@ -1,5 +1,5 @@
 
-name: ShopDrop Fix128A - Provider Prices Only
+name: ShopDrop Fix128A - Correct Provider Prices
 
 on:
   push:
@@ -16,11 +16,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
         with:
           ref: shopdrop-phase6-integration
 
-      - name: Correct customer rate display
+      - name: Correct provider price display
         shell: bash
         run: |
           set -euo pipefail
@@ -29,134 +30,96 @@ jobs:
           from pathlib import Path
           import subprocess
 
-          files={
+          files = {
             "public/shopdrop-customer-service-rates.js":
               "99f1cc038bbe87449a14062b18a3816b1dc22f5d",
             "public/shopdrop-dispatch-customer-rates.js":
               "4c84e5ad461b11658528c97769daf1f360235974"
           }
 
-          for name,expected in files.items():
-            actual=subprocess.check_output(
-              ["git","hash-object",name],
+          for name, expected in files.items():
+            actual = subprocess.check_output(
+              ["git", "hash-object", name],
               text=True
             ).strip()
 
-            if actual!=expected:
+            if actual != expected:
               raise SystemExit(
-                "SAFETY STOP: File changed: "+name
+                "SAFETY STOP: File changed: " + name
               )
 
-          def replace_once(source,old,new,name):
-            if source.count(old)!=1:
+          def replace_once(source, old, new, label):
+            if source.count(old) != 1:
               raise SystemExit(
-                "SAFETY STOP: Unexpected code: "+name
+                "SAFETY STOP: " + label
               )
-            return source.replace(old,new,1)
+            return source.replace(old, new, 1)
 
-          service=Path(
+          service = Path(
             "public/shopdrop-customer-service-rates.js"
           )
-          source=service.read_text(encoding="utf-8")
+          source = service.read_text(encoding="utf-8")
 
-          old="""  function customerCents(price){
-            const cents=Math.round(Number(price)*100);
+          old = """    const fee=cents<100000
+                ?Math.round(cents*0.10)
+                :Math.round(cents*0.07);
 
-            if(!Number.isSafeInteger(cents)||
-               cents<=0)return null;
+              return cents+fee;"""
 
-            const fee=cents<100000
-              ?Math.round(cents*0.10)
-              :Math.round(cents*0.07);
+          new = """    // Display provider price only.
+              // Commission is added at checkout.
+              return cents;"""
 
-            return cents+fee;
-          }"""
-
-          new="""  function customerCents(price){
-            const cents=Math.round(Number(price)*100);
-
-            if(!Number.isSafeInteger(cents)||
-               cents<=0)return null;
-
-            // Provider's advertised amount only.
-            // Commission belongs at checkout.
-            return cents;
-          }"""
-
-          source=replace_once(
-            source,old,new,"service commission"
+          source = replace_once(
+            source, old, new,
+            "Service price calculation changed"
           )
 
-          source=replace_once(
+          source = replace_once(
             source,
             "Estimated customer total: ",
             "Service booking price: ",
-            "service price label"
-          )
-
-          source=replace_once(
-            source,
-            "'Preview only. Dates, availability '+",
-            "'Provider price only. Dates, availability '+",
-            "service explanation"
+            "Service price label changed"
           )
 
           service.write_text(
-            source,encoding="utf-8"
+            source, encoding="utf-8"
           )
 
-          dispatch=Path(
+          dispatch = Path(
             "public/shopdrop-dispatch-customer-rates.js"
           )
-          source=dispatch.read_text(encoding="utf-8")
+          source = dispatch.read_text(encoding="utf-8")
 
-          old="""  function unitCents(price){
-            const cents=Math.round(Number(price)*100);
-            if(!Number.isSafeInteger(cents)||
-               cents<=0)return null;
+          old = """    const commission=cents<100000
+                ?Math.round(cents*0.10)
+                :Math.round(cents*0.07);
 
-            const commission=cents<100000
-              ?Math.round(cents*0.10)
-              :Math.round(cents*0.07);
+              return cents+commission;"""
 
-            return cents+commission;
-          }"""
+          new = """    // Display provider price only.
+              // Commission is added at checkout.
+              return cents;"""
 
-          new="""  function unitCents(price){
-            const cents=Math.round(Number(price)*100);
-            if(!Number.isSafeInteger(cents)||
-               cents<=0)return null;
-
-            // Provider's advertised amount only.
-            // Commission belongs at checkout.
-            return cents;
-          }"""
-
-          source=replace_once(
-            source,old,new,"dispatch commission"
+          source = replace_once(
+            source, old, new,
+            "Dispatch price calculation changed"
           )
 
-          source=replace_once(
+          source = replace_once(
             source,
             "Estimated customer price: ",
             "Dispatch service price: ",
-            "dispatch price label"
-          )
-
-          source=replace_once(
-            source,
-            "'Price preview only. Availability and '+",
-            "'Provider price only. Availability and '+",
-            "dispatch explanation"
+            "Dispatch price label changed"
           )
 
           dispatch.write_text(
-            source,encoding="utf-8"
+            source, encoding="utf-8"
           )
 
-          print("PASS: Service price excludes commission")
-          print("PASS: Dispatch price excludes commission")
-          print("PASS: Existing booking code preserved")
+          print("PASS: Service provider prices only")
+          print("PASS: Dispatch provider prices only")
+          print("PASS: Existing checkout untouched")
           PY
 
       - name: Verify and commit
@@ -175,24 +138,24 @@ jobs:
           python3 - <<'PY'
           import subprocess
 
-          expected={
+          expected = {
             "public/shopdrop-customer-service-rates.js",
             "public/shopdrop-dispatch-customer-rates.js"
           }
 
-          changed=set(
+          changed = set(
             subprocess.check_output(
-              ["git","diff","--name-only"],
+              ["git", "diff", "--name-only"],
               text=True
             ).splitlines()
           )
 
-          if changed!=expected:
+          if changed != expected:
             raise SystemExit(
-              "SAFETY STOP: Unexpected files changed"
+              "SAFETY STOP: Unexpected changed files"
             )
 
-          print("PASS: Only two rate components changed")
+          print("PASS: Only intended files changed")
           PY
 
           git add \
@@ -201,7 +164,6 @@ jobs:
 
           git -c user.name='github-actions[bot]' \
             -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-            commit -m "Fix128A show provider prices before checkout"
+            commit -m "Fix128A correct provider price display"
 
           git push origin HEAD:shopdrop-phase6-integration
-
