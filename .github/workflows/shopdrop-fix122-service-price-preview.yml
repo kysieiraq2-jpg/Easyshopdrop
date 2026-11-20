@@ -1,1 +1,148 @@
 
+name: ShopDrop Fix122 - Safe Service Price Preview
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix122-service-price-preview.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+
+      - name: Add isolated customer price preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          path=Path('public/services.html')
+          expected='e782d67caecd47ccc083de17c7ff622ef30780d8'
+          actual=subprocess.check_output(
+            ['git','hash-object',str(path)],
+            text=True
+          ).strip()
+          if actual!=expected:
+            raise SystemExit('SAFETY STOP: Services page changed')
+
+          source=path.read_text(encoding='utf-8')
+
+          anchor="""  el.append(heading);
+            if(imageValid)el.append(photo);
+            el.append(area,description,price,notice);
+            serviceResults.append(el);"""
+
+          if source.count(anchor)!=1:
+            raise SystemExit('SAFETY STOP: Listing renderer changed')
+
+          replacement="""  el.append(heading);
+            if(imageValid)el.append(photo);
+            el.append(area,description,price,notice);
+
+            // Read-only customer preview. No booking or payment.
+            const cents=Number(x.unit_price_cents);
+            const minimum=Number(x.minimum_units)||1;
+
+            if(
+              x.id &&
+              Number.isSafeInteger(cents) &&
+              cents>0 &&
+              Number.isFinite(minimum) &&
+              minimum>0
+            ){
+              const preview=document.createElement('div');
+              preview.className='shopdrop-service-price-preview';
+
+              const label=document.createElement('label');
+              label.textContent='Number of units: ';
+
+              const quantity=document.createElement('input');
+              quantity.type='number';
+              quantity.min=String(minimum);
+              quantity.step='1';
+              quantity.value=String(Math.ceil(minimum));
+              quantity.style.maxWidth='120px';
+              quantity.setAttribute(
+                'aria-label','Number of service units'
+              );
+
+              const total=document.createElement('p');
+              total.setAttribute('aria-live','polite');
+
+              function updateTotal(){
+                const units=Number(quantity.value);
+
+                if(
+                  !Number.isSafeInteger(units) ||
+                  units<minimum ||
+                  units>100000
+                ){
+                  total.textContent='Enter a valid number of units.';
+                  return;
+                }
+
+                const amount=cents*units;
+
+                if(!Number.isSafeInteger(amount)){
+                  total.textContent='Amount exceeds preview limit.';
+                  return;
+                }
+
+                total.textContent=
+                  'Estimated customer total: '+
+                  ShopDrop.money(
+                    amount,x.currency_code
+                  );
+              }
+
+              quantity.addEventListener(
+                'input',updateTotal
+              );
+
+              label.append(quantity);
+              preview.append(label,total);
+
+              const note=document.createElement('p');
+              note.className='muted';
+              note.textContent=
+                'Price preview only. Availability and '+
+                'booking must be confirmed separately.';
+
+              preview.append(note);
+              el.append(preview);
+              updateTotal();
+            }
+
+            serviceResults.append(el);"""
+
+          source=source.replace(anchor,replacement,1)
+          path.write_text(source,encoding='utf-8')
+          print('PASS: Customer price preview added')
+          PY
+
+      - name: Verify scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+
+          test "$(git diff --name-only)" = "public/services.html"
+
+          git add public/services.html
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Fix122 add safe service price preview"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
