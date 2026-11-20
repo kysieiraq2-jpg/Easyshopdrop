@@ -1,1 +1,211 @@
 
+name: ShopDrop Fix77 - Browse All Items
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix77-browse-all-items.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  add-browse-links:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Add browse navigation only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          home=Path("public/index.html")
+          cats=Path("public/categories.html")
+
+          original_home=home.read_text(encoding="utf-8")
+          original_cats=cats.read_text(encoding="utf-8")
+
+          # Existing product browsing must remain intact.
+          assert "browsePublicProducts({view:browseView})" in original_cats
+          assert "browseProductImages" in original_cats
+          assert "shopdropLoadMore" in original_cats
+
+          # Main menu: add one direct browsing link.
+          menu_anchor=(
+              '<a href="./index.html">Home / Shop</a>'
+          )
+          menu_add=(
+              '\n          <a href="./categories.html">'
+              'BROWSE ALL ITEMS</a>'
+          )
+
+          assert original_home.count(menu_anchor)==1
+          assert menu_add not in original_home
+
+          updated_home=original_home.replace(
+              menu_anchor,
+              menu_anchor+menu_add,
+              1
+          )
+
+          # Homepage: add prominent browsing entrance.
+          hero_anchor=(
+              '<section class="v264EntranceGrid" '
+              'aria-label="Marketplace areas">'
+          )
+          hero_add=(
+              '<div class="shopdrop-browse-all-entry" '
+              'style="text-align:center;margin:18px 0;">'
+              '<a class="btn" href="./categories.html" '
+              'style="display:inline-block;'
+              'padding:15px 25px;font-weight:bold;">'
+              'BROWSE ALL ITEMS</a>'
+              '<p>Explore available products and photographs '
+              'without registering.</p>'
+              '</div>\n'
+          )
+
+          assert updated_home.count(hero_anchor)==1
+          updated_home=updated_home.replace(
+              hero_anchor,
+              hero_add+hero_anchor,
+              1
+          )
+
+          # Categories page: add a direct Browse All card.
+          cats_anchor=(
+              '<a class="card" '
+              'href="./categories.html?view=new">'
+          )
+          cats_add=(
+              '<a class="card" href="./categories.html">'
+              '<b>BROWSE ALL ITEMS</b>'
+              '<p>Explore all available products with photographs, '
+              'across every category.</p></a>\n'
+          )
+
+          assert original_cats.count(cats_anchor)==1
+
+          updated_cats=original_cats.replace(
+              cats_anchor,
+              cats_add+cats_anchor,
+              1
+          )
+
+          # Preserve original pages byte-for-byte
+          # after removing only the new additions.
+          assert updated_home.replace(
+              hero_add,"",1
+          ).replace(menu_add,"",1)==original_home
+
+          assert updated_cats.replace(
+              cats_add,"",1
+          )==original_cats
+
+          # Existing operational references remain present.
+          for token in [
+              "shopdropLoadMore",
+              "browsePublicProducts",
+              "browseProductImages",
+              "listing_status",
+              "quantity",
+              "country_code"
+          ]:
+              assert token in updated_cats
+
+          for token in [
+              "checkout.html",
+              "sign-in.html",
+              "services.html",
+              "dispatching.html",
+              "sell-item.html"
+          ]:
+              assert token in updated_home
+
+          home.write_text(
+              updated_home,encoding="utf-8"
+          )
+          cats.write_text(
+              updated_cats,encoding="utf-8"
+          )
+
+          print("PASS: Homepage Browse All Items added")
+          print("PASS: Main menu Browse All Items added")
+          print("PASS: Categories Browse All Items added")
+          print("PASS: Existing browsing logic unchanged")
+          print("PASS: Existing homepage otherwise unchanged")
+          print("PASS: No operational JavaScript changed")
+          PY
+
+      - name: Verify changed files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+
+          python3 - <<'PY'
+          import subprocess
+
+          changed=set(
+              subprocess.check_output(
+                  ["git","diff","--name-only"],
+                  text=True
+              ).splitlines()
+          )
+
+          expected={
+              "public/index.html",
+              "public/categories.html"
+          }
+
+          assert changed==expected, (
+              "SAFETY STOP: unexpected files changed"
+          )
+
+          print("PASS: Only two navigation pages changed")
+          PY
+
+      - name: Commit navigation update
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add public/index.html public/categories.html
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "Fix77 add Browse All Items navigation"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload existing website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy website
+        id: deployment
+        uses: actions/deploy-pages@v4
+
