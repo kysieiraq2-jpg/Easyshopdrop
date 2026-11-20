@@ -1,1 +1,265 @@
 
+name: ShopDrop Fix85 - Isolated Gallery Preparation
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix85-isolated-gallery-interface.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  prepare-gallery:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Create isolated gallery preparation page
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          target=Path(
+              "public/shopdrop-ad-gallery-preparation.html"
+          )
+
+          if target.exists():
+              raise SystemExit(
+                  "SAFETY STOP: gallery page already exists"
+              )
+
+          page=r'''<!doctype html>
+          <html lang="en">
+          <head>
+          <meta charset="utf-8">
+          <meta name="viewport"
+                content="width=device-width,initial-scale=1">
+          <title>Advertisement Photographs | Shop&Drop</title>
+          <style>
+          *{box-sizing:border-box}
+          body{
+            margin:0;
+            font:16px Arial,sans-serif;
+            background:#f4f6f8;
+            color:#17202a;
+          }
+          header{
+            background:#101827;
+            color:white;
+            padding:18px;
+          }
+          main{
+            max-width:900px;
+            margin:auto;
+            padding:16px;
+          }
+          .panel{
+            background:white;
+            border-radius:12px;
+            padding:20px;
+            margin:16px 0;
+          }
+          label{display:block;margin:14px 0}
+          select,input,button{
+            font:inherit;
+            padding:12px;
+            max-width:100%;
+          }
+          select,input{width:100%}
+          button{
+            background:#0f766e;
+            color:white;
+            border:0;
+            border-radius:8px;
+          }
+          .grid{
+            display:grid;
+            grid-template-columns:
+              repeat(auto-fit,minmax(140px,1fr));
+            gap:12px;
+            margin-top:16px;
+          }
+          figure{
+            margin:0;
+            border:1px solid #ddd;
+            border-radius:9px;
+            padding:8px;
+          }
+          img{
+            width:100%;
+            aspect-ratio:4/3;
+            object-fit:cover;
+          }
+          figcaption{font-size:13px}
+          .muted{color:#64748b}
+          </style>
+          </head>
+          <body>
+          <header>
+            <strong>Shop&Drop</strong>
+            <div>Advertisement Photograph Preparation</div>
+          </header>
+          <main>
+          <section class="panel">
+            <h1>Prepare your advertisement photographs</h1>
+            <p>
+              Select up to six photographs for an
+              Other Services or Dispatch advertisement.
+            </p>
+            <p class="muted">
+              Preparation only. Photographs are not
+              uploaded, saved or published by this page.
+            </p>
+
+            <label for="kind">Advertisement type</label>
+            <select id="kind">
+              <option value="service">Other Services</option>
+              <option value="vehicle">Dispatch vehicle</option>
+            </select>
+
+            <label for="photos">
+              Choose up to six photographs
+            </label>
+            <input
+              id="photos"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+            >
+
+            <p id="status" role="status" aria-live="polite">
+              No photographs selected.
+            </p>
+
+            <div id="preview" class="grid"></div>
+          </section>
+          </main>
+
+          <script>
+          (() => {
+            'use strict';
+
+            const input=document.getElementById('photos');
+            const preview=document.getElementById('preview');
+            const status=document.getElementById('status');
+            const urls=[];
+
+            function clear(){
+              urls.forEach(url=>URL.revokeObjectURL(url));
+              urls.length=0;
+              preview.replaceChildren();
+            }
+
+            input.addEventListener('change',()=>{
+              clear();
+
+              const files=Array.from(input.files||[]);
+
+              if(files.length>6){
+                status.textContent=
+                  'Maximum six photographs. Please select again.';
+                input.value='';
+                return;
+              }
+
+              const allowed=[
+                'image/jpeg',
+                'image/png',
+                'image/webp'
+              ];
+
+              if(files.some(file=>
+                !allowed.includes(file.type) ||
+                file.size===0 ||
+                file.size>10485760
+              )){
+                status.textContent=
+                  'Use JPEG, PNG or WebP photographs, '+
+                  'maximum 10 MB each.';
+                input.value='';
+                return;
+              }
+
+              files.forEach((file,index)=>{
+                const url=URL.createObjectURL(file);
+                urls.push(url);
+
+                const figure=document.createElement('figure');
+                const img=document.createElement('img');
+                const caption=document.createElement('figcaption');
+
+                img.src=url;
+                img.alt='Photograph '+(index+1);
+                caption.textContent=
+                  'Photograph '+(index+1)+
+                  (index===0?' — Main photograph':'');
+
+                figure.append(img,caption);
+                preview.append(figure);
+              });
+
+              status.textContent=
+                files.length+' of 6 photographs selected. '+
+                'Nothing has been uploaded.';
+            });
+
+            window.addEventListener('pagehide',clear);
+          })();
+          </script>
+          </body>
+          </html>'''
+
+          target.write_text(page,encoding="utf-8")
+          print("PASS: Standalone gallery page created")
+          PY
+
+      - name: Verify no existing website files changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add public/shopdrop-ad-gallery-preparation.html
+          git diff --cached --check
+
+          python3 - <<'PY'
+          import subprocess
+
+          changed=subprocess.check_output(
+              ["git","diff","--cached","--name-only"],
+              text=True
+          ).splitlines()
+
+          assert changed==[
+              "public/shopdrop-ad-gallery-preparation.html"
+          ], "SAFETY STOP: existing website file changed"
+
+          print("PASS: Only one new page added")
+          PY
+
+      - name: Commit isolated page
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "Fix85 add isolated photo preparation page"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
