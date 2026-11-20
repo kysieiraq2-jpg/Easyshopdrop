@@ -1,1 +1,108 @@
 
+name: ShopDrop Fix106 - Vehicle Advertising Link
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix106-vehicle-advert-link.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  connect-vehicle-advertising:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Add vehicle advertising link
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path=Path("public/seller.html")
+          original=path.read_text(encoding="utf-8")
+
+          target=Path(
+            "public/shopdrop-vehicle-draft-private.html"
+          )
+
+          if not target.exists():
+              raise SystemExit(
+                "SAFETY STOP: vehicle form missing"
+              )
+
+          if "shopdropVehicleAdvertLink" in original:
+              raise SystemExit(
+                "SAFETY STOP: link already exists"
+              )
+
+          anchor='<div id=pageStatus'
+
+          if original.count(anchor)!=1:
+              raise SystemExit(
+                "SAFETY STOP: Seller Centre changed"
+              )
+
+          addition=(
+            '<section class="box" '
+            'id="shopdropVehicleAdvertLink">'
+            '<h2>Advertise a vehicle — FREE</h2>'
+            '<p>List your delivery vehicle, bakkie, '
+            'truck or transport service. '
+            'Add up to six photographs and specify '
+            'your vehicle location and service area.</p>'
+            '<p>No administrator approval is required.</p>'
+            '<p><a class="btn primary" '
+            'href="./shopdrop-vehicle-draft-private.html">'
+            'Advertise your vehicle</a></p>'
+            '</section>'
+          )
+
+          updated=original.replace(
+            anchor,addition+anchor,1
+          )
+
+          if updated.replace(
+            addition+anchor,anchor,1
+          )!=original:
+              raise SystemExit(
+                "SAFETY STOP: unrelated code changed"
+              )
+
+          path.write_text(
+            updated,encoding="utf-8"
+          )
+
+          print("PASS: Vehicle advertising link added")
+          print("PASS: Existing Seller Centre preserved")
+          PY
+
+      - name: Verify and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git diff --check
+
+          test "$(git diff --name-only)" = \
+            "public/seller.html"
+
+          git add public/seller.html
+
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Fix106 connect vehicle advertising to Seller Centre"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
