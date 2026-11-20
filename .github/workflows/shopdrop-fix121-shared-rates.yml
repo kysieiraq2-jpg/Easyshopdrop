@@ -1,1 +1,673 @@
 
+name: ShopDrop Fix121 - Shared Service Rates
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix121-shared-rates.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Install shared pricing component
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          expected={
+            "public/seller.html":
+              "4af1a9305bd6a5590118d40971048f952d819a34",
+            "public/shopdrop-seller-product-supabase.js":
+              "511e723d0ad4c04b5d6baa19adeed6965dd539b5",
+            "public/shopdrop-vehicle-draft-private.html":
+              "f3e365adf82579c29e2a472e76f8edab3093829f"
+          }
+
+          for name,sha in expected.items():
+            actual=subprocess.check_output(
+              ["git","hash-object",name],
+              text=True
+            ).strip()
+            if actual!=sha:
+              raise SystemExit(
+                "SAFETY STOP: Changed file "+name
+              )
+
+          component=Path(
+            "public/shopdrop-shared-service-rates.js"
+          )
+
+          if component.exists():
+            raise SystemExit(
+              "SAFETY STOP: Shared component exists"
+            )
+
+          component.write_text(r"""
+          /*
+           Shop&Drop Fix121
+           Shared provider rates for services and dispatch.
+           No payment or booking modifications.
+          */
+          (() => {
+            'use strict';
+
+            const units=[
+              ['hour','Per hour'],
+              ['half_day','Per half-day'],
+              ['day','Per day'],
+              ['night','Per night'],
+              ['week','Per week'],
+              ['month','Per month'],
+              ['kilometre','Per kilometre'],
+              ['trip','Per trip'],
+              ['load','Per load'],
+              ['visit','Per visit'],
+              ['job','Per completed job'],
+              ['square_metre','Per square metre']
+            ];
+
+            const days=[
+              'Sunday','Monday','Tuesday',
+              'Wednesday','Thursday','Friday',
+              'Saturday'
+            ];
+
+            const instances=new Map();
+
+            function make(tag,text){
+              const node=document.createElement(tag);
+              if(text!=null)node.textContent=text;
+              return node;
+            }
+
+            function mount(id,kind){
+              const root=document.getElementById(id);
+              if(!root)return;
+
+              if(instances.has(id))return;
+
+              const rows=new Map();
+              const section=make('section');
+              section.style.margin='14px 0';
+
+              const heading=make(
+                'h3','Additional service rates'
+              );
+
+              section.append(heading);
+
+              if(kind==='dispatch'){
+                heading.textContent=
+                  'Service rates — choose at least one';
+              }
+
+              const explanation=make(
+                'p',
+                'Enter the prices you offer. '+
+                'Leave unused rates empty.'
+              );
+              section.append(explanation);
+
+              for(const [unit,label] of units){
+                const line=make('label');
+                line.style.display='flex';
+                line.style.flexWrap='wrap';
+                line.style.gap='8px';
+                line.style.alignItems='center';
+                line.style.margin='8px 0';
+
+                const name=make('span',label);
+                name.style.minWidth='145px';
+
+                const price=make('input');
+                price.type='number';
+                price.min='0.01';
+                price.step='0.01';
+                price.placeholder='R amount';
+                price.style.maxWidth='160px';
+                price.setAttribute(
+                  'aria-label',label+' price'
+                );
+
+                line.append(name,price);
+                section.append(line);
+                rows.set(unit,price);
+              }
+
+              section.append(
+                make('h3','Operating days')
+              );
+
+              const dayInputs=[];
+
+              days.forEach((day,index)=>{
+                const label=make('label');
+                label.style.display='inline-flex';
+                label.style.alignItems='center';
+                label.style.margin='6px 10px 6px 0';
+
+                const input=make('input');
+                input.type='checkbox';
+                input.checked=index>=1&&index<=5;
+                input.style.width='auto';
+                input.style.marginRight='5px';
+
+                label.append(input,make('span',day));
+                section.append(label);
+                dayInputs.push(input);
+              });
+
+              section.append(
+                make('h3','Operating hours')
+              );
+
+              const start=make('input');
+              start.type='time';
+              start.value='08:00';
+
+              const finish=make('input');
+              finish.type='time';
+              finish.value='17:00';
+
+              const startLabel=make(
+                'label','Available from'
+              );
+              startLabel.append(start);
+
+              const finishLabel=make(
+                'label','Available until'
+              );
+              finishLabel.append(finish);
+
+              section.append(
+                startLabel,finishLabel
+              );
+
+              const packageLabel=make(
+                'label',
+                'Package details (optional)'
+              );
+
+              const packageText=make('textarea');
+              packageText.rows=2;
+              packageText.maxLength=1000;
+              packageText.placeholder=
+                'Example: Four visits per month, '+
+                'three hours per visit';
+
+              packageLabel.append(packageText);
+              section.append(packageLabel);
+
+              root.append(section);
+
+              instances.set(id,{
+                kind,rows,dayInputs,
+                start,finish,packageText
+              });
+            }
+
+            function collect(id){
+              const instance=instances.get(id);
+              if(!instance){
+                throw Error(
+                  'Service rate form unavailable.'
+                );
+              }
+
+              const rates=[];
+
+              for(const [unit,input] of
+                  instance.rows.entries()){
+                const raw=input.value.trim();
+                if(!raw)continue;
+
+                const amount=Number(raw);
+
+                if(
+                  !Number.isFinite(amount)||
+                  amount<=0||
+                  amount>9999999999
+                ){
+                  throw Error(
+                    'Enter a valid price for '+unit
+                  );
+                }
+
+                rates.push({
+                  pricing_unit:unit,
+                  price_zar:
+                    Math.round(amount*100)/100,
+                  minimum_units:1
+                });
+              }
+
+              if(
+                instance.kind==='dispatch'&&
+                !rates.length
+              ){
+                throw Error(
+                  'Enter at least one service rate.'
+                );
+              }
+
+              const selectedDays=
+                instance.dayInputs
+                  .map((input,index)=>
+                    input.checked?index:null
+                  )
+                  .filter(index=>index!==null);
+
+              if(!selectedDays.length){
+                throw Error(
+                  'Choose at least one operating day.'
+                );
+              }
+
+              const from=instance.start.value;
+              const until=instance.finish.value;
+
+              if(!from||!until||from===until){
+                throw Error(
+                  'Enter valid operating hours.'
+                );
+              }
+
+              const details=
+                instance.packageText.value.trim();
+
+              return rates.map(rate=>({
+                ...rate,
+                availability_days:selectedDays,
+                available_from_time:from,
+                available_until_time:until,
+                package_description:details||null
+              }));
+            }
+
+            async function save(
+              client,kind,advertisementId,rates
+            ){
+              if(!client?.from||
+                 !advertisementId){
+                throw Error(
+                  'Service storage unavailable.'
+                );
+              }
+
+              if(!Array.isArray(rates)){
+                throw Error('Invalid service rates.');
+              }
+
+              if(!rates.length)return 0;
+
+              const parent=kind==='service'
+                ?'service_id'
+                :'dispatch_advert_id';
+
+              if(!['service','dispatch'].includes(kind)){
+                throw Error('Invalid service type.');
+              }
+
+              const records=rates.map(rate=>({
+                ...rate,
+                [parent]:advertisementId
+              }));
+
+              const {error}=await client
+                .from('shopdrop_advert_service_rates')
+                .insert(records);
+
+              if(error){
+                throw Error(
+                  'Rates could not be saved: '+
+                  error.message
+                );
+              }
+
+              return records.length;
+            }
+
+            window.ShopDropSharedServiceRates=
+              Object.freeze({
+                mount,collect,save
+              });
+          })();
+          """.lstrip(),encoding="utf-8")
+
+          # Add the shared form to Other Services.
+          seller=Path("public/seller.html")
+          source=seller.read_text(encoding="utf-8")
+
+          anchor=(
+            '<label>Minimum booking / units'
+            '<input id=smin type=number '
+            'min=0.1 step=0.1 value=1></label>'
+          )
+
+          if source.count(anchor)!=1:
+            raise SystemExit(
+              "SAFETY STOP: Service form changed"
+            )
+
+          source=source.replace(
+            anchor,
+            anchor+
+            '<div id="shopdropExtraServiceRates"></div>',
+            1
+          )
+
+          script=(
+            '<script src="./shopdrop-shared-photo-reader.js" defer>'
+          )
+
+          if source.count(script)!=1:
+            raise SystemExit(
+              "SAFETY STOP: Service scripts changed"
+            )
+
+          source=source.replace(
+            script,
+            '<script src="./shopdrop-shared-service-rates.js" defer></script>'+
+            script,
+            1
+          )
+
+          seller.write_text(
+            source,encoding="utf-8"
+          )
+
+          # Add only the service rate persistence
+          # connection to the existing submission.
+          bridge=Path(
+            "public/shopdrop-seller-product-supabase.js"
+          )
+          source=bridge.read_text(encoding="utf-8")
+
+          anchor=(
+            "      const servicePhotos="
+            "serviceSelectedPhotos();"
+          )
+
+          if source.count(anchor)!=1:
+            raise SystemExit(
+              "SAFETY STOP: Service submit changed"
+            )
+
+          source=source.replace(
+            anchor,
+            """      const extraRates=
+                window.ShopDropSharedServiceRates
+                  ?.collect('shopdropExtraServiceRates');
+
+              if(!Array.isArray(extraRates)){
+                throw Error('Additional rate form unavailable.');
+              }
+
+          """+anchor,
+            1
+          )
+
+          anchor=(
+            "    status.textContent=\n"
+            "      'Service saved. Reference: '+"
+          )
+
+          if source.count(anchor)!=1:
+            raise SystemExit(
+              "SAFETY STOP: Service completion changed"
+            )
+
+          source=source.replace(
+            anchor,
+            """    if(extraRates.length){
+                status.textContent=
+                  'Saving additional service rates...';
+
+                try{
+                  await window.ShopDropSharedServiceRates.save(
+                    sb,'service',data.id,extraRates
+                  );
+                }catch(rateError){
+                  throw Error(
+                    'Service and photographs saved. Reference: '+
+                    data.id+
+                    '. Additional rates need attention: '+
+                    rateError.message
+                  );
+                }
+              }
+
+          """+anchor,
+            1
+          )
+
+          anchor="    initServicePhotos();"
+
+          if source.count(anchor)!=1:
+            raise SystemExit(
+              "SAFETY STOP: Service initialization changed"
+            )
+
+          source=source.replace(
+            anchor,
+            anchor+
+            """
+            window.ShopDropSharedServiceRates
+              ?.mount('shopdropExtraServiceRates','service');
+          """,
+            1
+          )
+
+          bridge.write_text(
+            source,encoding="utf-8"
+          )
+
+          # Dispatching: same shared rate component.
+          dispatch=Path(
+            "public/shopdrop-vehicle-draft-private.html"
+          )
+          source=dispatch.read_text(encoding="utf-8")
+
+          anchor='<p id="vehiclePhotoCount"'
+
+          if source.count(anchor)!=1:
+            raise SystemExit(
+              "SAFETY STOP: Dispatch photo area changed"
+            )
+
+          source=source.replace(
+            anchor,
+            '<div id="shopdropDispatchRates"></div>\n'+anchor,
+            1
+          )
+
+          anchor=(
+            '<script src="./shopdrop-ad-gallery-uploader.js">'
+            '</script>'
+          )
+
+          if source.count(anchor)!=1:
+            raise SystemExit(
+              "SAFETY STOP: Dispatch scripts changed"
+            )
+
+          source=source.replace(
+            anchor,
+            anchor+'\n'+
+            '<script src="./shopdrop-shared-service-rates.js"></script>',
+            1
+          )
+
+          anchor="const cameraPhotos=[];"
+
+          if source.count(anchor)!=1:
+            raise SystemExit(
+              "SAFETY STOP: Dispatch initialization changed"
+            )
+
+          source=source.replace(
+            anchor,
+            """window.ShopDropSharedServiceRates
+              ?.mount('shopdropDispatchRates','dispatch');
+
+          """+anchor,
+            1
+          )
+
+          anchor="    const record={"
+
+          if source.count(anchor)!=1:
+            raise SystemExit(
+              "SAFETY STOP: Dispatch record changed"
+            )
+
+          source=source.replace(
+            anchor,
+            """    const offeredRates=
+                window.ShopDropSharedServiceRates
+                  ?.collect('shopdropDispatchRates');
+
+              if(!Array.isArray(offeredRates)||
+                 !offeredRates.length){
+                throw Error('Enter at least one valid rate.');
+              }
+
+          """+anchor,
+            1
+          )
+
+          anchor=(
+            "    result.textContent=\n"
+            "      'Vehicle saved. Uploading photographs...';"
+          )
+
+          if source.count(anchor)!=1:
+            raise SystemExit(
+              "SAFETY STOP: Dispatch upload changed"
+            )
+
+          source=source.replace(
+            anchor,
+            """    try{
+                await window.ShopDropSharedServiceRates.save(
+                  client,'dispatch',data.id,offeredRates
+                );
+              }catch(rateError){
+                throw Error(
+                  'Service advertisement saved. Reference: '+
+                  data.id+
+                  '. Rates need attention: '+
+                  rateError.message
+                );
+              }
+
+          """+anchor,
+            1
+          )
+
+          dispatch.write_text(
+            source,encoding="utf-8"
+          )
+
+          print("PASS: Shared rate component installed")
+          print("PASS: Other Services connected")
+          print("PASS: Dispatching connected")
+          print("PASS: Existing uploaders preserved")
+          PY
+
+      - name: Verify JavaScript and file scope
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node --check \
+            public/shopdrop-shared-service-rates.js
+
+          node --check \
+            public/shopdrop-seller-product-supabase.js
+
+          git diff --check
+
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+
+          expected={
+            "public/seller.html",
+            "public/shopdrop-seller-product-supabase.js",
+            "public/shopdrop-vehicle-draft-private.html"
+          }
+
+          changed=set(
+            subprocess.check_output(
+              ["git","diff","--name-only"],
+              text=True
+            ).splitlines()
+          )
+
+          if changed!=expected:
+            raise SystemExit(
+              "SAFETY STOP: Unexpected modified files"
+            )
+
+          if not Path(
+            "public/shopdrop-shared-service-rates.js"
+          ).is_file():
+            raise SystemExit(
+              "SAFETY STOP: Shared component missing"
+            )
+
+          protected={
+            "public/shopdrop-product-photos.js":
+              "8ed1f80f67814b9ffdc78ec827ea9293ad5ce7ea",
+            "public/shopdrop-ad-gallery-uploader.js":
+              "df15f7e665f0b292c613d92f6a7269340a6e8b5f"
+          }
+
+          for name,sha in protected.items():
+            actual=subprocess.check_output(
+              ["git","hash-object",name],
+              text=True
+            ).strip()
+
+            if actual!=sha:
+              raise SystemExit(
+                "SAFETY STOP: Protected uploader changed"
+              )
+
+          print("PASS: Protected uploaders unchanged")
+          PY
+
+      - name: Commit integration changes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add \
+            public/shopdrop-shared-service-rates.js \
+            public/seller.html \
+            public/shopdrop-seller-product-supabase.js \
+            public/shopdrop-vehicle-draft-private.html
+
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Fix121 add shared service and dispatch rates"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
