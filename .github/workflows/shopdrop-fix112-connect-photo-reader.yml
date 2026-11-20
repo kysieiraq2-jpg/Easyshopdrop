@@ -1,5 +1,5 @@
 
-name: ShopDrop Fix112 - Connect Shared Photo Reader
+name: ShopDrop Fix112 - Easy Photo Upload Correction
 
 on:
   push:
@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 jobs:
-  connect-photo-reader:
+  easy-photo-upload:
     runs-on: ubuntu-latest
 
     steps:
@@ -22,7 +22,7 @@ jobs:
           ref: shopdrop-phase6-integration
           persist-credentials: true
 
-      - name: Apply minimal compatible connection
+      - name: Add automatic photo preparation
         shell: bash
         run: |
           set -euo pipefail
@@ -34,12 +34,12 @@ jobs:
           protected={
             "public/shopdrop-product-photos.js":
               "8ed1f80f67814b9ffdc78ec827ea9293ad5ce7ea",
+            "public/shopdrop-ad-gallery-uploader.js":
+              "df15f7e665f0b292c613d92f6a7269340a6e8b5f",
             "public/shopdrop-shared-photo-reader.js":
               "7ddd6863e2f75373da9df1f0f38a6b353cce5c30",
-            "public/shopdrop-ad-gallery-uploader.js":
-              "7d855aca7d4dee92ed5d07e5424a5aa9cac214ee",
             "public/shopdrop-vehicle-draft-private.html":
-              "1b10236bc3781f437b4f200f576ddc6c7cf14542"
+              "fb394c740131d37501c061a1c161b586a2efa59d"
           }
 
           for filename,expected in protected.items():
@@ -50,210 +50,417 @@ jobs:
 
               if actual!=expected:
                   raise SystemExit(
-                    "SAFETY STOP: Unexpected file version: "+
-                    filename
+                    "SAFETY STOP: File changed: "+filename
                   )
 
-          uploader=Path(
-            "public/shopdrop-ad-gallery-uploader.js"
+          reader=Path(
+            "public/shopdrop-shared-photo-reader.js"
           )
 
-          original=uploader.read_text(
-            encoding="utf-8"
-          )
+          reader.write_text(r"""/*
+           Shop&Drop Fix112 corrected photo preparation.
 
-          old_validation="""    for(const file of selected){
-                if(!MIME[file.type] ||
-                   file.size<1 ||
-                   file.size>10485760){
+           Preserves original supported photographs.
+           Attempts automatic browser conversion for
+           other common camera photograph formats.
+
+           Does not change product uploads, storage,
+           screening, publication or payment rules.
+          */
+          (() => {
+            'use strict';
+
+            const MAX_BYTES=10485760;
+
+            function detectMime(bytes){
+              if(
+                bytes.length>=3 &&
+                bytes[0]===255 &&
+                bytes[1]===216 &&
+                bytes[2]===255
+              )return 'image/jpeg';
+
+              const png=[137,80,78,71,13,10,26,10];
+
+              if(
+                bytes.length>=8 &&
+                png.every((v,i)=>bytes[i]===v)
+              )return 'image/png';
+
+              if(
+                bytes.length>=12 &&
+                String.fromCharCode(
+                  ...bytes.subarray(0,4)
+                )==='RIFF' &&
+                String.fromCharCode(
+                  ...bytes.subarray(8,12)
+                )==='WEBP'
+              )return 'image/webp';
+
+              return null;
+            }
+
+            async function readBytes(file){
+              try{
+                return await file.arrayBuffer();
+              }catch(_){
+                if(typeof FileReader==='undefined'){
                   throw Error(
-                    'JPEG, PNG or WebP required; maximum 10 MB each.'
+                    'We could not read this picture. '+
+                    'Please choose it again.'
                   );
                 }
-              }"""
 
-          actual_validation=(
-            "    for(const file of selected){\n"
-            "      if(!MIME[file.type] ||\n"
-            "         file.size<1 ||\n"
-            "         file.size>10485760){\n"
-            "        throw Error(\n"
-            "          'JPEG, PNG or WebP required; maximum 10 MB each.'\n"
-            "        );\n"
-            "      }\n"
-            "    }"
-          )
+                return await new Promise(
+                  (resolve,reject)=>{
+                    const reader=new FileReader();
 
-          new_validation=(
-            "    // Fix112: Use original-byte reading when available.\n"
-            "    // Preserve the previous uploader when it is absent.\n"
-            "    const reader=window.ShopDropSharedPhotoReader;\n"
-            "    const prepared=reader?.readSelection\n"
-            "      ?await reader.readSelection(selected)\n"
-            "      :null;\n"
-            "\n"
-            "    if(!prepared){\n"
-            +actual_validation+
-            "\n    }"
-          )
+                    reader.onload=()=>
+                      resolve(reader.result);
 
-          old_upload=(
-            "      const file=selected[i];\n"
-            "      const position=available[i];\n"
-            "      const filename=\n"
-            "        crypto.randomUUID()+'.'+MIME[file.type];"
-          )
+                    reader.onerror=()=>
+                      reject(Error(
+                        'We could not read this picture. '+
+                        'Please choose it again.'
+                      ));
 
-          new_upload=(
-            "      const file=selected[i];\n"
-            "      const originalPhoto=prepared?.[i];\n"
-            "      const uploadBody=originalPhoto?.blob||file;\n"
-            "      const uploadMime=originalPhoto?.mime||file.type;\n"
-            "      const position=available[i];\n"
-            "      const filename=\n"
-            "        crypto.randomUUID()+'.'+MIME[uploadMime];"
-          )
+                    reader.readAsArrayBuffer(file);
+                  }
+                );
+              }
+            }
 
-          old_storage=(
-            "          .upload(path,file,{\n"
-            "            contentType:file.type,\n"
-            "            upsert:false\n"
-            "          });"
-          )
+            async function convertPhoto(file){
+              let picture=null;
+              let objectUrl=null;
 
-          new_storage=(
-            "          .upload(path,uploadBody,{\n"
-            "            contentType:uploadMime,\n"
-            "            upsert:false\n"
-            "          });"
-          )
+              try{
+                if(
+                  typeof createImageBitmap==='function'
+                ){
+                  try{
+                    picture=await createImageBitmap(file);
+                  }catch(_){}
+                }
 
-          replacements=[
-            (actual_validation,new_validation),
-            (old_upload,new_upload),
-            (old_storage,new_storage)
-          ]
+                if(!picture){
+                  if(
+                    typeof Image==='undefined' ||
+                    !URL?.createObjectURL
+                  ){
+                    throw Error('Decoder unavailable');
+                  }
 
-          updated=original
+                  objectUrl=URL.createObjectURL(file);
 
-          for old,new in replacements:
-              if updated.count(old)!=1:
-                  raise SystemExit(
-                    "SAFETY STOP: Uploader structure changed"
-                  )
-              updated=updated.replace(old,new,1)
+                  picture=await new Promise(
+                    (resolve,reject)=>{
+                      const img=new Image();
 
-          restored=updated
+                      img.onload=()=>resolve(img);
+                      img.onerror=()=>reject(
+                        Error('Picture could not be opened')
+                      );
 
-          for old,new in reversed(replacements):
-              if restored.count(new)!=1:
-                  raise SystemExit(
-                    "SAFETY STOP: Replacement mismatch"
-                  )
-              restored=restored.replace(new,old,1)
+                      img.src=objectUrl;
+                    }
+                  );
+                }
 
-          if restored!=original:
-              raise SystemExit(
-                "SAFETY STOP: Unrelated uploader code changed"
-              )
+                const width=
+                  picture.naturalWidth||picture.width;
+                const height=
+                  picture.naturalHeight||picture.height;
+
+                if(
+                  !width || !height ||
+                  width*height>40000000
+                ){
+                  throw Error('Invalid picture dimensions');
+                }
+
+                const canvas=
+                  document.createElement('canvas');
+
+                canvas.width=width;
+                canvas.height=height;
+
+                const ctx=canvas.getContext('2d');
+
+                if(!ctx){
+                  throw Error('Picture processing unavailable');
+                }
+
+                ctx.drawImage(
+                  picture,0,0,width,height
+                );
+
+                const converted=await new Promise(
+                  (resolve,reject)=>{
+                    canvas.toBlob(
+                      blob=>blob
+                        ?resolve(blob)
+                        :reject(Error('Conversion failed')),
+                      'image/jpeg',
+                      0.88
+                    );
+                  }
+                );
+
+                if(
+                  !converted.size ||
+                  converted.size>MAX_BYTES
+                ){
+                  throw Error('Converted picture too large');
+                }
+
+                return converted;
+              }finally{
+                if(
+                  picture &&
+                  typeof picture.close==='function'
+                ){
+                  picture.close();
+                }
+
+                if(objectUrl){
+                  URL.revokeObjectURL(objectUrl);
+                }
+              }
+            }
+
+            async function readOriginal(file){
+              if(!file || !file.size){
+                throw Error(
+                  'Please choose a photograph.'
+                );
+              }
+
+              if(file.size>MAX_BYTES){
+                throw Error(
+                  'This picture is too large. '+
+                  'Please choose a smaller picture.'
+                );
+              }
+
+              const data=await readBytes(file);
+              const bytes=new Uint8Array(data);
+
+              if(
+                bytes.length!==file.size ||
+                !bytes.length
+              ){
+                throw Error(
+                  'We could not read this picture. '+
+                  'Please choose it again.'
+                );
+              }
+
+              let mime=detectMime(
+                bytes.subarray(0,24)
+              );
+
+              let blob;
+
+              if(mime){
+                blob=new Blob(
+                  [bytes],{type:mime}
+                );
+              }else{
+                const name=String(file.name||'');
+                const cameraFormat=
+                  /^image\//i.test(file.type||'') ||
+                  /\.(heic|heif|avif|jpg|jpeg|png|webp|bmp|gif)$/i
+                    .test(name);
+
+                if(!cameraFormat){
+                  throw Error(
+                    'This file is not a supported picture. '+
+                    'Please choose a photograph.'
+                  );
+                }
+
+                try{
+                  blob=await convertPhoto(file);
+                  mime='image/jpeg';
+                }catch(_){
+                  throw Error(
+                    'This picture could not be opened. '+
+                    'Please try another picture.'
+                  );
+                }
+              }
+
+              const extension={
+                'image/jpeg':'jpg',
+                'image/png':'png',
+                'image/webp':'webp'
+              }[mime];
+
+              return Object.freeze({
+                blob,
+                mime,
+                extension,
+                size:blob.size,
+                name:String(
+                  file.name||'photograph'
+                ).slice(0,150)
+              });
+            }
+
+            async function readSelection(files){
+              const selected=Array.from(files||[]);
+
+              if(
+                selected.length<1 ||
+                selected.length>6
+              ){
+                throw Error(
+                  'Please select between 1 and 6 pictures.'
+                );
+              }
+
+              return Promise.all(
+                selected.map(readOriginal)
+              );
+            }
+
+            window.ShopDropSharedPhotoReader=
+              Object.freeze({
+                detectMime,
+                readOriginal,
+                readSelection
+              });
+          })();
+          """,encoding="utf-8")
 
           form=Path(
             "public/shopdrop-vehicle-draft-private.html"
           )
 
-          form_original=form.read_text(
+          original=form.read_text(
             encoding="utf-8"
           )
 
-          old_script=(
-            '<script src="./shopdrop-ad-gallery-uploader.js">'
-            '</script>'
+          old_accept=(
+            'accept="image/jpeg,image/png,image/webp"'
           )
 
-          new_script=(
-            '<script src="./shopdrop-shared-photo-reader.js">'
-            '</script>\n'
-            +old_script
-          )
-
-          if form_original.count(old_script)!=1:
+          if original.count(old_accept)!=1:
               raise SystemExit(
-                "SAFETY STOP: Vehicle script changed"
+                "SAFETY STOP: Photo input changed"
               )
 
-          form_updated=form_original.replace(
-            old_script,new_script,1
+          updated=original.replace(
+            old_accept,
+            'accept="image/*,.heic,.heif,.avif"',
+            1
           )
 
-          if form_updated.replace(
-            new_script,old_script,1
-          )!=form_original:
+          old_check="""    for(const photo of photos){
+                if(
+                  !['image/jpeg','image/png','image/webp']
+                    .includes(photo.type)||
+                  photo.size<1||
+                  photo.size>10485760
+                ){
+                  throw Error(
+                    'Use JPEG, PNG or WebP photographs, maximum 10 MB each.'
+                  );
+                }
+              }"""
+
+          actual_check=(
+            "    for(const photo of photos){\n"
+            "      if(\n"
+            "        !['image/jpeg','image/png','image/webp']\n"
+            "          .includes(photo.type)||\n"
+            "        photo.size<1||\n"
+            "        photo.size>10485760\n"
+            "      ){\n"
+            "        throw Error(\n"
+            "          'Use JPEG, PNG or WebP photographs, maximum 10 MB each.'\n"
+            "        );\n"
+            "      }\n"
+            "    }"
+          )
+
+          new_check=(
+            "    for(const photo of photos){\n"
+            "      if(photo.size<1 || photo.size>10485760){\n"
+            "        throw Error(\n"
+            "          'Please choose a picture smaller than 10 MB.'\n"
+            "        );\n"
+            "      }\n"
+            "    }"
+          )
+
+          if updated.count(actual_check)!=1:
               raise SystemExit(
-                "SAFETY STOP: Vehicle form changed unexpectedly"
+                "SAFETY STOP: Photo validation changed"
               )
 
-          uploader.write_text(
-            updated,encoding="utf-8"
+          updated=updated.replace(
+            actual_check,new_check,1
           )
 
           form.write_text(
-            form_updated,encoding="utf-8"
+            updated,encoding="utf-8"
           )
 
-          print("PASS: Shared reader connected")
-          print("PASS: Existing fallback retained")
-          print("PASS: Vehicle form loads reader")
-          print("PASS: Product uploader unchanged")
+          print("PASS: Existing product uploader preserved")
+          print("PASS: Existing gallery uploader preserved")
+          print("PASS: Automatic photo preparation added")
+          print("PASS: Vehicle form accepts common camera formats")
           PY
 
-      - name: Verify files
+      - name: Verify exact changes
         shell: bash
         run: |
           set -euo pipefail
 
           node --check \
-            public/shopdrop-ad-gallery-uploader.js
+            public/shopdrop-shared-photo-reader.js
 
           node --check \
-            public/shopdrop-shared-photo-reader.js
+            public/shopdrop-ad-gallery-uploader.js
 
           git diff --check
 
           python3 - <<'PY'
           import subprocess
 
-          expected={
-            "public/shopdrop-ad-gallery-uploader.js",
-            "public/shopdrop-vehicle-draft-private.html"
-          }
-
-          actual=set(
+          changed=set(
             subprocess.check_output(
               ["git","diff","--name-only"],
               text=True
             ).splitlines()
           )
 
-          if actual!=expected:
+          expected={
+            "public/shopdrop-shared-photo-reader.js",
+            "public/shopdrop-vehicle-draft-private.html"
+          }
+
+          if changed!=expected:
               raise SystemExit(
-                "SAFETY STOP: Unexpected files modified"
+                "SAFETY STOP: Unexpected files changed"
               )
 
-          print("PASS: Only two intended files changed")
+          print("PASS: Only two intended files modified")
           PY
 
-      - name: Commit verified connection
+      - name: Commit correction
         shell: bash
         run: |
           set -euo pipefail
 
           git add \
-            public/shopdrop-ad-gallery-uploader.js \
+            public/shopdrop-shared-photo-reader.js \
             public/shopdrop-vehicle-draft-private.html
 
           git -c user.name='github-actions[bot]' \
             -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-            commit -m "Fix112 connect shared photo reader safely"
+            commit -m "Fix112 simplify photo format handling"
 
           git push origin HEAD:shopdrop-phase6-integration
-
