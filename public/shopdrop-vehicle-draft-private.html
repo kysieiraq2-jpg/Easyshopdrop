@@ -115,12 +115,22 @@ button:disabled{opacity:.5}
   </label>
 
   <label>
-  Vehicle photographs (1 to 6)
+  Choose photographs from your phone or computer (up to 6)
   <input id="vehiclePhotos"
          type="file"
          accept="image/*,.heic,.heif,.avif"
-         multiple required>
+         multiple>
 </label>
+<label for="vehicleCamera">
+  Or take a photograph with your phone
+  <input id="vehicleCamera"
+         type="file"
+         accept="image/*"
+         capture="environment">
+</label>
+<p id="vehiclePhotoCount" class="muted" role="status">
+  No photographs selected yet.
+</p>
 <p class="muted">
   Maximum 10 MB per photograph.
 </p>
@@ -154,6 +164,52 @@ const client=createClient(
   }
 );
 
+const cameraPhotos=[];
+const cameraInput=
+  document.getElementById('vehicleCamera');
+const galleryInput=
+  document.getElementById('vehiclePhotos');
+const photoCount=
+  document.getElementById('vehiclePhotoCount');
+
+function updatePhotoCount(){
+  const total=
+    Array.from(galleryInput.files||[]).length+
+    cameraPhotos.length;
+
+  photoCount.textContent=
+    total===0
+      ?'No photographs selected yet.'
+      :total+' of 6 photographs selected.';
+}
+
+galleryInput.addEventListener(
+  'change',updatePhotoCount
+);
+
+cameraInput.addEventListener('change',()=>{
+  const newPhotos=
+    Array.from(cameraInput.files||[]);
+
+  const galleryCount=
+    Array.from(galleryInput.files||[]).length;
+
+  if(
+    galleryCount+
+    cameraPhotos.length+
+    newPhotos.length>6
+  ){
+    photoCount.textContent=
+      'Maximum 6 photographs. '+
+      'Please remove some before adding more.';
+  }else{
+    cameraPhotos.push(...newPhotos);
+    updatePhotoCount();
+  }
+
+  cameraInput.value='';
+});
+
 const form=document.getElementById('draftForm');
 const result=document.getElementById('result');
 const button=document.getElementById('submit');
@@ -185,11 +241,10 @@ form.addEventListener('submit',async event=>{
     }
 
 
-    const photos=Array.from(
-      document.getElementById(
-        'vehiclePhotos'
-      ).files||[]
-    );
+    const photos=[
+      ...Array.from(galleryInput.files||[]),
+      ...cameraPhotos
+    ];
 
     if(photos.length<1||photos.length>6){
       throw Error(
