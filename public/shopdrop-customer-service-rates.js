@@ -43,11 +43,9 @@
     if(!Number.isSafeInteger(cents)||
        cents<=0)return null;
 
-    const fee=cents<100000
-      ?Math.round(cents*0.10)
-      :Math.round(cents*0.07);
-
-    return cents+fee;
+    // Display provider price only.
+    // Commission is added at checkout.
+    return cents;
   }
 
   function element(tag,text){
@@ -193,7 +191,7 @@
           'Amount exceeds preview limit.';
       }else{
         total.textContent=
-          'Estimated customer total: '+
+          'Service booking price: '+
           money(amount*n);
       }
 

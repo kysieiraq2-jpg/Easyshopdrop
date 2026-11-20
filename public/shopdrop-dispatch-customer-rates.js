@@ -46,11 +46,9 @@
     if(!Number.isSafeInteger(cents)||
        cents<=0)return null;
 
-    const commission=cents<100000
-      ?Math.round(cents*0.10)
-      :Math.round(cents*0.07);
-
-    return cents+commission;
+    // Display provider price only.
+    // Commission is added at checkout.
+    return cents;
   }
 
   async function rpc(name,body){
@@ -140,7 +138,7 @@
         total.textContent='Amount too large.';
       }else{
         total.textContent=
-          'Estimated customer price: '+
+          'Dispatch service price: '+
           money(n*cents);
       }
 
