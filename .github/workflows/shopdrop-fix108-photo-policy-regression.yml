@@ -1,1 +1,169 @@
 
+name: ShopDrop Fix108 - Photo Policy Regression
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix108-photo-policy-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-photo-policy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verify original Fix59 source
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f supabase/functions/_shared/shopdrop-photo-policy.mjs
+          test -f supabase/functions/shopdrop-photo-screen/index.ts
+          test -f tests/shopdrop-photo-policy.test.mjs
+          test -f public/shopdrop-ad-gallery-uploader.js
+
+          echo "PASS: Original photo security files exist"
+
+      - name: Run existing Fix59 tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node --test tests/shopdrop-photo-policy.test.mjs
+
+      - name: Test automatic rejection and selective screening
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+
+          import {
+            evaluateBasic,
+            evaluateAdvanced
+          } from './supabase/functions/_shared/shopdrop-photo-policy.mjs';
+
+          const rejected = [
+            ['Call 082 123 4567', 'telephone_number'],
+            ['Contact +27 82 123 4567', 'telephone_number'],
+            ['sales@example.com', 'email_address'],
+            ['www.example.co.za', 'website'],
+            ['10 Long Street', 'street_address'],
+            ['@directseller', 'social_handle'],
+            ['Contact us', 'direct_contact'],
+            ['Best furniture sales direct',
+             'advertising_or_extended_text']
+          ];
+
+          for (const [text, reason] of rejected) {
+            const result = evaluateBasic({text});
+
+            assert.equal(
+              result.action,
+              'reject',
+              `Expected rejection: ${text}`
+            );
+
+            assert.equal(result.reason, reason);
+          }
+
+          assert.equal(
+            evaluateBasic({
+              text:'',
+              textRegions:0,
+              lowConfidence:false
+            }).action,
+            'basic_pass'
+          );
+
+          assert.equal(
+            evaluateBasic({
+              text:'TOYOTA'
+            }).action,
+            'advanced'
+          );
+
+          assert.equal(
+            evaluateBasic({
+              lowConfidence:true
+            }).action,
+            'advanced'
+          );
+
+          assert.equal(
+            evaluateBasic({
+              barcodeDetected:true
+            }).reason,
+            'qr_or_barcode'
+          );
+
+          assert.equal(
+            evaluateAdvanced({
+              logos:['Company Logo']
+            }).reason,
+            'logo_or_promotional_mark'
+          );
+
+          assert.equal(
+            evaluateAdvanced({
+              unreadable:true
+            }).action,
+            'reject'
+          );
+
+          assert.equal(
+            evaluateAdvanced({
+              text:'',
+              logos:[]
+            }).action,
+            'advanced_pass'
+          );
+
+          console.log(
+            'PASS: Contact details rejected'
+          );
+          console.log(
+            'PASS: Advertising text rejected'
+          );
+          console.log(
+            'PASS: Ambiguous photos require advanced screening'
+          );
+          console.log(
+            'PASS: Clean photos skip advanced screening'
+          );
+          console.log(
+            'PASS: Barcode and logo rules preserved'
+          );
+          JS
+
+      - name: Confirm no production files changed
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "SAFETY STOP: Working files changed"
+            git status --short
+            exit 1
+          fi
+
+          echo "PASS: No website files changed"
+          echo "PASS: No Supabase files changed"
+          echo "PASS: No automation modified"
+
