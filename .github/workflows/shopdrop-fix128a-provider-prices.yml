@@ -1,1 +1,207 @@
 
+name: ShopDrop Fix128A - Provider Prices Only
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix128a-provider-prices.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  correct-prices:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+
+      - name: Correct customer rate display
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          files={
+            "public/shopdrop-customer-service-rates.js":
+              "99f1cc038bbe87449a14062b18a3816b1dc22f5d",
+            "public/shopdrop-dispatch-customer-rates.js":
+              "4c84e5ad461b11658528c97769daf1f360235974"
+          }
+
+          for name,expected in files.items():
+            actual=subprocess.check_output(
+              ["git","hash-object",name],
+              text=True
+            ).strip()
+
+            if actual!=expected:
+              raise SystemExit(
+                "SAFETY STOP: File changed: "+name
+              )
+
+          def replace_once(source,old,new,name):
+            if source.count(old)!=1:
+              raise SystemExit(
+                "SAFETY STOP: Unexpected code: "+name
+              )
+            return source.replace(old,new,1)
+
+          service=Path(
+            "public/shopdrop-customer-service-rates.js"
+          )
+          source=service.read_text(encoding="utf-8")
+
+          old="""  function customerCents(price){
+            const cents=Math.round(Number(price)*100);
+
+            if(!Number.isSafeInteger(cents)||
+               cents<=0)return null;
+
+            const fee=cents<100000
+              ?Math.round(cents*0.10)
+              :Math.round(cents*0.07);
+
+            return cents+fee;
+          }"""
+
+          new="""  function customerCents(price){
+            const cents=Math.round(Number(price)*100);
+
+            if(!Number.isSafeInteger(cents)||
+               cents<=0)return null;
+
+            // Provider's advertised amount only.
+            // Commission belongs at checkout.
+            return cents;
+          }"""
+
+          source=replace_once(
+            source,old,new,"service commission"
+          )
+
+          source=replace_once(
+            source,
+            "Estimated customer total: ",
+            "Service booking price: ",
+            "service price label"
+          )
+
+          source=replace_once(
+            source,
+            "'Preview only. Dates, availability '+",
+            "'Provider price only. Dates, availability '+",
+            "service explanation"
+          )
+
+          service.write_text(
+            source,encoding="utf-8"
+          )
+
+          dispatch=Path(
+            "public/shopdrop-dispatch-customer-rates.js"
+          )
+          source=dispatch.read_text(encoding="utf-8")
+
+          old="""  function unitCents(price){
+            const cents=Math.round(Number(price)*100);
+            if(!Number.isSafeInteger(cents)||
+               cents<=0)return null;
+
+            const commission=cents<100000
+              ?Math.round(cents*0.10)
+              :Math.round(cents*0.07);
+
+            return cents+commission;
+          }"""
+
+          new="""  function unitCents(price){
+            const cents=Math.round(Number(price)*100);
+            if(!Number.isSafeInteger(cents)||
+               cents<=0)return null;
+
+            // Provider's advertised amount only.
+            // Commission belongs at checkout.
+            return cents;
+          }"""
+
+          source=replace_once(
+            source,old,new,"dispatch commission"
+          )
+
+          source=replace_once(
+            source,
+            "Estimated customer price: ",
+            "Dispatch service price: ",
+            "dispatch price label"
+          )
+
+          source=replace_once(
+            source,
+            "'Price preview only. Availability and '+",
+            "'Provider price only. Availability and '+",
+            "dispatch explanation"
+          )
+
+          dispatch.write_text(
+            source,encoding="utf-8"
+          )
+
+          print("PASS: Service price excludes commission")
+          print("PASS: Dispatch price excludes commission")
+          print("PASS: Existing booking code preserved")
+          PY
+
+      - name: Verify and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node --check \
+            public/shopdrop-customer-service-rates.js
+
+          node --check \
+            public/shopdrop-dispatch-customer-rates.js
+
+          git diff --check
+
+          python3 - <<'PY'
+          import subprocess
+
+          expected={
+            "public/shopdrop-customer-service-rates.js",
+            "public/shopdrop-dispatch-customer-rates.js"
+          }
+
+          changed=set(
+            subprocess.check_output(
+              ["git","diff","--name-only"],
+              text=True
+            ).splitlines()
+          )
+
+          if changed!=expected:
+            raise SystemExit(
+              "SAFETY STOP: Unexpected files changed"
+            )
+
+          print("PASS: Only two rate components changed")
+          PY
+
+          git add \
+            public/shopdrop-customer-service-rates.js \
+            public/shopdrop-dispatch-customer-rates.js
+
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Fix128A show provider prices before checkout"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
