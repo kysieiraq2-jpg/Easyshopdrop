@@ -1,1 +1,176 @@
 
+name: ShopDrop Fix79 - Browse Photo Position
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix79-browse-photo-position.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  fix-browse-position:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Add isolated browsing position helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path=Path("public/categories.html")
+          original=path.read_text(encoding="utf-8")
+
+          assert original.count(
+              'id="browse-all-items"'
+          )==1, "SAFETY STOP: browsing anchor missing"
+
+          assert "browsePublicProducts({view:browseView})" in original
+          assert "browseProductImages" in original
+          assert "shopdropLoadMore" in original
+
+          anchor=(
+              '</script>\n'
+              '<script src="v26-bridge.js"></script>'
+          )
+
+          assert original.count(anchor)==1, (
+              "SAFETY STOP: script location changed"
+          )
+
+          helper="""</script>
+          <script>
+          /* Fix79: navigation only; existing product
+             retrieval and photo code remains unchanged. */
+          (function(){
+            if(location.hash!=='#browse-all-items')return;
+
+            const section=document.getElementById(
+              'browse-all-items'
+            );
+            const results=document.getElementById(
+              'shopdropPublicProductResults'
+            );
+
+            if(!section||!results)return;
+
+            function jump(){
+              requestAnimationFrame(()=>{
+                requestAnimationFrame(()=>{
+                  section.scrollIntoView({
+                    behavior:'auto',
+                    block:'start'
+                  });
+                });
+              });
+            }
+
+            // Position at advertisements immediately.
+            jump();
+
+            // Reposition once the asynchronous
+            // product cards have been rendered.
+            if(results.children.length){
+              jump();
+            }else{
+              const observer=new MutationObserver(()=>{
+                if(results.children.length){
+                  observer.disconnect();
+                  jump();
+                }
+              });
+
+              observer.observe(results,{
+                childList:true
+              });
+            }
+
+            window.addEventListener('load',jump,{
+              once:true
+            });
+          })();
+          </script>
+          <script src="v26-bridge.js"></script>"""
+
+          updated=original.replace(anchor,helper,1)
+
+          assert updated.replace(helper,anchor,1)==original
+          assert updated.count("Fix79: navigation only")==1
+
+          path.write_text(
+              updated,encoding="utf-8"
+          )
+
+          print("PASS: Original page preserved")
+          print("PASS: Browse positioning helper added")
+          print("PASS: Existing product logic unchanged")
+          print("PASS: Existing photo logic unchanged")
+          PY
+
+      - name: Verify exact file scope
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git diff --check
+
+          python3 - <<'PY'
+          import subprocess
+
+          changed=subprocess.check_output(
+              ["git","diff","--name-only"],
+              text=True
+          ).splitlines()
+
+          assert changed==[
+              "public/categories.html"
+          ], "SAFETY STOP: unexpected file changes"
+
+          print("PASS: Only categories.html modified")
+          PY
+
+      - name: Commit navigation correction
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add public/categories.html
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "Fix79 position Browse All at advertisements"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy website
+        id: deployment
+        uses: actions/deploy-pages@v4
+
