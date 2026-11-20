@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport"
+      content="width=device-width,initial-scale=1">
+<title>Vehicle Advertisement Draft | Shop&Drop</title>
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:#f4f6f8;
+  color:#17202a;
+  font:16px Arial,sans-serif
+}
+header{
+  background:#101827;
+  color:white;
+  padding:18px
+}
+main{
+  max-width:760px;
+  margin:20px auto;
+  padding:16px
+}
+section{
+  background:white;
+  padding:20px;
+  border-radius:12px
+}
+label{display:block;margin:14px 0}
+input,select,textarea,button{
+  display:block;
+  width:100%;
+  padding:12px;
+  margin-top:6px;
+  font:inherit;
+  border-radius:7px;
+  border:1px solid #cbd5e1
+}
+button{
+  background:#0f766e;
+  color:white;
+  border:0
+}
+button:disabled{opacity:.5}
+.muted{color:#64748b}
+#result{
+  white-space:pre-wrap;
+  overflow-wrap:anywhere
+}
+</style>
+</head>
+<body>
+<header>
+  <strong>Shop&Drop</strong>
+  <div>Private Vehicle Advertisement Draft</div>
+</header>
+<main>
+<section>
+<h1>Create a vehicle advertisement draft</h1>
+<p class="muted">
+  Development-only form. This page is not
+  connected to public browsing or bookings.
+  Creating a draft does not publish it.
+</p>
+
+<form id="draftForm">
+  <label>
+    Vehicle advertisement title
+    <input id="title" required minlength="3"
+           maxlength="120"
+           placeholder="Example: Bakkie transport">
+  </label>
+
+  <label>
+    Vehicle type
+    <select id="type">
+      <option value="">Choose type</option>
+      <option>Delivery vehicle / van</option>
+      <option>Light truck</option>
+      <option>Heavy truck</option>
+      <option>Extra-heavy transport</option>
+      <option>Other / specialist transport</option>
+    </select>
+  </label>
+
+  <label>
+    Description
+    <textarea id="description"
+              maxlength="2000"
+              rows="4"></textarea>
+  </label>
+
+  <label>
+    Vehicle base town
+    <input id="town" maxlength="120">
+  </label>
+
+  <label>
+    Vehicle base province
+    <input id="province" maxlength="120">
+  </label>
+
+  <label>
+    Service coverage
+    <select id="coverage">
+      <option value="">Not selected</option>
+      <option value="local">Local</option>
+      <option value="selected">Selected areas</option>
+      <option value="nationwide">
+        Anywhere in South Africa
+      </option>
+    </select>
+  </label>
+
+  <button id="submit" type="submit">
+    Save private draft
+  </button>
+</form>
+
+<p id="result" role="status"
+   aria-live="polite">
+  No draft created.
+</p>
+</section>
+</main>
+
+<script type="module">
+import {createClient} from
+  'https://esm.sh/@supabase/supabase-js@2';
+
+const client=createClient(
+  'https://dtkdvvxpwonywtsgqmdx.supabase.co',
+  'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q',
+  {
+    auth:{
+      persistSession:true,
+      autoRefreshToken:true,
+      detectSessionInUrl:true
+    }
+  }
+);
+
+const form=document.getElementById('draftForm');
+const result=document.getElementById('result');
+const button=document.getElementById('submit');
+
+const value=id=>
+  document.getElementById(id).value.trim();
+
+form.addEventListener('submit',async event=>{
+  event.preventDefault();
+  if(button.disabled)return;
+
+  button.disabled=true;
+  result.textContent='Checking signed-in account...';
+
+  try{
+    const {data:userData,error:userError}=
+      await client.auth.getUser();
+
+    if(userError || !userData?.user?.id){
+      throw Error(
+        'Please sign in to Shop&Drop first.'
+      );
+    }
+
+    const title=value('title');
+
+    if(title.length<3 || title.length>120){
+      throw Error('Enter a valid vehicle title.');
+    }
+
+    const record={
+      provider_id:userData.user.id,
+      vehicle_title:title,
+      vehicle_description:value('description')||null,
+      vehicle_type:value('type')||null,
+      base_town:value('town')||null,
+      base_province:value('province')||null,
+      coverage_mode:value('coverage')||null,
+      covered_areas:[],
+      listing_status:'draft'
+    };
+
+    const {data,error}=await client
+      .from('shopdrop_vehicle_adverts')
+      .insert(record)
+      .select('id,listing_status')
+      .single();
+
+    if(error)throw Error(
+      error.message||'Draft could not be saved.'
+    );
+
+    result.textContent=
+      'Private draft created successfully.\n'+
+      'Advertisement ID: '+data.id+'\n'+
+      'Status: '+data.listing_status+'\n'+
+      'Not publicly published.';
+
+    form.reset();
+  }catch(error){
+    result.textContent=
+      error?.message||'Draft creation failed.';
+  }finally{
+    button.disabled=false;
+  }
+});
+</script>
+</body>
+</html>
