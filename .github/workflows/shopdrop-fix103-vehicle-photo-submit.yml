@@ -1,5 +1,5 @@
 
-name: ShopDrop Fix103 - Vehicle Photo Submission
+name: ShopDrop Fix103B - Vehicle Photo Submission
 
 on:
   push:
@@ -16,15 +16,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
         with:
           ref: shopdrop-phase6-integration
           persist-credentials: true
 
-      - name: Connect existing vehicle form and uploader
+      - name: Correct vehicle submission form
         shell: bash
         run: |
           set -euo pipefail
+
           python3 - <<'PY'
           from pathlib import Path
 
@@ -33,53 +35,39 @@ jobs:
           )
           original=path.read_text(encoding="utf-8")
 
-          required=[
-            "public/shopdrop-ad-gallery-uploader.js",
-            "public/categories.html"
-          ]
-
-          for filename in required:
-              if not Path(filename).exists():
-                  raise SystemExit(
-                      "SAFETY STOP: missing "+filename
-                  )
-
-          if original.count(
-            '<form id="draftForm">'
-          )!=1:
-              raise SystemExit("SAFETY STOP: form changed")
-
-          if original.count(
-            "listing_status:'draft'"
-          )!=1:
-              raise SystemExit("SAFETY STOP: draft logic changed")
-
           if "id=\"vehiclePhotos\"" in original:
-              raise SystemExit("Already connected")
-
-          original_notice="""  Development-only form. This page is not
-          connected to public browsing or bookings.
-          Creating a draft does not publish it."""
-
-          new_notice="""  Enter your vehicle details and select up to six
-          photographs. Eligible advertisements publish
-          automatically after a successful photograph upload.
-          No administrator approval is required."""
-
-          if original_notice not in original:
               raise SystemExit(
-                  "SAFETY STOP: expected notice missing"
+                "SAFETY STOP: photographs already connected"
               )
 
-          updated=original.replace(
-              original_notice,new_notice,1
-          )
+          required=[
+            '<form id="draftForm">',
+            '<button id="submit" type="submit">',
+            "listing_status:'draft'",
+            "form.reset();",
+            '<script type="module">'
+          ]
 
-          form_end="""  <button id="submit" type="submit">
-            Save private draft
-          </button>"""
+          for marker in required:
+              if original.count(marker)!=1:
+                  raise SystemExit(
+                    "SAFETY STOP: expected structure changed: "
+                    +marker
+                  )
 
-          new_fields="""  <label>
+          if not Path(
+            "public/shopdrop-ad-gallery-uploader.js"
+          ).exists():
+              raise SystemExit(
+                "SAFETY STOP: existing uploader missing"
+              )
+
+          updated=original
+
+          # Insert photograph selector.
+          button='<button id="submit" type="submit">'
+
+          photos="""<label>
             Vehicle photographs (1 to 6)
             <input id="vehiclePhotos"
                    type="file"
@@ -89,154 +77,195 @@ jobs:
           <p class="muted">
             Maximum 10 MB per photograph.
           </p>
-          <button id="submit" type="submit">
-            Submit vehicle advertisement
-          </button>"""
-
-          if form_end not in updated:
-              raise SystemExit(
-                  "SAFETY STOP: submit button changed"
-              )
-
-          updated=updated.replace(
-              form_end,new_fields,1
-          )
-
-          script_marker='<script type="module">'
-
-          if updated.count(script_marker)!=1:
-              raise SystemExit(
-                  "SAFETY STOP: module changed"
-              )
-
-          updated=updated.replace(
-              script_marker,
-              '<script src="./shopdrop-ad-gallery-uploader.js">'
-              '</script>\n'+script_marker,
-              1
-          )
-
-          insertion="""    const record={
           """
 
-          validation="""    const photos=Array.from(
-              document.getElementById('vehiclePhotos').files||[]
-            );
+          updated=updated.replace(
+            button,photos+button,1
+          )
 
-            if(photos.length<1 || photos.length>6){
-              throw Error('Select 1 to 6 photographs.');
-            }
+          updated=updated.replace(
+            'Save private draft',
+            'Submit vehicle advertisement',
+            1
+          )
 
-            if(!value('type')||
-               !value('town')||
-               !value('province')||
-               !value('coverage')){
-              throw Error(
-                'Vehicle type, base town, province and coverage are required.'
+          # Load the existing gallery uploader.
+          updated=updated.replace(
+            '<script type="module">',
+            '<script src="./shopdrop-ad-gallery-uploader.js">'
+            '</script>\n<script type="module">',
+            1
+          )
+
+          # Validate required details and photographs.
+          marker="    const record={"
+
+          validation=r"""
+              const photos=Array.from(
+                document.getElementById(
+                  'vehiclePhotos'
+                ).files||[]
               );
-            }
 
-            const validTypes=[
-              'image/jpeg','image/png','image/webp'
-            ];
-
-            for(const photo of photos){
-              if(!validTypes.includes(photo.type)||
-                 photo.size<1||
-                 photo.size>10485760){
+              if(photos.length<1||photos.length>6){
                 throw Error(
-                  'Photographs must be JPEG, PNG or WebP, maximum 10 MB each.'
+                  'Select between 1 and 6 photographs.'
                 );
               }
-            }
 
-            const record={
+              if(!value('type')||
+                 !value('town')||
+                 !value('province')||
+                 !value('coverage')){
+                throw Error(
+                  'Vehicle type, town, province and coverage are required.'
+                );
+              }
+
+              for(const photo of photos){
+                if(
+                  !['image/jpeg','image/png','image/webp']
+                    .includes(photo.type)||
+                  photo.size<1||
+                  photo.size>10485760
+                ){
+                  throw Error(
+                    'Use JPEG, PNG or WebP photographs, maximum 10 MB each.'
+                  );
+                }
+              }
+
           """
 
-          if updated.count(insertion)!=1:
+          if updated.count(marker)!=1:
               raise SystemExit(
-                  "SAFETY STOP: record block changed"
+                "SAFETY STOP: record insertion missing"
               )
 
           updated=updated.replace(
-              insertion,validation,1
+            marker,validation+marker,1
           )
 
-          old_result="""    result.textContent=
-              'Private draft created successfully.\\n'+
-              'Advertisement ID: '+data.id+'\\n'+
-              'Status: '+data.listing_status+'\\n'+
-              'Not publicly published.';
+          # Replace only the result handling after
+          # successful vehicle record creation.
+          start=updated.index(
+            "    result.textContent=\n"
+            "      'Private draft created successfully."
+          )
 
-            form.reset();"""
+          end=updated.index(
+            "    form.reset();",
+            start
+          )+len("    form.reset();")
 
-          new_result="""    result.textContent=
-              'Vehicle saved. Uploading photographs...';
+          replacement=r"""
+              result.textContent=
+                'Vehicle saved. Uploading photographs...';
 
-            const uploader=
-              window.ShopDropAdGalleryUploader;
+              const uploader=
+                window.ShopDropAdGalleryUploader;
 
-            if(!uploader?.uploadGallery){
-              throw Error(
-                'Photograph uploader unavailable. '+
-                'Advertisement ID: '+data.id
-              );
-            }
+              if(!uploader?.uploadGallery){
+                throw Error(
+                  'Photograph uploader unavailable. '+
+                  'Advertisement ID: '+data.id
+                );
+              }
 
-            try{
-              const uploaded=await uploader.uploadGallery({
-                client,
-                kind:'vehicle',
-                advertisementId:data.id,
-                files:photos
-              });
+              try{
+                const uploaded=
+                  await uploader.uploadGallery({
+                    client,
+                    kind:'vehicle',
+                    advertisementId:data.id,
+                    files:photos
+                  });
 
-              const {data:published,error:checkError}=
-                await client
+                const {
+                  data:published,
+                  error:statusError
+                }=await client
                   .from('shopdrop_vehicle_adverts')
                   .select('listing_status')
                   .eq('id',data.id)
                   .single();
 
-              if(checkError)throw checkError;
+                if(statusError)throw statusError;
 
-              result.textContent=
-                uploaded.savedCount+
-                ' photograph(s) uploaded.\\n'+
-                'Advertisement ID: '+data.id+'\\n'+
-                'Status: '+published.listing_status+'\\n'+
-                (published.listing_status==='approved'
-                  ?'Automatically published in browsing.'
-                  :'Publication requirements not yet met.');
+                result.textContent=
+                  uploaded.savedCount+
+                  ' photograph(s) uploaded.\n'+
+                  'Advertisement ID: '+data.id+'\n'+
+                  'Status: '+published.listing_status;
 
-              form.reset();
-            }catch(uploadError){
-              result.textContent=
-                'Vehicle advertisement ID: '+data.id+
-                '\\nPhotograph upload incomplete: '+
-                (uploadError?.message||'Unknown error')+
-                '\\nKeep this ID. Do not submit another advertisement.';
-            }"""
+                if(published.listing_status==='approved'){
+                  result.textContent+=
+                    '\nAutomatically published in browsing.';
+                }
 
-          if updated.count(old_result)!=1:
-              raise SystemExit(
-                  "SAFETY STOP: original result block changed"
-              )
+                form.reset();
+
+              }catch(uploadError){
+                result.textContent=
+                  'Advertisement ID: '+data.id+
+                  '\nPhotograph upload incomplete: '+
+                  (uploadError?.message||'Unknown error')+
+                  '\nKeep this ID. Do not create a duplicate.';
+              }
+          """
+
+          updated=(
+            updated[:start]+
+            replacement+
+            updated[end:]
+          )
+
+          # Update the outdated explanatory notice.
+          updated=updated.replace(
+            'Creating a draft does not publish it.',
+            'Eligible advertisements publish automatically '
+            'after successful photograph submission.',
+            1
+          )
 
           updated=updated.replace(
-              old_result,new_result,1
+            'Private Vehicle Advertisement Draft',
+            'Vehicle Advertisement Submission',
+            1
           )
+
+          updated=updated.replace(
+            'Create a vehicle advertisement draft',
+            'Advertise your vehicle',
+            1
+          )
+
+          # Verify only the intended additions.
+          checks=[
+            'id="vehiclePhotos"',
+            'shopdrop-ad-gallery-uploader.js',
+            "kind:'vehicle'",
+            'uploaded.savedCount',
+            'Automatically published in browsing.'
+          ]
+
+          for marker in checks:
+              if marker not in updated:
+                  raise SystemExit(
+                    "SAFETY STOP: missing "+marker
+                  )
 
           path.write_text(
-              updated,encoding="utf-8"
+            updated,
+            encoding="utf-8"
           )
 
-          print("PASS: Vehicle form connected to uploader")
-          print("PASS: Automatic publication remains database-controlled")
-          print("PASS: Existing browsing page unchanged")
+          print("PASS: Vehicle submission connected")
+          print("PASS: Six-photo uploader connected")
+          print("PASS: Automatic publication status connected")
           PY
 
-      - name: Verify and commit
+      - name: Verify changes and commit
         shell: bash
         run: |
           set -euo pipefail
@@ -249,8 +278,7 @@ jobs:
           git add public/shopdrop-vehicle-draft-private.html
 
           git -c user.name='github-actions[bot]' \
-              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-              commit -m "Fix103 connect vehicle submission and gallery"
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Fix103B connect vehicle form and photographs"
 
           git push origin HEAD:shopdrop-phase6-integration
-
