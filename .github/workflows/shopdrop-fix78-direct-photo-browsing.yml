@@ -1,1 +1,205 @@
 
+name: ShopDrop Fix78 - Direct Photo Browsing
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix78-direct-photo-browsing.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  direct-browsing:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Update browsing links only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          home=Path("public/index.html")
+          cats=Path("public/categories.html")
+
+          original_home=home.read_text(encoding="utf-8")
+          original_cats=cats.read_text(encoding="utf-8")
+
+          old_link='href="./categories.html"'
+          new_link='href="./categories.html#browse-all-items"'
+
+          # Fix 77 added two labelled homepage links.
+          menu_old=(
+              '<a href="./categories.html">'
+              'BROWSE ALL ITEMS</a>'
+          )
+          menu_new=menu_old.replace(old_link,new_link)
+
+          hero_old=(
+              '<a class="btn" href="./categories.html" '
+              'style="display:inline-block;'
+              'padding:15px 25px;font-weight:bold;">'
+              'BROWSE ALL ITEMS</a>'
+          )
+          hero_new=hero_old.replace(old_link,new_link)
+
+          # Existing homepage header browsing link.
+          header_old=(
+              '<a class="btn shopdrop-header-browse" '
+              'href="./categories.html">'
+          )
+          header_new=header_old.replace(old_link,new_link)
+
+          for old in [menu_old,hero_old,header_old]:
+              assert original_home.count(old)==1, (
+                  "SAFETY STOP: homepage structure changed"
+              )
+
+          updated_home=original_home
+          for old,new in [
+              (menu_old,menu_new),
+              (hero_old,hero_new),
+              (header_old,header_new)
+          ]:
+              updated_home=updated_home.replace(old,new,1)
+
+          # Add an anchor to the existing results section.
+          section_old=(
+              '<section class="panel">\n'
+              '<h2>Available advertisements</h2>'
+          )
+          section_new=(
+              '<section class="panel" id="browse-all-items">\n'
+              '<h2>Available advertisements</h2>'
+          )
+
+          card_old=(
+              '<a class="card" href="./categories.html">'
+              '<b>BROWSE ALL ITEMS</b>'
+          )
+          card_new=card_old.replace(old_link,new_link)
+
+          assert original_cats.count(section_old)==1
+          assert original_cats.count(card_old)==1
+          assert 'id="browse-all-items"' not in original_cats
+
+          updated_cats=original_cats.replace(
+              section_old,section_new,1
+          ).replace(
+              card_old,card_new,1
+          )
+
+          # Reverse the exact modifications to prove
+          # everything else remains byte-for-byte intact.
+          restored_home=updated_home
+          for old,new in [
+              (menu_old,menu_new),
+              (hero_old,hero_new),
+              (header_old,header_new)
+          ]:
+              assert restored_home.count(new)==1
+              restored_home=restored_home.replace(new,old,1)
+
+          assert restored_home==original_home
+
+          restored_cats=updated_cats.replace(
+              section_new,section_old,1
+          ).replace(
+              card_new,card_old,1
+          )
+
+          assert restored_cats==original_cats
+
+          # Preserve existing browsing operations.
+          for token in [
+              'browsePublicProducts({view:browseView})',
+              'browseProductImages',
+              'shopdropLoadMore',
+              'shopdropPublicProductResults',
+              "listing_status:'eq.active'",
+              "quantity:'gt.0'",
+              "country_code:'eq.ZA'"
+          ]:
+              assert token in updated_cats, (
+                  "SAFETY STOP: browsing functionality changed"
+              )
+
+          home.write_text(updated_home,encoding="utf-8")
+          cats.write_text(updated_cats,encoding="utf-8")
+
+          print("PASS: Homepage links updated")
+          print("PASS: Main menu link updated")
+          print("PASS: Header browsing link updated")
+          print("PASS: Categories browsing card updated")
+          print("PASS: Existing photograph section targeted")
+          print("PASS: Original operational code preserved")
+          PY
+
+      - name: Verify file scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+
+          python3 - <<'PY'
+          import subprocess
+
+          changed=set(
+              subprocess.check_output(
+                  ["git","diff","--name-only"],
+                  text=True
+              ).splitlines()
+          )
+
+          assert changed=={
+              "public/index.html",
+              "public/categories.html"
+          }, "SAFETY STOP: unexpected files changed"
+
+          print("PASS: Only two navigation files changed")
+          PY
+
+      - name: Commit navigation correction
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add public/index.html public/categories.html
+
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "Fix78 open Browse All at product photographs"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload existing website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy website
+        id: deployment
+        uses: actions/deploy-pages@v4
+
