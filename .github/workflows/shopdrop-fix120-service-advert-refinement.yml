@@ -250,4 +250,3 @@ jobs:
             commit -m "Fix120 refine service advertising options"
 
           git push origin HEAD:shopdrop-phase6-integration
-
