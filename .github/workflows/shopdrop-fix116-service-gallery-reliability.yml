@@ -1,1 +1,301 @@
 
+name: ShopDrop Fix116 - Service Gallery Reliability
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix116-service-gallery-reliability.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix-service-gallery:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Preserve selected service photographs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          target=Path(
+            "public/shopdrop-seller-product-supabase.js"
+          )
+
+          expected=(
+            "02e9e56d7c34310cc889f89eaef67ee931256920"
+          )
+
+          actual=subprocess.check_output(
+            ["git","hash-object",str(target)],
+            text=True
+          ).strip()
+
+          if actual!=expected:
+              raise SystemExit(
+                "SAFETY STOP: Service code has changed."
+              )
+
+          original=target.read_text(
+            encoding="utf-8"
+          )
+
+          old_selection="""  const serviceCameraPhotos=[];
+          let serviceCameraBusy=false;
+
+          function serviceSelectedPhotos(){
+            const gallery=document.getElementById(
+              'serviceGalleryPhotos'
+            );
+
+            return [
+              ...Array.from(gallery?.files||[]),
+              ...serviceCameraPhotos
+            ];
+          }"""
+
+          new_selection="""  const serviceCameraPhotos=[];
+          let serviceGalleryPhotos=[];
+          let serviceCameraBusy=false;
+          let serviceGalleryBusy=false;
+
+          function serviceSelectedPhotos(){
+            return [
+              ...serviceGalleryPhotos,
+              ...serviceCameraPhotos
+            ];
+          }
+
+          async function preserveServicePhotos(files){
+            const reader=
+              window.ShopDropSharedPhotoReader;
+
+            if(!reader?.readOriginal){
+              throw Error(
+                'Picture reader unavailable. '+
+                'Please try again.'
+              );
+            }
+
+            const prepared=await Promise.all(
+              files.map(file=>reader.readOriginal(file))
+            );
+
+            return prepared.map((photo,index)=>
+              new File(
+                [photo.blob],
+                'service-photo-'+index+'.'+photo.extension,
+                {type:photo.mime}
+              )
+            );
+          }"""
+
+          if original.count(old_selection)!=1:
+              raise SystemExit(
+                "SAFETY STOP: Service selection changed."
+              )
+
+          updated=original.replace(
+            old_selection,new_selection,1
+          )
+
+          old_gallery="""    gallery.addEventListener(
+              'change',servicePhotoCount
+            );"""
+
+          new_gallery="""    gallery.addEventListener(
+              'change',async()=>{
+                if(serviceGalleryBusy)return;
+
+                serviceGalleryBusy=true;
+
+                const label=document.getElementById(
+                  'servicePhotoCount'
+                );
+
+                try{
+                  const files=Array.from(
+                    gallery.files||[]
+                  );
+
+                  if(
+                    files.length+
+                    serviceCameraPhotos.length>6
+                  ){
+                    throw Error(
+                      'Maximum 6 photographs.'
+                    );
+                  }
+
+                  if(label){
+                    label.textContent=
+                      'Preparing your pictures...';
+                  }
+
+                  const saved=
+                    await preserveServicePhotos(files);
+
+                  serviceGalleryPhotos=saved;
+                  servicePhotoCount();
+
+                }catch(error){
+                  serviceGalleryPhotos=[];
+
+                  if(label){
+                    label.textContent=
+                      error?.message||
+                      'Please choose your pictures again.';
+                  }
+                }finally{
+                  gallery.value='';
+                  serviceGalleryBusy=false;
+                }
+              }
+            );"""
+
+          if updated.count(old_gallery)!=1:
+              raise SystemExit(
+                "SAFETY STOP: Gallery handler changed."
+              )
+
+          updated=updated.replace(
+            old_gallery,new_gallery,1
+          )
+
+          old_camera="""          const prepared=await Promise.all(
+                    files.map(f=>reader.readOriginal(f))
+                  );
+
+                  for(const photo of prepared){
+                    serviceCameraPhotos.push(
+                      new File(
+                        [photo.blob],
+                        'service-photo.'+photo.extension,
+                        {type:photo.mime}
+                      )
+                    );
+                  }"""
+
+          new_camera="""          const saved=
+                    await preserveServicePhotos(files);
+
+                  serviceCameraPhotos.push(...saved);"""
+
+          if updated.count(old_camera)!=1:
+              raise SystemExit(
+                "SAFETY STOP: Camera handler changed."
+              )
+
+          updated=updated.replace(
+            old_camera,new_camera,1
+          )
+
+          old_busy="""      if(serviceCameraBusy){
+                throw Error('Please wait for your picture.');
+              }"""
+
+          new_busy="""      if(serviceCameraBusy||serviceGalleryBusy){
+                throw Error(
+                  'Please wait while your pictures are prepared.'
+                );
+              }"""
+
+          if updated.count(old_busy)!=1:
+              raise SystemExit(
+                "SAFETY STOP: Submission guard changed."
+              )
+
+          updated=updated.replace(
+            old_busy,new_busy,1
+          )
+
+          old_reset="""      el('sn').value='';
+                el('sp').value='';
+
+                serviceFeePreviewLive();"""
+
+          new_reset="""      el('sn').value='';
+                el('sp').value='';
+
+                serviceGalleryPhotos=[];
+                serviceCameraPhotos.length=0;
+                servicePhotoCount();
+
+                serviceFeePreviewLive();"""
+
+          if updated.count(old_reset)!=1:
+              raise SystemExit(
+                "SAFETY STOP: Submission reset changed."
+              )
+
+          updated=updated.replace(
+            old_reset,new_reset,1
+          )
+
+          target.write_text(
+            updated,encoding="utf-8"
+          )
+
+          print("PASS: Gallery photos read immediately")
+          print("PASS: Camera photos still preserved")
+          print("PASS: Existing service upload retained")
+          print("PASS: No product code changed")
+          PY
+
+      - name: Verify JavaScript and changes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node --check \
+            public/shopdrop-seller-product-supabase.js
+
+          git diff --check
+
+          python3 - <<'PY'
+          import subprocess
+
+          changed=set(
+            subprocess.check_output(
+              ["git","diff","--name-only"],
+              text=True
+            ).splitlines()
+          )
+
+          if changed!={
+            "public/shopdrop-seller-product-supabase.js"
+          }:
+              raise SystemExit(
+                "SAFETY STOP: Unexpected files modified."
+              )
+
+          print("PASS: Only service submission file changed")
+          PY
+
+      - name: Commit
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add \
+            public/shopdrop-seller-product-supabase.js
+
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Fix116 preserve service gallery photos"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
