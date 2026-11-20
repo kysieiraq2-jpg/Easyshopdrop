@@ -1,1 +1,390 @@
 
+name: ShopDrop Fix115 - Other Services Photos
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix115-service-photos.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  service-photos:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Add photos to existing service form
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          expected={
+            "public/seller.html":
+              "67346cd7a3aef6143a74c7cb57e6149fe39d5dae",
+            "public/shopdrop-seller-product-supabase.js":
+              "420e6c2b6c782077ae4d1825714fa91aa46a4d73",
+            "public/shopdrop-product-photos.js":
+              "8ed1f80f67814b9ffdc78ec827ea9293ad5ce7ea",
+            "public/shopdrop-ad-gallery-uploader.js":
+              "df15f7e665f0b292c613d92f6a7269340a6e8b5f"
+          }
+
+          for name,sha in expected.items():
+              actual=subprocess.check_output(
+                ["git","hash-object",name],
+                text=True
+              ).strip()
+              if actual!=sha:
+                  raise SystemExit(
+                    "SAFETY STOP: Changed file "+name
+                  )
+
+          page=Path("public/seller.html")
+          original=page.read_text(encoding="utf-8")
+
+          old=(
+            '<input id=sphoto placeholder='
+            '"Service photo web link (optional — advanced)">'
+          )
+
+          new=(
+            '<div id="shopdropServicePhotoControls">'
+            '<label>Choose service photographs from your '
+            'phone or computer (up to 6)'
+            '<input id="serviceGalleryPhotos" type="file" '
+            'accept="image/*,.heic,.heif,.avif" multiple>'
+            '</label>'
+            '<label>Or take a photograph with your phone'
+            '<input id="serviceCameraPhoto" type="file" '
+            'accept="image/*" capture="environment">'
+            '</label>'
+            '<p id="servicePhotoCount" role="status">'
+            'No photographs selected yet.</p>'
+            '</div>'
+            '<input id="sphoto" type="hidden" value="">'
+          )
+
+          if original.count(old)!=1:
+              raise SystemExit(
+                "SAFETY STOP: Service photo field changed"
+              )
+
+          updated=original.replace(old,new,1)
+
+          anchor=(
+            '<script src="./shopdrop-seller-product-supabase.js" '
+            'defer></script>'
+          )
+
+          scripts=(
+            '<script src="./shopdrop-shared-photo-reader.js" '
+            'defer></script>'
+            '<script src="./shopdrop-ad-gallery-uploader.js" '
+            'defer></script>'
+            +anchor
+          )
+
+          if updated.count(anchor)!=1:
+              raise SystemExit(
+                "SAFETY STOP: Seller scripts changed"
+              )
+
+          updated=updated.replace(anchor,scripts,1)
+          page.write_text(updated,encoding="utf-8")
+
+          source=Path(
+            "public/shopdrop-seller-product-supabase.js"
+          )
+          code=source.read_text(encoding="utf-8")
+
+          anchor2="  async function submitService(){"
+
+          addition="""  // Shared photo selection for Other Services.
+          // Uses the same original-byte reader as Dispatch.
+          const serviceCameraPhotos=[];
+          let serviceCameraBusy=false;
+
+          function serviceSelectedPhotos(){
+            const gallery=document.getElementById(
+              'serviceGalleryPhotos'
+            );
+
+            return [
+              ...Array.from(gallery?.files||[]),
+              ...serviceCameraPhotos
+            ];
+          }
+
+          function servicePhotoCount(){
+            const count=serviceSelectedPhotos().length;
+            const label=document.getElementById(
+              'servicePhotoCount'
+            );
+
+            if(label){
+              label.textContent=count
+                ?count+' of 6 photographs selected.'
+                :'No photographs selected yet.';
+            }
+          }
+
+          function initServicePhotos(){
+            const gallery=document.getElementById(
+              'serviceGalleryPhotos'
+            );
+            const camera=document.getElementById(
+              'serviceCameraPhoto'
+            );
+
+            if(!gallery||!camera)return;
+
+            gallery.addEventListener(
+              'change',servicePhotoCount
+            );
+
+            camera.addEventListener(
+              'change',async()=>{
+                if(serviceCameraBusy)return;
+                serviceCameraBusy=true;
+
+                try{
+                  const files=Array.from(
+                    camera.files||[]
+                  );
+
+                  if(
+                    serviceSelectedPhotos().length+
+                    files.length>6
+                  ){
+                    throw Error(
+                      'Maximum 6 photographs.'
+                    );
+                  }
+
+                  const reader=
+                    window.ShopDropSharedPhotoReader;
+
+                  if(!reader?.readOriginal){
+                    throw Error(
+                      'Photograph reader unavailable.'
+                    );
+                  }
+
+                  const prepared=await Promise.all(
+                    files.map(f=>reader.readOriginal(f))
+                  );
+
+                  for(const photo of prepared){
+                    serviceCameraPhotos.push(
+                      new File(
+                        [photo.blob],
+                        'service-photo.'+photo.extension,
+                        {type:photo.mime}
+                      )
+                    );
+                  }
+
+                  servicePhotoCount();
+                }catch(error){
+                  const label=document.getElementById(
+                    'servicePhotoCount'
+                  );
+
+                  if(label){
+                    label.textContent=
+                      error?.message||
+                      'Please try that picture again.';
+                  }
+                }finally{
+                  camera.value='';
+                  serviceCameraBusy=false;
+                }
+              }
+            );
+          }
+
+          """
+
+          if code.count(anchor2)!=1:
+              raise SystemExit(
+                "SAFETY STOP: Service submit changed"
+              )
+
+          code=code.replace(
+            anchor2,addition+anchor2,1
+          )
+
+          old_submit=(
+            "      const payload={\n"
+            "        provider_id:user.id,"
+          )
+
+          new_submit=(
+            "      if(serviceCameraBusy){\n"
+            "        throw Error('Please wait for your picture.');\n"
+            "      }\n"
+            "\n"
+            "      const servicePhotos=serviceSelectedPhotos();\n"
+            "      if(servicePhotos.length<1 ||\n"
+            "         servicePhotos.length>6){\n"
+            "        throw Error('Choose 1 to 6 photographs.');\n"
+            "      }\n"
+            "\n"
+            "      const photoReader=\n"
+            "        window.ShopDropSharedPhotoReader;\n"
+            "      if(!photoReader?.readSelection){\n"
+            "        throw Error('Photograph reader unavailable.');\n"
+            "      }\n"
+            "      await photoReader.readSelection(servicePhotos);\n"
+            "\n"
+            +old_submit
+          )
+
+          if code.count(old_submit)!=1:
+              raise SystemExit(
+                "SAFETY STOP: Service payload changed"
+              )
+
+          code=code.replace(
+            old_submit,new_submit,1
+          )
+
+          old_status=(
+            "      status.textContent=\n"
+            "        'Service saved. Reference: '+"
+          )
+
+          new_status="""      status.textContent=
+                'Service saved. Uploading photographs...';
+
+              const uploader=
+                window.ShopDropAdGalleryUploader;
+
+              if(!uploader?.uploadGallery){
+                throw Error(
+                  'Service saved, but photograph uploader '+
+                  'is unavailable. Reference: '+data.id
+                );
+              }
+
+              try{
+                await uploader.uploadGallery({
+                  client:sb,
+                  kind:'service',
+                  advertisementId:data.id,
+                  files:servicePhotos
+                });
+              }catch(photoError){
+                throw Error(
+                  'Service saved. Reference: '+data.id+
+                  '. Photographs need attention: '+
+                  (photoError?.message||'Upload incomplete')
+                );
+              }
+
+              status.textContent=
+                'Service saved. Reference: '+"""
+
+          if code.count(old_status)!=1:
+              raise SystemExit(
+                "SAFETY STOP: Service completion changed"
+              )
+
+          code=code.replace(
+            old_status,new_status,1
+          )
+
+          init_anchor=(
+            "    initServiceCoverage();\n"
+            "\n"
+            "    window.addService=submitService;"
+          )
+
+          init_new=(
+            "    initServiceCoverage();\n"
+            "    initServicePhotos();\n"
+            "\n"
+            "    window.addService=submitService;"
+          )
+
+          if code.count(init_anchor)!=1:
+              raise SystemExit(
+                "SAFETY STOP: Service initialization changed"
+              )
+
+          code=code.replace(
+            init_anchor,init_new,1
+          )
+
+          source.write_text(
+            code,encoding="utf-8"
+          )
+
+          print("PASS: Existing service submission preserved")
+          print("PASS: Shared gallery uploader connected")
+          print("PASS: Product uploader unchanged")
+          PY
+
+      - name: Verify exact changes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node --check \
+            public/shopdrop-seller-product-supabase.js
+
+          node --check \
+            public/shopdrop-ad-gallery-uploader.js
+
+          git diff --check
+
+          python3 - <<'PY'
+          import subprocess
+
+          changed=set(
+            subprocess.check_output(
+              ["git","diff","--name-only"],
+              text=True
+            ).splitlines()
+          )
+
+          expected={
+            "public/seller.html",
+            "public/shopdrop-seller-product-supabase.js"
+          }
+
+          if changed!=expected:
+              raise SystemExit(
+                "SAFETY STOP: Unexpected files modified"
+              )
+
+          print("PASS: Only two intended files changed")
+          PY
+
+      - name: Commit
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git add \
+            public/seller.html \
+            public/shopdrop-seller-product-supabase.js
+
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Fix115 connect Other Services photographs"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
