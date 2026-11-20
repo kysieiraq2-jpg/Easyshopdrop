@@ -56,6 +56,14 @@
       throw Error('Select between 1 and 6 photographs.');
     }
 
+    // Fix112: Use original-byte reading when available.
+    // Preserve the previous uploader when it is absent.
+    const reader=window.ShopDropSharedPhotoReader;
+    const prepared=reader?.readSelection
+      ?await reader.readSelection(selected)
+      :null;
+
+    if(!prepared){
     for(const file of selected){
       if(!MIME[file.type] ||
          file.size<1 ||
@@ -64,6 +72,7 @@
           'JPEG, PNG or WebP required; maximum 10 MB each.'
         );
       }
+    }
     }
 
     const {data:userData,error:userError}=
@@ -115,9 +124,12 @@
 
     for(let i=0;i<selected.length;i++){
       const file=selected[i];
+      const originalPhoto=prepared?.[i];
+      const uploadBody=originalPhoto?.blob||file;
+      const uploadMime=originalPhoto?.mime||file.type;
       const position=available[i];
       const filename=
-        crypto.randomUUID()+'.'+MIME[file.type];
+        crypto.randomUUID()+'.'+MIME[uploadMime];
 
       const path=[
         userId,
@@ -127,8 +139,8 @@
 
       const {error:uploadError}=
         await client.storage.from(type.bucket)
-          .upload(path,file,{
-            contentType:file.type,
+          .upload(path,uploadBody,{
+            contentType:uploadMime,
             upsert:false
           });
 
