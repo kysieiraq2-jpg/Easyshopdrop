@@ -1,1 +1,204 @@
 
+name: ShopDrop Fix105 - Vehicle Photos in Existing Browse
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix105-vehicle-photos.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  connect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Add vehicle photographs only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path=Path("public/categories.html")
+          original=path.read_text(encoding="utf-8")
+
+          start=original.find(
+            "/* Fix101: Public approved vehicle advertisements."
+          )
+          end=original.find(
+            "</script>",start
+          )
+
+          if start<0 or end<0:
+              raise SystemExit(
+                "SAFETY STOP: Dispatch section missing"
+              )
+
+          section=original[start:end]
+
+          marker="""      card.append(
+                type,title,area,description,link
+              );
+              fragment.append(card);"""
+
+          if section.count(marker)!=1:
+              raise SystemExit(
+                "SAFETY STOP: Dispatch card changed"
+              )
+
+          if "shopdropVehiclePhotoGallery" in original:
+              raise SystemExit(
+                "SAFETY STOP: Gallery already installed"
+              )
+
+          addition="""      card.append(
+                type,title,area,description,link
+              );
+
+              // Fix105: Photographs for this
+              // published vehicle only.
+              // Does not modify other advertisements.
+              (async()=>{
+                try{
+                  const base=
+                    'https://dtkdvvxpwonywtsgqmdx.supabase.co';
+                  const key=
+                    'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';
+
+                  const query=new URLSearchParams({
+                    select:
+                      'photo_position,storage_bucket,storage_path',
+                    vehicle_advert_id:'eq.'+item.id,
+                    order:'photo_position.asc',
+                    limit:'6'
+                  });
+
+                  const response=await fetch(
+                    base+
+                    '/rest/v1/shopdrop_public_vehicle_ad_photos?'+
+                    query.toString(),
+                    {headers:{
+                      apikey:key,
+                      Accept:'application/json'
+                    }}
+                  );
+
+                  if(!response.ok)return;
+
+                  const photos=await response.json();
+                  if(!Array.isArray(photos)||!photos.length)return;
+
+                  const gallery=document.createElement('div');
+                  gallery.className='shopdropVehiclePhotoGallery';
+                  gallery.style.cssText=
+                    'display:flex;gap:8px;overflow-x:auto;'+
+                    'margin:12px 0;';
+
+                  for(const photo of photos.slice(0,6)){
+                    if(
+                      photo.storage_bucket!==
+                        'shopdrop-vehicle-ad-gallery'||
+                      !photo.storage_path
+                    )continue;
+
+                    const path=photo.storage_path.split('/')
+                      .map(encodeURIComponent).join('/');
+
+                    const signed=await fetch(
+                      base+'/storage/v1/object/sign/'+
+                      'shopdrop-vehicle-ad-gallery/'+path,
+                      {
+                        method:'POST',
+                        headers:{
+                          apikey:key,
+                          'Content-Type':'application/json'
+                        },
+                        body:JSON.stringify({expiresIn:3600})
+                      }
+                    );
+
+                    if(!signed.ok)continue;
+
+                    const data=await signed.json();
+                    if(!data.signedURL)continue;
+
+                    const imageURL=new URL(
+                      data.signedURL,base
+                    );
+
+                    if(imageURL.origin!==base)continue;
+
+                    const img=document.createElement('img');
+                    img.src=imageURL.href;
+                    img.alt='Vehicle advertisement photograph';
+                    img.loading='lazy';
+                    img.style.cssText=
+                      'width:150px;height:120px;'+
+                      'object-fit:cover;border-radius:8px;'+
+                      'flex-shrink:0;';
+
+                    gallery.append(img);
+                  }
+
+                  if(gallery.childElementCount){
+                    card.insertBefore(gallery,area);
+                  }
+                }catch(_){
+                  // Vehicle details remain visible
+                  // if photograph retrieval fails.
+                }
+              })();
+
+              fragment.append(card);"""
+
+          updated_section=section.replace(
+            marker,addition,1
+          )
+
+          updated=(
+            original[:start]+
+            updated_section+
+            original[end:]
+          )
+
+          # Confirm only the Dispatch card changed.
+          restored=updated.replace(
+            addition,marker,1
+          )
+
+          if restored!=original:
+              raise SystemExit(
+                "SAFETY STOP: unrelated code changed"
+              )
+
+          path.write_text(updated,encoding="utf-8")
+          print("PASS: Vehicle gallery added")
+          print("PASS: Existing product and service code preserved")
+          PY
+
+      - name: Verify and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git diff --check
+
+          test "$(git diff --name-only)" = \
+            "public/categories.html"
+
+          git add public/categories.html
+
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Fix105 add vehicle gallery to existing browse"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
