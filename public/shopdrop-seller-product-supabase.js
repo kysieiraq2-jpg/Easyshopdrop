@@ -525,6 +525,110 @@ async function verifySeller(sb,userId){
     return d.toISOString();
   }
 
+  // Shared photo selection for Other Services.
+// Uses the same original-byte reader as Dispatch.
+const serviceCameraPhotos=[];
+let serviceCameraBusy=false;
+
+function serviceSelectedPhotos(){
+  const gallery=document.getElementById(
+    'serviceGalleryPhotos'
+  );
+
+  return [
+    ...Array.from(gallery?.files||[]),
+    ...serviceCameraPhotos
+  ];
+}
+
+function servicePhotoCount(){
+  const count=serviceSelectedPhotos().length;
+  const label=document.getElementById(
+    'servicePhotoCount'
+  );
+
+  if(label){
+    label.textContent=count
+      ?count+' of 6 photographs selected.'
+      :'No photographs selected yet.';
+  }
+}
+
+function initServicePhotos(){
+  const gallery=document.getElementById(
+    'serviceGalleryPhotos'
+  );
+  const camera=document.getElementById(
+    'serviceCameraPhoto'
+  );
+
+  if(!gallery||!camera)return;
+
+  gallery.addEventListener(
+    'change',servicePhotoCount
+  );
+
+  camera.addEventListener(
+    'change',async()=>{
+      if(serviceCameraBusy)return;
+      serviceCameraBusy=true;
+
+      try{
+        const files=Array.from(
+          camera.files||[]
+        );
+
+        if(
+          serviceSelectedPhotos().length+
+          files.length>6
+        ){
+          throw Error(
+            'Maximum 6 photographs.'
+          );
+        }
+
+        const reader=
+          window.ShopDropSharedPhotoReader;
+
+        if(!reader?.readOriginal){
+          throw Error(
+            'Photograph reader unavailable.'
+          );
+        }
+
+        const prepared=await Promise.all(
+          files.map(f=>reader.readOriginal(f))
+        );
+
+        for(const photo of prepared){
+          serviceCameraPhotos.push(
+            new File(
+              [photo.blob],
+              'service-photo.'+photo.extension,
+              {type:photo.mime}
+            )
+          );
+        }
+
+        servicePhotoCount();
+      }catch(error){
+        const label=document.getElementById(
+          'servicePhotoCount'
+        );
+
+        if(label){
+          label.textContent=
+            error?.message||
+            'Please try that picture again.';
+        }
+      }finally{
+        camera.value='';
+        serviceCameraBusy=false;
+      }
+    }
+  );
+}
+
   async function submitService(){
     const status=el('serviceStatus');
     if(!status)return;
@@ -668,6 +772,23 @@ async function verifySeller(sb,userId){
         );
       }
 
+      if(serviceCameraBusy){
+        throw Error('Please wait for your picture.');
+      }
+
+      const servicePhotos=serviceSelectedPhotos();
+      if(servicePhotos.length<1 ||
+         servicePhotos.length>6){
+        throw Error('Choose 1 to 6 photographs.');
+      }
+
+      const photoReader=
+        window.ShopDropSharedPhotoReader;
+      if(!photoReader?.readSelection){
+        throw Error('Photograph reader unavailable.');
+      }
+      await photoReader.readSelection(servicePhotos);
+
       const payload={
         provider_id:user.id,
         title,
@@ -706,7 +827,35 @@ async function verifySeller(sb,userId){
       }
 
       status.textContent=
-        'Service saved. Reference: '+
+      'Service saved. Uploading photographs...';
+
+    const uploader=
+      window.ShopDropAdGalleryUploader;
+
+    if(!uploader?.uploadGallery){
+      throw Error(
+        'Service saved, but photograph uploader '+
+        'is unavailable. Reference: '+data.id
+      );
+    }
+
+    try{
+      await uploader.uploadGallery({
+        client:sb,
+        kind:'service',
+        advertisementId:data.id,
+        files:servicePhotos
+      });
+    }catch(photoError){
+      throw Error(
+        'Service saved. Reference: '+data.id+
+        '. Photographs need attention: '+
+        (photoError?.message||'Upload incomplete')
+      );
+    }
+
+    status.textContent=
+      'Service saved. Reference: '+
         data.id+
         '. Status: '+data.listing_status+
         '. Eligible verified providers are published automatically. '+
@@ -731,6 +880,7 @@ async function verifySeller(sb,userId){
     if(!el('sarea'))return;
 
     initServiceCoverage();
+    initServicePhotos();
 
     window.addService=submitService;
     window.serviceFeePreview=serviceFeePreviewLive;
