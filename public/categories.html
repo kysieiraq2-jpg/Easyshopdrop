@@ -109,6 +109,21 @@ select,input,button{max-width:100%;box-sizing:border-box}
 <p id="shopdropCurrentSelection" class="muted" aria-live="polite"></p>
 <div id="shopdropPublicProductResults" class="grid" aria-live="polite"></div>
 <button id="shopdropLoadMore" class="btn" type="button" hidden>Load more products</button>
+<div id="shopdropCombinedServicesPanel"
+style="margin-top:24px">
+<h2>Other Services advertisements</h2>
+<p id="shopdropCombinedServicesStatus"
+   class="muted" aria-live="polite">
+Loading approved services...
+</p>
+<div id="shopdropCombinedServices"
+     class="grid" aria-live="polite"></div>
+<p>
+<a class="btn" href="./services.html">
+Browse all Other Services
+</a>
+</p>
+</div>
 <h2>Browse product departments A–Z</h2>
 <div id="cats" class="cats"></div>
 <p id="result" class="muted"></p>
@@ -483,6 +498,41 @@ currencyHint.textContent='South African marketplace — prices shown in the list
   window.addEventListener('load',jump,{
     once:true
   });
+})();
+</script>
+<script src="./shopdrop-services-connector.js"></script>
+<script src="./shopdrop-combined-service-cards.js"></script>
+<script>
+/* Fix96: isolated services display.
+   Existing product browsing remains unchanged. */
+(function(){
+  const container=document.getElementById(
+    'shopdropCombinedServices'
+  );
+  const status=document.getElementById(
+    'shopdropCombinedServicesStatus'
+  );
+
+  if(!container||!status)return;
+
+  const component=window.ShopDropCombinedServiceCards;
+
+  if(!component||typeof component.render!=='function'){
+    status.textContent=
+      'Service advertisements are temporarily unavailable.';
+    return;
+  }
+
+  component.render(container)
+    .then(count=>{
+      status.textContent=count
+        ?count+' approved service advertisement(s).'
+        :'No approved service advertisements yet.';
+    })
+    .catch(()=>{
+      status.textContent=
+        'Service advertisements are temporarily unavailable.';
+    });
 })();
 </script>
 <script src="v26-bridge.js"></script>
