@@ -128,6 +128,7 @@ button:disabled{opacity:.5}
          accept="image/*"
          capture="environment">
 </label>
+<div id="shopdropDispatchRates"></div>
 <p id="vehiclePhotoCount" class="muted" role="status">
   No photographs selected yet.
 </p>
@@ -148,6 +149,7 @@ button:disabled{opacity:.5}
 
 <script src="./shopdrop-shared-photo-reader.js"></script>
 <script src="./shopdrop-ad-gallery-uploader.js"></script>
+<script src="./shopdrop-shared-service-rates.js"></script>
 <script type="module">
 import {createClient} from
   'https://esm.sh/@supabase/supabase-js@2';
@@ -163,6 +165,9 @@ const client=createClient(
     }
   }
 );
+
+window.ShopDropSharedServiceRates
+    ?.mount('shopdropDispatchRates','dispatch');
 
 const cameraPhotos=[];
 const galleryPhotos=[];
@@ -321,6 +326,15 @@ form.addEventListener('submit',async event=>{
       }
     }
 
+    const offeredRates=
+      window.ShopDropSharedServiceRates
+        ?.collect('shopdropDispatchRates');
+
+    if(!Array.isArray(offeredRates)||
+       !offeredRates.length){
+      throw Error('Enter at least one valid rate.');
+    }
+
     const record={
       provider_id:userData.user.id,
       vehicle_title:title,
@@ -343,6 +357,19 @@ form.addEventListener('submit',async event=>{
       error.message||'Draft could not be saved.'
     );
 
+
+    try{
+      await window.ShopDropSharedServiceRates.save(
+        client,'dispatch',data.id,offeredRates
+      );
+    }catch(rateError){
+      throw Error(
+        'Service advertisement saved. Reference: '+
+        data.id+
+        '. Rates need attention: '+
+        rateError.message
+      );
+    }
 
     result.textContent=
       'Vehicle saved. Uploading photographs...';

@@ -813,6 +813,14 @@ function initServicePhotos(){
         throw Error('Please wait for your pictures.');
       }
 
+      const extraRates=
+      window.ShopDropSharedServiceRates
+        ?.collect('shopdropExtraServiceRates');
+
+    if(!Array.isArray(extraRates)){
+      throw Error('Additional rate form unavailable.');
+    }
+
       const servicePhotos=serviceSelectedPhotos();
       if(servicePhotos.length<1 ||
          servicePhotos.length>6){
@@ -891,6 +899,24 @@ function initServicePhotos(){
       );
     }
 
+    if(extraRates.length){
+      status.textContent=
+        'Saving additional service rates...';
+
+      try{
+        await window.ShopDropSharedServiceRates.save(
+          sb,'service',data.id,extraRates
+        );
+      }catch(rateError){
+        throw Error(
+          'Service and photographs saved. Reference: '+
+          data.id+
+          '. Additional rates need attention: '+
+          rateError.message
+        );
+      }
+    }
+
     status.textContent=
       'Service saved. Reference: '+
         data.id+
@@ -921,6 +947,9 @@ function initServicePhotos(){
 
     initServiceCoverage();
     initServicePhotos();
+  window.ShopDropSharedServiceRates
+    ?.mount('shopdropExtraServiceRates','service');
+
 
     window.addService=submitService;
     window.serviceFeePreview=serviceFeePreviewLive;
