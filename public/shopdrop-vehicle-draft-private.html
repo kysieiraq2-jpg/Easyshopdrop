@@ -165,6 +165,7 @@ const client=createClient(
 );
 
 const cameraPhotos=[];
+const galleryPhotos=[];
 const cameraInput=
   document.getElementById('vehicleCamera');
 const galleryInput=
@@ -172,43 +173,93 @@ const galleryInput=
 const photoCount=
   document.getElementById('vehiclePhotoCount');
 
-function updatePhotoCount(){
-  const total=
-    Array.from(galleryInput.files||[]).length+
-    cameraPhotos.length;
+let photosReading=false;
 
-  photoCount.textContent=
-    total===0
-      ?'No photographs selected yet.'
-      :total+' of 6 photographs selected.';
+function selectedPhotos(){
+  return [
+    ...galleryPhotos,
+    ...cameraPhotos
+  ];
+}
+
+function updatePhotoCount(){
+  const total=selectedPhotos().length;
+
+  photoCount.textContent=total
+    ?total+' of 6 photographs selected.'
+    :'No photographs selected yet.';
+}
+
+async function preparePhotos(files){
+  const reader=
+    window.ShopDropSharedPhotoReader;
+
+  if(!reader?.readOriginal){
+    throw Error(
+      'Picture reader unavailable. Please try again.'
+    );
+  }
+
+  const prepared=await Promise.all(
+    files.map(file=>reader.readOriginal(file))
+  );
+
+  return prepared.map((photo,index)=>
+    new File(
+      [photo.blob],
+      'vehicle-photo-'+index+'.'+photo.extension,
+      {type:photo.mime}
+    )
+  );
+}
+
+async function addPhotos(input,destination){
+  if(photosReading)return;
+
+  photosReading=true;
+  const submit=document.getElementById('submit');
+  const wasDisabled=submit.disabled;
+  submit.disabled=true;
+
+  try{
+    const files=Array.from(input.files||[]);
+
+    if(selectedPhotos().length+files.length>6){
+      throw Error(
+        'Maximum 6 pictures. Please choose fewer.'
+      );
+    }
+
+    if(!files.length)return;
+
+    photoCount.textContent=
+      'Preparing your pictures...';
+
+    const saved=await preparePhotos(files);
+
+    destination.push(...saved);
+    updatePhotoCount();
+
+  }catch(error){
+    photoCount.textContent=
+      error?.message||
+      'Please choose your pictures again.';
+  }finally{
+    input.value='';
+    photosReading=false;
+    submit.disabled=wasDisabled;
+  }
 }
 
 galleryInput.addEventListener(
-  'change',updatePhotoCount
+  'change',
+  ()=>addPhotos(galleryInput,galleryPhotos)
 );
 
-cameraInput.addEventListener('change',()=>{
-  const newPhotos=
-    Array.from(cameraInput.files||[]);
-
-  const galleryCount=
-    Array.from(galleryInput.files||[]).length;
-
-  if(
-    galleryCount+
-    cameraPhotos.length+
-    newPhotos.length>6
-  ){
-    photoCount.textContent=
-      'Maximum 6 photographs. '+
-      'Please remove some before adding more.';
-  }else{
-    cameraPhotos.push(...newPhotos);
-    updatePhotoCount();
-  }
-
-  cameraInput.value='';
-});
+cameraInput.addEventListener(
+  'change',
+  ()=>addPhotos(cameraInput,cameraPhotos)
+);
 
 const form=document.getElementById('draftForm');
 const result=document.getElementById('result');
@@ -241,10 +292,11 @@ form.addEventListener('submit',async event=>{
     }
 
 
-    const photos=[
-      ...Array.from(galleryInput.files||[]),
-      ...cameraPhotos
-    ];
+    if(photosReading){
+      throw Error('Please wait for your pictures.');
+    }
+
+    const photos=selectedPhotos();
 
     if(photos.length<1||photos.length>6){
       throw Error(
