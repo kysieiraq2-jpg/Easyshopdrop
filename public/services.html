@@ -204,6 +204,81 @@ function render(list,term=''){
   el.append(heading);
   if(imageValid)el.append(photo);
   el.append(area,description,price,notice);
+
+  // Read-only customer preview. No booking or payment.
+  const cents=Number(x.unit_price_cents);
+  const minimum=Number(x.minimum_units)||1;
+
+  if(
+    x.id &&
+    Number.isSafeInteger(cents) &&
+    cents>0 &&
+    Number.isFinite(minimum) &&
+    minimum>0
+  ){
+    const preview=document.createElement('div');
+    preview.className='shopdrop-service-price-preview';
+
+    const label=document.createElement('label');
+    label.textContent='Number of units: ';
+
+    const quantity=document.createElement('input');
+    quantity.type='number';
+    quantity.min=String(minimum);
+    quantity.step='1';
+    quantity.value=String(Math.ceil(minimum));
+    quantity.style.maxWidth='120px';
+    quantity.setAttribute(
+      'aria-label','Number of service units'
+    );
+
+    const total=document.createElement('p');
+    total.setAttribute('aria-live','polite');
+
+    function updateTotal(){
+      const units=Number(quantity.value);
+
+      if(
+        !Number.isSafeInteger(units) ||
+        units<minimum ||
+        units>100000
+      ){
+        total.textContent='Enter a valid number of units.';
+        return;
+      }
+
+      const amount=cents*units;
+
+      if(!Number.isSafeInteger(amount)){
+        total.textContent='Amount exceeds preview limit.';
+        return;
+      }
+
+      total.textContent=
+        'Estimated customer total: '+
+        ShopDrop.money(
+          amount,x.currency_code
+        );
+    }
+
+    quantity.addEventListener(
+      'input',updateTotal
+    );
+
+    label.append(quantity);
+    preview.append(label,total);
+
+    const note=document.createElement('p');
+    note.className='muted';
+    note.textContent=
+      'Price preview only. Availability and '+
+      'booking must be confirmed separately.';
+
+    preview.append(note);
+    el.append(preview);
+    updateTotal();
+  }
+
   serviceResults.append(el);
  });
 }
