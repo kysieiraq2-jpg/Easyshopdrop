@@ -1,5 +1,5 @@
 
-name: ShopDrop Fix134 - Repair Photo Scanner
+name: ShopDrop Fix134 - Corrected Scanner Repair
 
 on:
   push:
@@ -21,7 +21,7 @@ jobs:
         with:
           ref: shopdrop-phase6-integration
 
-      - name: Repair independent scan checks
+      - name: Repair scanner
         shell: bash
         run: |
           set -euo pipefail
@@ -29,10 +29,6 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import subprocess
-
-          path=Path(
-            'public/shopdrop-free-photo-screen.mjs'
-          )
 
           expected={
             'public/shopdrop-free-photo-screen.mjs':
@@ -54,25 +50,29 @@ jobs:
                 'SAFETY STOP: File changed: '+name
               )
 
+          path=Path(
+            'public/shopdrop-free-photo-screen.mjs'
+          )
+
           source=path.read_text(encoding='utf-8')
 
-          old="""      const [ocr, barcode] =
-                await Promise.all([
-                  getOCRWorker().then(worker =>
-                    worker.recognize(file)
-                  ),
-                  detectBarcode(file)
-                ]);
+          start='      const [ocr, barcode] ='
+          end='      results.push({'
 
-              const decision = barcode
-                ? {
-                    status: 'reject',
-                    reason: 'QR code or barcode'
-                  }
-                : inspectText(ocr.data?.text);"""
+          if source.count(start)!=1:
+            raise SystemExit(
+              'SAFETY STOP: Scanner start changed'
+            )
 
-          new="""      // Run both checks independently.
-              // Failure of one must not erase the other.
+          if source.count(end)!=2:
+            raise SystemExit(
+              'SAFETY STOP: Scanner structure changed'
+            )
+
+          a=source.index(start)
+          b=source.index(end,a)
+
+          replacement="""      // Each check must finish independently.
               const [ocrCheck,barcodeCheck] =
                 await Promise.allSettled([
                   getOCRWorker().then(worker =>
@@ -106,9 +106,8 @@ jobs:
                   decision={
                     status:'review',
                     reason:
-                      'Text check: '+
-                      textDecision.reason+
-                      '. Barcode check unavailable: '+
+                      'Text recognition completed. '+
+                      'Barcode check unavailable: '+
                       String(
                         barcodeCheck.reason?.name||
                         'Unknown error'
@@ -136,63 +135,32 @@ jobs:
                         :'. Barcode check completed.'
                     )
                 };
-              }"""
+              }
+
+          """
+
+          source=source[:a]+replacement+source[b:]
+
+          old="'Scanning unavailable or inconclusive'"
 
           if source.count(old)!=1:
             raise SystemExit(
-              'SAFETY STOP: Scanner logic changed'
+              'SAFETY STOP: Error message changed'
             )
 
-          source=source.replace(old,new,1)
-
-          old="""    } catch (error) {
-                results.push({
-                  name: file.name,
-                  status: 'review',
-                  reason:
-                    'Scanning unavailable or inconclusive',
-                  seconds: Number(
-                    (
-                      (performance.now() - started) /
-                      1000
-                    ).toFixed(1)
-                  )
-                });
-              }"""
-
-          new="""    } catch (error) {
-                results.push({
-                  name: file.name,
-                  status: 'review',
-                  reason:
-                    'Scanner error: '+
-                    String(
-                      error?.name||
-                      'Unknown error'
-                    ).slice(0,80),
-                  seconds: Number(
-                    (
-                      (performance.now() - started) /
-                      1000
-                    ).toFixed(1)
-                  )
-                });
-              }"""
-
-          if source.count(old)!=1:
-            raise SystemExit(
-              'SAFETY STOP: Error handler changed'
-            )
-
-          source=source.replace(old,new,1)
+          source=source.replace(
+            old,
+            "'Scanner error: '+String(error?.name||'Unknown error').slice(0,80)",
+            1
+          )
 
           path.write_text(
             source,encoding='utf-8'
           )
 
-          print('PASS: Independent scanning checks')
-          print('PASS: Diagnostic errors added')
-          print('PASS: Uploaders unchanged')
+          print('PASS: Independent scanner checks')
+          print('PASS: Diagnostic errors available')
+          print('PASS: Original uploader untouched')
           PY
 
       - name: Verify and commit
@@ -213,7 +181,6 @@ jobs:
 
           git -c user.name='github-actions[bot]' \
             -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-            commit -m "Fix134 repair independent photograph checks"
+            commit -m "Fix134 correct independent scanner checks"
 
           git push origin HEAD:shopdrop-phase6-integration
-
