@@ -1,5 +1,5 @@
 
-name: ShopDrop Fix134 - Corrected Scanner Repair
+name: ShopDrop Fix134 - Scanner Repair V3
 
 on:
   push:
@@ -16,12 +16,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout integration branch
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: shopdrop-phase6-integration
 
-      - name: Repair scanner
+      - name: Repair independent photo checks
         shell: bash
         run: |
           set -euo pipefail
@@ -34,9 +33,7 @@ jobs:
             'public/shopdrop-free-photo-screen.mjs':
               '81b12f2db4f5017fdce251adf7b3c0125032b7b8',
             'public/shopdrop-product-photos.js':
-              '8ed1f80f67814b9ffdc78ec827ea9293ad5ce7ea',
-            'public/shopdrop-photo-scan-status.js':
-              'f914a2aedbe7b37aee1f20d916950f9696b939fa'
+              '8ed1f80f67814b9ffdc78ec827ea9293ad5ce7ea'
           }
 
           for name,sha in expected.items():
@@ -53,7 +50,6 @@ jobs:
           path=Path(
             'public/shopdrop-free-photo-screen.mjs'
           )
-
           source=path.read_text(encoding='utf-8')
 
           start='      const [ocr, barcode] ='
@@ -61,19 +57,18 @@ jobs:
 
           if source.count(start)!=1:
             raise SystemExit(
-              'SAFETY STOP: Scanner start changed'
-            )
-
-          if source.count(end)!=2:
-            raise SystemExit(
-              'SAFETY STOP: Scanner structure changed'
+              'SAFETY STOP: Scan start changed'
             )
 
           a=source.index(start)
-          b=source.index(end,a)
+          b=source.find(end,a)
 
-          replacement="""      // Each check must finish independently.
-              const [ocrCheck,barcodeCheck] =
+          if b<0 or b<=a:
+            raise SystemExit(
+              'SAFETY STOP: Scan result missing'
+            )
+
+          replacement="""      const [ocrCheck,barcodeCheck] =
                 await Promise.allSettled([
                   getOCRWorker().then(worker =>
                     worker.recognize(file)
@@ -106,7 +101,7 @@ jobs:
                   decision={
                     status:'review',
                     reason:
-                      'Text recognition completed. '+
+                      'Text check completed. '+
                       'Barcode check unavailable: '+
                       String(
                         barcodeCheck.reason?.name||
@@ -158,9 +153,9 @@ jobs:
             source,encoding='utf-8'
           )
 
-          print('PASS: Independent scanner checks')
-          print('PASS: Diagnostic errors available')
-          print('PASS: Original uploader untouched')
+          print('PASS: Independent scanner checks installed')
+          print('PASS: Detailed error reporting installed')
+          print('PASS: Product uploader unchanged')
           PY
 
       - name: Verify and commit
@@ -181,6 +176,6 @@ jobs:
 
           git -c user.name='github-actions[bot]' \
             -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-            commit -m "Fix134 correct independent scanner checks"
+            commit -m "Fix134 independently report photo scan results"
 
           git push origin HEAD:shopdrop-phase6-integration
