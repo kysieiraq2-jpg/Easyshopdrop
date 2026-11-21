@@ -2,6 +2,7 @@
  // Shop&Drop — Other Services booking interface.
  // Customer location and coverage integration.
  // Preserves existing booking dates, references and safeguards.
+ // Fix142: selected rate and quantity integration.
  // No live payments, payouts or courier bookings.
 
 (function () {
@@ -239,22 +240,62 @@
           return;
         }
 
+        // Fix142: use the existing provider-rate controls.
+        // Do not create another rate selector.
+
+        const rateSection = card.querySelector(
+          '.shopdrop-approved-rates'
+        );
+
+        const rateSelect = rateSection?.querySelector(
+          '.shopdrop-selected-service-rate'
+        );
+
+        const rateOption =
+          rateSelect?.selectedOptions?.[0];
+
+        const rateId = rateOption?.dataset?.rateId;
+
+        const unitsInput = rateSection?.querySelector(
+          '.shopdrop-selected-service-quantity'
+        );
+
+        const quantity = Number(unitsInput?.value);
+
         if (
-          !window.ShopDropServicesConnector?.createBooking
+          !validUuid(rateId) ||
+          !Number.isSafeInteger(quantity) ||
+          quantity < 1 ||
+          quantity > 100000 ||
+          !unitsInput?.checkValidity()
         ) {
           status.textContent =
-            'Secure service booking is unavailable.';
+            'Choose an available provider rate ' +
+            'and a valid number of units.';
           return;
         }
 
-        // Include location in the idempotency key so
-        // changing the town cannot reuse an old request.
+        if (
+          !window.ShopDropServicesConnector
+            ?.createRatedBooking
+        ) {
+          status.textContent =
+            'Secure rated service booking is unavailable.';
+          return;
+        }
+
+        // Preserve existing idempotent request handling.
+        // Different dates, times, rates, quantities or
+        // locations must use different request references.
+
         const signature = JSON.stringify({
           serviceId,
           date: date.value,
           time: time.value,
           town: location.town.toLowerCase(),
-          province: location.province.toLowerCase()
+          province: location.province.toLowerCase(),
+          rateId,
+          quantity
         });
 
         if (!pendingRequests.has(signature)) {
@@ -268,14 +309,16 @@
 
         try {
           status.textContent =
-            'Checking service coverage and ' +
-            'preparing secure booking…';
+            'Checking service coverage, provider rate ' +
+            'and preparing secure booking…';
 
           const booking =
             await window.ShopDropServicesConnector
-              .createBooking({
+              .createRatedBooking({
                 serviceId,
                 requestId: pendingRequests.get(signature),
+                rateId,
+                quantity,
                 bookingDate: date.value,
                 bookingTime: time.value,
                 serviceTown: location.town,
