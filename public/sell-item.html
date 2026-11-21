@@ -339,6 +339,51 @@ $('itemForm').addEventListener('submit',async event=>{
       );
     }
 
+    // Scan original selected photo bytes
+    // before saving or publishing.
+    if (
+      !photosAttached &&
+      typeof photos.screenSelected==='function'
+    ){
+      show('Checking photographs…');
+
+      const results=await photos.screenSelected(
+        progress=>{
+          if(progress?.state==='scanning'){
+            show(
+              'Checking photograph '+
+              progress.current+' of '+
+              progress.total+'…'
+            );
+          }
+        }
+      );
+
+      const flagged=results.find(
+        result=>result.status==='reject'
+      );
+
+      if(flagged){
+        throw Error(
+          'Photograph blocked: '+
+          flagged.reason+
+          '. Remove or replace the photograph.'
+        );
+      }
+
+      const uncertain=results.find(
+        result=>result.status!=='preliminary_pass'
+      );
+
+      if(uncertain){
+        throw Error(
+          'Photograph check incomplete: '+
+          uncertain.reason+
+          '. Please try again or replace the photograph.'
+        );
+      }
+    }
+
     const description=$('d').value.trim();
 
     if(description.length<10){

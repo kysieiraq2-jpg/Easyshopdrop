@@ -387,6 +387,30 @@
             window.ShopDropProductPhotos = Object.freeze({
               count: () => selected.length,
               ready: () => pendingSelection,
+              screenSelected: async (progress) => {
+      await pendingSelection;
+
+      if (reading || uploading) {
+        throw Error(
+          'Please wait for your photographs.'
+        );
+      }
+
+      if (!selected.length) return [];
+
+      const scanner = await import(
+        './shopdrop-free-photo-screen.mjs'
+      );
+
+      const files = selected.map(
+        item => item.blob
+      );
+
+      return scanner.scanPhotos(
+        files,
+        progress
+      );
+    },
               pendingProduct: () => pending,
               setPending: (product, savedCount) => {
                 pending = product;
