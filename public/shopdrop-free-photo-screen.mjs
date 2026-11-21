@@ -102,13 +102,37 @@ async function getOCRWorker(){
     workerPromise=loadLibrary(
       'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js',
       'Tesseract'
-    ).then(library=>{
+    ).then(async library=>{
       if(typeof library.createWorker!=='function'){
         throw new Error(
-          'OCR worker function unavailable'
+          'OCR createWorker unavailable'
         );
       }
-      return library.createWorker('eng');
+
+      try{
+        return await library.createWorker(
+          'eng',
+          1,
+          {
+            workerPath:
+              'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js',
+            corePath:
+              'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.0.0',
+            langPath:
+              'https://tessdata.projectnaptha.com/4.0.0',
+            workerBlobURL:true
+          }
+        );
+      }catch(error){
+        throw new Error(
+          'OCR initialization failed: '+
+          String(
+            error?.message||
+            error?.name||
+            error
+          ).slice(0,180)
+        );
+      }
     }).catch(error=>{
       workerPromise=null;
       throw error;
@@ -303,7 +327,7 @@ export async function scanPhotos(
         reason:
           'Text recognition unavailable: '+
           String(
-            ocrCheck.reason?.name||
+            ocrCheck.reason?.message||ocrCheck.reason?.name||
             'Unknown error'
           ).slice(0,80)+
           (
