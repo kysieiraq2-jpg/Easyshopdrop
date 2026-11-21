@@ -1,1 +1,99 @@
 
+name: ShopDrop Fix135 - Publish Repaired Scanner
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix135-publish-scanner.yml'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Publish repaired scanner
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: false
+
+      - name: Verify repaired scanner and website
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test "$GITHUB_REF_NAME" = \
+            "shopdrop-phase6-integration"
+
+          for file in \
+            public/index.html \
+            public/sell-item.html \
+            public/checkout.html \
+            public/account.html \
+            public/register.html \
+            public/sign-in.html \
+            public/services.html \
+            public/dispatching.html \
+            public/shopdrop-product-photos.js \
+            public/shopdrop-photo-scan-status.js \
+            public/shopdrop-free-photo-screen.mjs
+          do
+            test -s "$file" || {
+              echo "SAFETY STOP: Missing $file"
+              exit 1
+            }
+          done
+
+          grep -Fq \
+            'Promise.allSettled' \
+            public/shopdrop-free-photo-screen.mjs
+
+          grep -Fq \
+            'src="./shopdrop-photo-scan-status.js"' \
+            public/sell-item.html
+
+          test "$(git hash-object \
+            public/shopdrop-product-photos.js)" = \
+            "8ed1f80f67814b9ffdc78ec827ea9293ad5ce7ea"
+
+          node --check \
+            public/shopdrop-free-photo-screen.mjs
+
+          node --check \
+            public/shopdrop-photo-scan-status.js
+
+          node --check \
+            public/shopdrop-product-photos.js
+
+          echo "PASS: Scanner repair present"
+          echo "PASS: Original uploader unchanged"
+          echo "PASS: Website files verified"
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload integrated website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy integrated website
+        id: deployment
+        uses: actions/deploy-pages@v4
+
