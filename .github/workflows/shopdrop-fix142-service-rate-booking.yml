@@ -1,1 +1,277 @@
 
+name: ShopDrop Fix142 Service Rate Booking
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix142:
+    if: github.ref_name == 'shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Connect service rates to bookings
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          expected = {
+            "public/shopdrop-customer-service-rates.js":
+              "3cc12f2dbf6ac697b4170156d5ba5ddb818fe5f9",
+            "public/shopdrop-service-booking-ui.js":
+              "21bae773d27770832523b6d6516f4201c0223659",
+            "public/shopdrop-services-connector.js":
+              "e94a19aca99529cb345f53ad1c5277526fc51130"
+          }
+
+          def load(path):
+              actual = subprocess.check_output(
+                  ["git", "hash-object", path],
+                  text=True
+              ).strip()
+              if actual != expected[path]:
+                  raise RuntimeError(
+                      "STOP: Existing file changed: " + path
+                  )
+              return Path(path).read_text()
+
+          def replace_once(text, old, new):
+              if text.count(old) != 1:
+                  raise RuntimeError(
+                      "STOP: Expected code not found uniquely"
+                  )
+              return text.replace(old, new, 1)
+
+          rate_path = "public/shopdrop-customer-service-rates.js"
+          ui_path = "public/shopdrop-service-booking-ui.js"
+          connector_path = "public/shopdrop-services-connector.js"
+
+          rate = load(rate_path)
+          ui = load(ui_path)
+          connector = load(connector_path)
+
+          rate = replace_once(
+              rate,
+              "      option.value=String(index);",
+              """      option.value=String(index);
+              option.dataset.rateId=rate.id;"""
+          )
+
+          rate = replace_once(
+              rate,
+              "    label.append(select);",
+              """    select.className='shopdrop-selected-service-rate';
+              label.append(select);"""
+          )
+
+          rate = replace_once(
+              rate,
+              "    quantity.type='number';",
+              """    quantity.type='number';
+              quantity.className='shopdrop-selected-service-quantity';"""
+          )
+
+          connector = replace_once(
+              connector,
+              "  window.ShopDropServicesConnector =",
+              """  async function createRatedBooking({
+              serviceId,
+              requestId,
+              rateId,
+              quantity,
+              bookingDate,
+              bookingTime,
+              serviceTown,
+              serviceProvince
+            } = {}) {
+              if (
+                !validUuid(serviceId) ||
+                !validUuid(requestId) ||
+                !validUuid(rateId)
+              ) {
+                throw new Error('Invalid booking or rate reference.');
+              }
+
+              const units = Number(quantity);
+
+              if (
+                !Number.isSafeInteger(units) ||
+                units < 1 ||
+                units > 100000
+              ) {
+                throw new Error('Enter a valid number of units.');
+              }
+
+              if (
+                !bookingDate ||
+                !validDate(bookingDate) ||
+                !bookingTime ||
+                !validTime(bookingTime)
+              ) {
+                throw new Error('Choose a valid date and time.');
+              }
+
+              const town = String(serviceTown || '').trim();
+              const province = String(serviceProvince || '').trim();
+
+              if (
+                town.length < 2 ||
+                town.length > 120 ||
+                province.length < 2 ||
+                province.length > 120
+              ) {
+                throw new Error('Enter a valid town and province.');
+              }
+
+              const client = await authenticatedClient();
+
+              const { data, error } = await client.rpc(
+                'shopdrop_create_rated_service_booking_141',
+                {
+                  p_service_id: serviceId,
+                  p_request_id: requestId,
+                  p_rate_id: rateId,
+                  p_quantity: units,
+                  p_booking_date: bookingDate,
+                  p_booking_time: bookingTime,
+                  p_service_town: town,
+                  p_service_province: province
+                }
+              );
+
+              if (error) {
+                throw new Error(
+                  error.message || 'Secure booking failed.'
+                );
+              }
+
+              if (!validUuid(data)) {
+                throw new Error('Booking reference unavailable.');
+              }
+
+              return Object.freeze({
+                ok: true,
+                booking_id: data,
+                service_id: serviceId,
+                rate_id: rateId,
+                quantity: units,
+                payment_status: 'pending',
+                payment_collected: false
+              });
+            }
+
+            window.ShopDropServicesConnector ="""
+          )
+
+          connector = replace_once(
+              connector,
+              """      search,
+              createBooking
+              """,
+              """      search,
+              createBooking,
+              createRatedBooking
+              """
+          )
+
+          ui = replace_once(
+              ui,
+              """        if (
+                  !window.ShopDropServicesConnector?.createBooking
+                ) {""",
+              """        if (
+                  !window.ShopDropServicesConnector?.createRatedBooking
+                ) {"""
+          )
+
+          ui = replace_once(
+              ui,
+              """        // Include location in the idempotency key so""",
+              """        const rateSection = card.querySelector(
+                  '.shopdrop-approved-rates'
+                );
+                const rateSelect = rateSection?.querySelector(
+                  '.shopdrop-selected-service-rate'
+                );
+                const rateOption = rateSelect?.selectedOptions?.[0];
+                const rateId = rateOption?.dataset?.rateId;
+                const unitsInput = rateSection?.querySelector(
+                  '.shopdrop-selected-service-quantity'
+                );
+                const quantity = Number(unitsInput?.value);
+
+                if (
+                  !validUuid(rateId) ||
+                  !Number.isSafeInteger(quantity) ||
+                  quantity < 1 ||
+                  quantity > 100000 ||
+                  !unitsInput?.checkValidity()
+                ) {
+                  status.textContent =
+                    'Choose an available rate and valid quantity.';
+                  return;
+                }
+
+                // Include location in the idempotency key so"""
+          )
+
+          ui = replace_once(
+              ui,
+              """          province: location.province.toLowerCase()
+                });""",
+              """          province: location.province.toLowerCase(),
+                  rateId,
+                  quantity
+                });"""
+          )
+
+          ui = replace_once(
+              ui,
+              """.createBooking({
+                    serviceId,""",
+              """.createRatedBooking({
+                    serviceId,
+                    rateId,
+                    quantity,"""
+          )
+
+          Path(rate_path).write_text(rate)
+          Path(ui_path).write_text(ui)
+          Path(connector_path).write_text(connector)
+
+          print("Fix142 applied to three Other Services files.")
+          PY
+
+      - name: Verify JavaScript syntax
+        run: |
+          node --check public/shopdrop-customer-service-rates.js
+          node --check public/shopdrop-service-booking-ui.js
+          node --check public/shopdrop-services-connector.js
+
+      - name: Commit Fix142
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/shopdrop-customer-service-rates.js
+          git add public/shopdrop-service-booking-ui.js
+          git add public/shopdrop-services-connector.js
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Fix142 connect service rates to secure bookings"
+            git push origin HEAD:shopdrop-phase6-integration
+          fi
+
