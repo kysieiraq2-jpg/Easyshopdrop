@@ -1,1 +1,113 @@
 
+name: ShopDrop Fix132 - Correct Photo Scan Page
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix132-correct-photo-page.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix-photo-page:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+
+      - name: Connect scanner to Post My Item
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          expected={
+            'public/sell-item.html':
+              '8c56de074c8cd2e1fed174fd88dd3aa794915024',
+            'public/shopdrop-photo-scan-status.js':
+              'f914a2aedbe7b37aee1f20d916950f9696b939fa',
+            'public/shopdrop-product-photos.js':
+              '8ed1f80f67814b9ffdc78ec827ea9293ad5ce7ea'
+          }
+
+          for name,sha in expected.items():
+            actual=subprocess.check_output(
+              ['git','hash-object',name],
+              text=True
+            ).strip()
+
+            if actual!=sha:
+              raise SystemExit(
+                'SAFETY STOP: File changed: '+name
+              )
+
+          page=Path('public/sell-item.html')
+          source=page.read_text(encoding='utf-8')
+
+          old=(
+            '<script src="./shopdrop-product-photos.js" '
+            'defer></script>'
+          )
+
+          new=(
+            '<script src="./shopdrop-photo-scan-status.js" '
+            'defer></script>\n'
+            '<script src="./shopdrop-product-photos.js" '
+            'defer></script>'
+          )
+
+          if source.count(old)!=1:
+            raise SystemExit(
+              'SAFETY STOP: Photo uploader script changed'
+            )
+
+          if 'shopdrop-photo-scan-status.js' in source:
+            raise SystemExit(
+              'SAFETY STOP: Scanner already connected'
+            )
+
+          if (
+            'id="photo"' not in source or
+            'id="shopdropPhotoCamera"' not in source or
+            'id="uploadStatus"' not in source
+          ):
+            raise SystemExit(
+              'SAFETY STOP: Photo controls changed'
+            )
+
+          source=source.replace(old,new,1)
+          page.write_text(
+            source,encoding='utf-8'
+          )
+
+          print('PASS: Correct Post My Item page updated')
+          print('PASS: Original photo uploader preserved')
+          PY
+
+      - name: Verify and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node --check public/shopdrop-photo-scan-status.js
+          git diff --check
+
+          test "$(git diff --name-only)" = "public/sell-item.html"
+
+          git add public/sell-item.html
+
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Fix132 connect scanner to actual item form"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
