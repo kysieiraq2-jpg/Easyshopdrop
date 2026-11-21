@@ -1,1 +1,168 @@
 
+name: ShopDrop Fix138 - OCR Initialization
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix138-ocr-initialization.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+
+      - name: Configure OCR worker and diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          scanner=Path(
+            'public/shopdrop-free-photo-screen.mjs'
+          )
+
+          expected={
+            'public/shopdrop-free-photo-screen.mjs':
+              '2bc71d17e1b7cc65289607903b97c74d3545a5b9',
+            'public/shopdrop-product-photos.js':
+              '8ed1f80f67814b9ffdc78ec827ea9293ad5ce7ea'
+          }
+
+          for name,sha in expected.items():
+            actual=subprocess.check_output(
+              ['git','hash-object',name],
+              text=True
+            ).strip()
+
+            if actual!=sha:
+              raise SystemExit(
+                'SAFETY STOP: Unexpected file change: '+name
+              )
+
+          source=scanner.read_text(encoding='utf-8')
+
+          start='async function getOCRWorker(){'
+          end='async function getBarcodeReader(){'
+
+          if source.count(start)!=1 or source.count(end)!=1:
+            raise SystemExit(
+              'SAFETY STOP: OCR structure changed'
+            )
+
+          a=source.index(start)
+          b=source.index(end,a)
+
+          replacement="""async function getOCRWorker(){
+            if(!workerPromise){
+              workerPromise=loadLibrary(
+                'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js',
+                'Tesseract'
+              ).then(async library=>{
+                if(typeof library.createWorker!=='function'){
+                  throw new Error(
+                    'OCR createWorker unavailable'
+                  );
+                }
+
+                try{
+                  return await library.createWorker(
+                    'eng',
+                    1,
+                    {
+                      workerPath:
+                        'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js',
+                      corePath:
+                        'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.0.0',
+                      langPath:
+                        'https://tessdata.projectnaptha.com/4.0.0',
+                      workerBlobURL:true
+                    }
+                  );
+                }catch(error){
+                  throw new Error(
+                    'OCR initialization failed: '+
+                    String(
+                      error?.message||
+                      error?.name||
+                      error
+                    ).slice(0,180)
+                  );
+                }
+              }).catch(error=>{
+                workerPromise=null;
+                throw error;
+              });
+            }
+
+            return workerPromise;
+          }
+
+          """
+
+          source=source[:a]+replacement+source[b:]
+
+          # Report useful OCR error details.
+          old="""String(
+              ocrCheck.reason?.name||
+              'Unknown error'
+            ).slice(0,80)"""
+
+          new="""String(
+              ocrCheck.reason?.message||
+              ocrCheck.reason?.name||
+              'Unknown error'
+            ).slice(0,180)"""
+
+          if source.count(old)!=1:
+            raise SystemExit(
+              'SAFETY STOP: OCR error reporting changed'
+            )
+
+          source=source.replace(old,new,1)
+
+          scanner.write_text(
+            source,encoding='utf-8'
+          )
+
+          print('PASS: Explicit OCR worker path')
+          print('PASS: Explicit processing engine path')
+          print('PASS: Explicit English language-data path')
+          print('PASS: OCR error diagnostics improved')
+          print('PASS: Photograph uploader unchanged')
+          PY
+
+      - name: Verify and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node --check \
+            public/shopdrop-free-photo-screen.mjs
+
+          git diff --check
+
+          test "$(git diff --name-only)" = \
+            "public/shopdrop-free-photo-screen.mjs"
+
+          git add \
+            public/shopdrop-free-photo-screen.mjs
+
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Fix138 configure OCR worker and language data"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
