@@ -1,1 +1,207 @@
 
+name: ShopDrop Fix140 - Final Photo Guard
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix140-final-photo-guard.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+
+      - name: Connect scanner to item posting
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          uploader=Path(
+            'public/shopdrop-product-photos.js'
+          )
+          page=Path('public/sell-item.html')
+
+          expected={
+            str(uploader):
+              '8ed1f80f67814b9ffdc78ec827ea9293ad5ce7ea',
+            str(page):
+              '0fdb24580601e30ca84cecfc99974e3232c68fc4',
+            'public/shopdrop-free-photo-screen.mjs':
+              'cb7702c301897fbe62aa869e1b122f2713a3efaa'
+          }
+
+          for name,sha in expected.items():
+            actual=subprocess.check_output(
+              ['git','hash-object',name],
+              text=True
+            ).strip()
+
+            if actual!=sha:
+              raise SystemExit(
+                'SAFETY STOP: File changed: '+name
+              )
+
+          source=uploader.read_text(
+            encoding='utf-8'
+          )
+
+          anchor="""              ready: () => pendingSelection,
+          """
+
+          addition="""              screenSelected: async (progress) => {
+                await pendingSelection;
+
+                if (reading || uploading) {
+                  throw Error(
+                    'Please wait for your photographs.'
+                  );
+                }
+
+                if (!selected.length) return [];
+
+                const scanner = await import(
+                  './shopdrop-free-photo-screen.mjs'
+                );
+
+                const files = selected.map(
+                  item => item.blob
+                );
+
+                return scanner.scanPhotos(
+                  files,
+                  progress
+                );
+              },
+          """
+
+          if source.count(anchor)!=1:
+            raise SystemExit(
+              'SAFETY STOP: Uploader API changed'
+            )
+
+          source=source.replace(
+            anchor,anchor+addition,1
+          )
+
+          uploader.write_text(
+            source,encoding='utf-8'
+          )
+
+          html=page.read_text(
+            encoding='utf-8'
+          )
+
+          anchor="""    const description=$('d').value.trim();
+          """
+
+          guard="""    // Scan original selected photo bytes
+              // before saving or publishing.
+              if (
+                !photosAttached &&
+                typeof photos.screenSelected==='function'
+              ){
+                show('Checking photographs…');
+
+                const results=await photos.screenSelected(
+                  progress=>{
+                    if(progress?.state==='scanning'){
+                      show(
+                        'Checking photograph '+
+                        progress.current+' of '+
+                        progress.total+'…'
+                      );
+                    }
+                  }
+                );
+
+                const flagged=results.find(
+                  result=>result.status==='reject'
+                );
+
+                if(flagged){
+                  throw Error(
+                    'Photograph blocked: '+
+                    flagged.reason+
+                    '. Remove or replace the photograph.'
+                  );
+                }
+
+                const uncertain=results.find(
+                  result=>result.status!=='preliminary_pass'
+                );
+
+                if(uncertain){
+                  throw Error(
+                    'Photograph check incomplete: '+
+                    uncertain.reason+
+                    '. Please try again or replace the photograph.'
+                  );
+                }
+              }
+
+          """
+
+          if html.count(anchor)!=1:
+            raise SystemExit(
+              'SAFETY STOP: Posting flow changed'
+            )
+
+          html=html.replace(
+            anchor,guard+anchor,1
+          )
+
+          page.write_text(
+            html,encoding='utf-8'
+          )
+
+          print('PASS: Scanner connected before posting')
+          print('PASS: Flagged photographs blocked')
+          print('PASS: Original upload logic preserved')
+          PY
+
+      - name: Verify and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node --check \
+            public/shopdrop-product-photos.js
+
+          node --check \
+            public/shopdrop-free-photo-screen.mjs
+
+          git diff --check
+
+          git diff --name-only | sort > /tmp/changed
+
+          printf '%s\n' \
+            public/sell-item.html \
+            public/shopdrop-product-photos.js \
+            | sort > /tmp/expected
+
+          diff -u /tmp/expected /tmp/changed
+
+          git add \
+            public/sell-item.html \
+            public/shopdrop-product-photos.js
+
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Fix140 connect fast photo scanner to posting"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
