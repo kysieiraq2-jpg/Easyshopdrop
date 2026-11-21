@@ -1,1 +1,93 @@
 
+name: ShopDrop Fix133 - Publish Integration Website
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix133-publish-integration.yml'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Publish ShopDrop Website
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: false
+
+      - name: Verify website and scanner
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test "$GITHUB_REF_NAME" = \
+            "shopdrop-phase6-integration"
+
+          for file in \
+            public/index.html \
+            public/sell-item.html \
+            public/account.html \
+            public/checkout.html \
+            public/register.html \
+            public/sign-in.html \
+            public/services.html \
+            public/dispatching.html \
+            public/shopdrop-product-photos.js \
+            public/shopdrop-photo-scan-status.js \
+            public/shopdrop-free-photo-screen.mjs
+          do
+            test -s "$file" || {
+              echo "SAFETY STOP: Missing $file"
+              exit 1
+            }
+          done
+
+          grep -Fq \
+            'src="./shopdrop-photo-scan-status.js"' \
+            public/sell-item.html
+
+          grep -Fq \
+            'Photograph scanner ready.' \
+            public/shopdrop-photo-scan-status.js
+
+          node --check \
+            public/shopdrop-photo-scan-status.js
+
+          node --check \
+            public/shopdrop-product-photos.js
+
+          echo "PASS: Integration branch verified"
+          echo "PASS: Scanner connected"
+          echo "PASS: Existing uploader preserved"
+          echo "PASS: Website files present"
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload existing website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy website
+        id: deployment
+        uses: actions/deploy-pages@v4
+
