@@ -1,1 +1,219 @@
 
+name: ShopDrop Fix134 - Repair Photo Scanner
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix134-scanner-repair.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+
+      - name: Repair independent scan checks
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          path=Path(
+            'public/shopdrop-free-photo-screen.mjs'
+          )
+
+          expected={
+            'public/shopdrop-free-photo-screen.mjs':
+              '81b12f2db4f5017fdce251adf7b3c0125032b7b8',
+            'public/shopdrop-product-photos.js':
+              '8ed1f80f67814b9ffdc78ec827ea9293ad5ce7ea',
+            'public/shopdrop-photo-scan-status.js':
+              'f914a2aedbe7b37aee1f20d916950f9696b939fa'
+          }
+
+          for name,sha in expected.items():
+            actual=subprocess.check_output(
+              ['git','hash-object',name],
+              text=True
+            ).strip()
+
+            if actual!=sha:
+              raise SystemExit(
+                'SAFETY STOP: File changed: '+name
+              )
+
+          source=path.read_text(encoding='utf-8')
+
+          old="""      const [ocr, barcode] =
+                await Promise.all([
+                  getOCRWorker().then(worker =>
+                    worker.recognize(file)
+                  ),
+                  detectBarcode(file)
+                ]);
+
+              const decision = barcode
+                ? {
+                    status: 'reject',
+                    reason: 'QR code or barcode'
+                  }
+                : inspectText(ocr.data?.text);"""
+
+          new="""      // Run both checks independently.
+              // Failure of one must not erase the other.
+              const [ocrCheck,barcodeCheck] =
+                await Promise.allSettled([
+                  getOCRWorker().then(worker =>
+                    worker.recognize(file)
+                  ),
+                  detectBarcode(file)
+                ]);
+
+              let decision;
+
+              if(
+                barcodeCheck.status==='fulfilled' &&
+                barcodeCheck.value===true
+              ){
+                decision={
+                  status:'reject',
+                  reason:'QR code or barcode detected'
+                };
+              }else if(
+                ocrCheck.status==='fulfilled'
+              ){
+                const textDecision=inspectText(
+                  ocrCheck.value?.data?.text
+                );
+
+                if(textDecision.status==='reject'){
+                  decision=textDecision;
+                }else if(
+                  barcodeCheck.status==='rejected'
+                ){
+                  decision={
+                    status:'review',
+                    reason:
+                      'Text check: '+
+                      textDecision.reason+
+                      '. Barcode check unavailable: '+
+                      String(
+                        barcodeCheck.reason?.name||
+                        'Unknown error'
+                      ).slice(0,80)
+                  };
+                }else{
+                  decision=textDecision;
+                }
+              }else{
+                decision={
+                  status:'review',
+                  reason:
+                    'Text recognition unavailable: '+
+                    String(
+                      ocrCheck.reason?.name||
+                      'Unknown error'
+                    ).slice(0,80)+
+                    (
+                      barcodeCheck.status==='rejected'
+                        ?'. Barcode recognition unavailable: '+
+                          String(
+                            barcodeCheck.reason?.name||
+                            'Unknown error'
+                          ).slice(0,80)
+                        :'. Barcode check completed.'
+                    )
+                };
+              }"""
+
+          if source.count(old)!=1:
+            raise SystemExit(
+              'SAFETY STOP: Scanner logic changed'
+            )
+
+          source=source.replace(old,new,1)
+
+          old="""    } catch (error) {
+                results.push({
+                  name: file.name,
+                  status: 'review',
+                  reason:
+                    'Scanning unavailable or inconclusive',
+                  seconds: Number(
+                    (
+                      (performance.now() - started) /
+                      1000
+                    ).toFixed(1)
+                  )
+                });
+              }"""
+
+          new="""    } catch (error) {
+                results.push({
+                  name: file.name,
+                  status: 'review',
+                  reason:
+                    'Scanner error: '+
+                    String(
+                      error?.name||
+                      'Unknown error'
+                    ).slice(0,80),
+                  seconds: Number(
+                    (
+                      (performance.now() - started) /
+                      1000
+                    ).toFixed(1)
+                  )
+                });
+              }"""
+
+          if source.count(old)!=1:
+            raise SystemExit(
+              'SAFETY STOP: Error handler changed'
+            )
+
+          source=source.replace(old,new,1)
+
+          path.write_text(
+            source,encoding='utf-8'
+          )
+
+          print('PASS: Independent scanning checks')
+          print('PASS: Diagnostic errors added')
+          print('PASS: Uploaders unchanged')
+          PY
+
+      - name: Verify and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node --check \
+            public/shopdrop-free-photo-screen.mjs
+
+          git diff --check
+
+          test "$(git diff --name-only)" = \
+            "public/shopdrop-free-photo-screen.mjs"
+
+          git add \
+            public/shopdrop-free-photo-screen.mjs
+
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Fix134 repair independent photograph checks"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
