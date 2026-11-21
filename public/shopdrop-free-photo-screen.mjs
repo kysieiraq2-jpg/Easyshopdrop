@@ -35,14 +35,82 @@ const patterns = [
   ]
 ];
 
-async function getOCRWorker() {
-  if (!workerPromise) {
-    workerPromise = import(
-      'https://esm.sh/tesseract.js@5'
-    ).then(({createWorker}) =>
-      createWorker('eng')
-    ).catch(error => {
-      workerPromise = null;
+
+const scriptLoads=new Map();
+
+function loadLibrary(url,globalName){
+  if(globalThis[globalName]){
+    return Promise.resolve(globalThis[globalName]);
+  }
+
+  if(!scriptLoads.has(url)){
+    const loading=new Promise((resolve,reject)=>{
+      const script=document.createElement('script');
+      let finished=false;
+
+      const timeout=setTimeout(()=>{
+        fail(new Error(
+          globalName+' library loading timed out'
+        ));
+      },30000);
+
+      function fail(error){
+        if(finished)return;
+        finished=true;
+        clearTimeout(timeout);
+        script.remove();
+        reject(error);
+      }
+
+      script.src=url;
+      script.async=true;
+
+      script.onload=()=>{
+        if(finished)return;
+        clearTimeout(timeout);
+        finished=true;
+
+        const library=globalThis[globalName];
+
+        if(library){
+          resolve(library);
+        }else{
+          reject(new Error(
+            globalName+' library did not initialize'
+          ));
+        }
+      };
+
+      script.onerror=()=>fail(new Error(
+        globalName+' library download failed'
+      ));
+
+      document.head.appendChild(script);
+    }).catch(error=>{
+      scriptLoads.delete(url);
+      throw error;
+    });
+
+    scriptLoads.set(url,loading);
+  }
+
+  return scriptLoads.get(url);
+}
+
+async function getOCRWorker(){
+  if(!workerPromise){
+    workerPromise=loadLibrary(
+      'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js',
+      'Tesseract'
+    ).then(library=>{
+      if(typeof library.createWorker!=='function'){
+        throw new Error(
+          'OCR worker function unavailable'
+        );
+      }
+      return library.createWorker('eng');
+    }).catch(error=>{
+      workerPromise=null;
       throw error;
     });
   }
@@ -50,14 +118,21 @@ async function getOCRWorker() {
   return workerPromise;
 }
 
-async function getBarcodeReader() {
-  if (!barcodeReaderPromise) {
-    barcodeReaderPromise = import(
-      'https://esm.sh/@zxing/browser@0.1.5'
-    ).then(({BrowserMultiFormatReader}) =>
-      new BrowserMultiFormatReader()
-    ).catch(error => {
-      barcodeReaderPromise = null;
+async function getBarcodeReader(){
+  if(!barcodeReaderPromise){
+    barcodeReaderPromise=loadLibrary(
+      'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js',
+      'ZXing'
+    ).then(library=>{
+      if(!library.BrowserMultiFormatReader){
+        throw new Error(
+          'Barcode reader unavailable'
+        );
+      }
+
+      return new library.BrowserMultiFormatReader();
+    }).catch(error=>{
+      barcodeReaderPromise=null;
       throw error;
     });
   }
@@ -65,28 +140,43 @@ async function getBarcodeReader() {
   return barcodeReaderPromise;
 }
 
-async function detectBarcode(file) {
-  const reader = await getBarcodeReader();
-  const url = URL.createObjectURL(file);
+async function detectBarcode(file){
+  if(typeof globalThis.BarcodeDetector==='function'){
+    try{
+      const detector=new BarcodeDetector();
+      const bitmap=await createImageBitmap(file);
 
-  try {
-    try {
-      const result =
-        await reader.decodeFromImageUrl(url);
+      try{
+        const found=await detector.detect(bitmap);
+        return found.length>0;
+      }finally{
+        bitmap.close();
+      }
+    }catch(error){
+      // Use ZXing if native detection fails.
+    }
+  }
 
+  const reader=await getBarcodeReader();
+  const url=URL.createObjectURL(file);
+
+  try{
+    try{
+      const result=await reader.decodeFromImageUrl(
+        url
+      );
       return Boolean(result);
-    } catch (error) {
-      if (
-        error?.name === 'NotFoundException' ||
-        error?.constructor?.name ===
-          'NotFoundException'
-      ) {
+    }catch(error){
+      if(
+        error?.name==='NotFoundException' ||
+        error?.constructor?.name==='NotFoundException'
+      ){
         return false;
       }
 
       throw error;
     }
-  } finally {
+  }finally{
     URL.revokeObjectURL(url);
   }
 }
