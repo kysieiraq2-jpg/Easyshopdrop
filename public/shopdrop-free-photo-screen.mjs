@@ -164,20 +164,69 @@ export async function scanPhotos(
     }
 
     try {
-      const [ocr, barcode] =
-        await Promise.all([
-          getOCRWorker().then(worker =>
-            worker.recognize(file)
-          ),
-          detectBarcode(file)
-        ]);
+      const [ocrCheck,barcodeCheck] =
+      await Promise.allSettled([
+        getOCRWorker().then(worker =>
+          worker.recognize(file)
+        ),
+        detectBarcode(file)
+      ]);
 
-      const decision = barcode
-        ? {
-            status: 'reject',
-            reason: 'QR code or barcode'
-          }
-        : inspectText(ocr.data?.text);
+    let decision;
+
+    if(
+      barcodeCheck.status==='fulfilled' &&
+      barcodeCheck.value===true
+    ){
+      decision={
+        status:'reject',
+        reason:'QR code or barcode detected'
+      };
+    }else if(
+      ocrCheck.status==='fulfilled'
+    ){
+      const textDecision=inspectText(
+        ocrCheck.value?.data?.text
+      );
+
+      if(textDecision.status==='reject'){
+        decision=textDecision;
+      }else if(
+        barcodeCheck.status==='rejected'
+      ){
+        decision={
+          status:'review',
+          reason:
+            'Text check completed. '+
+            'Barcode check unavailable: '+
+            String(
+              barcodeCheck.reason?.name||
+              'Unknown error'
+            ).slice(0,80)
+        };
+      }else{
+        decision=textDecision;
+      }
+    }else{
+      decision={
+        status:'review',
+        reason:
+          'Text recognition unavailable: '+
+          String(
+            ocrCheck.reason?.name||
+            'Unknown error'
+          ).slice(0,80)+
+          (
+            barcodeCheck.status==='rejected'
+              ?'. Barcode recognition unavailable: '+
+                String(
+                  barcodeCheck.reason?.name||
+                  'Unknown error'
+                ).slice(0,80)
+              :'. Barcode check completed.'
+          )
+      };
+    }
 
       results.push({
         name: file.name,
@@ -195,7 +244,7 @@ export async function scanPhotos(
         name: file.name,
         status: 'review',
         reason:
-          'Scanning unavailable or inconclusive',
+          'Scanner error: '+String(error?.name||'Unknown error').slice(0,80),
         seconds: Number(
           (
             (performance.now() - started) /
