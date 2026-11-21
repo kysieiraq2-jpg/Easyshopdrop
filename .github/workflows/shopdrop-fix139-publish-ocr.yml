@@ -1,1 +1,88 @@
 
+name: ShopDrop Fix139 - Publish OCR Repair
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix139-publish-ocr.yml'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: shopdrop-integrated-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: false
+
+      - name: Verify OCR and website
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test "$GITHUB_REF_NAME" = \
+            "shopdrop-phase6-integration"
+
+          for file in \
+            public/index.html \
+            public/sell-item.html \
+            public/account.html \
+            public/checkout.html \
+            public/register.html \
+            public/sign-in.html \
+            public/services.html \
+            public/dispatching.html \
+            public/shopdrop-product-photos.js \
+            public/shopdrop-photo-scan-status.js \
+            public/shopdrop-free-photo-screen.mjs
+          do
+            test -s "$file"
+          done
+
+          test "$(git hash-object \
+            public/shopdrop-free-photo-screen.mjs)" = \
+            "cb7702c301897fbe62aa869e1b122f2713a3efaa"
+
+          test "$(git hash-object \
+            public/shopdrop-product-photos.js)" = \
+            "8ed1f80f67814b9ffdc78ec827ea9293ad5ce7ea"
+
+          grep -Fq \
+            'OCR initialization failed:' \
+            public/shopdrop-free-photo-screen.mjs
+
+          node --check \
+            public/shopdrop-free-photo-screen.mjs
+
+          echo "PASS: OCR repair verified"
+          echo "PASS: Original uploader preserved"
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+      - name: Deploy website
+        id: deployment
+        uses: actions/deploy-pages@v4
+
