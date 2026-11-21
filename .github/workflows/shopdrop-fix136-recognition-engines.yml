@@ -1,5 +1,5 @@
 
-name: ShopDrop Fix136 - Repair Recognition Engines
+name: ShopDrop Fix136 - Recognition Engines V2
 
 on:
   push:
@@ -16,8 +16,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout integration branch
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: shopdrop-phase6-integration
 
@@ -66,7 +65,6 @@ jobs:
           b=source.index(end,a)
 
           replacement=r"""
-          // Load standard browser scripts without ESM CDN imports.
           const scriptLoads=new Map();
 
           function loadLibrary(url,globalName){
@@ -172,7 +170,6 @@ jobs:
           }
 
           async function detectBarcode(file){
-            // Prefer native barcode detection where available.
             if(typeof globalThis.BarcodeDetector==='function'){
               try{
                 const detector=new BarcodeDetector();
@@ -185,7 +182,7 @@ jobs:
                   bitmap.close();
                 }
               }catch(error){
-                // Fall back to ZXing on unsupported devices.
+                // Use ZXing if native detection fails.
               }
             }
 
@@ -217,43 +214,6 @@ jobs:
 
           source=source[:a]+replacement+source[b:]
 
-          # Show meaningful error messages, not only "Error".
-          old="""String(
-                      ocrCheck.reason?.name||
-                      'Unknown error'
-                    ).slice(0,80)"""
-
-          new="""String(
-                      ocrCheck.reason?.message||
-                      ocrCheck.reason?.name||
-                      'Unknown error'
-                    ).slice(0,120)"""
-
-          if source.count(old)!=1:
-            raise SystemExit(
-              'SAFETY STOP: OCR diagnostic changed'
-            )
-
-          source=source.replace(old,new,1)
-
-          old="""String(
-                        barcodeCheck.reason?.name||
-                        'Unknown error'
-                      ).slice(0,80)"""
-
-          new="""String(
-                        barcodeCheck.reason?.message||
-                        barcodeCheck.reason?.name||
-                        'Unknown error'
-                      ).slice(0,120)"""
-
-          if source.count(old)!=2:
-            raise SystemExit(
-              'SAFETY STOP: Barcode diagnostics changed'
-            )
-
-          source=source.replace(old,new)
-
           path.write_text(
             source,encoding='utf-8'
           )
@@ -282,7 +242,6 @@ jobs:
 
           git -c user.name='github-actions[bot]' \
             -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-            commit -m "Fix136 repair browser OCR and barcode loading"
+            commit -m "Fix136 repair OCR and barcode library loading"
 
           git push origin HEAD:shopdrop-phase6-integration
-
