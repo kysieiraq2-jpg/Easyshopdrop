@@ -1,5 +1,5 @@
 
-name: ShopDrop Fix138 - OCR Initialization
+name: ShopDrop Fix138 - OCR Initialization V2
 
 on:
   push:
@@ -21,7 +21,7 @@ jobs:
         with:
           ref: shopdrop-phase6-integration
 
-      - name: Configure OCR worker and diagnostics
+      - name: Repair OCR initialization
         shell: bash
         run: |
           set -euo pipefail
@@ -30,7 +30,7 @@ jobs:
           from pathlib import Path
           import subprocess
 
-          scanner=Path(
+          path=Path(
             'public/shopdrop-free-photo-screen.mjs'
           )
 
@@ -49,17 +49,17 @@ jobs:
 
             if actual!=sha:
               raise SystemExit(
-                'SAFETY STOP: Unexpected file change: '+name
+                'SAFETY STOP: File changed: '+name
               )
 
-          source=scanner.read_text(encoding='utf-8')
+          source=path.read_text(encoding='utf-8')
 
           start='async function getOCRWorker(){'
           end='async function getBarcodeReader(){'
 
           if source.count(start)!=1 or source.count(end)!=1:
             raise SystemExit(
-              'SAFETY STOP: OCR structure changed'
+              'SAFETY STOP: Scanner structure changed'
             )
 
           a=source.index(start)
@@ -114,34 +114,37 @@ jobs:
 
           source=source[:a]+replacement+source[b:]
 
-          # Report useful OCR error details.
-          old="""String(
-              ocrCheck.reason?.name||
-              'Unknown error'
-            ).slice(0,80)"""
+          # Preserve the existing barcode and
+          # photograph upload functionality.
+          # Improve OCR errors without relying
+          # on exact indentation or whitespace.
+          import re
 
-          new="""String(
-              ocrCheck.reason?.message||
-              ocrCheck.reason?.name||
-              'Unknown error'
-            ).slice(0,180)"""
+          pattern=(
+            r"ocrCheck\.reason\?\.name\s*\|\|"
+          )
 
-          if source.count(old)!=1:
+          if len(re.findall(pattern,source))!=1:
             raise SystemExit(
-              'SAFETY STOP: OCR error reporting changed'
+              'SAFETY STOP: OCR diagnostic changed'
             )
 
-          source=source.replace(old,new,1)
+          source=re.sub(
+            pattern,
+            "ocrCheck.reason?.message||"
+            "ocrCheck.reason?.name||",
+            source,
+            count=1
+          )
 
-          scanner.write_text(
+          path.write_text(
             source,encoding='utf-8'
           )
 
-          print('PASS: Explicit OCR worker path')
-          print('PASS: Explicit processing engine path')
-          print('PASS: Explicit English language-data path')
-          print('PASS: OCR error diagnostics improved')
-          print('PASS: Photograph uploader unchanged')
+          print('PASS: OCR initialization updated')
+          print('PASS: OCR diagnostics improved')
+          print('PASS: Barcode code preserved')
+          print('PASS: Original uploader preserved')
           PY
 
       - name: Verify and commit
@@ -162,7 +165,6 @@ jobs:
 
           git -c user.name='github-actions[bot]' \
             -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-            commit -m "Fix138 configure OCR worker and language data"
+            commit -m "Fix138 configure OCR initialization"
 
           git push origin HEAD:shopdrop-phase6-integration
-
