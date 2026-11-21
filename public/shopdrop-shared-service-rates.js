@@ -3,6 +3,7 @@
  Shop&Drop Fix121
  Shared provider rates for services and dispatch.
  Fix146: optional booking duration per rate.
+ Fix149: optional concurrent booking capacity.
  Existing functions preserved.
  No payment or booking modifications.
 */
@@ -46,6 +47,7 @@
 
     const rows = new Map();
     const durations = new Map();
+    const capacities = new Map();
 
     const section = make('section');
     section.style.margin = '14px 0';
@@ -66,7 +68,9 @@
       'Enter the prices you offer. ' +
       'Leave unused rates empty. ' +
       'For bookings with a known duration, ' +
-      'enter the estimated minutes per unit.'
+      'enter the estimated minutes per unit. ' +
+      'You may also specify how many bookings ' +
+      'you can handle simultaneously.'
     );
 
     section.append(explanation);
@@ -108,11 +112,35 @@
         label + ' duration in minutes per unit'
       );
 
-      line.append(name, price, duration);
+      // Fix149: optional provider capacity.
+      // Empty means capacity not specified.
+      // No capacity is assumed automatically.
+
+      const capacity = make('input');
+      capacity.type = 'number';
+      capacity.min = '1';
+      capacity.max = '10000';
+      capacity.step = '1';
+      capacity.placeholder = 'Concurrent bookings';
+      capacity.style.maxWidth = '170px';
+
+      capacity.setAttribute(
+        'aria-label',
+        label + ' maximum concurrent bookings'
+      );
+
+      line.append(
+        name,
+        price,
+        duration,
+        capacity
+      );
+
       section.append(line);
 
       rows.set(unit, price);
       durations.set(unit, duration);
+      capacities.set(unit, capacity);
     }
 
     section.append(
@@ -185,6 +213,7 @@
       kind,
       rows,
       durations,
+      capacities,
       dayInputs,
       start,
       finish,
@@ -220,8 +249,7 @@
         );
       }
 
-      // Fix146: collect duration only for
-      // a rate with a supplied price.
+      // Fix146: preserve duration collection.
 
       const durationInput =
         instance.durations.get(unit);
@@ -246,13 +274,45 @@
         }
       }
 
+      // Fix149: collect capacity only for
+      // a rate with a supplied price.
+
+      const capacityInput =
+        instance.capacities.get(unit);
+
+      const capacityRaw =
+        capacityInput?.value.trim() || '';
+
+      let maxConcurrentBookings = null;
+
+      if (capacityRaw) {
+        maxConcurrentBookings = Number(
+          capacityRaw
+        );
+
+        if (
+          !Number.isSafeInteger(
+            maxConcurrentBookings
+          ) ||
+          maxConcurrentBookings < 1 ||
+          maxConcurrentBookings > 10000
+        ) {
+          throw Error(
+            'Enter a valid concurrent booking ' +
+            'capacity of 1 to 10000 for ' + unit
+          );
+        }
+      }
+
       rates.push({
         pricing_unit: unit,
         price_zar:
           Math.round(amount * 100) / 100,
         minimum_units: 1,
         booking_duration_minutes:
-          durationMinutes
+          durationMinutes,
+        max_concurrent_bookings:
+          maxConcurrentBookings
       });
     }
 
