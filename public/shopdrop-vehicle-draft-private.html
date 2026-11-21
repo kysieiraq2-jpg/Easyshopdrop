@@ -150,6 +150,7 @@ button:disabled{opacity:.5}
 <script src="./shopdrop-shared-photo-reader.js"></script>
 <script src="./shopdrop-ad-gallery-uploader.js"></script>
 <script src="./shopdrop-shared-service-rates.js"></script>
+<script src="./shopdrop-dispatch-equipment-fields.js"></script>
 <script type="module">
 import {createClient} from
   'https://esm.sh/@supabase/supabase-js@2';
@@ -296,7 +297,6 @@ form.addEventListener('submit',async event=>{
       throw Error('Enter a valid vehicle title.');
     }
 
-
     if(photosReading){
       throw Error('Please wait for your pictures.');
     }
@@ -308,6 +308,17 @@ form.addEventListener('submit',async event=>{
         'Select between 1 and 6 photographs.'
       );
     }
+
+    const equipmentCollector=
+      window.ShopDropDispatchEquipment174;
+
+    if(!equipmentCollector?.collect){
+      throw Error(
+        'Equipment selection unavailable. Reload the page.'
+      );
+    }
+
+    const equipment=equipmentCollector.collect();
 
     if(!value('type')||
        !value('town')||
@@ -340,6 +351,11 @@ form.addEventListener('submit',async event=>{
       vehicle_title:title,
       vehicle_description:value('description')||null,
       vehicle_type:value('type')||null,
+      dispatch_category:equipment.dispatch_category,
+      dispatch_subtype:equipment.dispatch_subtype,
+      hire_arrangement:equipment.hire_arrangement,
+      equipment_specifications:
+        equipment.equipment_specifications,
       base_town:value('town')||null,
       base_province:value('province')||null,
       coverage_mode:value('coverage')||null,
@@ -356,7 +372,6 @@ form.addEventListener('submit',async event=>{
     if(error)throw Error(
       error.message||'Draft could not be saved.'
     );
-
 
     try{
       await window.ShopDropSharedServiceRates.save(
