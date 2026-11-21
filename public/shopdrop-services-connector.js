@@ -2,6 +2,7 @@
  // Shop&Drop Phase 6C — Other Services connector.
  // Approved public listings and service-area matching.
  // Existing authenticated booking safeguards preserved.
+ // Fix142: additive rated-service booking.
  // No live payments, payouts or provider activation.
 
 (function () {
@@ -217,7 +218,7 @@
           shopdrop_fee_cents:
             feeCents,
 
-          // Customer display includes Shop&Drop's fee.
+          // Existing customer display preserved.
           // Backend calculation remains authoritative.
           unit_price_cents:
             providerCents + feeCents,
@@ -248,8 +249,8 @@
       });
   }
 
-  // Secure booking preparation.
-  // Location is verified by Supabase before booking.
+  // Original secure booking preparation.
+  // Preserved for compatibility.
   // No payment session or charge is created.
 
   let clientPromise = null;
@@ -448,9 +449,126 @@
     });
   }
 
+  // Fix142 — Additional rated booking method.
+  // The original createBooking remains unchanged.
+
+  async function createRatedBooking({
+    serviceId,
+    requestId,
+    rateId,
+    quantity,
+    bookingDate,
+    bookingTime,
+    serviceTown,
+    serviceProvince
+  } = {}) {
+    if (
+      !validUuid(serviceId) ||
+      !validUuid(requestId) ||
+      !validUuid(rateId)
+    ) {
+      throw new Error(
+        'Invalid service, request or rate reference.'
+      );
+    }
+
+    const units = Number(quantity);
+
+    if (
+      !Number.isSafeInteger(units) ||
+      units < 1 ||
+      units > 100000
+    ) {
+      throw new Error(
+        'Enter a valid number of booking units.'
+      );
+    }
+
+    if (
+      !bookingDate ||
+      !validDate(bookingDate) ||
+      !bookingTime ||
+      !validTime(bookingTime)
+    ) {
+      throw new Error(
+        'Choose a valid booking date and time.'
+      );
+    }
+
+    const town = String(
+      serviceTown || ''
+    ).trim();
+
+    const province = String(
+      serviceProvince || ''
+    ).trim();
+
+    if (
+      town.length < 2 ||
+      town.length > 120 ||
+      province.length < 2 ||
+      province.length > 120
+    ) {
+      throw new Error(
+        'Enter a valid service town and province.'
+      );
+    }
+
+    const client =
+      await authenticatedClient();
+
+    // Server verifies user, listing, rate,
+    // quantity, date, time, location and price.
+    // No customer-supplied amount is trusted.
+
+    const { data, error } = await client.rpc(
+      'shopdrop_create_rated_service_booking_141',
+      {
+        p_service_id: serviceId,
+        p_request_id: requestId,
+        p_rate_id: rateId,
+        p_quantity: units,
+        p_booking_date: bookingDate,
+        p_booking_time: bookingTime,
+        p_service_town: town,
+        p_service_province: province
+      }
+    );
+
+    if (error) {
+      throw new Error(
+        error.message ||
+        'Secure rated booking could not be created.'
+      );
+    }
+
+    if (!validUuid(data)) {
+      throw new Error(
+        'Booking reference was not returned.'
+      );
+    }
+
+    return Object.freeze({
+      ok: true,
+      booking_id: data,
+      service_id: serviceId,
+      request_id: requestId,
+      rate_id: rateId,
+      quantity: units,
+      service_town: town,
+      service_province: province,
+      booking_date: bookingDate,
+      booking_time: bookingTime,
+      payment_status: 'pending',
+      payment_provider_status: 'not_activated',
+      payment_collected: false
+    });
+  }
+
   window.ShopDropServicesConnector =
     Object.freeze({
       search,
-      createBooking
+      createBooking,
+      createRatedBooking
     });
 })();
