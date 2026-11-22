@@ -1,1 +1,114 @@
 
+name: ShopDrop Fix180 - Remove Wording Overlap
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix180-remove-wording-overlap.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix-wording:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+
+      - name: Remove old display substitution
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          path = Path('public/v26-bridge.js')
+
+          expected = (
+              '517780ee164f391c49e120ff7b9878faf605a9f8'
+          )
+
+          actual = subprocess.check_output(
+              ['git', 'hash-object', str(path)],
+              text=True
+          ).strip()
+
+          if actual != expected:
+              raise SystemExit(
+                  'SAFETY STOP: Bridge file has changed.'
+              )
+
+          source = path.read_text(encoding='utf-8')
+
+          marker = 'SHOPDROP_DESPATCH_DISPLAY_ONLY_V2'
+
+          if source.count(marker) != 1:
+              raise SystemExit(
+                  'SAFETY STOP: Display correction not found.'
+              )
+
+          start = source.rfind(' /*', 0, source.index(marker))
+
+          if start < 0:
+              raise SystemExit(
+                  'SAFETY STOP: Display section start missing.'
+              )
+
+          section = source[start:]
+
+          if (
+              'Despatching / Dispatching & Transport'
+              not in section
+              or 'MutationObserver' not in section
+              or not section.rstrip().endswith('})();')
+          ):
+              raise SystemExit(
+                  'SAFETY STOP: Unexpected display section.'
+              )
+
+          preserved = source[:start]
+
+          if (
+              'window.ShopDropV26' not in preserved
+              or 'window.shopdropV26Status' not in preserved
+              or 'window.shopdropV26SafeAction' not in preserved
+          ):
+              raise SystemExit(
+                  'SAFETY STOP: Original bridge functions missing.'
+              )
+
+          path.write_text(
+              preserved.rstrip() + '\n',
+              encoding='utf-8'
+          )
+
+          print('PASS: Unwanted wording script removed.')
+          print('PASS: Original bridge functions preserved.')
+          print('PASS: No Dispatching identifiers renamed.')
+          PY
+
+      - name: Verify and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node --check public/v26-bridge.js
+          git diff --check
+
+          test "$(git diff --name-only)" = \
+            "public/v26-bridge.js"
+
+          git add public/v26-bridge.js
+
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Fix180 remove duplicate dispatch wording"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
