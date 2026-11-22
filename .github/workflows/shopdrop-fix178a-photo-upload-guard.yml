@@ -1,1 +1,193 @@
 
+name: ShopDrop Fix178A - Shared Photo Upload Guard
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix178a-photo-upload-guard.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  protect-advert-photos:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+
+      - name: Add pre-upload scanner protection
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          target=Path(
+            'public/shopdrop-ad-gallery-uploader.js'
+          )
+
+          expected=(
+            'df15f7e665f0b292c613d92f6a7269340a6e8b5f'
+          )
+
+          actual=subprocess.check_output(
+            ['git','hash-object',str(target)],
+            text=True
+          ).strip()
+
+          if actual!=expected:
+            raise SystemExit(
+              'SAFETY STOP: Shared uploader changed. '
+              'Do not overwrite newer code.'
+            )
+
+          scanner=Path(
+            'public/shopdrop-free-photo-screen.mjs'
+          )
+
+          if not scanner.exists():
+            raise SystemExit(
+              'SAFETY STOP: Existing scanner missing.'
+            )
+
+          source=target.read_text(
+            encoding='utf-8'
+          )
+
+          marker=(
+            '    const {data:userData,error:userError}='
+          )
+
+          if source.count(marker)!=1:
+            raise SystemExit(
+              'SAFETY STOP: Upload location changed.'
+            )
+
+          addition=r"""
+    // Fix178A: Scan before any photograph upload.
+    // Shared by Other Services and Transport adverts.
+    // This is preliminary client-side protection.
+    // Trusted backend publication checks remain required.
+    let scanner;
+
+    try{
+      scanner=await import(
+        './shopdrop-free-photo-screen.mjs'
+      );
+    }catch(error){
+      throw Error(
+        'Photograph scanner unavailable. '+
+        'No photographs were uploaded. Please retry.'
+      );
+    }
+
+    if(typeof scanner.scanPhotos!=='function'){
+      throw Error(
+        'Photograph scanner unavailable. '+
+        'No photographs were uploaded.'
+      );
+    }
+
+    const scanFiles=selected.map((file,index)=>{
+      return prepared?.[index]?.blob||file;
+    });
+
+    let scanResults;
+
+    try{
+      scanResults=await scanner.scanPhotos(
+        scanFiles
+      );
+    }catch(error){
+      throw Error(
+        'Photograph scanning could not finish. '+
+        'No photographs were uploaded. Please retry.'
+      );
+    }
+
+    if(
+      !Array.isArray(scanResults) ||
+      scanResults.length!==selected.length
+    ){
+      throw Error(
+        'Photograph scan verification incomplete. '+
+        'No photographs were uploaded.'
+      );
+    }
+
+    const rejected=scanResults
+      .map((result,index)=>({
+        result,
+        number:index+1
+      }))
+      .filter(item=>
+        item.result?.status!=='preliminary_pass'
+      );
+
+    if(rejected.length){
+      const numbers=rejected
+        .map(item=>item.number)
+        .join(', ');
+
+      throw Error(
+        'Photograph '+numbers+
+        ' not accepted by automatic scanning. '+
+        'No photographs were uploaded. '+
+        'Please remove or replace the flagged '+
+        'photograph and submit again.'
+      );
+    }
+
+"""
+
+          source=source.replace(
+            marker,
+            addition+marker,
+            1
+          )
+
+          target.write_text(
+            source,
+            encoding='utf-8'
+          )
+
+          print(
+            'PASS: Existing shared uploader protected'
+          )
+          print(
+            'PASS: Existing scanner reused'
+          )
+          print(
+            'PASS: No product uploader changes'
+          )
+          PY
+
+      - name: Verify and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node --check \
+            public/shopdrop-ad-gallery-uploader.js
+
+          git diff --check
+
+          test "$(git diff --name-only)" = \
+            "public/shopdrop-ad-gallery-uploader.js"
+
+          git add \
+            public/shopdrop-ad-gallery-uploader.js
+
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Fix178A guard shared photo uploads"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
