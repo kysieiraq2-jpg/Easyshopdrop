@@ -3,16 +3,6 @@
    Does NOT alter hrefs, event handlers, listing logic, taxonomy, finance or backend behaviour.
    Homepage four-card presentation fix: each marketplace option is a separate tile.
 
-   FIX 175D:
-   Identify the transport card by its existing destination link,
-   not by public-facing heading text. Preserve all four cards.
-
-   FIX 175F:
-   1. Change transport/hire DISPLAY labels only, after card assembly.
-   2. Keep Sell / Offer as three independent advertising links.
-   Do not modify the original homepage, API adapters, booking,
-   payment, language or Supabase code.
-
    V26_26_HEIGHT_ONLY:
    Preserve existing widths. Match bottom button heights to top buttons.
 */
@@ -54,25 +44,10 @@
     const how=firstExisting(["How Shop&Drop Works"]);
     const contact=firstExisting(["Contact Shop&Drop Admin"]);
     const intro=firstExisting(["Shop&Drop"]);
-
-    // Identify existing cards by their unchanged destination links.
-    const shop=
-      document.querySelector('a.v264Card[href="./categories.html"]') ||
-      firstExisting(["Shop Products"]);
-
-    const service=
-      document.querySelector('a.v264Card[href="./services.html"]') ||
-      firstExisting(["Find Other Services","Find a Service"]);
-
-    const dispatch=
-      document.querySelector('a.v264Card[href="./dispatching.html"]') ||
-      firstExisting([
-        "Transport Services & Equipment Hire",
-        "Dispatch & Transport"
-      ]);
-
+    const shop=firstExisting(["Shop Products"]);
+    const service=firstExisting(["Find Other Services","Find a Service"]);
+    const dispatch=firstExisting(["Dispatch & Transport"]);
     const sell=firstExisting(["Sell / Offer — FREE","Sell / Offer - FREE"]);
-
     const categories=firstExisting(["Shop by category","Shop by Category"]);
     const featured=firstExisting([
       "New & featured products","New & Featured Products"
@@ -103,7 +78,7 @@
     }
 
     // Four independent marketplace tiles.
-    // Keep all original elements and destination links.
+    // Preserve existing headings, descriptions, links and event handlers.
     const available=[dispatch,service,shop,sell].filter(Boolean);
 
     if(available.length){
@@ -127,16 +102,6 @@
 
       available.forEach(card=>{
         grid.appendChild(card);
-
-        // FIX 175F:
-        // The fourth block contains THREE different actions.
-        // Never turn its entire container into a single link.
-        if(card===sell){
-          card.classList.remove("v26-home-action-tile");
-          card.removeAttribute("role");
-          card.removeAttribute("tabindex");
-          return;
-        }
 
         const existing=card.matches("a[href]")
           ?card
@@ -242,7 +207,7 @@
 
         if(!email.querySelector(".v26-email-mark")){
           const mark=document.createElement("span");
-          mark.className="v26-whatsapp-mark";
+          mark.className="v26-email-mark";
           mark.setAttribute("aria-hidden","true");
           mark.textContent="✉";
           email.prepend(mark);
@@ -307,15 +272,6 @@
           box-sizing:border-box!important;
         }
 
-        .shopdrop-header-secondary > *,
-        .shopdrop-browse-bag-row > *{
-          min-width:0!important;
-          width:100%!important;
-          max-width:100%!important;
-          margin:0!important;
-          box-sizing:border-box!important;
-        }
-
         .shopdrop-browse-bag-row .shopdrop-header-bag,
         .shopdrop-browse-bag-row .shopdrop-header-browse{
           display:flex!important;
@@ -356,77 +312,6 @@
       `;
 
       document.head.appendChild(style);
-    }
-
-    // FIX 175F: DISPLAY LABELS ONLY.
-    // The four cards have already been assembled.
-    if(dispatch){
-      const heading=dispatch.querySelector("h2");
-      const description=dispatch.querySelector("p");
-
-      if(heading){
-        heading.textContent="Transport Services & Equipment Hire";
-      }
-
-      if(description){
-        description.textContent=
-          "Transport Services & Vehicle Hire • Machinery, Equipment & Tool Hire";
-      }
-    }
-
-    const transportMenu=document.querySelector(
-      '#shopdropHeader #menu a[href="./dispatching.html"]'
-    );
-
-    if(transportMenu){
-      transportMenu.textContent="Transport Services & Equipment Hire";
-    }
-
-    // FIX 175F: Restore three separately selectable advertising actions.
-    if(sell){
-      const actions=sell.querySelector(".v264Actions");
-
-      if(actions){
-        actions.style.display="flex";
-        actions.style.flexDirection="column";
-        actions.style.alignItems="stretch";
-        actions.style.gap="8px";
-
-        const item=actions.querySelector('a[href="./sell-item.html"]');
-        const serviceLink=actions.querySelector(
-          'a[href="./seller.html#list-service"]'
-        );
-        const transport=actions.querySelector(
-          'a[href="./dispatching.html"]'
-        );
-
-        if(item){
-          item.textContent="Sell an Item — FREE";
-        }
-
-        if(serviceLink){
-          serviceLink.textContent="Offer a Service — FREE";
-        }
-
-        if(transport){
-          transport.textContent="Offer Transport Services or Equipment Hire — FREE";
-        }
-
-        [item,serviceLink,transport].filter(Boolean).forEach(link=>{
-          link.style.display="block";
-          link.style.width="100%";
-          link.style.boxSizing="border-box";
-          link.style.padding="10px";
-          link.style.borderRadius="8px";
-          link.style.textAlign="center";
-          link.style.background="#0f766e";
-          link.style.color="#fff";
-          link.style.textDecoration="none";
-          link.style.fontWeight="600";
-          link.style.whiteSpace="normal";
-          link.style.overflowWrap="anywhere";
-        });
-      }
     }
   });
 })();
