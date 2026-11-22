@@ -1,7 +1,10 @@
 /* Shop&Drop V26-13 homepage layout + controlled menu containment repair.
    Reorders/groups EXISTING homepage sections.
-   Does NOT alter hrefs, event handlers, listing logic, taxonomy, finance or backend behaviour.
-   Homepage four-card presentation fix: each marketplace option is a separate tile.
+   Does NOT alter listing, registration, photos, checkout, finance or backend logic.
+
+   FIX 176:
+   Present four existing marketplace actions as green buttons.
+   Preserve the original destinations and other homepage functionality.
 
    V26_26_HEIGHT_ONLY:
    Preserve existing widths. Match bottom button heights to top buttons.
@@ -77,8 +80,7 @@
       intro.hidden=true;
     }
 
-    // Four independent marketplace tiles.
-    // Preserve existing headings, descriptions, links and event handlers.
+    // Preserve the existing marketplace elements.
     const available=[dispatch,service,shop,sell].filter(Boolean);
 
     if(available.length){
@@ -102,6 +104,16 @@
 
       available.forEach(card=>{
         grid.appendChild(card);
+
+        // FIX 176:
+        // The Sell / Offer section contains multiple independent links.
+        // Never make the whole section navigate to one destination.
+        if(card===sell){
+          card.classList.remove("v26-home-action-tile");
+          card.removeAttribute("role");
+          card.removeAttribute("tabindex");
+          return;
+        }
 
         const existing=card.matches("a[href]")
           ?card
@@ -130,6 +142,123 @@
           }
         }
       });
+
+      // FIX 176:
+      // Reuse the three existing advertising links and Shop Products.
+      // Do not recreate their destinations or touch their page logic.
+      if(sell && shop){
+        const actions=sell.querySelector(".v264Actions");
+
+        const item=actions &&
+          actions.querySelector('a[href="./sell-item.html"]');
+
+        const offer=actions &&
+          actions.querySelector('a[href="./seller.html#list-service"]');
+
+        const transport=actions &&
+          actions.querySelector('a[href="./dispatching.html"]');
+
+        if(actions && item && offer && transport){
+          // Keep original buyer-discovery destinations accessible
+          // through the existing main menu.
+          if(dispatch){
+            dispatch.style.display="none";
+          }
+
+          if(service){
+            service.style.display="none";
+          }
+
+          // Move the original Shop Products link, preserving its href.
+          shop.classList.remove("v264Card","v26-home-action-tile");
+          shop.removeAttribute("role");
+          shop.removeAttribute("tabindex");
+          actions.appendChild(shop);
+
+          const shopHeading=shop.querySelector("h2");
+          const shopDescription=shop.querySelector("p");
+
+          if(shopHeading){
+            shopHeading.textContent="Shop Products";
+          }
+
+          if(shopDescription){
+            shopDescription.textContent="New, handmade & second-hand";
+          }
+
+          item.textContent="Sell an Item — FREE";
+          offer.textContent="Offer a Service — FREE";
+          transport.textContent=
+            "Offer Transport Services or Equipment Hire — FREE";
+
+          const sellHeading=sell.querySelector("h2");
+          if(sellHeading){
+            sellHeading.hidden=true;
+          }
+
+          grid.style.gridTemplateColumns="minmax(0,1fr)";
+          sell.style.width="100%";
+          sell.style.minWidth="0";
+          sell.style.height="auto";
+          sell.style.margin="0";
+          sell.style.cursor="default";
+
+          actions.style.display="grid";
+          actions.style.gridTemplateColumns=
+            "repeat(2,minmax(0,1fr))";
+          actions.style.gap="10px";
+          actions.style.width="100%";
+          actions.style.margin="0";
+          actions.style.justifyContent="stretch";
+          actions.style.alignItems="stretch";
+
+          [item,offer,transport,shop].forEach(link=>{
+            link.style.display="flex";
+            link.style.flexDirection="column";
+            link.style.alignItems="center";
+            link.style.justifyContent="center";
+            link.style.gap="5px";
+            link.style.width="100%";
+            link.style.minWidth="0";
+            link.style.minHeight="116px";
+            link.style.height="100%";
+            link.style.padding="12px 8px";
+            link.style.margin="0";
+            link.style.boxSizing="border-box";
+            link.style.background="#0f766e";
+            link.style.color="#ffffff";
+            link.style.border="1px solid #0f766e";
+            link.style.borderRadius="12px";
+            link.style.fontWeight="700";
+            link.style.fontSize="14px";
+            link.style.lineHeight="1.35";
+            link.style.textAlign="center";
+            link.style.textDecoration="none";
+            link.style.whiteSpace="normal";
+            link.style.overflowWrap="anywhere";
+            link.style.boxShadow="none";
+            link.style.transform="none";
+          });
+
+          if(shopHeading){
+            shopHeading.style.margin="0";
+            shopHeading.style.color="#ffffff";
+            shopHeading.style.fontSize="14px";
+            shopHeading.style.fontWeight="700";
+            shopHeading.style.lineHeight="1.35";
+          }
+
+          if(shopDescription){
+            shopDescription.style.margin="0";
+            shopDescription.style.color="#ffffff";
+            shopDescription.style.fontSize="11px";
+            shopDescription.style.fontWeight="400";
+            shopDescription.style.lineHeight="1.35";
+          }
+
+          action.dataset.shopdropFourGreenActions="176";
+        }
+      }
 
       if(anchor){
         moveAfter(action,anchor);
