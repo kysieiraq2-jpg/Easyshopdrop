@@ -19,7 +19,7 @@ main{max-width:1100px;margin:auto;padding:18px}
 .notice{background:#fff7ed;border:1px solid #fed7aa}
 .search{display:flex;gap:8px}
 .search input{flex:1;padding:11px}
-.btn{background:#0f766e;color:#fff;border:0;border-radius:8px;padding:11px 14px;cursor:pointer}
+.btn{background:#0f766e;color:#fff;border:0;border-radius:8px;padding:11px 14px;cursor:pointer;display:inline-block;max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.4;text-align:center;text-decoration:none}
 .cats{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px}
 .cat{padding:11px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;text-align:left;cursor:pointer}
 .subcats{display:none;padding:8px 4px 2px 14px}
@@ -101,7 +101,7 @@ select,input,button{max-width:100%;box-sizing:border-box}
 <a class="card" href="./categories.html?view=new"><b>New Products</b><p>Browse new products across Shop&Drop departments.</p></a>
 <a class="card" href="./categories.html?view=preowned"><b>Second-Hand & Pre-Owned</b><p>Used, like-new and refurbished products across the same catalogue.</p></a>
 <a class="card" href="./services.html"><b>Other Services</b><p>Independent service providers who list on Shop&Drop for FREE.</p></a>
-<a class="card" href="./dispatching.html"><b>Dispatching & Transport</b><p>Dedicated transport and dispatch requests.</p></a>
+<a class="card" href="./dispatching.html"><b>Transport Services &amp; Equipment Hire</b><p>Dedicated transport and dispatch requests.</p></a>
 </div>
 </section>
 <section class="panel" id="browse-all-items">
@@ -126,7 +126,7 @@ Browse all Other Services
 </div>
 <div id="shopdropVehicleBrowsePanel"
 style="margin-top:24px">
-<h2>Dispatching &amp; Transport advertisements</h2>
+<h2>Transport Services &amp; Equipment Hire advertisements</h2>
 <p id="shopdropVehicleBrowseStatus"
    class="muted" aria-live="polite">
 Loading vehicle advertisements...
@@ -134,7 +134,7 @@ Loading vehicle advertisements...
 <div id="shopdropVehicleBrowseResults"
      class="grid" aria-live="polite"></div>
 <p><a class="btn" href="./dispatching.html">
-Browse Dispatching &amp; Transport
+Browse Transport Services &amp; Equipment Hire
 </a></p>
 </div>
 <h2>Browse product departments A–Z</h2>
