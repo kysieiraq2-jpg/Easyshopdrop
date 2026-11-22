@@ -1,1 +1,117 @@
 
+name: ShopDrop Fix179 - Browse Wording
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix179-browse-wording.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix-browse-wording:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+
+      - name: Correct visible wording only
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          path = Path('public/categories.html')
+
+          expected_sha = (
+              '7ef0c9076cbd36a9b4ecad670bdb9818e141c265'
+          )
+
+          actual_sha = subprocess.check_output(
+              ['git', 'hash-object', str(path)],
+              text=True
+          ).strip()
+
+          if actual_sha != expected_sha:
+              raise SystemExit(
+                  'SAFETY STOP: Categories file has changed.'
+              )
+
+          source = path.read_text(encoding='utf-8')
+
+          changes = [
+              (
+                  '<b>Dispatching & Transport</b>',
+                  '<b>Transport Services &amp; Equipment Hire</b>'
+              ),
+              (
+                  '<h2>Dispatching &amp; Transport advertisements</h2>',
+                  '<h2>Transport Services &amp; Equipment Hire advertisements</h2>'
+              ),
+              (
+                  'Browse Dispatching &amp; Transport',
+                  'Browse Transport Services &amp; Equipment Hire'
+              )
+          ]
+
+          for old, new in changes:
+              if source.count(old) != 1:
+                  raise SystemExit(
+                      'SAFETY STOP: Expected wording not found exactly once.'
+                  )
+              source = source.replace(old, new, 1)
+
+          old_css = (
+              '.btn{background:#0f766e;color:#fff;border:0;'
+              'border-radius:8px;padding:11px 14px;cursor:pointer}'
+          )
+
+          new_css = (
+              '.btn{background:#0f766e;color:#fff;border:0;'
+              'border-radius:8px;padding:11px 14px;cursor:pointer;'
+              'display:inline-block;max-width:100%;'
+              'white-space:normal;overflow-wrap:anywhere;'
+              'line-height:1.4;text-align:center;'
+              'text-decoration:none}'
+          )
+
+          if source.count(old_css) != 1:
+              raise SystemExit(
+                  'SAFETY STOP: Button styling changed.'
+              )
+
+          source = source.replace(old_css, new_css, 1)
+
+          path.write_text(source, encoding='utf-8')
+
+          print('PASS: Three visible labels corrected.')
+          print('PASS: Green button text wrapping corrected.')
+          print('PASS: Existing links and functionality preserved.')
+          PY
+
+      - name: Verify and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git diff --check
+
+          test "$(git diff --name-only)" = \
+            "public/categories.html"
+
+          git add public/categories.html
+
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Fix179 correct browse transport wording"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
