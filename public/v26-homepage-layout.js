@@ -1,8 +1,11 @@
-
 /* Shop&Drop V26-13 homepage layout + controlled menu containment repair.
    Reorders/groups EXISTING homepage sections.
    Does NOT alter hrefs, event handlers, listing logic, taxonomy, finance or backend behaviour.
    Homepage four-card presentation fix: each marketplace option is a separate tile.
+
+   FIX 175D:
+   Identify the transport card by its existing destination link,
+   not by public-facing heading text. Preserve all four cards.
 
    V26_26_HEIGHT_ONLY:
    Preserve existing widths. Match bottom button heights to top buttons.
@@ -45,10 +48,26 @@
     const how=firstExisting(["How Shop&Drop Works"]);
     const contact=firstExisting(["Contact Shop&Drop Admin"]);
     const intro=firstExisting(["Shop&Drop"]);
-    const shop=firstExisting(["Shop Products"]);
-    const service=firstExisting(["Find Other Services","Find a Service"]);
-    const dispatch=firstExisting(["Dispatch & Transport"]);
+
+    // FIX 175D: Existing homepage cards are identified
+    // by their original links, not changeable display names.
+    const shop=
+      document.querySelector('a.v264Card[href="./categories.html"]') ||
+      firstExisting(["Shop Products"]);
+
+    const service=
+      document.querySelector('a.v264Card[href="./services.html"]') ||
+      firstExisting(["Find Other Services","Find a Service"]);
+
+    const dispatch=
+      document.querySelector('a.v264Card[href="./dispatching.html"]') ||
+      firstExisting([
+        "Transport Services & Equipment Hire",
+        "Dispatch & Transport"
+      ]);
+
     const sell=firstExisting(["Sell / Offer — FREE","Sell / Offer - FREE"]);
+
     const categories=firstExisting(["Shop by category","Shop by Category"]);
     const featured=firstExisting([
       "New & featured products","New & Featured Products"
