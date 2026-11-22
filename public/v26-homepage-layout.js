@@ -1,13 +1,17 @@
 /* Shop&Drop V26-13 homepage layout + controlled menu containment repair.
    Reorders/groups EXISTING homepage sections.
-   Does NOT alter listing, registration, photos, checkout, finance or backend logic.
+   Does NOT alter registration, listings, photographs, checkout,
+   payments, taxonomy, Supabase or backend behaviour.
 
-   FIX 176:
-   Present four existing marketplace actions as green buttons.
-   Preserve the original destinations and other homepage functionality.
+   FIX 177 CORRECTED:
+   Four green marketplace blocks in the original 2x2 order:
+   1. Transport Services & Equipment Hire
+   2. Other Services
+   3. Shop Products
+   4. Sell an Item — FREE
 
-   V26_26_HEIGHT_ONLY:
-   Preserve existing widths. Match bottom button heights to top buttons.
+   Reuse original working destination links.
+   Preserve existing contact and header functionality.
 */
 (function () {
   function norm(s){
@@ -42,19 +46,94 @@
     return node;
   }
 
+  function setImportant(el,name,value){
+    if(el){
+      el.style.setProperty(name,value,"important");
+    }
+  }
+
+  function greenBlock(link){
+    if(!link)return;
+
+    link.classList.remove("v264Card","v26-home-action-tile");
+    link.removeAttribute("role");
+    link.removeAttribute("tabindex");
+
+    setImportant(link,"display","flex");
+    setImportant(link,"flex-direction","column");
+    setImportant(link,"align-items","center");
+    setImportant(link,"justify-content","center");
+    setImportant(link,"gap","6px");
+    setImportant(link,"width","100%");
+    setImportant(link,"min-width","0");
+    setImportant(link,"min-height","125px");
+    setImportant(link,"height","100%");
+    setImportant(link,"padding","12px 8px");
+    setImportant(link,"margin","0");
+    setImportant(link,"box-sizing","border-box");
+    setImportant(link,"background","#0f766e");
+    setImportant(link,"background-image","none");
+    setImportant(link,"color","#ffffff");
+    setImportant(link,"border","1px solid #0f766e");
+    setImportant(link,"border-radius","12px");
+    setImportant(link,"font-weight","700");
+    setImportant(link,"font-size","14px");
+    setImportant(link,"line-height","1.35");
+    setImportant(link,"text-align","center");
+    setImportant(link,"text-decoration","none");
+    setImportant(link,"white-space","normal");
+    setImportant(link,"overflow-wrap","anywhere");
+    setImportant(link,"box-shadow","none");
+    setImportant(link,"transform","none");
+    setImportant(link,"cursor","pointer");
+
+    [...link.querySelectorAll("h2,h3,p,small,strong,span")]
+      .forEach(child=>{
+        setImportant(child,"color","#ffffff");
+        setImportant(child,"text-align","center");
+        setImportant(child,"margin","0");
+        setImportant(child,"white-space","normal");
+        setImportant(child,"overflow-wrap","anywhere");
+      });
+  }
+
   document.addEventListener("DOMContentLoaded", function(){
     const main=document.querySelector("main") || document.body;
+
     const how=firstExisting(["How Shop&Drop Works"]);
     const contact=firstExisting(["Contact Shop&Drop Admin"]);
     const intro=firstExisting(["Shop&Drop"]);
-    const shop=firstExisting(["Shop Products"]);
-    const service=firstExisting(["Find Other Services","Find a Service"]);
-    const dispatch=firstExisting(["Dispatch & Transport"]);
-    const sell=firstExisting(["Sell / Offer — FREE","Sell / Offer - FREE"]);
-    const categories=firstExisting(["Shop by category","Shop by Category"]);
-    const featured=firstExisting([
-      "New & featured products","New & Featured Products"
+
+    const shop=
+      document.querySelector('a.v264Card[href="./categories.html"]') ||
+      firstExisting(["Shop Products"]);
+
+    const service=
+      document.querySelector('a.v264Card[href="./services.html"]') ||
+      firstExisting(["Find Other Services","Find a Service"]);
+
+    const dispatch=
+      document.querySelector('a.v264Card[href="./dispatching.html"]') ||
+      firstExisting([
+        "Transport Services & Equipment Hire",
+        "Dispatch & Transport"
+      ]);
+
+    const sell=firstExisting([
+      "Sell / Offer — FREE",
+      "Sell / Offer - FREE"
     ]);
+
+    const categories=firstExisting([
+      "Shop by category",
+      "Shop by Category"
+    ]);
+
+    const featured=firstExisting([
+      "New & featured products",
+      "New & Featured Products"
+    ]);
+
     const preview=[...document.querySelectorAll("section,article,div")]
       .find(el=>norm(el.textContent).startsWith("preview site:"));
 
@@ -69,21 +148,33 @@
     }
 
     if(how && intro && intro!==how){
-      // V26_11_INTRO_CONSOLIDATION_CORRECTED:
-      // Keep original introduction content intact.
       const introWrap=document.createElement("div");
       introWrap.className="v26-shopdrop-introduction";
+
       while(intro.firstChild){
         introWrap.appendChild(intro.firstChild);
       }
+
       how.appendChild(introWrap);
       intro.hidden=true;
     }
 
-    // Preserve the existing marketplace elements.
-    const available=[dispatch,service,shop,sell].filter(Boolean);
+    // FIX 177 CORRECTED:
+    // Reuse the four original working links.
+    // The Other Services block links to services.html.
+    const actions=sell && sell.querySelector(".v264Actions");
 
-    if(available.length){
+    const itemLink=actions &&
+      actions.querySelector('a[href="./sell-item.html"]');
+
+    const complete=
+      dispatch &&
+      service &&
+      shop &&
+      sell &&
+      itemLink;
+
+    if(complete){
       let action=document.getElementById("v26HomeActionBlock");
 
       if(!action){
@@ -91,181 +182,155 @@
         action.id="v26HomeActionBlock";
         action.className="v26-home-action-block";
 
-        const h=document.createElement("h2");
-        h.textContent="WHAT ARE YOU LOOKING FOR?";
+        const heading=document.createElement("h2");
+        heading.textContent="WHAT ARE YOU LOOKING FOR?";
 
         const grid=document.createElement("div");
         grid.className="v26-home-action-grid";
 
-        action.append(h,grid);
+        action.append(heading,grid);
       }
 
       const grid=action.querySelector(".v26-home-action-grid");
 
-      available.forEach(card=>{
-        grid.appendChild(card);
+      // Transport Services & Equipment Hire.
+      const transportHeading=dispatch.querySelector("h2");
+      const transportDescription=dispatch.querySelector("p");
 
-        // FIX 176:
-        // The Sell / Offer section contains multiple independent links.
-        // Never make the whole section navigate to one destination.
-        if(card===sell){
-          card.classList.remove("v26-home-action-tile");
-          card.removeAttribute("role");
-          card.removeAttribute("tabindex");
-          return;
-        }
+      if(transportHeading){
+        transportHeading.textContent=
+          "Transport Services & Equipment Hire";
+      }
 
-        const existing=card.matches("a[href]")
-          ?card
-          :card.querySelector("a[href]");
+      if(transportDescription){
+        transportDescription.textContent=
+          "Transport Services & Vehicle Hire • " +
+          "Machinery, Equipment & Tool Hire";
+      }
 
-        if(existing){
-          card.classList.add("v26-home-action-tile");
+      // Other Services.
+      const serviceHeading=service.querySelector("h2");
+      const serviceDescription=service.querySelector("p");
 
-          if(!card.matches("a[href]")){
-            card.setAttribute("role","link");
-            card.tabIndex=0;
+      if(serviceHeading){
+        serviceHeading.textContent="Other Services";
+      }
 
-            const go=()=>existing.click();
+      if(serviceDescription){
+        serviceDescription.textContent=
+          "Everyday services & professionals";
+      }
 
-            card.addEventListener("click",e=>{
-              if(e.target.closest("a,button,input,select,textarea"))return;
-              go();
-            });
+      // Shop Products.
+      const shopHeading=shop.querySelector("h2");
+      const shopDescription=shop.querySelector("p");
 
-            card.addEventListener("keydown",e=>{
-              if(e.key==="Enter"||e.key===" "){
-                e.preventDefault();
-                go();
-              }
-            });
-          }
-        }
+      if(shopHeading){
+        shopHeading.textContent="Shop Products";
+      }
+
+      if(shopDescription){
+        shopDescription.textContent=
+          "New, handmade & second-hand";
+      }
+
+      // Sell an Item.
+      itemLink.textContent="Sell an Item — FREE";
+
+      // Original white-card layout becomes four green blocks.
+      // Move existing links rather than creating new destinations.
+      grid.replaceChildren(
+        dispatch,
+        service,
+        shop,
+        itemLink
+      );
+
+      // The unused Sell / Offer container remains in the DOM.
+      // Its other service/transport advertising links are preserved.
+      sell.hidden=true;
+      setImportant(sell,"display","none");
+
+      setImportant(grid,"display","grid");
+      setImportant(
+        grid,
+        "grid-template-columns",
+        "repeat(2,minmax(0,1fr))"
+      );
+      setImportant(grid,"gap","10px");
+      setImportant(grid,"width","100%");
+      setImportant(grid,"align-items","stretch");
+
+      [dispatch,service,shop,itemLink].forEach(greenBlock);
+
+      // Ensure headings and descriptions stay white.
+      [transportHeading,serviceHeading,shopHeading]
+        .filter(Boolean)
+        .forEach(heading=>{
+          setImportant(heading,"color","#ffffff");
+          setImportant(heading,"font-size","14px");
+          setImportant(heading,"font-weight","700");
+          setImportant(heading,"line-height","1.35");
+          setImportant(heading,"margin","0");
+        });
+
+      [
+        transportDescription,
+        serviceDescription,
+        shopDescription
+      ].filter(Boolean).forEach(description=>{
+        setImportant(description,"color","#ffffff");
+        setImportant(description,"font-size","11px");
+        setImportant(description,"font-weight","400");
+        setImportant(description,"line-height","1.35");
+        setImportant(description,"margin","0");
       });
 
-      // FIX 176:
-      // Reuse the three existing advertising links and Shop Products.
-      // Do not recreate their destinations or touch their page logic.
-      if(sell && shop){
-        const actions=sell.querySelector(".v264Actions");
-
-        const item=actions &&
-          actions.querySelector('a[href="./sell-item.html"]');
-
-        const offer=actions &&
-          actions.querySelector('a[href="./seller.html#list-service"]');
-
-        const transport=actions &&
-          actions.querySelector('a[href="./dispatching.html"]');
-
-        if(actions && item && offer && transport){
-          // Keep original buyer-discovery destinations accessible
-          // through the existing main menu.
-          if(dispatch){
-            dispatch.style.display="none";
-          }
-
-          if(service){
-            service.style.display="none";
-          }
-
-          // Move the original Shop Products link, preserving its href.
-          shop.classList.remove("v264Card","v26-home-action-tile");
-          shop.removeAttribute("role");
-          shop.removeAttribute("tabindex");
-          actions.appendChild(shop);
-
-          const shopHeading=shop.querySelector("h2");
-          const shopDescription=shop.querySelector("p");
-
-          if(shopHeading){
-            shopHeading.textContent="Shop Products";
-          }
-
-          if(shopDescription){
-            shopDescription.textContent="New, handmade & second-hand";
-          }
-
-          item.textContent="Sell an Item — FREE";
-          offer.textContent="Offer a Service — FREE";
-          transport.textContent=
-            "Offer Transport Services or Equipment Hire — FREE";
-
-          const sellHeading=sell.querySelector("h2");
-          if(sellHeading){
-            sellHeading.hidden=true;
-          }
-
-          grid.style.gridTemplateColumns="minmax(0,1fr)";
-          sell.style.width="100%";
-          sell.style.minWidth="0";
-          sell.style.height="auto";
-          sell.style.margin="0";
-          sell.style.cursor="default";
-
-          actions.style.display="grid";
-          actions.style.gridTemplateColumns=
-            "repeat(2,minmax(0,1fr))";
-          actions.style.gap="10px";
-          actions.style.width="100%";
-          actions.style.margin="0";
-          actions.style.justifyContent="stretch";
-          actions.style.alignItems="stretch";
-
-          [item,offer,transport,shop].forEach(link=>{
-            link.style.display="flex";
-            link.style.flexDirection="column";
-            link.style.alignItems="center";
-            link.style.justifyContent="center";
-            link.style.gap="5px";
-            link.style.width="100%";
-            link.style.minWidth="0";
-            link.style.minHeight="116px";
-            link.style.height="100%";
-            link.style.padding="12px 8px";
-            link.style.margin="0";
-            link.style.boxSizing="border-box";
-            link.style.background="#0f766e";
-            link.style.color="#ffffff";
-            link.style.border="1px solid #0f766e";
-            link.style.borderRadius="12px";
-            link.style.fontWeight="700";
-            link.style.fontSize="14px";
-            link.style.lineHeight="1.35";
-            link.style.textAlign="center";
-            link.style.textDecoration="none";
-            link.style.whiteSpace="normal";
-            link.style.overflowWrap="anywhere";
-            link.style.boxShadow="none";
-            link.style.transform="none";
-          });
-
-          if(shopHeading){
-            shopHeading.style.margin="0";
-            shopHeading.style.color="#ffffff";
-            shopHeading.style.fontSize="14px";
-            shopHeading.style.fontWeight="700";
-            shopHeading.style.lineHeight="1.35";
-          }
-
-          if(shopDescription){
-            shopDescription.style.margin="0";
-            shopDescription.style.color="#ffffff";
-            shopDescription.style.fontSize="11px";
-            shopDescription.style.fontWeight="400";
-            shopDescription.style.lineHeight="1.35";
-          }
-
-          action.dataset.shopdropFourGreenActions="176";
-        }
-      }
+      action.dataset.shopdropFourGreenActions="177";
 
       if(anchor){
         moveAfter(action,anchor);
       }else{
         main.prepend(action);
       }
+
       anchor=action;
+    }else{
+      // Safety fallback: preserve the original layout if
+      // any expected existing link is missing.
+      const available=[dispatch,service,shop,sell].filter(Boolean);
+
+      if(available.length){
+        let action=document.getElementById("v26HomeActionBlock");
+
+        if(!action){
+          action=document.createElement("section");
+          action.id="v26HomeActionBlock";
+          action.className="v26-home-action-block";
+
+          const h=document.createElement("h2");
+          h.textContent="WHAT ARE YOU LOOKING FOR?";
+
+          const grid=document.createElement("div");
+          grid.className="v26-home-action-grid";
+
+          action.append(h,grid);
+        }
+
+        const grid=action.querySelector(".v26-home-action-grid");
+
+        available.forEach(card=>{
+          grid.appendChild(card);
+        });
+
+        if(anchor){
+          moveAfter(action,anchor);
+        }else{
+          main.prepend(action);
+        }
+
+        anchor=action;
+      }
     }
 
     if(categories){
@@ -364,7 +429,7 @@
     document.documentElement.dataset.shopdropHomepageLayout="v26-13";
 
     // V26_25_BROWSE_BAG_EQUAL_WIDTH:
-    // Preserve the previously approved width alignment.
+    // Preserve previously approved header alignment.
     if(
       document.querySelector(".shopdrop-browse-bag-row") &&
       !document.getElementById("shopdropBrowseBagAlignmentFix")
@@ -415,7 +480,7 @@
         }
 
         /* V26_26_HEIGHT_ONLY:
-           Match the top row height without changing widths. */
+           Preserve approved header button heights. */
         .shopdrop-browse-bag-row .shopdrop-header-bag,
         .shopdrop-browse-bag-row .shopdrop-header-browse{
           height:64px!important;
