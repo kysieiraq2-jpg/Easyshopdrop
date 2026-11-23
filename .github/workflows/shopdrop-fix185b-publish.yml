@@ -1,1 +1,84 @@
 
+name: ShopDrop Fix 185B - Verify and Publish
+
+'on':
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix185b-publish.yml'
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  verify:
+    name: Verify Fix 185A and preserve website
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout latest integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: false
+
+      - name: Verify existing website and dropdown
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test "${GITHUB_REF_NAME}" = \
+            "shopdrop-phase6-integration"
+
+          test -s public/index.html
+          test -s public/dispatching.html
+          test -s public/shopdrop-vehicle-draft-private.html
+
+          test -s \
+            public/shopdrop-dispatch-equipment-fields.js
+
+          test -s \
+            public/shopdrop-transport-title-185a.js
+
+          grep -Fq \
+            'shopdrop-transport-title-185a.js' \
+            public/shopdrop-vehicle-draft-private.html
+
+          grep -Fq \
+            'dispatchCategory174' \
+            public/shopdrop-dispatch-equipment-fields.js
+
+          grep -Fq \
+            'shopdropTitleSelect185A' \
+            public/shopdrop-transport-title-185a.js
+
+          node --check \
+            public/shopdrop-dispatch-equipment-fields.js
+
+          node --check \
+            public/shopdrop-transport-title-185a.js
+
+          echo "PASS: Existing website preserved"
+          echo "PASS: Equipment dropdown exists"
+          echo "PASS: Fix 185A title script exists"
+          echo "PASS: Script reference exists"
+          echo "PASS: JavaScript syntax checks"
+
+          echo "Publishing latest integration branch."
+
+  deploy:
+    name: Publish current integration website
+    needs: verify
+
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
