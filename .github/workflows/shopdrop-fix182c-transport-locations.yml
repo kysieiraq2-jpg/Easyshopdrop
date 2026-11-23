@@ -1,5 +1,5 @@
 
-name: ShopDrop Fix 182C - Transport Locations
+name: ShopDrop Fix 182C - Transport Dropdown Repair
 
 on:
   push:
@@ -13,8 +13,8 @@ permissions:
 
 jobs:
   repair:
-    runs-on: ubuntu-latest
     if: github.ref_name == 'shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout integration
@@ -23,47 +23,64 @@ jobs:
           ref: shopdrop-phase6-integration
           persist-credentials: true
 
-      - name: Backup and repair only transport dropdowns
+      - name: Repair transport location fields
         shell: bash
         run: |
           set -euo pipefail
-
           python3 - <<'PY'
           from pathlib import Path
           import subprocess
           import json
+          import textwrap
 
           page = Path("public/dispatching.html")
-          script = Path("public/shopdrop-transport-location-182c.js")
+          script = Path("public/shopdrop-transport-location-182d.js")
           datafile = Path("public/shopdrop-sa-towns-181.json")
-          backup = Path("backups/fix182c/transport-script-BEFORE-182C-R.js")
+          backup = Path("backups/fix182c/dispatching-BEFORE-182D.html")
 
-          expected_page = "035a6b6e185954aa40b3cddae4e26cbf5bf2fedb"
-          expected_script = "fb2a49d5b394b83e30bf2d64d1c304cfb7506f64"
+          expected = "035a6b6e185954aa40b3cddae4e26cbf5bf2fedb"
 
-          def verify(path, expected):
-              actual = subprocess.check_output(
-                  ["git", "hash-object", str(path)],
-                  text=True
-              ).strip()
-              if actual != expected:
-                  raise SystemExit(
-                      "SAFETY STOP: File changed: " + str(path)
-                  )
+          actual = subprocess.check_output(
+              ["git", "hash-object", str(page)],
+              text=True
+          ).strip()
 
-          verify(page, expected_page)
-          verify(script, expected_script)
-
-          if not datafile.is_file():
-              raise SystemExit("SAFETY STOP: Town data missing")
+          if actual != expected:
+              raise SystemExit("STOP: Transport HTML has changed")
 
           data = json.loads(datafile.read_text())
-          provinces = data.get("provinces", {})
 
-          if data.get("country") != "ZA" or len(provinces) != 9:
-              raise SystemExit("SAFETY STOP: Invalid town data")
+          if data.get("country") != "ZA":
+              raise SystemExit("STOP: Invalid town data")
 
-          html = page.read_text()
+          if len(data.get("provinces", {})) != 9:
+              raise SystemExit("STOP: Province data incomplete")
+
+          original = page.read_bytes()
+          html = original.decode("utf-8")
+
+          old181 = (
+              '<script src="./shopdrop-location-dropdowns-181.js">'
+              '</script>'
+          )
+
+          old182 = (
+              '<script defer '
+              'src="./shopdrop-transport-location-182c.js">'
+              '</script>'
+          )
+
+          new182 = (
+              '<script defer '
+              'src="./shopdrop-transport-location-182d.js?v=182d">'
+              '</script>'
+          )
+
+          if html.count(old181) != 1:
+              raise SystemExit("STOP: Old 181 connection mismatch")
+
+          if html.count(old182) != 1:
+              raise SystemExit("STOP: Old 182C connection mismatch")
 
           for field in (
               "pickupRegion", "pickup",
@@ -71,67 +88,58 @@ jobs:
               "pickupCountry", "dropoffCountry"
           ):
               if html.count('id="' + field + '"') != 1:
-                  raise SystemExit("SAFETY STOP: Field " + field)
-
-          if html.count(
-              'src="./shopdrop-transport-location-182c.js"'
-          ) != 1:
-              raise SystemExit("SAFETY STOP: Script not connected")
+                  raise SystemExit("STOP: Location field mismatch")
 
           backup.parent.mkdir(parents=True, exist_ok=True)
-          original = script.read_bytes()
           backup.write_bytes(original)
 
           if backup.read_bytes() != original:
-              raise SystemExit("SAFETY STOP: Backup mismatch")
+              raise SystemExit("STOP: Backup failed")
 
-          code = r"""
+          javascript = r"""
           (() => {
             'use strict';
 
-            const provinceNames = [
-              'Eastern Cape',
-              'Free State',
-              'Gauteng',
-              'KwaZulu-Natal',
-              'Limpopo',
-              'Mpumalanga',
-              'North West',
-              'Northern Cape',
-              'Western Cape'
+            const provinces = [
+              'Eastern Cape', 'Free State', 'Gauteng',
+              'KwaZulu-Natal', 'Limpopo', 'Mpumalanga',
+              'North West', 'Northern Cape', 'Western Cape'
             ];
 
-            const fields = [
+            const pairs = [
               ['pickupRegion', 'pickup', 'pickupCountry'],
               ['dropoffRegion', 'dropoff', 'dropoffCountry']
             ];
 
-            const fill = (element, values, prompt) => {
-              element.replaceChildren(new Option(prompt, ''));
-              for (const value of values) {
-                element.add(new Option(value, value));
-              }
-            };
+            function fill(select, values, prompt) {
+              select.replaceChildren(new Option(prompt, ''));
+              values.forEach(value => {
+                select.add(new Option(value, value));
+              });
+            }
 
-            const createSelect = input => {
-              const select = document.createElement('select');
+            function makeSelect(old) {
+              const next = document.createElement('select');
 
-              for (const attr of input.attributes) {
-                if (!['type', 'value', 'placeholder'].includes(attr.name)) {
-                  select.setAttribute(attr.name, attr.value);
+              for (const attr of old.attributes) {
+                if (!['type', 'placeholder', 'value']
+                    .includes(attr.name)) {
+                  next.setAttribute(attr.name, attr.value);
                 }
               }
 
-              select.id = input.id;
-              select.style.width = '100%';
-              select.style.minHeight = '46px';
+              next.id = old.id;
+              next.style.width = '100%';
+              next.style.minHeight = '46px';
 
-              input.replaceWith(select);
-              return select;
-            };
+              old.replaceWith(next);
+              return next;
+            }
 
-            function install(data) {
-              for (const [regionId, townId, countryId] of fields) {
+            function start() {
+              const controls = [];
+
+              for (const [regionId, townId, countryId] of pairs) {
                 const country = document.getElementById(countryId);
                 let region = document.getElementById(regionId);
                 let town = document.getElementById(townId);
@@ -141,26 +149,29 @@ jobs:
                 const originalRegion = region.cloneNode(true);
                 const originalTown = town.cloneNode(true);
 
-                let originalRegionValue = region.value;
-                let originalTownValue = town.value;
+                let townData = null;
 
-                const southAfrica = () => {
-                  const value = String(country.value).trim().toLowerCase();
-                  return value === 'za' || value === 'south africa';
+                const isSA = () => {
+                  const value = String(country.value).toLowerCase();
+                  return value === 'za' ||
+                    value === 'south africa';
                 };
 
-                const updateTowns = selected => {
-                  const available = data.provinces[region.value] || [];
+                const updateTowns = (selected = '') => {
+                  const available =
+                    townData?.[region.value] || [];
 
                   fill(
                     town,
                     available,
                     region.value
-                      ? 'Choose town or area'
+                      ? (townData
+                          ? 'Choose town or area'
+                          : 'Loading towns...')
                       : 'Choose province first'
                   );
 
-                  town.disabled = !region.value;
+                  town.disabled = !townData || !region.value;
 
                   if (available.includes(selected)) {
                     town.value = selected;
@@ -173,86 +184,91 @@ jobs:
 
                   if (!region || !town) return;
 
-                  if (!southAfrica()) {
-                    const regionValue = region.value;
-                    const townValue = town.value;
+                  const previousRegion = region.value;
+                  const previousTown = town.value;
 
+                  if (!isSA()) {
                     if (region.tagName === 'SELECT') {
                       const input = originalRegion.cloneNode(true);
-                      input.value = regionValue;
+                      input.value = previousRegion;
                       region.replaceWith(input);
                       region = input;
                     }
 
                     if (town.tagName === 'SELECT') {
                       const input = originalTown.cloneNode(true);
-                      input.value = townValue;
+                      input.value = previousTown;
                       town.replaceWith(input);
                       town = input;
                     }
-
                     return;
                   }
 
-                  const previousRegion = region.value || originalRegionValue;
-                  const previousTown = town.value || originalTownValue;
-
                   if (region.tagName !== 'SELECT') {
-                    region = createSelect(region);
+                    region = makeSelect(region);
                   }
 
                   if (town.tagName !== 'SELECT') {
-                    town = createSelect(town);
+                    town = makeSelect(town);
                   }
 
-                  fill(region, provinceNames, 'Choose province');
+                  fill(region, provinces, 'Choose province');
 
-                  if (provinceNames.includes(previousRegion)) {
+                  if (provinces.includes(previousRegion)) {
                     region.value = previousRegion;
                   }
 
-                  region.onchange = () => {
-                    originalRegionValue = region.value;
-                    originalTownValue = '';
-                    updateTowns('');
-                  };
-
-                  town.onchange = () => {
-                    originalTownValue = town.value;
-                  };
-
+                  region.onchange = () => updateTowns();
                   updateTowns(previousTown);
                 }
+
+                controls.push({
+                  setData(data) {
+                    townData = data;
+                    const selected = town.value;
+                    updateTowns(selected);
+                  }
+                });
 
                 country.addEventListener('change', setup);
                 setup();
               }
-            }
 
-            function start() {
-              fetch('./shopdrop-sa-towns-181.json', {
+              fetch('./shopdrop-sa-towns-181.json?v=182d', {
                 cache: 'no-store'
               })
                 .then(response => {
                   if (!response.ok) {
-                    throw new Error('Town dataset unavailable');
+                    throw Error('Town data unavailable');
                   }
                   return response.json();
                 })
                 .then(data => {
                   if (data.country !== 'ZA' || !data.provinces) {
-                    throw new Error('Invalid South African town data');
+                    throw Error('Invalid South African town data');
                   }
-                  install(data);
+                  controls.forEach(control => {
+                    control.setData(data.provinces);
+                  });
                 })
                 .catch(error => {
-                  console.error('Fix 182C:', error);
+                  console.error('Transport towns:', error);
+                  document.querySelectorAll(
+                    '#pickup, #dropoff'
+                  ).forEach(field => {
+                    if (field.tagName !== 'SELECT') return;
+                    const input = document.createElement('input');
+                    input.id = field.id;
+                    input.placeholder = 'Enter town manually';
+                    input.style.cssText = field.style.cssText;
+                    field.replaceWith(input);
+                  });
                 });
             }
 
             if (document.readyState === 'loading') {
               document.addEventListener(
-                'DOMContentLoaded', start, {once: true}
+                'DOMContentLoaded', start, {once:true}
               );
             } else {
               start();
@@ -260,20 +276,32 @@ jobs:
           })();
           """
 
-          script.write_text(code.strip() + "\n")
+          script.write_text(
+              textwrap.dedent(javascript).strip() + "\n"
+          )
 
-          print("PASS: Original transport HTML unchanged")
-          print("PASS: Previous transport script backed up")
-          print("PASS: New dropdown script prepared")
+          updated = html.replace(old181, "", 1)
+          updated = updated.replace(old182, new182, 1)
+
+          expected_html = html.replace(
+              old181, "", 1
+          ).replace(old182, new182, 1)
+
+          if updated != expected_html:
+              raise SystemExit("STOP: Unexpected HTML changes")
+
+          page.write_text(updated)
+
+          print("PASS: Original transport HTML backed up")
+          print("PASS: Old 181 transport connection disabled")
+          print("PASS: Old 182C connection replaced")
+          print("PASS: All other transport HTML preserved")
           PY
 
-          node --check public/shopdrop-transport-location-182c.js
+          node --check public/shopdrop-transport-location-182d.js
           git diff --check
 
-          test "$(git hash-object public/dispatching.html)" = \
-            "035a6b6e185954aa40b3cddae4e26cbf5bf2fedb"
-
-      - name: Commit repair
+      - name: Commit and publish correction
         shell: bash
         run: |
           set -euo pipefail
@@ -282,8 +310,9 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add \
-            public/shopdrop-transport-location-182c.js \
-            backups/fix182c/transport-script-BEFORE-182C-R.js
+            public/dispatching.html \
+            public/shopdrop-transport-location-182d.js \
+            backups/fix182c/dispatching-BEFORE-182D.html
 
-          git commit -m "Fix 182C-R transport dropdown repair"
+          git commit -m "Fix 182C-D isolated transport dropdown repair"
           git push origin HEAD:shopdrop-phase6-integration
