@@ -1,1 +1,94 @@
 
+
+name: ShopDrop Fix 181A Province Dropdown
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - .github/workflows/shopdrop-fix181a-province-dropdown.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  province-dropdown:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Apply guarded province dropdown fix
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          path = Path("public/shopdrop-vehicle-draft-private.html")
+          expected_sha = "e7d332735543c46e4dfc628ae3d9bfe097a0e071"
+
+          actual_sha = subprocess.check_output(
+              ["git", "hash-object", str(path)],
+              text=True
+          ).strip()
+
+          if actual_sha != expected_sha:
+              raise SystemExit(
+                  "STOP: Target file changed. No correction applied."
+              )
+
+          source = path.read_text(encoding="utf-8")
+
+          old = '''<input id="province" maxlength="120">'''
+
+          new = '''<select id="province" required>
+      <option value="">Choose your province</option>
+      <option value="Eastern Cape">Eastern Cape</option>
+      <option value="Free State">Free State</option>
+      <option value="Gauteng">Gauteng</option>
+      <option value="KwaZulu-Natal">KwaZulu-Natal</option>
+      <option value="Limpopo">Limpopo</option>
+      <option value="Mpumalanga">Mpumalanga</option>
+      <option value="North West">North West</option>
+      <option value="Northern Cape">Northern Cape</option>
+      <option value="Western Cape">Western Cape</option>
+    </select>'''
+
+          if source.count(old) != 1:
+              raise SystemExit(
+                  "STOP: Expected province field not found exactly once."
+              )
+
+          updated = source.replace(old, new, 1)
+          path.write_text(updated, encoding="utf-8")
+          print("Fix 181A applied safely.")
+          PY
+
+      - name: Verify changes
+        shell: bash
+        run: |
+          git diff --check
+          test "$(git diff --name-only | wc -l)" -eq 1
+          test "$(git diff --name-only)" = \
+            "public/shopdrop-vehicle-draft-private.html"
+
+      - name: Commit correction
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No changes required."
+            exit 0
+          fi
+
+          git config user.name "ShopDrop Fix Workflow"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add public/shopdrop-vehicle-draft-private.html
+          git commit -m "Fix 181A: South African province dropdown"
+          git push origin HEAD:shopdrop-phase6-integration
