@@ -1,1 +1,232 @@
 
+name: ShopDrop Fix 182C - Transport Locations
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix182c:
+    if: github.ref_name == 'shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+
+      - name: Backup and install location dropdowns
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          page = Path("public/dispatching.html")
+          script = Path("public/shopdrop-transport-location-182c.js")
+          backup = Path("backups/fix182c/dispatching-BEFORE-182C.html")
+          data = Path("public/shopdrop-sa-towns-181.json")
+
+          expected = "ce9f0c9b7b84a822703f38ded718d4783b39fa8f"
+
+          actual = subprocess.check_output(
+              ["git", "hash-object", str(page)],
+              text=True
+          ).strip()
+
+          if actual != expected:
+              raise SystemExit(
+                  "STOP: Dispatching file changed. "
+                  "No replacement permitted."
+              )
+
+          if not data.is_file():
+              raise SystemExit("STOP: Town data missing.")
+
+          original = page.read_bytes()
+
+          required = [
+              'id="pickupRegion"',
+              'id="pickup"',
+              'id="dropoffRegion"',
+              'id="dropoff"',
+              'id="pickupCountry"',
+              'id="dropoffCountry"'
+          ]
+
+          text = original.decode("utf-8")
+
+          for field in required:
+              if text.count(field) != 1:
+                  raise SystemExit(
+                      "STOP: Unexpected field " + field
+                  )
+
+          marker = (
+              '<script src="./shopdrop-transport-location-182c.js">'
+              '</script>'
+          )
+
+          if marker in text or text.count("</body>") != 1:
+              raise SystemExit("STOP: Unsafe page structure.")
+
+          backup.parent.mkdir(parents=True, exist_ok=True)
+          backup.write_bytes(original)
+
+          javascript = r"""
+          (() => {
+            'use strict';
+
+            const pairs = [
+              ['pickupRegion', 'pickup', 'pickupCountry'],
+              ['dropoffRegion', 'dropoff', 'dropoffCountry']
+            ];
+
+            const provinces = [
+              'Eastern Cape', 'Free State', 'Gauteng',
+              'KwaZulu-Natal', 'Limpopo', 'Mpumalanga',
+              'North West', 'Northern Cape', 'Western Cape'
+            ];
+
+            const fill = (select, values, prompt) => {
+              select.replaceChildren(new Option(prompt, ''));
+              values.forEach(v => select.add(new Option(v, v)));
+            };
+
+            fetch('./shopdrop-sa-towns-181.json')
+              .then(response => {
+                if (!response.ok) throw Error('Town data unavailable');
+                return response.json();
+              })
+              .then(data => {
+                if (data.country !== 'ZA' || !data.provinces)
+                  throw Error('Invalid town data');
+
+                pairs.forEach(([provinceId, townId, countryId]) => {
+                  let region = document.getElementById(provinceId);
+                  let town = document.getElementById(townId);
+                  const country = document.getElementById(countryId);
+
+                  if (!region || !town || !country) return;
+
+                  const originalRegion = region.cloneNode(true);
+                  const originalTown = town.cloneNode(true);
+
+                  const isSA = () => {
+                    const value = String(country.value).toLowerCase();
+                    return value === 'za' || value === 'south africa';
+                  };
+
+                  const setup = () => {
+                    if (!isSA()) {
+                      if (region.tagName === 'SELECT') {
+                        region.replaceWith(originalRegion.cloneNode(true));
+                        region = document.getElementById(provinceId);
+                      }
+                      if (town.tagName === 'SELECT') {
+                        town.replaceWith(originalTown.cloneNode(true));
+                        town = document.getElementById(townId);
+                      }
+                      return;
+                    }
+
+                    const oldProvince = region.value;
+                    const oldTown = town.value;
+
+                    if (region.tagName !== 'SELECT') {
+                      const next = document.createElement('select');
+                      next.id = provinceId;
+                      next.className = region.className;
+                      region.replaceWith(next);
+                      region = next;
+                    }
+
+                    if (town.tagName !== 'SELECT') {
+                      const next = document.createElement('select');
+                      next.id = townId;
+                      next.className = town.className;
+                      town.replaceWith(next);
+                      town = next;
+                    }
+
+                    fill(region, provinces, 'Choose province');
+
+                    if (provinces.includes(oldProvince))
+                      region.value = oldProvince;
+
+                    const updateTowns = (selected = '') => {
+                      const values = data.provinces[region.value] || [];
+                      fill(
+                        town,
+                        values,
+                        region.value
+                          ? 'Choose town or area'
+                          : 'Choose province first'
+                      );
+                      town.disabled = !values.length;
+
+                      if (values.includes(selected))
+                        town.value = selected;
+                    };
+
+                    region.onchange = () => updateTowns();
+                    updateTowns(oldTown);
+                  };
+
+                  country.addEventListener('change', setup);
+                  setup();
+                });
+              })
+              .catch(error => {
+                console.warn(
+                  'ShopDrop transport locations unchanged:',
+                  error.message
+                );
+              });
+          })();
+          """
+
+          script.write_text(javascript.strip() + "\n")
+
+          updated = text.replace(
+              "</body>",
+              marker + "</body>",
+              1
+          )
+
+          if updated.replace(marker, "", 1) != text:
+              raise SystemExit("STOP: Unrelated HTML change.")
+
+          page.write_text(updated)
+
+          if backup.read_bytes() != original:
+              raise SystemExit("STOP: Backup mismatch.")
+
+          print("Backup verified.")
+          print("Transport location script installed.")
+          print("Other form fields unchanged.")
+          PY
+
+          git diff --check
+
+      - name: Commit fix and backup
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "ShopDrop Fix Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            public/dispatching.html \
+            public/shopdrop-transport-location-182c.js \
+            backups/fix182c/dispatching-BEFORE-182C.html
+
+          git commit -m "Fix 182C transport location dropdowns with backup"
+          git push origin HEAD:shopdrop-phase6-integration
+
