@@ -1,5 +1,4 @@
 
-
 name: ShopDrop Fix 181C Town Database
 
 on:
@@ -61,7 +60,7 @@ jobs:
           ) as response:
               raw = response.read(3000000)
 
-          content = raw.decode("utf-8-sig")
+          content = raw.decode("cp1252")
           reader = csv.DictReader(io.StringIO(content))
 
           expected_columns = {
