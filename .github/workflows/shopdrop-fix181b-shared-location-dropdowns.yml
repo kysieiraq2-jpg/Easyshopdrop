@@ -1,1 +1,246 @@
 
+name: ShopDrop Fix 181B Shared Location Dropdowns
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Install shared location dropdowns
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          expected = {
+              "public/dispatching.html":
+                  "805383129281c85518e1a84906273f7510f6ff8b",
+              "public/seller.html":
+                  "4e8a01929394af1a044b69760d3ff64e31e80e70",
+              "public/shopdrop-vehicle-draft-private.html":
+                  "e7d332735543c46e4dfc628ae3d9bfe097a0e071"
+          }
+
+          for name, sha in expected.items():
+              actual = subprocess.check_output(
+                  ["git", "hash-object", name],
+                  text=True
+              ).strip()
+              if actual != sha:
+                  raise SystemExit(
+                      "STOP: Existing file changed: " + name
+                  )
+
+          asset = Path(
+              "public/shopdrop-location-dropdowns-181.js"
+          )
+
+          if asset.exists():
+              raise SystemExit(
+                  "STOP: Shared component already exists."
+              )
+
+          javascript = r"""
+          /*
+           ShopDrop Fix 181B
+           Shared South African province dropdowns.
+           Preserves field IDs and submitted values.
+           International fields remain editable.
+           No database, payment or booking changes.
+          */
+          (() => {
+            'use strict';
+
+            const provinces = [
+              'Eastern Cape',
+              'Free State',
+              'Gauteng',
+              'KwaZulu-Natal',
+              'Limpopo',
+              'Mpumalanga',
+              'North West',
+              'Northern Cape',
+              'Western Cape'
+            ];
+
+            const configurations = [
+              ['province', null],
+              ['pickupRegion', 'pickupCountry'],
+              ['dropoffRegion', 'dropoffCountry'],
+              ['serviceRegion', 'serviceCountry']
+            ];
+
+            function isSouthAfrica(country) {
+              if (!country) return true;
+
+              const value = String(country.value || '')
+                .trim().toLowerCase();
+
+              return value === 'za' ||
+                value === 'south africa';
+            }
+
+            function makeField(id, dropdown, oldValue) {
+              const element = document.createElement(
+                dropdown ? 'select' : 'input'
+              );
+
+              element.id = id;
+              element.className = 'shopdrop-location-181';
+              element.style.width = '100%';
+
+              if (dropdown) {
+                const empty = document.createElement('option');
+                empty.value = '';
+                empty.textContent = 'Choose province';
+                element.append(empty);
+
+                for (const name of provinces) {
+                  const option = document.createElement('option');
+                  option.value = name;
+                  option.textContent = name;
+                  element.append(option);
+                }
+
+                if (provinces.includes(oldValue)) {
+                  element.value = oldValue;
+                }
+              } else {
+                element.type = 'text';
+                element.maxLength = 120;
+                element.placeholder = 'Province / state / region';
+                element.value = oldValue || '';
+              }
+
+              return element;
+            }
+
+            function configure(id, countryId) {
+              const country = countryId
+                ? document.getElementById(countryId)
+                : null;
+
+              let field = document.getElementById(id);
+              if (!field) return;
+
+              function update() {
+                const dropdown = isSouthAfrica(country);
+
+                if (
+                  dropdown && field.tagName === 'SELECT' ||
+                  !dropdown && field.tagName === 'INPUT' &&
+                  field.classList.contains('shopdrop-location-181')
+                ) return;
+
+                const oldValue = field.value || '';
+                const replacement = makeField(
+                  id, dropdown, oldValue
+                );
+
+                replacement.required = field.required;
+                replacement.setAttribute(
+                  'aria-label',
+                  dropdown
+                    ? 'Choose South African province'
+                    : 'Province, state or region'
+                );
+
+                field.replaceWith(replacement);
+                field = replacement;
+              }
+
+              update();
+
+              if (country) {
+                country.addEventListener('change', update);
+              }
+            }
+
+            function initialize() {
+              for (const [id, country] of configurations) {
+                configure(id, country);
+              }
+            }
+
+            if (document.readyState === 'loading') {
+              document.addEventListener(
+                'DOMContentLoaded',
+                initialize,
+                { once: true }
+              );
+            } else {
+              initialize();
+            }
+          })();
+          """
+
+          asset.write_text(
+              javascript.lstrip(),
+              encoding="utf-8"
+          )
+
+          script = (
+              '<script src="./shopdrop-location-dropdowns-181.js">'
+              '</script>'
+          )
+
+          for name in expected:
+              path = Path(name)
+              source = path.read_text(encoding="utf-8")
+
+              if source.count("</body>") != 1:
+                  raise SystemExit(
+                      "STOP: Unexpected page structure: " + name
+                  )
+
+              if script in source:
+                  raise SystemExit(
+                      "STOP: Component already linked: " + name
+                  )
+
+              source = source.replace(
+                  "</body>",
+                  script + "\n</body>",
+                  1
+              )
+
+              path.write_text(
+                  source,
+                  encoding="utf-8"
+              )
+
+          print("Shared dropdown component installed.")
+          PY
+
+      - name: Verify exact changes
+        shell: bash
+        run: |
+          git diff --check
+          node --check public/shopdrop-location-dropdowns-181.js
+          git status --short
+
+      - name: Commit integration
+        shell: bash
+        run: |
+          git config user.name "ShopDrop Fix Workflow"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            public/shopdrop-location-dropdowns-181.js \
+            public/dispatching.html \
+            public/seller.html \
+            public/shopdrop-vehicle-draft-private.html
+          git commit -m "Fix 181B shared province dropdowns"
+          git push origin HEAD:shopdrop-phase6-integration
+
