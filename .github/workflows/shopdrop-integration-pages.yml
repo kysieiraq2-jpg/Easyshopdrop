@@ -1,17 +1,17 @@
 
-# ShopDrop deployment refresh - Fix 182C
-# Publish existing integration branch without modifying website code.
-
 name: ShopDrop Integrated Website Deployment
 
 'on':
   workflow_dispatch:
+
   push:
     branches:
       - shopdrop-phase6-integration
     paths:
       - 'public/**'
       - '.github/workflows/shopdrop-integration-pages.yml'
+
+  workflow_call:
 
 permissions:
   contents: read
@@ -25,6 +25,9 @@ concurrency:
 jobs:
   deploy:
     name: Publish integrated ShopDrop website
+
+    if: github.ref_name == 'shopdrop-phase6-integration'
+
     runs-on: ubuntu-latest
 
     environment:
@@ -53,9 +56,45 @@ jobs:
           test -f public/sign-in.html
           test -f public/dispatching.html
           test -f public/services.html
+          test -f public/sell-item.html
           test -f public/supabase-adapter.js
 
           echo "Integration website files verified."
+
+      - name: Verify transport location script
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if grep -Fq \
+            'shopdrop-transport-location-182d.js' \
+            public/dispatching.html
+          then
+            test -s \
+              public/shopdrop-transport-location-182d.js
+
+            node --check \
+              public/shopdrop-transport-location-182d.js
+          fi
+
+          echo "Transport script verification passed."
+
+      - name: Verify normal item location script
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if grep -Fq \
+            'shopdrop-location-182a.js' \
+            public/sell-item.html
+          then
+            test -s public/shopdrop-location-182a.js
+
+            node --check \
+              public/shopdrop-location-182a.js
+          fi
+
+          echo "Normal item script verification passed."
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
@@ -68,3 +107,12 @@ jobs:
       - name: Deploy integrated website
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Confirm deployment completed
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "ShopDrop integration deployment completed."
+          echo "Branch: shopdrop-phase6-integration"
+          echo "Commit: ${GITHUB_SHA}"
