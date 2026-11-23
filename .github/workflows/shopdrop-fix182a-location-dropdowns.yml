@@ -1,1 +1,276 @@
 
+name: ShopDrop Fix 182A - Normal Item Locations
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix182a:
+    if: github.ref_name == 'shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Verify originals and create backups
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test "$(git hash-object public/sell-item.html)" = "cf99c0f70ad94794770ad848d1e8390dc4db5bce"
+          test "$(git hash-object public/checkout.html)" = "5a42ec1d6fa106f97e68a74b5adb3127609f0fe3"
+
+          mkdir -p backups/fix182a
+
+          cp public/sell-item.html backups/fix182a/sell-item-BEFORE-182A.html
+          cp public/checkout.html backups/fix182a/checkout-BEFORE-182A.html
+
+          cmp public/sell-item.html backups/fix182a/sell-item-BEFORE-182A.html
+          cmp public/checkout.html backups/fix182a/checkout-BEFORE-182A.html
+
+          test -f public/shopdrop-sa-towns-181.json
+
+      - name: Create isolated dropdown script
+        shell: bash
+        run: |
+          cat > public/shopdrop-location-182a.js <<'JAVASCRIPT'
+          (() => {
+            'use strict';
+
+            const provinces = [
+              'Eastern Cape', 'Free State', 'Gauteng',
+              'KwaZulu-Natal', 'Limpopo', 'Mpumalanga',
+              'North West', 'Northern Cape', 'Western Cape'
+            ];
+
+            const isSeller =
+              location.pathname.endsWith('/sell-item.html');
+
+            const provinceId = isSeller ? null : 'region';
+            const townId = isSeller ? 'town' : 'city';
+
+            const town = document.getElementById(townId);
+            if (!town || town.tagName !== 'INPUT') return;
+
+            const oldValue = town.value;
+            let province = provinceId
+              ? document.getElementById(provinceId)
+              : null;
+
+            if (!province) {
+              const label = document.createElement('label');
+              label.htmlFor = 'itemProvince182A';
+              label.textContent = 'Province (optional)';
+
+              province = document.createElement('select');
+              province.id = 'itemProvince182A';
+
+              town.before(label, province);
+            }
+
+            const originalTown = town.cloneNode(true);
+            const originalProvince = province.cloneNode(true);
+
+            const townSelect = document.createElement('select');
+            townSelect.id = townId;
+            townSelect.className = town.className;
+            townSelect.disabled = true;
+
+            const provinceSelect = document.createElement('select');
+            provinceSelect.id = province.id;
+            provinceSelect.className = province.className;
+
+            function options(select, values, prompt) {
+              select.replaceChildren(new Option(prompt, ''));
+              values.forEach(value => {
+                select.add(new Option(value, value));
+              });
+            }
+
+            options(provinceSelect, provinces, 'Choose province');
+            options(townSelect, [], 'Choose province first');
+
+            province.replaceWith(provinceSelect);
+            town.replaceWith(townSelect);
+
+            let towns = {};
+
+            function updateTowns(selected = '') {
+              const values = towns[provinceSelect.value] || [];
+              options(
+                townSelect,
+                values,
+                provinceSelect.value
+                  ? 'Choose town or area'
+                  : 'Choose province first'
+              );
+              townSelect.disabled = !values.length;
+              if (values.includes(selected)) {
+                townSelect.value = selected;
+              }
+              sync();
+            }
+
+            function sync() {
+              if (!isSeller) return;
+              const value = townSelect.value.trim();
+              const region = provinceSelect.value.trim();
+              townSelect.dataset.locationValue =
+                value && region ? value + ', ' + region : value;
+            }
+
+            if (isSeller) {
+              // Keep the original field ID and existing save logic.
+              Object.defineProperty(townSelect, 'value', {
+                configurable: true,
+                get() {
+                  return this.dataset.locationValue ||
+                    this.selectedOptions[0]?.value || '';
+                },
+                set(value) {
+                  restore(value);
+                }
+              });
+            }
+
+            function restore(value) {
+              const raw = String(value || '').trim();
+              if (!raw) return;
+
+              const matchedProvince = provinces.find(
+                p => raw.endsWith(', ' + p)
+              );
+
+              if (matchedProvince) {
+                provinceSelect.value = matchedProvince;
+                updateTowns(
+                  raw.slice(0, -matchedProvince.length - 2)
+                );
+              } else {
+                const found = provinces.find(
+                  p => (towns[p] || []).includes(raw)
+                );
+                if (found) {
+                  provinceSelect.value = found;
+                  updateTowns(raw);
+                } else if (isSeller) {
+                  townSelect.dataset.locationValue = raw;
+                }
+              }
+            }
+
+            provinceSelect.addEventListener('change', () => {
+              updateTowns();
+            });
+
+            townSelect.addEventListener('change', sync);
+
+            fetch('./shopdrop-sa-towns-181.json')
+              .then(response => {
+                if (!response.ok) throw Error('Town data unavailable');
+                return response.json();
+              })
+              .then(data => {
+                if (data.country !== 'ZA' || !data.provinces) {
+                  throw Error('Invalid town data');
+                }
+                towns = data.provinces;
+                restore(oldValue);
+                updateTowns(
+                  isSeller
+                    ? townSelect.selectedOptions[0]?.value || ''
+                    : oldValue
+                );
+              })
+              .catch(() => {
+                // Restore original controls if town data fails.
+                townSelect.replaceWith(originalTown);
+                provinceSelect.replaceWith(originalProvince);
+              });
+          })();
+          JAVASCRIPT
+
+      - name: Connect dropdowns without replacing other code
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          script = '<script src="./shopdrop-location-182a.js" defer></script>'
+
+          for filename in (
+              'public/sell-item.html',
+              'public/checkout.html'
+          ):
+              path = Path(filename)
+              content = path.read_text()
+
+              if script in content:
+                  raise SystemExit('Fix already installed: ' + filename)
+
+              if content.count('</body>') != 1:
+                  raise SystemExit('Unsafe HTML structure: ' + filename)
+
+              content = content.replace(
+                  '</body>',
+                  script + '</body>',
+                  1
+              )
+
+              path.write_text(content)
+          PY
+
+      - name: Verify only approved changes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          script = '<script src="./shopdrop-location-182a.js" defer></script>'
+
+          pairs = [
+            ('public/sell-item.html',
+             'backups/fix182a/sell-item-BEFORE-182A.html'),
+            ('public/checkout.html',
+             'backups/fix182a/checkout-BEFORE-182A.html')
+          ]
+
+          for current, backup in pairs:
+              new = Path(current).read_text()
+              old = Path(backup).read_text()
+
+              assert new.replace(script, '', 1) == old, current
+              assert new.count(script) == 1, current
+
+          print('Both original files preserved.')
+          print('Only dropdown script references added.')
+          PY
+
+          git diff --check
+
+      - name: Commit backups and fix
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "ShopDrop Fix Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            backups/fix182a/ \
+            public/sell-item.html \
+            public/checkout.html \
+            public/shopdrop-location-182a.js
+
+          git commit -m "Fix 182A - backup and normal item location dropdowns"
+          git push origin HEAD:shopdrop-phase6-integration
+
