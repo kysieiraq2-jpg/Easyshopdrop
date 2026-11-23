@@ -1,1 +1,301 @@
 
+name: ShopDrop Fix 185A - Transport Advertisement Title
+
+'on':
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix185a-transport-title.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  fix:
+    name: Add transport title dropdown
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Preserve existing code and add Fix 185A
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          page = Path(
+              "public/shopdrop-vehicle-draft-private.html"
+          )
+
+          script = Path(
+              "public/shopdrop-transport-title-185a.js"
+          )
+
+          backup = Path(
+              "backups/fix185a/"
+              "shopdrop-vehicle-draft-private-before-185a.html"
+          )
+
+          expected = (
+              "59b554729c3e223b37f2e53bc14850a50e4ff1fb"
+          )
+
+          actual = subprocess.check_output(
+              ["git", "hash-object", str(page)],
+              text=True
+          ).strip()
+
+          if actual != expected:
+              raise SystemExit(
+                  "SAFETY STOP: Advertisement file changed. "
+                  "No changes made."
+              )
+
+          original = page.read_bytes()
+          html = original.decode("utf-8")
+
+          anchor = (
+              '<script src="./'
+              'shopdrop-dispatch-equipment-fields.js">'
+              '</script>'
+          )
+
+          addition = (
+              '\n<script defer src="./'
+              'shopdrop-transport-title-185a.js?v=185a">'
+              '</script>'
+          )
+
+          if html.count(anchor) != 1:
+              raise SystemExit(
+                  "SAFETY STOP: Existing equipment script "
+                  "not found exactly once."
+              )
+
+          if "shopdrop-transport-title-185a.js" in html:
+              raise SystemExit(
+                  "SAFETY STOP: Fix already present."
+              )
+
+          backup.parent.mkdir(
+              parents=True,
+              exist_ok=True
+          )
+
+          backup.write_bytes(original)
+
+          if backup.read_bytes() != original:
+              raise SystemExit(
+                  "SAFETY STOP: Backup verification failed."
+              )
+
+          javascript = r"""
+          (() => {
+            'use strict';
+
+            function initialize() {
+              const title =
+                document.getElementById('title');
+
+              const category =
+                document.getElementById(
+                  'dispatchCategory174'
+                );
+
+              const subtype =
+                document.getElementById(
+                  'dispatchSubtype174'
+                );
+
+              if (!title || !category || !subtype) {
+                return;
+              }
+
+              if (document.getElementById(
+                'shopdropTitleSelect185A'
+              )) {
+                return;
+              }
+
+              const label = title.closest('label');
+
+              if (!label) return;
+
+              const select =
+                document.createElement('select');
+
+              select.id = 'shopdropTitleSelect185A';
+              select.required = true;
+
+              select.setAttribute(
+                'aria-label',
+                'Transport or equipment service title'
+              );
+
+              function refresh() {
+                const selected = subtype.value;
+
+                select.replaceChildren(
+                  new Option(
+                    'Choose transport or equipment title',
+                    ''
+                  )
+                );
+
+                Array.from(subtype.options).forEach(
+                  option => {
+                    if (!option.value) return;
+
+                    select.add(
+                      new Option(
+                        option.textContent,
+                        option.value
+                      )
+                    );
+                  }
+                );
+
+                select.disabled = !category.value;
+
+                if (selected) {
+                  select.value = selected;
+                }
+
+                title.value = select.value;
+
+                title.dispatchEvent(
+                  new Event('input', {
+                    bubbles: true
+                  })
+                );
+              }
+
+              category.addEventListener(
+                'change',
+                () => {
+                  refresh();
+                }
+              );
+
+              subtype.addEventListener(
+                'change',
+                refresh
+              );
+
+              select.addEventListener(
+                'change',
+                () => {
+                  subtype.value = select.value;
+
+                  subtype.dispatchEvent(
+                    new Event('change', {
+                      bubbles: true
+                    })
+                  );
+
+                  title.value = select.value;
+                }
+              );
+
+              const originalTitle = title.value;
+
+              title.insertAdjacentElement(
+                'beforebegin',
+                select
+              );
+
+              title.hidden = true;
+              title.style.display = 'none';
+
+              refresh();
+
+              if (
+                originalTitle &&
+                Array.from(select.options).some(
+                  option =>
+                    option.value === originalTitle
+                )
+              ) {
+                select.value = originalTitle;
+                title.value = originalTitle;
+              }
+            }
+
+            if (document.readyState === 'loading') {
+              document.addEventListener(
+                'DOMContentLoaded',
+                initialize,
+                { once: true }
+              );
+            } else {
+              initialize();
+            }
+          })();
+          """
+
+          script.write_text(
+              javascript.strip() + "\n"
+          )
+
+          updated = html.replace(
+              anchor,
+              anchor + addition,
+              1
+          )
+
+          if updated.replace(addition, "", 1) != html:
+              raise SystemExit(
+                  "SAFETY STOP: Unexpected HTML change."
+              )
+
+          page.write_text(updated)
+
+          print("PASS: Original advertisement backed up")
+          print("PASS: Existing equipment dropdown preserved")
+          print("PASS: Original title input preserved")
+          print("PASS: Only new script reference added")
+          PY
+
+          node --check \
+            public/shopdrop-transport-title-185a.js
+
+          git diff --check
+
+      - name: Commit additive fix
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "ShopDrop Fix Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            public/shopdrop-vehicle-draft-private.html \
+            public/shopdrop-transport-title-185a.js \
+            backups/fix185a/
+
+          git commit -m \
+            "Fix 185A add transport advertisement title dropdown"
+
+          git push origin \
+            HEAD:shopdrop-phase6-integration
+
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
