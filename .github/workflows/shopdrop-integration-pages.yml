@@ -1,7 +1,10 @@
 
+# ShopDrop deployment refresh - Fix 182C
+# Publish existing integration branch without modifying website code.
+
 name: ShopDrop Integrated Website Deployment
 
-on:
+'on':
   workflow_dispatch:
   push:
     branches:
@@ -65,4 +68,3 @@ jobs:
       - name: Deploy integrated website
         id: deployment
         uses: actions/deploy-pages@v4
-
