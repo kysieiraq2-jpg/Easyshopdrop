@@ -2,6 +2,11 @@
 name: ShopDrop Fix 182A - Normal Item Locations
 
 on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - .github/workflows/shopdrop-fix182a-location-dropdowns.yml
   workflow_dispatch:
 
 permissions:
@@ -19,28 +24,60 @@ jobs:
           ref: shopdrop-phase6-integration
           persist-credentials: true
 
-      - name: Verify originals and create backups
+      - name: Backup and install dropdowns
         shell: bash
         run: |
           set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import textwrap
+          import json
 
-          test "$(git hash-object public/sell-item.html)" = "cf99c0f70ad94794770ad848d1e8390dc4db5bce"
-          test "$(git hash-object public/checkout.html)" = "5a42ec1d6fa106f97e68a74b5adb3127609f0fe3"
+          files = {
+              "public/sell-item.html":
+                  "cf99c0f70ad94794770ad848d1e8390dc4db5bce",
+              "public/checkout.html":
+                  "5a42ec1d6fa106f97e68a74b5adb3127609f0fe3"
+          }
 
-          mkdir -p backups/fix182a
+          marker = (
+              '<script src="./shopdrop-location-182a.js" '
+              'defer></script>'
+          )
 
-          cp public/sell-item.html backups/fix182a/sell-item-BEFORE-182A.html
-          cp public/checkout.html backups/fix182a/checkout-BEFORE-182A.html
+          data_path = Path("public/shopdrop-sa-towns-181.json")
+          if not data_path.is_file():
+              raise SystemExit("STOP: Town dataset missing")
 
-          cmp public/sell-item.html backups/fix182a/sell-item-BEFORE-182A.html
-          cmp public/checkout.html backups/fix182a/checkout-BEFORE-182A.html
+          data = json.loads(data_path.read_text())
+          if data.get("country") != "ZA":
+              raise SystemExit("STOP: Incorrect town dataset")
 
-          test -f public/shopdrop-sa-towns-181.json
+          originals = {}
 
-      - name: Create isolated dropdown script
-        shell: bash
-        run: |
-          cat > public/shopdrop-location-182a.js <<'JAVASCRIPT'
+          for filename, expected in files.items():
+              actual = subprocess.check_output(
+                  ["git", "hash-object", filename],
+                  text=True
+              ).strip()
+
+              if actual != expected:
+                  raise SystemExit(
+                      "STOP: Original changed: " + filename
+                  )
+
+              content = Path(filename).read_bytes()
+              text = content.decode("utf-8")
+
+              if text.count("</body>") != 1 or marker in text:
+                  raise SystemExit(
+                      "STOP: Unsafe HTML: " + filename
+                  )
+
+              originals[filename] = content
+
+          js = r"""
           (() => {
             'use strict';
 
@@ -50,214 +87,186 @@ jobs:
               'North West', 'Northern Cape', 'Western Cape'
             ];
 
-            const isSeller =
-              location.pathname.endsWith('/sell-item.html');
+            const seller = location.pathname
+              .endsWith('/sell-item.html');
 
-            const provinceId = isSeller ? null : 'region';
-            const townId = isSeller ? 'town' : 'city';
+            const townId = seller ? 'town' : 'city';
+            const provinceId = seller ? null : 'region';
 
-            const town = document.getElementById(townId);
-            if (!town || town.tagName !== 'INPUT') return;
-
-            const oldValue = town.value;
-            let province = provinceId
+            const originalTown = document.getElementById(townId);
+            const originalProvince = provinceId
               ? document.getElementById(provinceId)
               : null;
 
-            if (!province) {
-              const label = document.createElement('label');
-              label.htmlFor = 'itemProvince182A';
-              label.textContent = 'Province (optional)';
+            if (!originalTown) return;
+            if (!seller && !originalProvince) return;
 
-              province = document.createElement('select');
-              province.id = 'itemProvince182A';
+            const makeSelect = (id) => {
+              const select = document.createElement('select');
+              select.id = id;
+              select.style.cssText =
+                'display:block;width:100%;min-height:46px;' +
+                'padding:11px;margin:8px 0 15px;' +
+                'border:1px solid #cbd5e1;border-radius:9px;' +
+                'background:#fff;box-sizing:border-box';
+              return select;
+            };
 
-              town.before(label, province);
-            }
+            const province = makeSelect('locationProvince182A');
+            const town = makeSelect('locationTown182A');
 
-            const originalTown = town.cloneNode(true);
-            const originalProvince = province.cloneNode(true);
-
-            const townSelect = document.createElement('select');
-            townSelect.id = townId;
-            townSelect.className = town.className;
-            townSelect.disabled = true;
-
-            const provinceSelect = document.createElement('select');
-            provinceSelect.id = province.id;
-            provinceSelect.className = province.className;
-
-            function options(select, values, prompt) {
-              select.replaceChildren(new Option(prompt, ''));
+            const fill = (element, values, prompt) => {
+              element.replaceChildren(new Option(prompt, ''));
               values.forEach(value => {
-                select.add(new Option(value, value));
+                element.add(new Option(value, value));
               });
-            }
+            };
 
-            options(provinceSelect, provinces, 'Choose province');
-            options(townSelect, [], 'Choose province first');
+            const provinceLabel = document.createElement('label');
+            provinceLabel.htmlFor = province.id;
+            provinceLabel.textContent = 'Province';
 
-            province.replaceWith(provinceSelect);
-            town.replaceWith(townSelect);
+            const townLabel = document.createElement('label');
+            townLabel.htmlFor = town.id;
+            townLabel.textContent = 'Town or city';
 
-            let towns = {};
-
-            function updateTowns(selected = '') {
-              const values = towns[provinceSelect.value] || [];
-              options(
-                townSelect,
-                values,
-                provinceSelect.value
-                  ? 'Choose town or area'
-                  : 'Choose province first'
-              );
-              townSelect.disabled = !values.length;
-              if (values.includes(selected)) {
-                townSelect.value = selected;
-              }
-              sync();
-            }
-
-            function sync() {
-              if (!isSeller) return;
-              const value = townSelect.value.trim();
-              const region = provinceSelect.value.trim();
-              townSelect.dataset.locationValue =
-                value && region ? value + ', ' + region : value;
-            }
-
-            if (isSeller) {
-              // Keep the original field ID and existing save logic.
-              Object.defineProperty(townSelect, 'value', {
-                configurable: true,
-                get() {
-                  return this.dataset.locationValue ||
-                    this.selectedOptions[0]?.value || '';
-                },
-                set(value) {
-                  restore(value);
-                }
-              });
-            }
-
-            function restore(value) {
-              const raw = String(value || '').trim();
-              if (!raw) return;
-
-              const matchedProvince = provinces.find(
-                p => raw.endsWith(', ' + p)
-              );
-
-              if (matchedProvince) {
-                provinceSelect.value = matchedProvince;
-                updateTowns(
-                  raw.slice(0, -matchedProvince.length - 2)
-                );
-              } else {
-                const found = provinces.find(
-                  p => (towns[p] || []).includes(raw)
-                );
-                if (found) {
-                  provinceSelect.value = found;
-                  updateTowns(raw);
-                } else if (isSeller) {
-                  townSelect.dataset.locationValue = raw;
-                }
-              }
-            }
-
-            provinceSelect.addEventListener('change', () => {
-              updateTowns();
-            });
-
-            townSelect.addEventListener('change', sync);
+            const originalTownValue = originalTown.value;
+            const originalProvinceValue =
+              originalProvince ? originalProvince.value : '';
 
             fetch('./shopdrop-sa-towns-181.json')
               .then(response => {
-                if (!response.ok) throw Error('Town data unavailable');
+                if (!response.ok) throw Error('Town list unavailable');
                 return response.json();
               })
               .then(data => {
-                if (data.country !== 'ZA' || !data.provinces) {
-                  throw Error('Invalid town data');
+                if (data.country !== 'ZA' || !data.provinces)
+                  throw Error('Invalid town list');
+
+                const towns = data.provinces;
+
+                fill(province, provinces, 'Choose province');
+                fill(town, [], 'Choose province first');
+                town.disabled = true;
+
+                const sync = () => {
+                  if (seller) {
+                    originalTown.value = town.value
+                      ? town.value + ', ' + province.value
+                      : '';
+                  } else {
+                    originalTown.value = town.value;
+                    originalProvince.value = province.value;
+                  }
+                };
+
+                const updateTowns = (selected = '') => {
+                  const available = towns[province.value] || [];
+                  fill(town, available, 'Choose town or city');
+                  town.disabled = !available.length;
+
+                  if (available.includes(selected))
+                    town.value = selected;
+
+                  sync();
+                };
+
+                province.addEventListener('change', () => {
+                  updateTowns();
+                });
+
+                town.addEventListener('change', sync);
+
+                let savedProvince = originalProvinceValue;
+                let savedTown = originalTownValue;
+
+                if (seller) {
+                  const found = provinces.find(p =>
+                    originalTownValue.endsWith(', ' + p)
+                  );
+
+                  if (found) {
+                    savedProvince = found;
+                    savedTown = originalTownValue.slice(
+                      0, -(found.length + 2)
+                    );
+                  }
                 }
-                towns = data.provinces;
-                restore(oldValue);
-                updateTowns(
-                  isSeller
-                    ? townSelect.selectedOptions[0]?.value || ''
-                    : oldValue
-                );
+
+                if (provinces.includes(savedProvince)) {
+                  province.value = savedProvince;
+                  updateTowns(savedTown);
+                }
+
+                const parent = originalTown.parentNode;
+                if (!parent) return;
+
+                if (seller) {
+                  originalTown.before(
+                    provinceLabel, province,
+                    townLabel, town
+                  );
+                } else {
+                  originalProvince.before(
+                    provinceLabel, province
+                  );
+                  originalTown.before(townLabel, town);
+                }
+
+                originalTown.type = 'hidden';
+                if (originalProvince)
+                  originalProvince.type = 'hidden';
+
+                const form = originalTown.closest('form');
+                if (form) {
+                  form.addEventListener('submit', sync, true);
+                }
               })
-              .catch(() => {
-                // Restore original controls if town data fails.
-                townSelect.replaceWith(originalTown);
-                provinceSelect.replaceWith(originalProvince);
+              .catch(error => {
+                console.warn(
+                  'ShopDrop location dropdowns unavailable:',
+                  error.message
+                );
               });
           })();
-          JAVASCRIPT
+          """
 
-      - name: Connect dropdowns without replacing other code
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
+          script = Path("public/shopdrop-location-182a.js")
+          script.write_text(textwrap.dedent(js).strip() + "\n")
 
-          script = '<script src="./shopdrop-location-182a.js" defer></script>'
+          backup_dir = Path("backups/fix182a")
+          backup_dir.mkdir(parents=True, exist_ok=True)
 
-          for filename in (
-              'public/sell-item.html',
-              'public/checkout.html'
-          ):
+          for filename, original in originals.items():
               path = Path(filename)
-              content = path.read_text()
-
-              if script in content:
-                  raise SystemExit('Fix already installed: ' + filename)
-
-              if content.count('</body>') != 1:
-                  raise SystemExit('Unsafe HTML structure: ' + filename)
-
-              content = content.replace(
-                  '</body>',
-                  script + '</body>',
-                  1
+              backup = backup_dir / (
+                  path.stem + "-BEFORE-182A.html"
               )
 
-              path.write_text(content)
+              backup.write_bytes(original)
+
+              if backup.read_bytes() != original:
+                  raise SystemExit("STOP: Backup failed")
+
+              text = original.decode("utf-8")
+              updated = text.replace(
+                  "</body>", marker + "</body>", 1
+              )
+
+              if updated.replace(marker, "", 1) != text:
+                  raise SystemExit("STOP: Unexpected HTML change")
+
+              path.write_text(updated)
+
+          print("Fix 182A files prepared.")
+          print("Original HTML backed up.")
+          print("Only script references added.")
           PY
 
-      - name: Verify only approved changes
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          python3 - <<'PY'
-          from pathlib import Path
-
-          script = '<script src="./shopdrop-location-182a.js" defer></script>'
-
-          pairs = [
-            ('public/sell-item.html',
-             'backups/fix182a/sell-item-BEFORE-182A.html'),
-            ('public/checkout.html',
-             'backups/fix182a/checkout-BEFORE-182A.html')
-          ]
-
-          for current, backup in pairs:
-              new = Path(current).read_text()
-              old = Path(backup).read_text()
-
-              assert new.replace(script, '', 1) == old, current
-              assert new.count(script) == 1, current
-
-          print('Both original files preserved.')
-          print('Only dropdown script references added.')
-          PY
-
+          node --check public/shopdrop-location-182a.js
           git diff --check
 
-      - name: Commit backups and fix
+      - name: Commit backups and dropdown fix
         shell: bash
         run: |
           set -euo pipefail
@@ -271,6 +280,5 @@ jobs:
             public/checkout.html \
             public/shopdrop-location-182a.js
 
-          git commit -m "Fix 182A - backup and normal item location dropdowns"
+          git commit -m "Fix 182A normal item location dropdowns with backups"
           git push origin HEAD:shopdrop-phase6-integration
-
