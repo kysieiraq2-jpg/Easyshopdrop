@@ -12,18 +12,18 @@ permissions:
   contents: write
 
 jobs:
-  transport-locations:
+  repair:
     runs-on: ubuntu-latest
     if: github.ref_name == 'shopdrop-phase6-integration'
 
     steps:
-      - name: Checkout integration branch
+      - name: Checkout integration
         uses: actions/checkout@v4
         with:
           ref: shopdrop-phase6-integration
           persist-credentials: true
 
-      - name: Backup and install Fix 182C
+      - name: Backup and repair only transport dropdowns
         shell: bash
         run: |
           set -euo pipefail
@@ -34,29 +34,36 @@ jobs:
           import json
 
           page = Path("public/dispatching.html")
-          backup = Path("backups/fix182c/dispatching-BEFORE-182C.html")
           script = Path("public/shopdrop-transport-location-182c.js")
-          towns = Path("public/shopdrop-sa-towns-181.json")
+          datafile = Path("public/shopdrop-sa-towns-181.json")
+          backup = Path("backups/fix182c/transport-script-BEFORE-182C-R.js")
 
-          expected = "ce9f0c9b7b84a822703f38ded718d4783b39fa8f"
+          expected_page = "035a6b6e185954aa40b3cddae4e26cbf5bf2fedb"
+          expected_script = "fb2a49d5b394b83e30bf2d64d1c304cfb7506f64"
 
-          actual = subprocess.check_output(
-              ["git", "hash-object", str(page)],
-              text=True
-          ).strip()
+          def verify(path, expected):
+              actual = subprocess.check_output(
+                  ["git", "hash-object", str(path)],
+                  text=True
+              ).strip()
+              if actual != expected:
+                  raise SystemExit(
+                      "SAFETY STOP: File changed: " + str(path)
+                  )
 
-          if actual != expected:
-              raise SystemExit("STOP: Original transport file changed")
+          verify(page, expected_page)
+          verify(script, expected_script)
 
-          if not towns.exists():
-              raise SystemExit("STOP: Town dataset missing")
+          if not datafile.is_file():
+              raise SystemExit("SAFETY STOP: Town data missing")
 
-          data = json.loads(towns.read_text())
-          if data.get("country") != "ZA":
-              raise SystemExit("STOP: Incorrect town dataset")
+          data = json.loads(datafile.read_text())
+          provinces = data.get("provinces", {})
 
-          original = page.read_bytes()
-          html = original.decode("utf-8")
+          if data.get("country") != "ZA" or len(provinces) != 9:
+              raise SystemExit("SAFETY STOP: Invalid town data")
+
+          html = page.read_text()
 
           for field in (
               "pickupRegion", "pickup",
@@ -64,91 +71,101 @@ jobs:
               "pickupCountry", "dropoffCountry"
           ):
               if html.count('id="' + field + '"') != 1:
-                  raise SystemExit("STOP: Field mismatch: " + field)
+                  raise SystemExit("SAFETY STOP: Field " + field)
 
-          marker = '<script defer src="./shopdrop-transport-location-182c.js"></script>'
-
-          if marker in html or html.count("</body>") != 1:
-              raise SystemExit("STOP: Unexpected HTML structure")
+          if html.count(
+              'src="./shopdrop-transport-location-182c.js"'
+          ) != 1:
+              raise SystemExit("SAFETY STOP: Script not connected")
 
           backup.parent.mkdir(parents=True, exist_ok=True)
+          original = script.read_bytes()
           backup.write_bytes(original)
 
           if backup.read_bytes() != original:
-              raise SystemExit("STOP: Backup verification failed")
+              raise SystemExit("SAFETY STOP: Backup mismatch")
 
-          javascript = r"""
+          code = r"""
           (() => {
             'use strict';
 
-            const provinces = [
-              'Eastern Cape', 'Free State', 'Gauteng',
-              'KwaZulu-Natal', 'Limpopo', 'Mpumalanga',
-              'North West', 'Northern Cape', 'Western Cape'
+            const provinceNames = [
+              'Eastern Cape',
+              'Free State',
+              'Gauteng',
+              'KwaZulu-Natal',
+              'Limpopo',
+              'Mpumalanga',
+              'North West',
+              'Northern Cape',
+              'Western Cape'
             ];
 
-            const pairs = [
+            const fields = [
               ['pickupRegion', 'pickup', 'pickupCountry'],
               ['dropoffRegion', 'dropoff', 'dropoffCountry']
             ];
 
-            function fill(select, values, prompt) {
-              select.replaceChildren(new Option(prompt, ''));
-              values.forEach(value => {
-                select.add(new Option(value, value));
-              });
-            }
+            const fill = (element, values, prompt) => {
+              element.replaceChildren(new Option(prompt, ''));
+              for (const value of values) {
+                element.add(new Option(value, value));
+              }
+            };
 
-            function start(data) {
-              pairs.forEach(([regionId, townId, countryId]) => {
+            const createSelect = input => {
+              const select = document.createElement('select');
+
+              for (const attr of input.attributes) {
+                if (!['type', 'value', 'placeholder'].includes(attr.name)) {
+                  select.setAttribute(attr.name, attr.value);
+                }
+              }
+
+              select.id = input.id;
+              select.style.width = '100%';
+              select.style.minHeight = '46px';
+
+              input.replaceWith(select);
+              return select;
+            };
+
+            function install(data) {
+              for (const [regionId, townId, countryId] of fields) {
                 const country = document.getElementById(countryId);
-                if (!country) return;
-
                 let region = document.getElementById(regionId);
                 let town = document.getElementById(townId);
 
-                if (!region || !town) return;
+                if (!country || !region || !town) continue;
 
                 const originalRegion = region.cloneNode(true);
                 const originalTown = town.cloneNode(true);
 
-                function isSA() {
-                  const value = String(country.value).toLowerCase();
+                let originalRegionValue = region.value;
+                let originalTownValue = town.value;
+
+                const southAfrica = () => {
+                  const value = String(country.value).trim().toLowerCase();
                   return value === 'za' || value === 'south africa';
-                }
+                };
 
-                function makeSelect(old) {
-                  const next = document.createElement('select');
-
-                  for (const attr of old.attributes) {
-                    if (!['type', 'value', 'placeholder'].includes(attr.name)) {
-                      next.setAttribute(attr.name, attr.value);
-                    }
-                  }
-
-                  next.id = old.id;
-                  next.style.width = '100%';
-                  next.style.minHeight = '46px';
-
-                  old.replaceWith(next);
-                  return next;
-                }
-
-                function updateTowns(selected = '') {
+                const updateTowns = selected => {
                   const available = data.provinces[region.value] || [];
 
                   fill(
                     town,
                     available,
-                    region.value ? 'Choose town or area' : 'Choose province first'
+                    region.value
+                      ? 'Choose town or area'
+                      : 'Choose province first'
                   );
 
-                  town.disabled = !available.length;
+                  town.disabled = !region.value;
 
                   if (available.includes(selected)) {
                     town.value = selected;
                   }
-                }
+                };
 
                 function setup() {
                   region = document.getElementById(regionId);
@@ -156,78 +173,107 @@ jobs:
 
                   if (!region || !town) return;
 
-                  if (!isSA()) {
-                    if (town.tagName === 'SELECT') {
-                      town.replaceWith(originalTown.cloneNode(true));
+                  if (!southAfrica()) {
+                    const regionValue = region.value;
+                    const townValue = town.value;
+
+                    if (region.tagName === 'SELECT') {
+                      const input = originalRegion.cloneNode(true);
+                      input.value = regionValue;
+                      region.replaceWith(input);
+                      region = input;
                     }
+
+                    if (town.tagName === 'SELECT') {
+                      const input = originalTown.cloneNode(true);
+                      input.value = townValue;
+                      town.replaceWith(input);
+                      town = input;
+                    }
+
                     return;
                   }
 
-                  const previousRegion = region.value;
-                  const previousTown = town.value;
+                  const previousRegion = region.value || originalRegionValue;
+                  const previousTown = town.value || originalTownValue;
 
                   if (region.tagName !== 'SELECT') {
-                    region = makeSelect(region);
+                    region = createSelect(region);
                   }
 
                   if (town.tagName !== 'SELECT') {
-                    town = makeSelect(town);
+                    town = createSelect(town);
                   }
 
-                  fill(region, provinces, 'Choose province');
+                  fill(region, provinceNames, 'Choose province');
 
-                  if (provinces.includes(previousRegion)) {
+                  if (provinceNames.includes(previousRegion)) {
                     region.value = previousRegion;
                   }
 
-                  region.addEventListener('change', () => updateTowns());
+                  region.onchange = () => {
+                    originalRegionValue = region.value;
+                    originalTownValue = '';
+                    updateTowns('');
+                  };
+
+                  town.onchange = () => {
+                    originalTownValue = town.value;
+                  };
+
                   updateTowns(previousTown);
                 }
 
                 country.addEventListener('change', setup);
                 setup();
-              });
+              }
             }
 
-            window.addEventListener('load', () => {
+            function start() {
               fetch('./shopdrop-sa-towns-181.json', {
                 cache: 'no-store'
               })
                 .then(response => {
-                  if (!response.ok) throw Error('Town data unavailable');
+                  if (!response.ok) {
+                    throw new Error('Town dataset unavailable');
+                  }
                   return response.json();
                 })
                 .then(data => {
                   if (data.country !== 'ZA' || !data.provinces) {
-                    throw Error('Invalid South African town data');
+                    throw new Error('Invalid South African town data');
                   }
-                  start(data);
+                  install(data);
                 })
                 .catch(error => {
-                  console.warn('Transport dropdowns unavailable:', error);
+                  console.error('Fix 182C:', error);
                 });
-            });
+            }
+
+            if (document.readyState === 'loading') {
+              document.addEventListener(
+                'DOMContentLoaded', start, {once: true}
+              );
+            } else {
+              start();
+            }
           })();
           """
 
-          script.write_text(javascript.strip() + "\n")
+          script.write_text(code.strip() + "\n")
 
-          updated = html.replace("</body>", marker + "</body>", 1)
-
-          if updated.replace(marker, "", 1) != html:
-              raise SystemExit("STOP: Unrelated HTML change detected")
-
-          page.write_text(updated)
-
-          print("Backup verified")
-          print("Transport location dropdowns installed")
-          print("Other transport code preserved")
+          print("PASS: Original transport HTML unchanged")
+          print("PASS: Previous transport script backed up")
+          print("PASS: New dropdown script prepared")
           PY
 
           node --check public/shopdrop-transport-location-182c.js
           git diff --check
 
-      - name: Commit Fix 182C
+          test "$(git hash-object public/dispatching.html)" = \
+            "035a6b6e185954aa40b3cddae4e26cbf5bf2fedb"
+
+      - name: Commit repair
         shell: bash
         run: |
           set -euo pipefail
@@ -236,9 +282,8 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add \
-            public/dispatching.html \
             public/shopdrop-transport-location-182c.js \
-            backups/fix182c/dispatching-BEFORE-182C.html
+            backups/fix182c/transport-script-BEFORE-182C-R.js
 
-          git commit -m "Fix 182C transport dropdowns with original backup"
+          git commit -m "Fix 182C-R transport dropdown repair"
           git push origin HEAD:shopdrop-phase6-integration
