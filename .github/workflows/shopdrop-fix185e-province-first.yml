@@ -1,1 +1,149 @@
 
+name: ShopDrop Fix 185E - Province Before Town
+
+'on':
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix185e-province-first.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  fix:
+    name: Correct transport location field order
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Backup and reorder existing fields
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          page = Path(
+              "public/shopdrop-vehicle-draft-private.html"
+          )
+
+          backup = Path(
+              "backups/fix185e/"
+              "transport-before-province-order.html"
+          )
+
+          expected_sha = (
+              "59b554729c3e223b37f2e53bc14850a50e4ff1fb"
+          )
+
+          actual_sha = subprocess.check_output(
+              ["git", "hash-object", str(page)],
+              text=True
+          ).strip()
+
+          if actual_sha != expected_sha:
+              raise SystemExit(
+                  "SAFETY STOP: Advertisement file changed. "
+                  "No changes made."
+              )
+
+          original = page.read_bytes()
+
+          town = b'''  <label>
+    Service provider base town
+    <input id="town" maxlength="120">
+  </label>'''
+
+          province = b'''  <label>
+    Service provider base province
+    <input id="province" maxlength="120">
+  </label>'''
+
+          before = town + b'\n\n' + province
+          after = province + b'\n\n' + town
+
+          if original.count(before) != 1:
+              raise SystemExit(
+                  "SAFETY STOP: Expected fields not found."
+              )
+
+          updated = original.replace(
+              before, after, 1
+          )
+
+          if updated.replace(
+              after, before, 1
+          ) != original:
+              raise SystemExit(
+                  "SAFETY STOP: Unexpected HTML changes."
+              )
+
+          backup.parent.mkdir(
+              parents=True,
+              exist_ok=True
+          )
+
+          backup.write_bytes(original)
+
+          if backup.read_bytes() != original:
+              raise SystemExit(
+                  "SAFETY STOP: Backup failed."
+              )
+
+          page.write_bytes(updated)
+
+          if not (
+              updated.index(province) <
+              updated.index(town)
+          ):
+              raise SystemExit(
+                  "SAFETY STOP: Incorrect field order."
+              )
+
+          print("PASS: Existing code preserved")
+          print("PASS: Province appears before Town")
+          print("PASS: Original IDs preserved")
+          print("PASS: Dropdown scripts unchanged")
+          print("PASS: Supabase code unchanged")
+          PY
+
+          git diff --check
+
+      - name: Commit isolated correction
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "ShopDrop Fix Bot"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            public/shopdrop-vehicle-draft-private.html \
+            backups/fix185e/transport-before-province-order.html
+
+          git commit -m \
+            "Fix 185E show province before town"
+
+          git push origin \
+            HEAD:shopdrop-phase6-integration
+
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
