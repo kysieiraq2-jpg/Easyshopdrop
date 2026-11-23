@@ -1,1 +1,232 @@
 
+name: ShopDrop Fix 185C - Read Only Diagnostic
+
+'on':
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix185c-diagnostic.yml'
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    name: Diagnose live website against GitHub
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: false
+
+      - name: Check local files and JavaScript
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "=== INTEGRATION BRANCH ==="
+          git branch --show-current
+          git rev-parse HEAD
+
+          echo "=== REQUIRED FILES ==="
+
+          files=(
+            public/shopdrop-vehicle-draft-private.html
+            public/shopdrop-dispatch-equipment-fields.js
+            public/shopdrop-transport-title-185a.js
+            public/dispatching.html
+            public/shopdrop-customer-equipment-184b.js
+            public/supabase-adapter.js
+          )
+
+          for file in "${files[@]}"; do
+            if test -s "$file"; then
+              echo "PASS: $file"
+            else
+              echo "FAIL: $file missing or empty"
+              exit 1
+            fi
+          done
+
+          echo "=== JAVASCRIPT SYNTAX ==="
+
+          node --check \
+            public/shopdrop-dispatch-equipment-fields.js
+
+          node --check \
+            public/shopdrop-transport-title-185a.js
+
+          node --check \
+            public/shopdrop-customer-equipment-184b.js
+
+          echo "PASS: JavaScript syntax"
+
+          echo "=== SCRIPT REFERENCES ==="
+
+          grep -Fn \
+            'shopdrop-dispatch-equipment-fields.js' \
+            public/shopdrop-vehicle-draft-private.html
+
+          grep -Fn \
+            'shopdrop-transport-title-185a.js' \
+            public/shopdrop-vehicle-draft-private.html
+
+          echo "=== LOCAL FILE HASHES ==="
+
+          sha256sum \
+            public/shopdrop-vehicle-draft-private.html \
+            public/shopdrop-transport-title-185a.js \
+            public/shopdrop-dispatch-equipment-fields.js
+
+      - name: Compare live website files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import urllib.request
+          import urllib.error
+          import hashlib
+          import time
+
+          base = "https://shopadrop.co.za/"
+
+          paths = [
+              "shopdrop-vehicle-draft-private.html",
+              "shopdrop-transport-title-185a.js",
+              "shopdrop-dispatch-equipment-fields.js",
+              "dispatching.html",
+              "shopdrop-customer-equipment-184b.js",
+          ]
+
+          failures = []
+
+          for path in paths:
+              print("\n=== " + path + " ===")
+
+              local = Path("public") / path
+
+              expected = local.read_bytes()
+
+              url = (
+                  base + path +
+                  "?shopdrop_diagnostic=" +
+                  str(int(time.time()))
+              )
+
+              request = urllib.request.Request(
+                  url,
+                  headers={
+                      "User-Agent":
+                          "ShopDrop-ReadOnly-Diagnostic/185C",
+                      "Cache-Control": "no-cache",
+                  }
+              )
+
+              try:
+                  with urllib.request.urlopen(
+                      request,
+                      timeout=25
+                  ) as response:
+                      live = response.read()
+                      status = response.status
+                      final_url = response.url
+                      content_type = response.headers.get(
+                          "Content-Type", ""
+                      )
+
+                  print("HTTP status:", status)
+                  print("Final URL:", final_url)
+                  print("Content type:", content_type)
+
+                  local_hash = hashlib.sha256(
+                      expected
+                  ).hexdigest()
+
+                  live_hash = hashlib.sha256(
+                      live
+                  ).hexdigest()
+
+                  print("GitHub SHA256:", local_hash)
+                  print("Live SHA256:", live_hash)
+
+                  if live == expected:
+                      print("PASS: Exact file match")
+                  else:
+                      print("MISMATCH: Live file differs")
+                      failures.append(
+                          path + ": live content differs"
+                      )
+
+                  if path.endswith(".html"):
+                      markers = [
+                          "shopdrop-transport-title-185a.js"
+                      ] if "vehicle-draft" in path else [
+                          "shopdrop-customer-equipment-184b.js"
+                      ]
+
+                      text = live.decode(
+                          "utf-8",
+                          errors="replace"
+                      )
+
+                      for marker in markers:
+                          if marker in text:
+                              print("PASS: Found", marker)
+                          else:
+                              print("FAIL: Missing", marker)
+                              failures.append(
+                                  path + ": missing " + marker
+                              )
+
+              except Exception as error:
+                  print(
+                      "UNAVAILABLE:",
+                      type(error).__name__,
+                      str(error)
+                  )
+                  failures.append(
+                      path + ": could not inspect live file"
+                  )
+
+          print("\n=== DIAGNOSTIC SUMMARY ===")
+
+          if failures:
+              for failure in failures:
+                  print("INVESTIGATE:", failure)
+
+              print(
+                  "No website files were modified."
+              )
+
+              raise SystemExit(1)
+
+          print(
+              "PASS: All inspected live files match GitHub."
+          )
+          print(
+              "If the dropdown still fails, "
+              "investigate browser execution."
+          )
+          print(
+              "No website files were modified."
+          )
+          PY
+
+      - name: Confirm read-only completion
+        if: always()
+        shell: bash
+        run: |
+          echo "ShopDrop Fix 185C diagnostic finished."
+          echo "No files modified."
+          echo "No commits created."
+          echo "No deployment performed."
+          echo "No Supabase changes."
+
