@@ -1,1 +1,218 @@
 
+name: ShopDrop Fix 181B Automatic Install
+
+on:
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - .github/workflows/shopdrop-fix181b-auto-install.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Install guarded shared dropdowns
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          expected = {
+              'public/dispatching.html': '805383129281c85518e1a84906273f7510f6ff8b',
+              'public/seller.html': '4e8a01929394af1a044b69760d3ff64e31e80e70',
+              'public/shopdrop-vehicle-draft-private.html': 'e7d332735543c46e4dfc628ae3d9bfe097a0e071',
+          }
+
+          for name, sha in expected.items():
+              actual = subprocess.check_output(
+                  ['git', 'hash-object', name],
+                  text=True
+              ).strip()
+              if actual != sha:
+                  raise SystemExit(
+                      'STOP: Changed file: ' + name
+                  )
+
+          asset = Path(
+              'public/shopdrop-location-dropdowns-181.js'
+          )
+
+          if asset.exists():
+              raise SystemExit(
+                  'STOP: Component already exists'
+              )
+
+          js = r'''(() => {
+            'use strict';
+
+            const provinces = [
+              'Eastern Cape', 'Free State', 'Gauteng',
+              'KwaZulu-Natal', 'Limpopo', 'Mpumalanga',
+              'North West', 'Northern Cape', 'Western Cape'
+            ];
+
+            const fields = [
+              ['province', null],
+              ['pickupRegion', 'pickupCountry'],
+              ['dropoffRegion', 'dropoffCountry'],
+              ['serviceRegion', 'serviceCountry']
+            ];
+
+            function init(id, countryId) {
+              let field = document.getElementById(id);
+              if (!field) return;
+
+              const country = countryId
+                ? document.getElementById(countryId)
+                : null;
+
+              function update() {
+                const code = String(
+                  country?.value || 'ZA'
+                ).trim().toLowerCase();
+
+                const sa = code === 'za' ||
+                  code === 'south africa';
+
+                if (sa === (field.tagName === 'SELECT')) {
+                  return;
+                }
+
+                const previous = field.value;
+
+                const next = document.createElement(
+                  sa ? 'select' : 'input'
+                );
+
+                for (const attribute of field.attributes) {
+                  if (![
+                    'id', 'type', 'value', 'placeholder'
+                  ].includes(attribute.name)) {
+                    next.setAttribute(
+                      attribute.name,
+                      attribute.value
+                    );
+                  }
+                }
+
+                next.id = id;
+
+                if (sa) {
+                  next.add(
+                    new Option('Choose province', '')
+                  );
+
+                  provinces.forEach(p =>
+                    next.add(new Option(p, p))
+                  );
+
+                  if (provinces.includes(previous)) {
+                    next.value = previous;
+                  }
+                } else {
+                  next.type = 'text';
+                  next.maxLength = 120;
+                  next.placeholder =
+                    'Province / state / region';
+                  next.value = previous;
+                }
+
+                field.replaceWith(next);
+                field = next;
+              }
+
+              update();
+
+              country?.addEventListener(
+                'change', update
+              );
+            }
+
+            function start() {
+              fields.forEach(
+                ([id, country]) => init(id, country)
+              );
+            }
+
+            if (document.readyState === 'loading') {
+              document.addEventListener(
+                'DOMContentLoaded',
+                start,
+                {once: true}
+              );
+            } else {
+              start();
+            }
+          })();
+          '''
+
+          asset.write_text(
+              js, encoding='utf-8'
+          )
+
+          tag = (
+              '<script src="./shopdrop-location-dropdowns-181.js">'
+              '</script>'
+          )
+
+          for name in expected:
+              page = Path(name)
+              original = page.read_text(
+                  encoding='utf-8'
+              )
+
+              if original.count('</body>') != 1:
+                  raise SystemExit(
+                      'STOP: Unexpected page: ' + name
+                  )
+
+              if tag in original:
+                  raise SystemExit(
+                      'STOP: Already linked: ' + name
+                  )
+
+              page.write_text(
+                  original.replace(
+                      '</body>',
+                      tag + '\n</body>',
+                      1
+                  ),
+                  encoding='utf-8'
+              )
+
+          print('Fix 181B installed')
+          PY
+
+      - name: Verify and commit
+        shell: bash
+        run: |
+          set -e
+          git diff --check
+          node --check public/shopdrop-location-dropdowns-181.js
+
+          git add \
+            public/shopdrop-location-dropdowns-181.js \
+            public/dispatching.html \
+            public/seller.html \
+            public/shopdrop-vehicle-draft-private.html
+
+          git diff --cached --check
+
+          git config user.name "ShopDrop Fix Workflow"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git commit -m "Fix 181B: shared SA province dropdowns"
+          git push origin HEAD:shopdrop-phase6-integration
+
