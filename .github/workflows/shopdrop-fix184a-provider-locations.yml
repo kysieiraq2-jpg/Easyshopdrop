@@ -1,1 +1,199 @@
 
+
+name: ShopDrop Fix 184A - Transport Provider Locations
+
+'on':
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix184a-provider-locations.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  fix:
+    if: github.ref_name == 'shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+
+      - name: Backup and install dropdowns
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import json
+
+          page = Path("public/shopdrop-vehicle-draft-private.html")
+          script = Path("public/shopdrop-provider-location-184a.js")
+          backup = Path("backups/fix184a/vehicle-form-original.html")
+
+          expected = "16e70212a0155504550fe82fd6907aab4e3c4ccc"
+          actual = subprocess.check_output(
+              ["git", "hash-object", str(page)],
+              text=True
+          ).strip()
+
+          if actual != expected:
+              raise SystemExit("STOP: Original form changed")
+
+          data = json.loads(
+              Path("public/shopdrop-sa-towns-181.json").read_text()
+          )
+
+          if data.get("country") != "ZA":
+              raise SystemExit("STOP: Invalid town data")
+
+          original = page.read_bytes()
+          html = original.decode("utf-8")
+
+          for field in ("town", "province"):
+              if html.count('id="' + field + '"') != 1:
+                  raise SystemExit("STOP: Field mismatch " + field)
+
+          marker = (
+              '<script defer src="./shopdrop-provider-location-184a.js">'
+              '</script>'
+          )
+
+          if marker in html or html.count("</body>") != 1:
+              raise SystemExit("STOP: Unexpected HTML structure")
+
+          backup.parent.mkdir(parents=True, exist_ok=True)
+          backup.write_bytes(original)
+
+          if backup.read_bytes() != original:
+              raise SystemExit("STOP: Backup mismatch")
+
+          js = r"""
+          (() => {
+            'use strict';
+
+            const provinces = [
+              'Eastern Cape','Free State','Gauteng',
+              'KwaZulu-Natal','Limpopo','Mpumalanga',
+              'North West','Northern Cape','Western Cape'
+            ];
+
+            const province = document.getElementById('province');
+            const town = document.getElementById('town');
+
+            if (!province || !town) return;
+
+            const fill = (select, values, prompt) => {
+              select.replaceChildren(new Option(prompt, ''));
+              values.forEach(v => select.add(new Option(v, v)));
+            };
+
+            function replaceWithSelect(old) {
+              if (old.tagName === 'SELECT') return old;
+
+              const select = document.createElement('select');
+
+              for (const attr of old.attributes) {
+                if (!['type','value','placeholder'].includes(attr.name)) {
+                  select.setAttribute(attr.name, attr.value);
+                }
+              }
+
+              select.id = old.id;
+              select.style.width = '100%';
+              select.style.minHeight = '46px';
+              old.replaceWith(select);
+              return select;
+            }
+
+            const previousProvince = province.value;
+            const previousTown = town.value;
+
+            const region = replaceWithSelect(province);
+            const city = replaceWithSelect(town);
+
+            fill(region, provinces, 'Choose province');
+            fill(city, [], 'Choose province first');
+            city.disabled = true;
+
+            if (provinces.includes(previousProvince)) {
+              region.value = previousProvince;
+            }
+
+            function updateTowns(selected = '') {
+              const values = window.shopdrop184aTowns?.[region.value] || [];
+
+              fill(
+                city,
+                values,
+                region.value ? 'Choose town' : 'Choose province first'
+              );
+
+              city.disabled = !values.length;
+
+              if (values.includes(selected)) city.value = selected;
+            }
+
+            region.addEventListener('change', () => updateTowns());
+
+            fetch('./shopdrop-sa-towns-181.json?v=184a', {
+              cache:'no-store'
+            })
+              .then(response => {
+                if (!response.ok) throw Error('Town data unavailable');
+                return response.json();
+              })
+              .then(data => {
+                if (data.country !== 'ZA' || !data.provinces) {
+                  throw Error('Invalid town data');
+                }
+
+                window.shopdrop184aTowns = data.provinces;
+                updateTowns(previousTown);
+              })
+              .catch(error => {
+                console.error('Provider location:', error);
+              });
+          })();
+          """
+
+          script.write_text(js.strip() + "\n")
+
+          updated = html.replace("</body>", marker + "</body>", 1)
+
+          if updated.replace(marker, "", 1) != html:
+              raise SystemExit("STOP: Unrelated HTML change")
+
+          page.write_text(updated)
+          print("PASS: Provider form backed up")
+          print("PASS: Only location script connected")
+          PY
+
+          node --check public/shopdrop-provider-location-184a.js
+          git diff --check
+
+      - name: Commit changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "ShopDrop Fix Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            public/shopdrop-vehicle-draft-private.html \
+            public/shopdrop-provider-location-184a.js \
+            backups/fix184a/vehicle-form-original.html
+          git commit -m "Fix 184A provider location dropdowns"
+          git push origin HEAD:shopdrop-phase6-integration
+
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
