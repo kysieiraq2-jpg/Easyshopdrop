@@ -96,6 +96,23 @@ jobs:
 
           echo "Normal item script verification passed."
 
+      - name: Verify customer equipment dropdowns
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -s \
+            public/shopdrop-customer-equipment-184b.js
+
+          grep -Fq \
+            'shopdrop-customer-equipment-184b.js' \
+            public/dispatching.html
+
+          node --check \
+            public/shopdrop-customer-equipment-184b.js
+
+          echo "Customer equipment dropdown verification passed."
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
