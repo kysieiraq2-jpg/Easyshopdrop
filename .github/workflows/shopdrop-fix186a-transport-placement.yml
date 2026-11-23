@@ -1,1 +1,213 @@
 
+name: ShopDrop Fix 186A - Remove Misplaced Transport Panel
+
+'on':
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix186a-transport-placement.yml'
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  fix:
+    name: Preserve seller page and remove duplicate transport panel
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Verify backup and make isolated correction
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import re
+
+          seller = Path("public/seller.html")
+          dispatch = Path("public/dispatching.html")
+          transport_form = Path(
+              "public/shopdrop-vehicle-draft-private.html"
+          )
+
+          backup = Path(
+              "backups/fix186a/"
+              "seller-before-transport-panel-removal.html"
+          )
+
+          expected_sha = (
+              "9296fed82548c20e9af630bcb8d948fb2d042f30"
+          )
+
+          def sha(path):
+              return subprocess.check_output(
+                  ["git", "hash-object", str(path)],
+                  text=True
+              ).strip()
+
+          for file in (seller, dispatch, transport_form):
+              if not file.is_file():
+                  raise SystemExit(
+                      "SAFETY STOP: Required file missing: "
+                      + str(file)
+                  )
+
+          if sha(seller) != expected_sha:
+              raise SystemExit(
+                  "SAFETY STOP: Seller page has changed. "
+                  "No changes made."
+              )
+
+          dispatch_html = dispatch.read_text(
+              encoding="utf-8"
+          )
+
+          if (
+              'id="shopdropDispatchAdvertise"'
+              not in dispatch_html
+              or
+              "shopdrop-vehicle-draft-private.html"
+              not in dispatch_html
+          ):
+              raise SystemExit(
+                  "SAFETY STOP: Correct transport "
+                  "advertisement entry not verified."
+              )
+
+          original = seller.read_bytes()
+          html = original.decode("utf-8")
+
+          pattern = (
+              r'<section class="box" '
+              r'id="shopdropVehicleAdvertLink">'
+              r'.*?</section>'
+          )
+
+          matches = list(
+              re.finditer(pattern, html, re.S)
+          )
+
+          if len(matches) != 1:
+              raise SystemExit(
+                  "SAFETY STOP: Expected exactly one "
+                  "misplaced transport section."
+              )
+
+          match = matches[0]
+          removed = match.group(0)
+
+          required = (
+              "Advertise a vehicle",
+              "Advertise your vehicle",
+              "shopdrop-vehicle-draft-private.html"
+          )
+
+          if not all(x in removed for x in required):
+              raise SystemExit(
+                  "SAFETY STOP: Unexpected section."
+              )
+
+          updated = (
+              html[:match.start()]
+              + html[match.end():]
+          )
+
+          if (
+              updated[:match.start()]
+              + removed
+              + updated[match.start():]
+              != html
+          ):
+              raise SystemExit(
+                  "SAFETY STOP: Other content changed."
+              )
+
+          for marker in (
+              'id="list-service"',
+              'id="shopdropSellerAliasPanel"',
+              'id="shopdropLegacyAddProduct"',
+              'shopdrop-service-locations-182b.js',
+              'shopdrop-shared-service-rates.js',
+              'function addService()'
+          ):
+              if marker not in updated:
+                  raise SystemExit(
+                      "SAFETY STOP: Existing function missing: "
+                      + marker
+                  )
+
+          backup.parent.mkdir(
+              parents=True,
+              exist_ok=True
+          )
+
+          backup.write_bytes(original)
+
+          if backup.read_bytes() != original:
+              raise SystemExit(
+                  "SAFETY STOP: Backup verification failed."
+              )
+
+          seller.write_bytes(
+              updated.encode("utf-8")
+          )
+
+          if (
+              seller.read_bytes()
+              != updated.encode("utf-8")
+          ):
+              raise SystemExit(
+                  "SAFETY STOP: Output verification failed."
+              )
+
+          print("PASS: Original seller page backed up")
+          print("PASS: Only misplaced panel removed")
+          print("PASS: Other Services form preserved")
+          print("PASS: Public seller name preserved")
+          print("PASS: Product management preserved")
+          print("PASS: Transport advertisement preserved")
+          print("PASS: Supabase and payment code untouched")
+          PY
+
+          git diff --check
+
+      - name: Commit verified correction
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "ShopDrop Fix Bot"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            public/seller.html \
+            backups/fix186a/seller-before-transport-panel-removal.html
+
+          git commit -m \
+            "Fix 186A remove misplaced transport panel"
+
+          git push origin \
+            HEAD:shopdrop-phase6-integration
+
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
