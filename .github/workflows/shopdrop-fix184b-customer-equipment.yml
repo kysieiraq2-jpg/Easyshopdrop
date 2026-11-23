@@ -1,1 +1,354 @@
 
+name: ShopDrop Fix 184B - Customer Equipment Choices
+
+'on':
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix184b-customer-equipment.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  fix:
+    if: github.ref_name == 'shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Backup and install customer selectors
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import json
+          import re
+
+          page = Path("public/dispatching.html")
+          source = Path(
+              "public/shopdrop-dispatch-equipment-fields.js"
+          )
+          script = Path(
+              "public/shopdrop-customer-equipment-184b.js"
+          )
+          backup = Path(
+              "backups/fix184b/dispatching-BEFORE-184B.html"
+          )
+
+          expected = "b0da1b0f20a60603aaac6102162e63d4222257b0"
+
+          actual = subprocess.check_output(
+              ["git", "hash-object", str(page)],
+              text=True
+          ).strip()
+
+          if actual != expected:
+              raise SystemExit(
+                  "SAFETY STOP: Customer form changed"
+              )
+
+          original = page.read_bytes()
+          html = original.decode("utf-8")
+
+          if html.count('<select id="vehicle">') != 1:
+              raise SystemExit(
+                  "SAFETY STOP: Vehicle field mismatch"
+              )
+
+          if not source.is_file():
+              raise SystemExit(
+                  "SAFETY STOP: Equipment taxonomy missing"
+              )
+
+          content = source.read_text()
+
+          match = re.search(
+              r"const CATEGORIES\s*=\s*(\{.*?\});"
+              r"\s*const ARRANGEMENTS",
+              content,
+              re.S
+          )
+
+          if not match:
+              raise SystemExit(
+                  "SAFETY STOP: Cannot read categories"
+              )
+
+          categories = {}
+
+          for category, body in re.findall(
+              r"'([^']+)'\s*:\s*\[(.*?)\]",
+              match.group(1),
+              re.S
+          ):
+              items = re.findall(r"'([^']+)'", body)
+              if items:
+                  categories[category] = items
+
+          if len(categories) < 8:
+              raise SystemExit(
+                  "SAFETY STOP: Category list incomplete"
+              )
+
+          required = [
+              "Bulldozer",
+              "Excavator",
+              "Road roller",
+              "Mobile crane",
+              "Industrial generator"
+          ]
+
+          all_items = [
+              item
+              for values in categories.values()
+              for item in values
+          ]
+
+          if not all(item in all_items for item in required):
+              raise SystemExit(
+                  "SAFETY STOP: Equipment types missing"
+              )
+
+          marker = (
+              '<script defer '
+              'src="./shopdrop-customer-equipment-184b.js?v=184b">'
+              '</script>'
+          )
+
+          if marker in html or html.count("</body>") != 1:
+              raise SystemExit(
+                  "SAFETY STOP: Unexpected HTML structure"
+              )
+
+          backup.parent.mkdir(
+              parents=True,
+              exist_ok=True
+          )
+          backup.write_bytes(original)
+
+          if backup.read_bytes() != original:
+              raise SystemExit(
+                  "SAFETY STOP: Backup failed"
+              )
+
+          js = r"""
+          (() => {
+            'use strict';
+
+            const CATEGORIES = __CATEGORIES__;
+
+            function start() {
+              const original =
+                document.getElementById('vehicle');
+
+              if (!original) return;
+
+              if (document.getElementById(
+                'shopdropCustomerCategory184B'
+              )) return;
+
+              const category =
+                document.createElement('select');
+
+              category.id =
+                'shopdropCustomerCategory184B';
+
+              category.setAttribute(
+                'aria-label',
+                'Choose vehicle or equipment category'
+              );
+
+              const subtype =
+                document.createElement('select');
+
+              subtype.id =
+                'shopdropCustomerSubtype184B';
+
+              subtype.setAttribute(
+                'aria-label',
+                'Choose specific vehicle or equipment'
+              );
+
+              const categoryLabel =
+                document.createElement('label');
+
+              categoryLabel.textContent =
+                'Vehicle or equipment category';
+
+              const subtypeLabel =
+                document.createElement('label');
+
+              subtypeLabel.textContent =
+                'Specific vehicle or equipment';
+
+              const fill = (select, values, prompt) => {
+                select.replaceChildren(
+                  new Option(prompt, '')
+                );
+
+                values.forEach(value => {
+                  select.add(new Option(value, value));
+                });
+              };
+
+              fill(
+                category,
+                Object.keys(CATEGORIES),
+                'Choose category'
+              );
+
+              fill(
+                subtype,
+                [],
+                'Choose category first'
+              );
+
+              subtype.disabled = true;
+
+              function syncOriginal() {
+                const value = subtype.value;
+
+                if (
+                  value &&
+                  !Array.from(original.options)
+                    .some(option => option.value === value)
+                ) {
+                  original.add(new Option(value, value));
+                }
+
+                original.value = value;
+
+                original.dispatchEvent(
+                  new Event('change', {bubbles:true})
+                );
+              }
+
+              category.addEventListener(
+                'change',
+                () => {
+                  const values =
+                    CATEGORIES[category.value] || [];
+
+                  fill(
+                    subtype,
+                    values,
+                    'Choose specific type'
+                  );
+
+                  subtype.disabled = !values.length;
+                  syncOriginal();
+                }
+              );
+
+              subtype.addEventListener(
+                'change',
+                syncOriginal
+              );
+
+              const oldValue = original.value;
+
+              categoryLabel.append(category);
+              subtypeLabel.append(subtype);
+
+              original.before(
+                categoryLabel,
+                subtypeLabel
+              );
+
+              original.style.display = 'none';
+
+              if (oldValue) {
+                for (const [name, values]
+                  of Object.entries(CATEGORIES)) {
+                  if (values.includes(oldValue)) {
+                    category.value = name;
+                    category.dispatchEvent(
+                      new Event('change')
+                    );
+                    subtype.value = oldValue;
+                    syncOriginal();
+                    break;
+                  }
+                }
+              }
+            }
+
+            if (document.readyState === 'loading') {
+              document.addEventListener(
+                'DOMContentLoaded',
+                start,
+                {once:true}
+              );
+            } else {
+              start();
+            }
+          })();
+          """
+
+          js = js.replace(
+              "__CATEGORIES__",
+              json.dumps(categories, ensure_ascii=False)
+          )
+
+          script.write_text(js.strip() + "\n")
+
+          updated = html.replace(
+              "</body>",
+              marker + "</body>",
+              1
+          )
+
+          if updated.replace(marker, "", 1) != html:
+              raise SystemExit(
+                  "SAFETY STOP: Unrelated HTML change"
+              )
+
+          page.write_text(updated)
+
+          print("PASS: Original customer form backed up")
+          print("PASS: Existing equipment categories reused")
+          print("PASS: Existing vehicle field preserved")
+          print("PASS: Other transport fields unchanged")
+          PY
+
+          node --check \
+            public/shopdrop-customer-equipment-184b.js
+
+          git diff --check
+
+      - name: Commit Fix 184B
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "ShopDrop Fix Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            public/dispatching.html \
+            public/shopdrop-customer-equipment-184b.js \
+            backups/fix184b/dispatching-BEFORE-184B.html
+
+          git commit -m "Fix 184B customer transport equipment dropdowns"
+
+          git push origin HEAD:shopdrop-phase6-integration
+
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
