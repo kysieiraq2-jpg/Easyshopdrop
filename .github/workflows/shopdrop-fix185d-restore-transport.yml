@@ -1,1 +1,158 @@
 
+name: ShopDrop Fix 185D - Restore Working Transport Form
+
+'on':
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix185d-restore-transport.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  restore:
+    name: Safely restore pre-185A transport form
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Verify and restore working form
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          page = Path(
+              "public/shopdrop-vehicle-draft-private.html"
+          )
+
+          original = Path(
+              "backups/fix185a/"
+              "shopdrop-vehicle-draft-private-before-185a.html"
+          )
+
+          safety_backup = Path(
+              "backups/fix185d/"
+              "transport-before-recovery.html"
+          )
+
+          expected_current = (
+              "1d33e1bbc2c3f3a3e7cb521b2321ff54884f9f3a"
+          )
+
+          expected_original = (
+              "59b554729c3e223b37f2e53bc14850a50e4ff1fb"
+          )
+
+          def git_hash(path):
+              return subprocess.check_output(
+                  ["git", "hash-object", str(path)],
+                  text=True
+              ).strip()
+
+          if not page.is_file() or not original.is_file():
+              raise SystemExit(
+                  "SAFETY STOP: Required files missing."
+              )
+
+          if git_hash(page) != expected_current:
+              raise SystemExit(
+                  "SAFETY STOP: Current form has changed. "
+                  "No restoration performed."
+              )
+
+          if git_hash(original) != expected_original:
+              raise SystemExit(
+                  "SAFETY STOP: Original backup mismatch."
+              )
+
+          current_bytes = page.read_bytes()
+          original_bytes = original.read_bytes()
+
+          marker = (
+              '\n<script defer src="./'
+              'shopdrop-transport-title-185a.js?v=185a">'
+              '</script>'
+          ).encode()
+
+          if current_bytes.count(marker) != 1:
+              raise SystemExit(
+                  "SAFETY STOP: Fix 185A marker mismatch."
+              )
+
+          if current_bytes.replace(
+              marker, b'', 1
+          ) != original_bytes:
+              raise SystemExit(
+                  "SAFETY STOP: Other changes detected. "
+                  "Refusing to overwrite them."
+              )
+
+          safety_backup.parent.mkdir(
+              parents=True,
+              exist_ok=True
+          )
+
+          safety_backup.write_bytes(current_bytes)
+
+          if safety_backup.read_bytes() != current_bytes:
+              raise SystemExit(
+                  "SAFETY STOP: Recovery backup failed."
+              )
+
+          page.write_bytes(original_bytes)
+
+          if git_hash(page) != expected_original:
+              raise SystemExit(
+                  "SAFETY STOP: Restore verification failed."
+              )
+
+          print("PASS: Current form backed up")
+          print("PASS: Original pre-185A form restored")
+          print("PASS: Existing equipment selectors preserved")
+          print("PASS: Existing location fields preserved")
+          print("PASS: Advertisement submission preserved")
+          print("PASS: No Supabase changes")
+          PY
+
+          git diff --check
+
+      - name: Commit verified recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "ShopDrop Fix Bot"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            public/shopdrop-vehicle-draft-private.html \
+            backups/fix185d/transport-before-recovery.html
+
+          git commit -m \
+            "Fix 185D restore pre-185A transport advertisement form"
+
+          git push origin \
+            HEAD:shopdrop-phase6-integration
+
+  deploy:
+    needs: restore
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
