@@ -1,0 +1,74 @@
+name: ShopDrop Fix 194D Seller Advertisements
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix194d-seller-advertisements.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Install read-only seller advertisement overview
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import subprocess
+        menu='public/product-shopping-194a.html'
+        old='<a class="product-menu-194a" href="./sell-item.html">Sell a Product — FREE</a>'
+        new='<a class="product-menu-194a" href="./sell-item.html">Sell a Product — FREE</a><a class="product-menu-194a" href="./my-product-advertisements-194d.html">My Product Advertisements</a>'
+        sha='e743ad3f5a94a44375c9613a74a42156b3165641'
+        new_files={'public/my-product-advertisements-194d.html': '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer">\n<title>My Product Advertisements | Shop&amp;Drop</title><link rel="stylesheet" href="./shopdrop-transport-search-192b.css">\n<style>article p{overflow-wrap:anywhere}article img{height:160px;object-fit:contain}h1{margin-top:0}#sellerAdsStatus194d{overflow-wrap:anywhere}a:focus-visible,button:focus-visible,select:focus-visible{outline:3px solid #17202a;outline-offset:3px}</style></head>\n<body><header><a href="./index.html">Home</a><a href="./product-shopping-194a.html">Product Shopping &amp; Selling</a><a href="./account.html">My Account</a></header>\n<main><section class="panel"><h1>My Product Advertisements</h1><p>See your own advertisements, listed quantity and publication status. This page does not change your stock, prices or advertisements.</p>\n<a class="btn" href="./sell-item.html">Sell a Product — FREE / Continue Unfinished Advertisement</a>\n<label for="sellerAdsFilter194d">Advertisement status</label><select id="sellerAdsFilter194d" disabled><option value="all">All my advertisements</option><option value="available">Active and available</option><option value="pending">Unfinished / pending</option><option value="out">Active but out of stock</option><option value="other">Other publication status</option></select>\n<button type="button" id="sellerAdsRefresh194d" disabled>Refresh my advertisements</button>\n<p class="muted">Listed quantity is not a guarantee that stock is unreserved. To continue an unfinished advertisement, open the existing selling form and choose your saved item there.</p>\n<p id="sellerAdsStatus194d" role="status" aria-live="polite">Checking your sign-in…</p><div class="grid" id="sellerAdsList194d"></div><button type="button" id="sellerAdsMore194d" hidden disabled>Load more advertisements</button>\n<a class="btn" href="./product-shopping-194a.html">Back to Product Shopping &amp; Selling</a></section></main>\n<script src="./shopdrop-my-product-advertisements-194d.js?v=194d" defer></script></body></html>\n', 'public/shopdrop-my-product-advertisements-194d.js': "(() => {\n 'use strict';\n const BASE='https://dtkdvvxpwonywtsgqmdx.supabase.co',KEY='sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';\n const PAGE=24;\n const uuid=v=>typeof v==='string'&&/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v);\n function ownerQuery(db,uid,filter,offset){\n  if(!uuid(uid)||!Number.isSafeInteger(offset)||offset<0||!['all','available','pending','out','other'].includes(filter))throw Error('Invalid listing request');\n  let q=db.from('products').select('id,title,category,subcategory,condition,price,currency,country_code,quantity,listing_status,listing_reference,created_at').eq('seller_id',uid).eq('country_code','ZA');\n  if(filter==='available')q=q.eq('listing_status','active').gt('quantity',0);\n  else if(filter==='pending')q=q.eq('listing_status','pending');\n  else if(filter==='out')q=q.eq('listing_status','active').lte('quantity',0);\n  else if(filter==='other')q=q.not('listing_status','in','(active,pending)');\n  return q.order('created_at',{ascending:false}).order('id',{ascending:true}).range(offset,offset+PAGE-1);\n }\n const $=id=>document.getElementById(id), filter=$('sellerAdsFilter194d'),refresh=$('sellerAdsRefresh194d'),status=$('sellerAdsStatus194d'),list=$('sellerAdsList194d'),more=$('sellerAdsMore194d');\n if(!filter||!refresh||!status||!list||!more)return;\n const el=(tag,t)=>{const n=document.createElement(tag);if(t!==undefined)n.textContent=t;return n;};\n const link=(t,h)=>{const a=el('a',t);a.href=h;a.className='btn';return a;};\n const label=s=>({active:'Active',pending:'Unfinished / pending',draft:'Draft',approved:'Approved',archived:'Archived',suspended:'Suspended',rejected:'Rejected',sold:'Sold'})[s]||String(s||'Unknown').replaceAll('_',' ');\n let clientPromise,owner=null,offset=0,busy=false,current='all',sessionGeneration=0,watching=false;\n function authRequired(){return Object.assign(Error('Sign in required'),{needsSignIn:true});}\n function clearPrivate(){sessionGeneration++;owner=null;offset=0;list.replaceChildren();more.hidden=true;}\n async function session(){\n  if(!clientPromise)clientPromise=import('https://esm.sh/@supabase/supabase-js@2.49.4').then(({createClient})=>createClient(BASE,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}})).catch(e=>{clientPromise=undefined;throw e;});\n  const db=await clientPromise;\n  if(!watching){watching=true;db.auth.onAuthStateChange((event,s)=>{if(event==='SIGNED_OUT'||(owner&&s?.user?.id!==owner)){clearPrivate();status.textContent='Your sign-in changed. Refresh to view your advertisements.';}});}\n  const {data:s,error:se}=await db.auth.getSession();if(se||!s?.session?.access_token)throw authRequired();\n  const {data:u,error:ue}=await db.auth.getUser(s.session.access_token);if(ue||!uuid(u?.user?.id)||u.user.is_anonymous===true)throw authRequired();\n  return {db,uid:u.user.id};\n }\n async function photos(db,rows){\n  const ids=rows.filter(r=>r.listing_status==='active'&&Number(r.quantity)>0).map(r=>r.id).filter(uuid),result=new Map();\n  if(!ids.length)return result;\n  try{const {data,error}=await db.from('listing_images').select('product_id,storage_bucket,storage_path,is_primary,image_position').in('product_id',ids).order('image_position',{ascending:true});if(error||!Array.isArray(data))return result;\n   for(const r of data){const path=String(r.storage_path||'');if(!ids.includes(r.product_id)||r.storage_bucket!=='listing-images'||!path||path.startsWith('/')||path.split('/').includes('..'))continue;\n    if(!result.has(r.product_id)||(!result.get(r.product_id).primary&&r.is_primary===true))result.set(r.product_id,{url:BASE+'/storage/v1/object/public/listing-images/'+path.split('/').map(encodeURIComponent).join('/'),primary:r.is_primary===true});}\n  }catch{}return result;\n }\n function card(p,photo){const a=el('article');\n  if(photo){const im=el('img');im.src=photo.url;im.alt='Photograph of '+(p.title||'product');im.loading='lazy';im.referrerPolicy='no-referrer';im.addEventListener('error',()=>im.remove(),{once:true});a.append(im);}\n  a.append(el('h2',p.title||'Product advertisement'),el('p',[p.category,p.subcategory,p.condition].filter(Boolean).join(' · ')),el('p','Publication status: '+label(p.listing_status)),el('p','Listed quantity: '+String(p.quantity??'Unavailable')));\n  if(p.listing_reference)a.append(el('p','Item reference: '+p.listing_reference));\n  if(p.price!==null&&p.price!==undefined&&Number.isFinite(Number(p.price))&&p.currency==='ZAR')a.append(el('p','Your advertised price: '+new Intl.NumberFormat('en-ZA',{style:'currency',currency:'ZAR'}).format(Number(p.price))));\n  if(p.listing_status==='active'&&Number(p.quantity)>0)a.append(link('View public advertisement','./product.html?id='+encodeURIComponent(p.id)));\n  else if(p.listing_status==='pending'){a.append(el('p','Choose this saved item in the original selling form.'),link('Open unfinished advertisements','./sell-item.html'));}\n  return a;\n }\n function controls(value){busy=value;filter.disabled=value;refresh.disabled=value;more.disabled=value;}\n async function load(append=false){\n  if(busy)return;controls(true);more.hidden=true;status.textContent='Checking your private advertisements…';\n  if(!append){clearPrivate();current=filter.value;}\n  const generation=sessionGeneration;\n  try{const {db,uid}=await session();if(generation!==sessionGeneration)return;if(owner&&owner!==uid){clearPrivate();throw authRequired();}owner=uid;\n   const {data,error}=await ownerQuery(db,uid,current,offset);\n   if(error||!Array.isArray(data)||data.some(p=>!uuid(p.id)))throw Error('Listings unavailable');\n   const pictures=await photos(db,data);\n   if(generation!==sessionGeneration||owner!==uid)return;\n   for(const p of data)list.append(card(p,pictures.get(p.id)));\n   offset+=data.length;more.hidden=data.length<PAGE;\n   status.textContent=offset?offset+' of your advertisement(s) displayed.':'No advertisements match this selection.';\n  }catch(e){clearPrivate();status.textContent=e?.needsSignIn?'Sign in to view your private advertisements.':'Your advertisements are temporarily unavailable. Refresh to try again.';if(e?.needsSignIn)status.append(link('Sign in','./sign-in.html?next=my-product-advertisements-194d.html'));}\n  finally{controls(false);}\n }\n filter.addEventListener('change',()=>load());refresh.addEventListener('click',()=>load());more.addEventListener('click',()=>load(true));window.addEventListener('pagehide',clearPrivate);window.addEventListener('pageshow',e=>{if(e.persisted)load();});load();\n})();\n"}
+        p=Path(menu); source=p.read_text(encoding='utf-8')
+        installed=source.count(new)==1
+        backup=Path('backups/fix194d')/p.name
+        if not installed:
+            if subprocess.check_output(['git','hash-object',menu],text=True).strip()!=sha or source.count(old)!=1:
+                raise SystemExit('Unexpected menu source; no changes installed')
+            if backup.exists() and backup.read_bytes()!=p.read_bytes():
+                raise SystemExit('Unexpected backup; no changes installed')
+        else:
+            if subprocess.check_output(['git','hash-object','--stdin'],input=source.replace(new,old,1).encode()).decode().strip()!=sha:
+                raise SystemExit('Unexpected installed menu version; no changes installed')
+        for name,content in new_files.items():
+            f=Path(name)
+            if f.exists() and f.read_text(encoding='utf-8')!=content:
+                raise SystemExit('Unexpected file collision: '+name)
+        if not installed:
+            backup.parent.mkdir(parents=True,exist_ok=True)
+            if not backup.exists():backup.write_bytes(p.read_bytes())
+            p.write_text(source.replace(old,new,1),encoding='utf-8')
+        for name,content in new_files.items():
+            f=Path(name)
+            if not f.exists():f.write_text(content,encoding='utf-8')
+        print('Fix 194D private read-only seller advertisement page installed.')
+        PYCODE
+        node --check public/shopdrop-my-product-advertisements-194d.js
+        git diff --check
+        git config user.name 'ShopDrop Integration'
+        git config user.email 'actions@users.noreply.github.com'
+        git add public/product-shopping-194a.html public/my-product-advertisements-194d.html public/shopdrop-my-product-advertisements-194d.js
+        if test -d backups/fix194d; then git add backups/fix194d; fi
+        if ! git diff --cached --quiet; then
+          git commit -m 'Fix 194D private seller advertisement overview'
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
