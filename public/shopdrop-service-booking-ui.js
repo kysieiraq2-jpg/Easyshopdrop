@@ -247,7 +247,7 @@
 
       const button = createElement(
         'button',
-        'Prepare service booking'
+        document.getElementById('shopdropServiceMenu193b') ? 'Add to Service Bag' : 'Prepare service booking'
       );
 
       button.type = 'button';
@@ -327,6 +327,30 @@
           status.textContent =
             'Choose an available provider rate ' +
             'and a valid number of units.';
+          return;
+        }
+
+        // Fix 193C: Other Services selections are saved before booking.
+        // Preserve the original booking handler for any other page using this script.
+        if (document.getElementById('shopdropServiceMenu193b')) {
+          if (!window.ShopDropServiceBag193C) {
+            status.textContent = 'Service Bag unavailable. Refresh the page and try again.';
+            return;
+          }
+          button.disabled = true;
+          status.textContent = 'Checking details and saving your service…';
+          try {
+            await window.ShopDropServiceBag193C.add({
+              p_service_id: serviceId, p_rate_id: rateId, p_quantity: quantity,
+              p_date: date.value, p_time: time.value,
+              p_province: location.province, p_town: location.town
+            });
+            window.ShopDropServiceBag193C.saved(status);
+          } catch (error) {
+            window.ShopDropServiceBag193C.errorMessage(status,error);
+          } finally {
+            button.disabled = false;
+          }
           return;
         }
 
