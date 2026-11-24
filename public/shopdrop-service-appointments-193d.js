@@ -85,9 +85,10 @@
     }
     if(!inactive&&row.payment_status==='paid'){
       actions.append(link('View verified contact and service address','./service-location-193f.html?role='+(provider?'provider':'customer')+'&booking_id='+encodeURIComponent(row.booking_id)));
-      actions.append(link('My Account – completion information','./account.html#service-arrival-pin-panel'));
-      if(provider)actions.append(link('Optional completion photographs','./shopdrop-service-completion.html?booking_id='+encodeURIComponent(row.booking_id)),link('Submit Completion PIN','./shopdrop-provider-completion.html?booking_type=service'));
+      actions.append(link(provider?'Confirm completion and view payment release':'My Completion PIN and payment release','./service-completion-status-193g.html?booking_type=service&booking_id='+encodeURIComponent(row.booking_id)));
+      if(provider)actions.append(link('Optional completion photographs','./shopdrop-service-completion.html?booking_id='+encodeURIComponent(row.booking_id)));
     }
+    if(row.booking_status==='completed'&&row.payment_status==='paid')actions.append(link('View completion and payment release','./service-completion-status-193g.html?booking_type=service&booking_id='+encodeURIComponent(row.booking_id)));
     card.append(actions,feedback);list.append(card);
   }
   async function load(notice=''){

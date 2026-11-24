@@ -181,6 +181,9 @@
     }
     if(row.booking_id){const ref=el('p','Booking reference: '+row.booking_id);ref.className='muted';card.append(ref);}
     addPrivateBookingControls(card,actions,row,provider,pending);
+    if(row.booking_id&&row.payment_status==='paid'&&['confirmed','arrival_pending','arrival_verified','completed'].includes(row.booking_status)){
+      actions.append(link(provider?'Confirm completion and view payment release':'My Completion PIN and payment release','./service-completion-status-193g.html?booking_type=dispatch&booking_id='+encodeURIComponent(row.booking_id)));
+    }
     card.append(actions,msg);list.append(card);
   }
   async function load(notice=''){
