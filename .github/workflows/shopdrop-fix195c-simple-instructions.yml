@@ -1,0 +1,77 @@
+name: ShopDrop Fix 195C Simple Instructions
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix195c-simple-instructions.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Simplify visible instructions only
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import subprocess, re
+        shas={'public/product-shopping-194a.html': '21676a7bdb0c220c1f916c11b6b4e675d11ea412', 'public/product-search-194b.html': 'a4f7643241943c82772df043d2c795fe2d1d3396', 'public/my-product-advertisements-194d.html': 'f592c065635ee48d7727a5f0a28b077fc9fbc3ab', 'public/product-orders-194f.html': 'ba8b9d312f64f28d12b72edd0b952c811bdbdb91', 'public/service-bag-193c.html': '128cd6c7fa3a76e6c5d7dd494f69f9412dad3801', 'public/service-appointments-193d.html': '1296bf63258826bf24a76ec42d9981a647882ecb', 'public/service-checkout-193e.html': '16249196d9a67da542d0f1da2e89526fbbcd4f45', 'public/dispatch-bag-192dc.html': 'b0f31cf7797aa2d65af6f00b1a7196393a663389', 'public/dispatch-appointments-192dd.html': '0b6bf9979b3106452b16f0659871fccfe59fc2db', 'public/dispatch-checkout-192de.html': '3052b437251a5f9a00db378b1e610ca6e241d856', 'public/service-completion-status-193g.html': 'f8265b0d8951d79f1104a365675f1359319b0f4a'}
+        patches={'public/product-shopping-194a.html': [('Browse new, handmade and second-hand products across South Africa. Browsing, registration and advertising are free.', 'Look for new, handmade and second-hand products anywhere in South Africa. It is free to browse, register and advertise.'), ('Sign in when buying, advertising or managing your own orders. Private buyer and seller contact details remain protected.', 'You can look at products without an account. Sign in when you want to buy, sell or check your own orders. Your private contact details stay protected.'), ('Choose how you would like to browse.', 'Choose a button below to find an item. Open the item to see its price and details. Add it to your Shopping Bag if you want to buy it.'), ("For sold products, record the courier company's own reference only after physical collection. Independent courier verification is required before seller funds can be released.", "For a sold item, get the courier company's own reference number when the courier collects it. Enter that number after pickup. Shop&amp;Drop must also verify collection with the courier before your payment can be released.")], 'public/product-search-194b.html': [('Browse free without signing in. Choose any filters or leave them open to search all available products in South Africa.', 'You can search for free without signing in. Choose only the details you know, or leave the boxes as they are to see all available products in South Africa. Tap Search Products.'), ('Handmade and homemade are product categories, not conditions. Choose the handmade and homemade group to browse both existing departments, or choose one specific category and its subcategories. These departments also include craft supplies and related items.', 'For handmade or homemade items, choose the handmade and homemade categories. They also include craft supplies and related items. Use Condition to choose whether an item is new, used or refurbished.'), ('Location filters match the public town and province recorded on advertisements. Older advertisements without a matching location may be found by choosing all provinces.', 'Choose a province and town if you want to find items in a particular area. If you cannot find an item, try All provinces. Some older advertisements may not have a matching location.')], 'public/my-product-advertisements-194d.html': [('See your own advertisements, listed quantity and publication status. This page does not change your stock, prices or advertisements.', 'See your own advertisements, how many items are listed and whether your advertisements are live. Looking at this page will not change your items, prices or advertisements.'), ('Listed quantity is not a guarantee that stock is unreserved. To continue an unfinished advertisement, open the existing selling form and choose your saved item there.', 'Some listed items may already be reserved for a buyer. To finish an advertisement you started earlier, tap Sell a Product — FREE / Continue Unfinished Advertisement and choose your saved item.')], 'public/product-orders-194f.html': [('View your own product orders. Select a purchase or sale to see its existing order details and relevant actions.', 'Choose My Purchases for items you bought, or My Sales for items you sold. Open an order to see its details and what you can do next.'), ("This page only displays recorded information. For sales, enter the courier company's reference after physical collection in the existing collection form. Independent courier verification is required for seller payment release.", "This page shows your recorded orders. If you sold an item, obtain the courier company's reference number when it is collected. Enter it in the courier collection form. Shop&amp;Drop must also verify collection with the courier before your payment can be released.")], 'public/service-bag-193c.html': [('Review your saved services, requested dates and estimated prices. Send an appointment request when ready.', 'Check the services you saved, the dates you want and the estimated prices. When you are ready, tap Send appointment request.'), ('Saving a service does not reserve an appointment or collect payment. The provider must confirm the booking. No courier charges apply.', 'Saving a service does not book the appointment or take any money. Wait for the person offering the service to confirm your appointment. There are no courier fees.')], 'public/service-appointments-193d.html': [('Agree on your service appointment before payment. Contact details and street addresses remain private before verified payment. No courier charges apply.', 'Agree on a date and time with the person offering the service before paying. Your contact details and street address stay private until Shop&amp;Drop has verified payment. There are no courier fees.')], 'public/service-checkout-193e.html': [('Review your confirmed booking and the Shop&amp;Drop service fee. No courier selection or courier charges apply.', 'Check the agreed service, appointment and total price, including the Shop&amp;Drop fee. Tap Prepare payment to prepare your checkout. This step does not take money. There are no courier fees.')], 'public/dispatch-bag-192dc.html': [('Your saved Transport Services &amp; Equipment Hire selections are private. Saving a selection does not reserve a vehicle or equipment, confirm an appointment or collect payment.', 'Your saved transport and equipment hire choices are private. Saving a choice does not book a vehicle or equipment, confirm a date or take money.'), ('Prices include the Shop&amp;Drop service fee. Availability and the final booking must still be confirmed before payment.', 'Prices include the Shop&amp;Drop fee. Request an appointment and wait for the person offering the service to confirm availability before you pay.')], 'public/dispatch-appointments-192dd.html': [('Send your booking request and wait for the provider to confirm the appointment before payment. Street addresses are kept private before payment. No courier charges apply.', 'Send your booking request. Wait for the person offering the transport or equipment hire to confirm the appointment before paying. Your street address stays private until payment is confirmed. There are no courier fees.')], 'public/dispatch-checkout-192de.html': [('Review your confirmed booking and the Shop&amp;Drop service fee. No courier selection or courier charges apply.', 'Check your agreed transport or equipment hire, appointment and total price, including the Shop&amp;Drop fee. Tap Prepare payment to prepare your checkout. This step does not take money. There are no courier fees.')], 'public/service-completion-status-193g.html': [('A verified PIN prepares the release of provider-held funds.', 'Shop&amp;Drop checks the PIN before preparing payment to the person who completed the work.'), ('Payment provider activation and confirmed settlement are required before any actual fund transfer. No courier charges apply.', 'Money can only be transferred once the payment company is connected and confirms the transfer. There are no courier fees.')]}
+        def blob(data):
+            return subprocess.check_output(['git','hash-object','--stdin'],input=data.encode('utf-8')).decode().strip()
+        def protected(source):
+            # All HTML tags, including attributes and input values, stay exactly the same.
+            # All executable scripts, CSS, buttons, labels and links stay exactly the same.
+            return [re.findall(p,source,re.I) for p in [r'<[^>]+>',r'<script\b[^>]*>[\s\S]*?</script>',r'<style\b[^>]*>[\s\S]*?</style>',r'<(?:button|label|a|select|textarea)\b[^>]*>[\s\S]*?</(?:button|label|a|select|textarea)>']]
+        planned={}
+        for name,changes in patches.items():
+            p=Path(name); source=p.read_bytes().decode('utf-8')
+            if all(source.count(new)==1 for old,new in changes):
+                original=source
+                for old,new in reversed(changes): original=original.replace(new,old,1)
+                if blob(original)!=shas[name]: raise SystemExit('Unexpected installed version: '+name)
+                continue
+            if blob(source)!=shas[name]: raise SystemExit('Unexpected source version; no changes installed: '+name)
+            updated=source
+            for old,new in changes:
+                if '<' in old or '<' in new: raise SystemExit('Only visible text may change')
+                if updated.count(old)!=1: raise SystemExit('Unexpected instruction anchor: '+name)
+                updated=updated.replace(old,new,1)
+            if protected(source)!=protected(updated): raise SystemExit('Protected markup or executable code differs: '+name)
+            backup=Path('backups/fix195c')/p.name
+            if backup.exists() and backup.read_bytes()!=p.read_bytes(): raise SystemExit('Unexpected backup: '+name)
+            planned[name]=updated
+        for name,content in planned.items():
+            p=Path(name); backup=Path('backups/fix195c')/p.name
+            backup.parent.mkdir(parents=True,exist_ok=True)
+            if not backup.exists(): backup.write_bytes(p.read_bytes())
+            p.write_bytes(content.encode('utf-8'))
+        print('Fix 195C: visible instructions only. All markup, forms, controls, scripts and destinations preserved.')
+        PYCODE
+        git diff --check
+        git config user.name "ShopDrop Integration"
+        git config user.email "actions@users.noreply.github.com"
+        git add public/product-shopping-194a.html public/product-search-194b.html public/my-product-advertisements-194d.html public/product-orders-194f.html public/service-bag-193c.html public/service-appointments-193d.html public/service-checkout-193e.html public/dispatch-bag-192dc.html public/dispatch-appointments-192dd.html public/dispatch-checkout-192de.html public/service-completion-status-193g.html
+        if test -d backups/fix195c; then git add backups/fix195c; fi
+        if ! git diff --cached --quiet; then
+          git commit -m "Fix 195C simple customer instructions"
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
