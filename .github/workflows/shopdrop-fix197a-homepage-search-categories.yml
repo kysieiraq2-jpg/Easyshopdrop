@@ -1,0 +1,99 @@
+name: ShopDrop Fix 197A Homepage Search and Categories
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix197a-homepage-search-categories.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Repair homepage navigation and public search
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import subprocess,re
+        SHAS = {'public/index.html': '3a8b387c162704d70d8223260dcc00e4a65ca4b4', 'public/v26-homepage-layout.js': '2464bad10ff2f398d3c7f250f46fd2589843d02b', 'public/product-search-194b.html': '5562358e590d32954167d300c0e7eea45ec09426', 'public/shopdrop-product-search-194b.js': '6cff13dd68df081b40132d5b5af6c018f51be7c2'}
+        PATCHES = {'public/index.html': [('<div class="shopdrop-header-search">\n      <input class="search" id="search" type="search" placeholder="Search products" aria-label="Search products">\n      <button class="btn searchbtn" id="searchButton" type="button">Search</button>\n    </div>', '<form class="shopdrop-header-search" action="./product-search-194b.html" method="get">\n      <input class="search" id="search" name="q" type="search" maxlength="100" placeholder="Search products" aria-label="Search products">\n      <button class="btn searchbtn" id="searchButton" type="submit">Search</button>\n    </form>'), ('<section class="section">\n<h2>Shop by category</h2>\n<div class="cats" id="cats"></div>\n<p><button class="btn" id="preownedButton" type="button">Second-Hand & Pre-Owned</button> <span class="muted">Browse used and refurbished products across all categories.</span></p>\n</section>', '<section class="section" id="shopdropHomeCategories197a" aria-label="Products and categories" style="margin:10px 0 18px;">\n<a id="shopdropHomeCategoryLink197a" href="./categories.html#cats" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%;min-height:100px;padding:16px 12px;box-sizing:border-box;background:#0f766e;color:#fff;border:1px solid #0f766e;border-radius:12px;font-size:16px;font-weight:700;line-height:1.35;text-align:center;text-decoration:none;overflow-wrap:anywhere;"><strong>Products &amp; Categories</strong><small style="font-size:13px;font-weight:400;color:#fff;">Search for items by category</small></a>\n</section>'), ('searchButton.onclick=()=>loadProducts(true);\nasync function loadHomeCategories(){\n try{\n  const r=await fetch(\'./taxonomy.json\',{cache:\'force-cache\'});\n  const t=await r.json();\n  const ds=[...t.departments].sort((a,b)=>a.name.localeCompare(b.name));\n  cats.innerHTML=ds.map(d=>`<button type="button" data-category="${esc(d.name)}">${esc(d.name)}</button>`).join(\'\');\n  cats.querySelectorAll(\'button\').forEach(b=>()=>{\n   location.href=\'./categories.html?category=\'+encodeURIComponent(b.dataset.category);\n  });\n }catch(e){\n  cats.innerHTML=\'<span class="muted">Categories could not be loaded.</span>\';\n }\n}\nloadHomeCategories();', '// Fix 197A: the homepage search uses a native GET form; categories use the existing category page.'), ("preownedButton.onclick=()=>{\n window.location.href='./categories.html?view=preowned';\n};\nsearch.addEventListener('keydown',e=>{\n if(e.key==='Enter'){\n  e.preventDefault();\n  loadProducts(true);\n }\n});", '// Fix 197A: Search button and Enter both submit the native search form.'), ('<script src="v26-homepage-layout.js"></script>', '<script src="v26-homepage-layout.js?v=197a"></script>')], 'public/v26-homepage-layout.js': [('const categories=firstExisting([', 'const categories=document.getElementById("shopdropHomeCategories197a")||firstExisting([')], 'public/product-search-194b.html': [('<section class="panel"><h2>Available Products</h2>', '<section class="panel" id="shopdropSearchResults197a"><h2>Available Products</h2>'), ('shopdrop-product-search-194b.js?v=194c', 'shopdrop-product-search-194b.js?v=197a')], 'public/shopdrop-product-search-194b.js': [("if(term)p.set('or','(title.ilike.*'+term+'*,description.ilike.*'+term+'*)');", "if(term)p.set('or','(title.ilike.*'+term+'*,description.ilike.*'+term+'*,category.ilike.*'+term+'*,subcategory.ilike.*'+term+'*)');"), ('async function init(){try{const [tax,loc]', "async function init(){const incomingTerm=(new URLSearchParams(location.search).get('q')||'').trim().slice(0,100);if(incomingTerm)term.value=incomingTerm;try{const [tax,loc]"), ("catch{status.textContent='Search options are unavailable. Use the original product categories or refresh this page.';}}", "catch{status.textContent='Search options are unavailable. Use the original product categories or refresh this page.';}finally{if(incomingTerm){document.getElementById('shopdropSearchResults197a')?.scrollIntoView({behavior:'auto',block:'start'});}}}")]}
+
+        def blob(raw):
+            return subprocess.check_output(['git','hash-object','--stdin'],input=raw).decode().strip()
+
+        def transform(source,name):
+            updated=source
+            for old,new in PATCHES[name]:
+                if updated.count(old)!=1: raise SystemExit('Unexpected anchor: '+name+' '+old[:80])
+                updated=updated.replace(old,new,1)
+            if name=='public/index.html':
+                if 'id="cats"' in updated or 'loadHomeCategories' in updated or 'preownedButton' in updated or 'searchButton.onclick' in updated: raise SystemExit('Old homepage handler remains')
+                if updated.count('id="mainMenuCategories"')!=1: raise SystemExit('Main menu category navigation changed')
+                if updated.count('id="shopdropHomeCategories197a"')!=1: raise SystemExit('Missing new category block')
+            # Reverse all edits to prove all other bytes are preserved.
+            reverted=updated
+            for old,new in reversed(PATCHES[name]):
+                if reverted.count(new)!=1: raise SystemExit('Unexpected replacement: '+name)
+                reverted=reverted.replace(new,old,1)
+            if reverted!=source: raise SystemExit('Unexpected unrelated change: '+name)
+            return updated
+
+        planned={}
+        for name,expected in SHAS.items():
+            p=Path(name); backup=Path('backups/fix197a')/p.name; raw=p.read_bytes()
+            if blob(raw)==expected:
+                original=raw
+            elif backup.is_file() and blob(backup.read_bytes())==expected:
+                original=backup.read_bytes()
+                if raw!=transform(original.decode('utf-8'),name).encode('utf-8'): raise SystemExit('Unexpected installed version: '+name)
+                continue
+            else:
+                raise SystemExit('Unexpected original source; no changes installed: '+name)
+            if backup.exists() and backup.read_bytes()!=original: raise SystemExit('Backup collision: '+name)
+            revised=transform(original.decode('utf-8'),name).encode('utf-8')
+            planned[name]=(original,revised)
+        # Destination and existing category navigation must exist before installing.
+        category_page=Path('public/categories.html').read_text(encoding='utf-8')
+        if 'id="cats"' not in category_page or 'category-results.html?' not in category_page:
+            raise SystemExit('Existing category navigation missing; no changes installed')
+        # Check changed and embedded scripts before writing any website files.
+        for name,(original,revised) in planned.items():
+            if name.endswith('.js'):
+                subprocess.run(['node','--check','-'],input=revised,check=True)
+            elif name=='public/index.html':
+                for script in re.findall(r'<script\b(?![^>]*\bsrc\s*=)[^>]*>([\s\S]*?)</script>',revised.decode('utf-8'),re.I):
+                    subprocess.run(['node','--check','-'],input=script.encode('utf-8'),check=True)
+        for name,(original,revised) in planned.items():
+            p=Path(name); backup=Path('backups/fix197a')/p.name
+            backup.parent.mkdir(parents=True,exist_ok=True)
+            if not backup.exists(): backup.write_bytes(original)
+            p.write_bytes(revised)
+        print('Fix 197A: homepage category shortcut and read-only search navigation repaired.')
+        PYCODE
+        git diff --check
+        git config user.name "ShopDrop Integration"
+        git config user.email "actions@users.noreply.github.com"
+        git add public/index.html public/v26-homepage-layout.js public/product-search-194b.html public/shopdrop-product-search-194b.js
+        if test -d backups/fix197a; then git add backups/fix197a; fi
+        if ! git diff --cached --quiet; then
+          git commit -m "Fix 197A homepage search and category navigation"
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
