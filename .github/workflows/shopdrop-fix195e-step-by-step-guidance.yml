@@ -1,0 +1,77 @@
+name: ShopDrop Fix 195E Step by Step Guidance
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix195e-step-by-step-guidance.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Install static numbered instructions
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import subprocess, re
+        SHAS = {'public/product-shopping-194a.html': '2b4b0dcc259900df2ea49a187aed2ed41071943a', 'public/services.html': 'db4add7a9bb720d2f4a49f8c7809537fa6e8c304', 'public/dispatching.html': '10a2d67e6ac3c7e15c7bbd002e301fbc164650ae'}
+        PATCHES = {'public/product-shopping-194a.html': [('<p>Advertise your own products, including handmade items and second-hand goods.</p>', '<p>Advertise your own products, including handmade items and second-hand goods.</p>\n<div class="shopdrop-steps-195e"><p><strong>How to sell an item</strong></p><ol><li>Sign in or create your free account.</li><li>Tap Sell a Product — FREE. Add photos, describe the item and enter the price you want to receive.</li><li>Check your details and post your advertisement.</li><li>After a sale, get the courier reference when the courier collects your item. Go to My Account — Receive My Payment.</li></ol></div>\n'), ('<p>Choose a button below to find an item. Open the item to see its price and details. Add it to your Shopping Bag if you want to buy it.</p>', '<p>Choose a button below to find an item. Open the item to see its price and details. Add it to your Shopping Bag if you want to buy it.</p>\n<div class="shopdrop-steps-195e"><p><strong>How to buy an item</strong></p><ol><li>Browse or search for the item you want.</li><li>Open the item, check its details and sign in when ready to add it to your Shopping Bag.</li><li>Open your Shopping Bag, check your items and enter your delivery address. Follow the checkout instructions.</li><li>After ordering, use My Purchases or Track My Order to check progress.</li></ol></div>\n')], 'public/services.html': [('<p>No listing fee. Your advertisement can publish automatically when the required information has passed the existing listing checks.</p>', '<p>No listing fee. Your advertisement can publish automatically when the required information has passed the existing listing checks.</p>\n<div class="shopdrop-steps-195e"><p><strong>How to advertise your service</strong></p><ol><li>Sign in or create your free account.</li><li>Tap Advertise Your Services — FREE. Choose your service, area and rates, and add photos.</li><li>Submit your advertisement. Use Requests for My Service Advertisements to manage requests.</li><li>After completing a paid service, get the six-digit Completion PIN from the paying customer. Go to My Account — Receive My Payment.</li></ol></div>\n'), ('<p>Search available services and find a provider in your area.</p>', '<p>Search available services and find a provider in your area.</p>\n<div class="shopdrop-steps-195e"><p><strong>How to book a service</strong></p><ol><li>Tap Search Other Services and choose a service, rate and appointment time.</li><li>Sign in and add your choice to My Service Bag. Send an appointment request.</li><li>Wait for the appointment to be agreed. Open My Service Appointments, complete the required address details and follow checkout instructions.</li><li>Give the six-digit Completion PIN to the person doing the work only after the agreed service is finished and you are satisfied.</li></ol></div>\n')], 'public/dispatching.html': [('<p>No listing fee and no administrator approval. Your advertisement can publish automatically when the required details and photographs have been successfully submitted.</p>', '<p>No listing fee and no administrator approval. Your advertisement can publish automatically when the required details and photographs have been successfully submitted.</p>\n<div class="shopdrop-steps-195e"><p><strong>How to advertise transport or equipment hire</strong></p><ol><li>Sign in or create your free account.</li><li>Tap Advertise Transport Services or Equipment Hire — FREE. Add your details, operating area, rates and photos.</li><li>Submit your advertisement. Use Requests for My Transport Advertisements to manage requests.</li><li>After completing a paid task, get the six-digit Completion PIN from the paying customer. Go to My Account — Receive My Payment.</li></ol></div>\n'), ('<p>Search available transport services, vehicles, machinery, equipment and tools for hire.</p>', '<p>Search available transport services, vehicles, machinery, equipment and tools for hire.</p>\n<div class="shopdrop-steps-195e"><p><strong>How to book transport or hire equipment</strong></p><ol><li>Tap Search Transport &amp; Equipment Hire. Choose the service or equipment, rate and appointment time.</li><li>Sign in and add your choice to My Transport Bag. Request an appointment.</li><li>Wait for the appointment to be agreed. Open My Transport Appointments, complete the required address details and follow checkout instructions.</li><li>Give the six-digit Completion PIN to the person doing the work only after the agreed task or hire is finished and you are satisfied.</li></ol></div>\n')]}
+        def blob(data):
+            return subprocess.check_output(['git','hash-object','--stdin'],input=data.encode('utf-8')).decode().strip()
+        def reverse(content,changes):
+            for old,new in reversed(changes):
+                if content.count(new)!=1: raise SystemExit('Unexpected guide block')
+                content=content.replace(new,old,1)
+            return content
+        planned={}
+        for name,changes in PATCHES.items():
+            p=Path(name); source=p.read_bytes().decode('utf-8')
+            if all(source.count(new)==1 for old,new in changes):
+                if blob(reverse(source,changes))!=SHAS[name]: raise SystemExit('Unexpected installed version: '+name)
+                continue
+            if blob(source)!=SHAS[name]: raise SystemExit('Unexpected source version; no files changed: '+name)
+            updated=source
+            for old,new in changes:
+                if updated.count(old)!=1 or not new.startswith(old): raise SystemExit('Unexpected anchor: '+name)
+                addition=new[len(old):]
+                if re.search(r'<(?:script|style|form|input|select|button|a)\b|\son\w+=',addition,re.I): raise SystemExit('Non-instruction content')
+                updated=updated.replace(old,new,1)
+            if reverse(updated,changes)!=source: raise SystemExit('Original code differs: '+name)
+            backup=Path('backups/fix195e')/p.name
+            if backup.exists() and backup.read_bytes()!=p.read_bytes(): raise SystemExit('Unexpected backup: '+name)
+            planned[name]=(source,updated)
+        for name,(source,updated) in planned.items():
+            p=Path(name); backup=Path('backups/fix195e')/p.name
+            backup.parent.mkdir(parents=True,exist_ok=True)
+            if not backup.exists(): backup.write_bytes(source.encode('utf-8'))
+            p.write_bytes(updated.encode('utf-8'))
+        print('Fix 195E: six static instruction blocks; all original bytes preserved.')
+        PYCODE
+        git diff --check
+        git config user.name "ShopDrop Integration"
+        git config user.email "actions@users.noreply.github.com"
+        git add public/product-shopping-194a.html public/services.html public/dispatching.html
+        if test -d backups/fix195e; then git add backups/fix195e; fi
+        if ! git diff --cached --quiet; then
+          git commit -m "Fix 195E step by step guidance"
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
