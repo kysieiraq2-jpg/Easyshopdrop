@@ -1,0 +1,86 @@
+name: ShopDrop Fix 193A Other Services Dropdowns
+'on':
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - .github/workflows/shopdrop-fix193a-service-dropdowns.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+      - name: Add Other Services dropdowns without replacing existing code
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+          python3 <<'PYCODE'
+          from pathlib import Path
+          import subprocess
+          patches = {'public/shopdrop-services-connector.js': [('async function search(term, location = {}) {', 'async function search(term, location = {}, filters = {}) {'), ("    query.set('order', 'created_at.desc');\n    query.set('limit', '50');", "    query.set('order', 'created_at.desc,id.asc');\n    query.set('limit', '50');\n    if (filters.category) query.set('category', 'eq.' + filters.category);\n    if (filters.subcategory) query.set('subcategory', 'eq.' + filters.subcategory);"), ('          category: row.category,', '          category: row.category,\n          subcategory: row.subcategory,')], 'public/services.html': [('<div class="search">\n<input id="q"', '<div id="shopdropServiceCategory193a" style="margin:16px 0">\n<label for="serviceCategory193a" style="display:block;font-weight:600;margin-bottom:6px">Service category</label>\n<select id="serviceCategory193a" style="width:100%;min-height:46px;font:inherit;padding:10px;border:1px solid #cbd5e1;border-radius:8px"><option value="">All categories</option></select>\n<label for="serviceSubcategory193a" style="display:block;font-weight:600;margin:12px 0 6px">Type of service</label>\n<select id="serviceSubcategory193a" disabled style="width:100%;min-height:46px;font:inherit;padding:10px;border:1px solid #cbd5e1;border-radius:8px"><option value="">Choose a category first</option></select>\n<p class="muted">Choose a category or type of service. You can also search by words below.</p>\n</div>\n<div class="search">\n<input id="q"'), ('let serviceSearchSequence=0;', "let serviceSearchSequence=0;\nconst serviceCategory193a=document.getElementById('serviceCategory193a');\nconst serviceSubcategory193a=document.getElementById('serviceSubcategory193a');\nconst serviceTaxonomy193a=window.ShopDropServiceTaxonomy||{};\nfunction fillService193a(select,values,placeholder){\n select.replaceChildren(new Option(placeholder,''));\n for(const value of [...new Set(values)].sort((a,b)=>a.localeCompare(b)))select.add(new Option(value,value));\n}\nfunction selectService193a(category='',subcategory=''){\n serviceCategory193a.value=Object.hasOwn(serviceTaxonomy193a,category)?category:'';\n const values=serviceTaxonomy193a[serviceCategory193a.value]||[];\n fillService193a(serviceSubcategory193a,values,serviceCategory193a.value?'All service types':'Choose a category first');\n serviceSubcategory193a.disabled=!serviceCategory193a.value;\n serviceSubcategory193a.value=values.includes(subcategory)?subcategory:'';\n}\nfillService193a(serviceCategory193a,Object.keys(serviceTaxonomy193a),'All categories');\nselectService193a();\nserviceCategory193a.addEventListener('change',()=>{\n selectService193a(serviceCategory193a.value);\n serviceQuery.value='';\n document.querySelectorAll('.subcat.selected').forEach(x=>x.classList.remove('selected'));\n search('');\n});\nserviceSubcategory193a.addEventListener('change',()=>{\n serviceQuery.value='';\n document.querySelectorAll('.subcat.selected').forEach(x=>x.classList.remove('selected'));\n search('');\n});"), ("async function search(term,category=''){", 'async function search(term,category=serviceCategory193a.value,subcategory=serviceSubcategory193a.value){'), ('const list=await window.ShopDropServicesConnector.search(term);', 'const list=await window.ShopDropServicesConnector.search(term,{}, {category,subcategory});'), ("  const filtered=category\n   ?list.filter(x=>String(x.category||'').toLowerCase()===category.toLowerCase())\n   :list;", '  const filtered=list.filter(x=>(!category||x.category===category)&&(!subcategory||x.subcategory===subcategory));'), ("document.getElementById('browseAllServices').onclick=()=>{\n serviceQuery.value='';", "document.getElementById('browseAllServices').onclick=()=>{\n selectService193a();\n serviceQuery.value='';"), ("   b.classList.add('selected');\n   serviceQuery.value=name;", "   b.classList.add('selected');\n   selectService193a(card.dataset.category,name);\n   serviceQuery.value='';"), ('    serviceQuery.value=name;\n    search(name);', "    selectService193a(card.dataset.category,name);\n    serviceQuery.value='';\n    search('');"), ('   search(name);\n   choice.scrollIntoView', "   search('');\n   choice.scrollIntoView"), ("   serviceQuery.value='';\n   search('',card.dataset.category);", "   selectService193a(card.dataset.category);\n   serviceQuery.value='';\n   search('');"), ('<p>Objectively verified provider arrival is the normal payout milestone.</p>', '<p>Verified service completion using the customer-held Completion PIN is required before held proceeds can be released, subject to payment-provider activation and safeguards.</p>'), ('Dispatching & Transport</a>', 'Transport Services &amp; Equipment Hire</a>'), ('shopdrop-services-connector.js"></script>', 'shopdrop-services-connector.js?v=193a"></script>')]}
+          expected = {'public/shopdrop-services-connector.js': '0e5f08ea1ff36424fc8d8d1032f8f6ba4c7386b4', 'public/services.html': '2c88f452389eee45a6056a65f4984e707246c115'}
+          planned={}
+          for name, changes in patches.items():
+              p=Path(name)
+              source=p.read_text(encoding='utf-8')
+              if all(new in source for old,new in changes):
+                  continue
+              sha=subprocess.check_output(['git','hash-object',name],text=True).strip()
+              if sha != expected[name]: raise SystemExit('Unexpected source version: '+name+'; no changes installed.')
+              result=source
+              for old,new in changes:
+                  if result.count(old)!=1: raise SystemExit('Unexpected patch anchor in '+name+': '+old[:100])
+                  result=result.replace(old,new,1)
+              planned[name]=result
+          for name in planned:
+              p=Path(name); backup=Path('backups/fix193a')/p.name
+              if backup.exists() and backup.read_bytes()!=p.read_bytes(): raise SystemExit('Unexpected backup: '+name)
+          for name,result in planned.items():
+              p=Path(name); backup=Path('backups/fix193a')/p.name
+              backup.parent.mkdir(parents=True,exist_ok=True)
+              if not backup.exists(): backup.write_bytes(p.read_bytes())
+              p.write_text(result,encoding='utf-8')
+          PYCODE
+          node --check public/shopdrop-services-connector.js
+          python3 <<'PYCODE'
+          from pathlib import Path
+          from html.parser import HTMLParser
+          import subprocess,tempfile
+          class Scripts(HTMLParser):
+              def __init__(self): super().__init__(); self.active=False; self.parts=[]; self.scripts=[]
+              def handle_starttag(self,tag,attrs):
+                  if tag=='script' and not dict(attrs).get('src'): self.active=True; self.parts=[]
+              def handle_data(self,data):
+                  if self.active: self.parts.append(data)
+              def handle_endtag(self,tag):
+                  if tag=='script' and self.active: self.scripts.append(''.join(self.parts)); self.active=False
+          parser=Scripts();parser.feed(Path('public/services.html').read_text())
+          for script in parser.scripts:
+              with tempfile.NamedTemporaryFile(suffix='.js',mode='w') as f:
+                  f.write(script);f.flush();subprocess.run(['node','--check',f.name],check=True)
+          PYCODE
+          git diff --check
+          git config user.name 'ShopDrop Integration'
+          git config user.email 'actions@users.noreply.github.com'
+          git add public/services.html public/shopdrop-services-connector.js
+          if test -d backups/fix193a; then git add backups/fix193a; fi
+          if ! git diff --cached --quiet; then
+            git commit -m 'Fix 193A Other Services search dropdowns'
+            git push origin HEAD:shopdrop-phase6-integration
+          fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
