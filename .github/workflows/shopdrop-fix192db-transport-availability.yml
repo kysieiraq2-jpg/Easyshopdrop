@@ -1,0 +1,62 @@
+name: ShopDrop Fix 192DB Transport Availability
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix192db-transport-availability.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Install availability connection
+      shell: bash
+      run: "set -euo pipefail\nfile=public/shopdrop-transport-results-192b.js\ntest\
+        \ \"$(git hash-object \"$file\")\" = 572ccd8a6a6911dc7442ae5c2eb1fb62745f775e\n\
+        mkdir -p backups/fix192db\ncp \"$file\" backups/fix192db/\npython3 <<'PYCODE'\n\
+        from pathlib import Path\np=Path('public/shopdrop-transport-results-192b.js')\n\
+        s=p.read_text()\nanchor='        details.append(label,quantityLabel,summary,dateLabel,check);'\n\
+        assert s.count(anchor)==1\ns=s.replace(anchor,anchor+'\\n'+\"        const\
+        \ verify = node('button','Check availability');\\n        verify.type = 'button';\\\
+        n        const serverStatus = node('p','','muted');\\n        let revision\
+        \ = 0;\\n        for (const control of [select,quantity,appointment]) {\\\
+        n          control.addEventListener('input',()=>{revision++;serverStatus.textContent='';});\\\
+        n          control.addEventListener('change',()=>{revision++;serverStatus.textContent='';});\\\
+        n        }\\n        verify.addEventListener('click',async()=>{\\n       \
+        \   const n = Number(quantity.value);\\n          const start = Date.parse(appointment.value+'+02:00');\\\
+        n          if (!select.value || !Number.isInteger(n) || n<1 || n>365 || !Number.isFinite(start)\
+        \ || start<=Date.now()) {\\n            serverStatus.textContent='Choose a\
+        \ rate, future appointment and 1\u2013365 units.'; return;\\n          }\\\
+        n          const token = ++revision;\\n          verify.disabled = true;\\\
+        n          serverStatus.textContent='Checking availability\u2026';\\n    \
+        \      try {\\n            const response = await fetch(BASE+'/rest/v1/rpc/shopdrop_transport_availability_192db',{\\\
+        n              method:'POST',headers,body:JSON.stringify({p_advert_id:advert.id,p_rate_id:select.value,p_quantity:n,p_start:new\
+        \ Date(start).toISOString()})\\n            });\\n            if (!response.ok)\
+        \ throw Error('Availability check failed');\\n            const data = await\
+        \ response.json();\\n            if (token!==revision) return;\\n        \
+        \    serverStatus.textContent = data.ok===true ? 'Available at time of check.\
+        \ Provider amount: '+money(data.provider_amount_zar)+'. Not reserved; provider\
+        \ confirmation required.' : 'Unavailable: '+(data.reason||'Please choose another\
+        \ appointment.');\\n          } catch (_) {\\n            if(token===revision)\
+        \ serverStatus.textContent='Unable to check availability. Please retry.';\\\
+        n          } finally {verify.disabled=false;}\\n        });\\n        details.append(verify,serverStatus);\\\
+        n\")\np.write_text(s)\nPYCODE\nnode --check \"$file\"\ngit diff --check\n\
+        git config user.name 'ShopDrop Integration'\ngit config user.email 'actions@users.noreply.github.com'\n\
+        git add \"$file\" backups/fix192db\ngit commit -m 'Fix 192DB Transport server\
+        \ availability check'\ngit push origin HEAD:shopdrop-phase6-integration\n"
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
