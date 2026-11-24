@@ -1,0 +1,80 @@
+name: ShopDrop Fix 195D Division Layout
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix195d-division-layout.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Install presentation stylesheet only
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import subprocess
+        SHAS = {'public/product-shopping-194a.html': '60e9843c67e9ab200fd0e867f0492a9104a3b90b', 'public/services.html': '2879aaa57f8cc32851fb2729d2328401275aa45c', 'public/dispatching.html': '118ff2fb937f0186e08e06323dcae1bfd1a2fd0f'}
+        CSS_PATH = 'public/shopdrop-division-layout-195d.css'
+        CSS = '/* Fix 195D: the three division landing pages only. No workflow or visibility rules. */\nbody{line-height:1.5}\nbody>header{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:14px 16px}\nbody>header a{margin:0;padding:8px 0;min-height:44px;line-height:1.5;overflow-wrap:anywhere;font-weight:700}\nbody>header a:focus-visible{outline:3px solid #fff;outline-offset:2px}\nbody>main{max-width:950px;margin:0 auto;padding:14px 16px 32px}\nbody>main>.panel{border-radius:12px;margin:14px 0;padding:18px;overflow-wrap:anywhere;box-shadow:0 1px 3px rgba(23,32,42,.06)}\nbody>main>.panel h1{font-size:26px;line-height:1.25;margin:0 0 12px}\nbody>main>.panel h2{font-size:21px;line-height:1.3;margin:0 0 10px}\nbody>main>.panel h3{line-height:1.4}\nbody>main>.panel p{line-height:1.5}\nbody>main a:is(.product-menu-194a,.shopdrop-service-menu-193b,.shopdrop-provider-advert-link):not([hidden]){display:flex;align-items:center;justify-content:center;min-height:56px;padding:14px;margin-top:14px;border-radius:8px;background:#0f766e;color:#fff;text-align:center;text-decoration:none;font-weight:700;font-size:16px;line-height:1.35;overflow-wrap:anywhere}\nbody>main a:is(.product-menu-194a,.shopdrop-service-menu-193b,.shopdrop-provider-advert-link):focus-visible{outline:3px solid #17202a;outline-offset:3px}\n@media(max-width:480px){body>main{padding:10px 12px 24px}body>main>.panel{padding:14px}body>main>.panel h1{font-size:24px}body>main>.panel h2{font-size:20px}body>header{gap:4px 12px;padding:12px}}\n'
+        LINK = '<link rel="stylesheet" href="./shopdrop-division-layout-195d.css?v=195d">\n'
+        def blob(data):
+            return subprocess.check_output(['git','hash-object','--stdin'],input=data).decode().strip()
+        planned={}
+        style=Path(CSS_PATH)
+        if style.exists() and style.read_bytes()!=CSS.encode('utf-8'):
+            raise SystemExit('Unexpected stylesheet collision; no changes installed')
+        for name,expected in SHAS.items():
+            p=Path(name); source=p.read_bytes()
+            anchor=b'</head>'; addition=LINK.encode('utf-8')
+            if source.count(anchor)!=1:
+                raise SystemExit('Unexpected head anchor: '+name)
+            if addition+anchor in source:
+                if source.count(addition)!=1 or blob(source.replace(addition, b'', 1))!=expected:
+                    raise SystemExit('Unexpected installed version: '+name)
+                continue
+            if blob(source)!=expected:
+                raise SystemExit('Unexpected source version; no changes installed: '+name)
+            updated=source.replace(anchor,addition+anchor,1)
+            if updated.replace(addition,b'',1)!=source:
+                raise SystemExit('Original bytes changed: '+name)
+            backup=Path('backups/fix195d')/p.name
+            if backup.exists() and backup.read_bytes()!=source:
+                raise SystemExit('Unexpected backup: '+name)
+            planned[name]=(source,updated)
+        for name,(source,updated) in planned.items():
+            p=Path(name); backup=Path('backups/fix195d')/p.name
+            backup.parent.mkdir(parents=True,exist_ok=True)
+            if not backup.exists(): backup.write_bytes(source)
+            p.write_bytes(updated)
+        if not style.exists(): style.write_bytes(CSS.encode('utf-8'))
+        print('Fix 195D: only one stylesheet link added to each of three pages; all original bytes preserved.')
+        PYCODE
+        git diff --check
+        git config user.name "ShopDrop Integration"
+        git config user.email "actions@users.noreply.github.com"
+        git add public/product-shopping-194a.html public/services.html public/dispatching.html public/shopdrop-division-layout-195d.css
+        if test -d backups/fix195d; then git add backups/fix195d; fi
+        if ! git diff --cached --quiet; then
+          git commit -m "Fix 195D consistent division presentation"
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
