@@ -1,0 +1,73 @@
+name: ShopDrop Fix 192DC Transport Bag
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix192dc-transport-bag.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Add Transport Bag without replacing existing code
+      shell: bash
+      run: |
+        set -euo pipefail
+         test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+         python3 <<'PYCODE'
+        from pathlib import Path
+        import subprocess
+        files = {
+            'public/shopdrop-transport-results-192b.js': ('        details.append(verify,serverStatus);', '        details.append(verify,serverStatus);\n        if (window.ShopDropDispatchBag192DC) window.ShopDropDispatchBag192DC.attach(details,advert,select,quantity,appointment);'),
+            'public/transport-results.html': ('<script src="./shopdrop-transport-results-192b.js"></script>', '<script src="./shopdrop-dispatch-bag-192dc.js?v=192dc"></script><script src="./shopdrop-transport-results-192b.js?v=192dc"></script>'),
+            'public/transport-search.html': ('<a href="./checkout.html">Bag</a>', '<a href="./checkout.html">Bag</a>\n<a href="./dispatch-bag-192dc.html">Transport Bag</a>'),
+            'public/dispatching.html': ('<a class="shopdrop-provider-advert-link" href="./transport-search.html">Search Transport &amp; Equipment Hire</a>', '<a class="shopdrop-provider-advert-link" href="./transport-search.html">Search Transport &amp; Equipment Hire</a>\n  <a class="shopdrop-provider-advert-link" href="./dispatch-bag-192dc.html">My Transport Bag</a>'),
+        }
+        # Validate all original anchors before changing anything. No broad text replacement.
+        for name,(old,new) in files.items():
+            s=Path(name).read_text()
+            if new not in s and s.count(old)!=1:
+                raise SystemExit(f'Unexpected or ambiguous anchor: {name}; no patch applied')
+        for name,(old,new) in files.items():
+            f=Path(name); s=f.read_text()
+            if new in s: continue
+            backup=Path('backups/fix192dc')/f.name
+            if not backup.exists():
+                backup.parent.mkdir(parents=True,exist_ok=True); backup.write_bytes(f.read_bytes())
+            f.write_text(s.replace(old,new,1))
+        # Add the results-page header link, without changing the product Bag.
+        f=Path('public/transport-results.html');s=f.read_text();old='<a href="./checkout.html">Bag</a>';new=old+'\n<a href="./dispatch-bag-192dc.html">Transport Bag</a>'
+        if new not in s:
+            if s.count(old)!=1: raise SystemExit('Unexpected results header')
+            f.write_text(s.replace(old,new,1))
+
+        new_files = {'public/shopdrop-dispatch-bag-192dc.js': "(() => {\n  'use strict';\n  const BASE = 'https://dtkdvvxpwonywtsgqmdx.supabase.co';\n  const KEY = 'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';\n  let clientPromise;\n  function el(tag, content) {\n    const item = document.createElement(tag);\n    if (content !== undefined) item.textContent = content;\n    return item;\n  }\n  function link(text, href) {\n    const item = el('a', text);\n    item.href = href; item.className = 'btn';\n    return item;\n  }\n  function message(parent, text) {\n    parent.replaceChildren(document.createTextNode(text));\n  }\n  function authMessage(parent) {\n    message(parent, 'Please sign in or register to use your Transport Bag. You can browse without an account.');\n    parent.append(link('Sign in', './sign-in.html'), link('Register', './register.html'));\n  }\n  function live() {\n    const p = el('div'); p.className = 'muted';\n    p.setAttribute('role', 'status'); p.setAttribute('aria-live', 'polite');\n    return p;\n  }\n  async function client() {\n    if (!clientPromise) {\n      clientPromise = import('https://esm.sh/@supabase/supabase-js@2.49.4')\n        .then(({createClient}) => createClient(BASE, KEY, {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}}))\n        .catch(error => { clientPromise = undefined; throw error; });\n    }\n    return clientPromise;\n  }\n  async function rpc(name, args) {\n    const db = await client();\n    const {data: session, error: sessionError} = await db.auth.getSession();\n    if (sessionError || !session?.session?.access_token) throw Object.assign(new Error('Sign in required'),{needsSignIn:true});\n    const {data: verified, error: authError} = await db.auth.getUser(session.session.access_token);\n    if (authError || !verified?.user?.id) throw Object.assign(new Error('Sign in required'),{needsSignIn:true});\n    const {data,error} = await db.rpc(name,args);\n    if (error) {\n      if (error.code === '28000' || error.code === 'PGRST301') throw Object.assign(new Error('Sign in required'),{needsSignIn:true});\n      throw new Error('Transport request failed');\n    }\n    return data;\n  }\n  const money = value => new Intl.NumberFormat('en-ZA',{style:'currency',currency:'ZAR'}).format(Number(value));\n  const date = value => new Intl.DateTimeFormat('en-ZA',{dateStyle:'medium',timeStyle:'short',timeZone:'Africa/Johannesburg'}).format(new Date(value));\n  function attach(details, advert, select, quantity, appointment) {\n    if (!details || details.dataset.dispatchBag192dc) return;\n    details.dataset.dispatchBag192dc = '1';\n    const add = el('button','Add to Transport Bag'); add.type='button';\n    const status = live();\n    let busy = false;\n    function selection() {\n      const rate = (Array.isArray(advert.rates) ? advert.rates : []).find(r => String(r.id) === select.value);\n      const n = Number(quantity.value);\n      const start = Date.parse(appointment.value + '+02:00');\n      if (!rate || !Number.isSafeInteger(n) || n < Math.max(1, Math.ceil(Number(rate.minimum_units))) || n > 365 || !Number.isFinite(start) || start <= Date.now()) return null;\n      return {p_advert_id:advert.id,p_rate_id:rate.id,p_quantity:n,p_start:new Date(start).toISOString()};\n    }\n    function refresh() { add.disabled = busy || !selection(); }\n    for (const control of [select,quantity,appointment]) {\n      for (const event of ['input','change']) control.addEventListener(event, () => { if (!busy) {message(status,'');refresh();} });\n    }\n    add.addEventListener('click', async () => {\n      const args = selection(); if (!args || busy) return;\n      busy=true; refresh();\n      const controls=[select,quantity,appointment];\n      const previous=controls.map(c=>c.disabled); controls.forEach(c=>{c.disabled=true;});\n      message(status,'Checking availability and saving your selection…');\n      try {\n        const id = await rpc('shopdrop_transport_bag_add_192dc',args);\n        if (typeof id !== 'string' || !id) throw new Error('Selection not saved');\n        message(status,'Saved to your Transport Bag. Not reserved or confirmed. No payment has been taken.');\n        status.append(link('Open Transport Bag','./dispatch-bag-192dc.html'));\n      } catch(error) {\n        if(error.needsSignIn) authMessage(status);\n        else message(status,'Could not save this selection. Check availability again, confirm the quantity and time, or remove an earlier selection for the same appointment in your Transport Bag.');\n      } finally {\n        controls.forEach((c,i)=>{c.disabled=previous[i];}); busy=false; refresh();\n      }\n    });\n    details.append(add,status); refresh();\n  }\n  async function showBag() {\n    const list=document.getElementById('dispatchBagItems192dc');\n    const status=document.getElementById('dispatchBagStatus192dc');\n    const reload=document.getElementById('dispatchBagReload192dc');\n    if(!list || !status || !reload) return;\n    let loading=false;\n    async function load() {\n      if(loading) return;\n      loading=true;reload.disabled=true;list.replaceChildren();message(status,'Loading your private Transport Bag…');\n      try {\n        const rows=await rpc('shopdrop_transport_bag_list_192dc',{});\n        if(!Array.isArray(rows)) throw new Error('Invalid bag response');\n        message(status,rows.length ? `${rows.length} saved selection${rows.length===1?'':'s'}.` : 'Your Transport Bag is empty.');\n        for(const row of rows) {\n          const card=el('article');\n          card.append(el('h2',row.title||'Transport selection'));\n          card.append(el('p',`Requested start: ${date(row.starts_at)} SAST`),el('p',`Estimated end: ${date(row.ends_at)} SAST`),el('p',`Quantity: ${row.quantity}`));\n          card.append(el('p',`Provider price: ${money(row.provider_amount)}`),el('p',`Shop&Drop service fee: ${money(row.commission)}`));\n          const total=el('p');total.append(el('strong',`Estimated total: ${money(row.total)}`));card.append(total);\n          card.append(el('p',row.status==='expired'?'Expired — choose a new appointment.':'Saved only — not reserved or confirmed.'));\n          const remove=el('button','Remove from Transport Bag');remove.type='button';\n          const feedback=live();\n          remove.addEventListener('click',async()=>{\n            remove.disabled=true;message(feedback,'Removing…');\n            try {const ok=await rpc('shopdrop_transport_bag_remove_192dc',{p_id:row.id});if(ok!==true) throw new Error('Not removed');await load();}\n            catch(error){if(error.needsSignIn)authMessage(feedback);else message(feedback,'Could not remove this selection. Refresh your Bag and try again.');remove.disabled=false;}\n          });\n          card.append(remove,feedback);list.append(card);\n        }\n      } catch(error){if(error.needsSignIn)authMessage(status);else message(status,'Unable to load your Transport Bag. Select Refresh and try again.');}\n      finally{loading=false;reload.disabled=false;}\n    }\n    reload.addEventListener('click',load);await load();\n  }\n  window.ShopDropDispatchBag192DC=Object.freeze({attach});\n  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',showBag,{once:true});\n  else showBag();\n})();\n", 'public/dispatch-bag-192dc.html': '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n<title>Transport Bag | Shop&amp;Drop</title><link rel="stylesheet" href="./shopdrop-transport-search-192b.css"></head>\n<body><header><a href="./index.html">Home</a><a href="./dispatching.html">Transport Services &amp; Equipment Hire</a><a href="./account.html">My Account</a><a href="./checkout.html">Product Bag</a></header>\n<main><section class="panel"><h1>My Transport Bag</h1>\n<p>Your saved Transport Services &amp; Equipment Hire selections are private. Saving a selection does not reserve a vehicle or equipment, confirm an appointment or collect payment.</p>\n<p class="muted">Prices include the Shop&amp;Drop service fee. Availability and the final booking must still be confirmed before payment.</p>\n<a class="btn" href="./transport-search.html">Search Transport Services &amp; Equipment Hire</a>\n<button id="dispatchBagReload192dc" type="button">Refresh Transport Bag</button>\n<div id="dispatchBagStatus192dc" role="status" aria-live="polite" class="muted">Loading your Transport Bag…</div>\n<div class="grid" id="dispatchBagItems192dc"></div>\n</section></main><script src="./shopdrop-dispatch-bag-192dc.js?v=192dc"></script></body></html>\n'}
+        for name,content in new_files.items():
+            f=Path(name)
+            if f.exists() and f.read_text()!=content: raise SystemExit(f'Unexpected existing new-file path: {name}')
+        for name,content in new_files.items():
+            Path(name).write_text(content)
+        PYCODE
+        node --check public/shopdrop-dispatch-bag-192dc.js
+        node --check public/shopdrop-transport-results-192b.js
+        git diff --check
+        git config user.name 'ShopDrop Integration'
+        git config user.email 'actions@users.noreply.github.com'
+        git add public/shopdrop-dispatch-bag-192dc.js public/dispatch-bag-192dc.html public/shopdrop-transport-results-192b.js public/transport-results.html public/transport-search.html public/dispatching.html backups/fix192dc
+        if git diff --cached --quiet; then echo 'Fix already installed'; else git commit -m 'Fix 192DC add private Transport Bag'; git push origin HEAD:shopdrop-phase6-integration; fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
