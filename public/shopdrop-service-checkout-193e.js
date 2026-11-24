@@ -30,6 +30,9 @@
     const row=rows.find(r=>r.booking_id===booking);
     if(!row)throw safe('This booking is not available in your account. Return to My Service Appointments.');
     if(row.status!=='confirmed'||row.booking_status!=='pending'||row.payment_status!=='pending'||!future(row.confirmed_date,row.confirmed_time))throw safe('A confirmed future appointment awaiting payment is required. Return to My Service Appointments.');
+    const locationState=await rpc(db,'shopdrop_service_location_state_193f',{p_booking_id:booking});
+    if(typeof locationState?.ready!=='boolean'||typeof locationState.customer_ready!=='boolean'||typeof locationState.provider_ready!=='boolean')throw safe('Private address readiness could not be verified. Refresh and try again.');
+    if(!locationState.ready)throw safe(!locationState.customer_ready?'Save your private service address in My Service Appointments before checkout.':'The provider still needs to save their private service address. Return to My Service Appointments and try again later.');
     const ready=await rpc(db,'shopdrop_service_checkout_readiness',{p_booking_id:booking});
     if(ready?.ok!==true||ready.ready_for_checkout!==true||ready.booking_id!==booking||ready.currency!=='ZAR'||ready.payment_collected!==false||ready.funds_moved!==false||ready.confirmed_date!==row.confirmed_date||String(ready.confirmed_arrival_time).slice(0,5)!==String(row.confirmed_time).slice(0,5))throw safe('This appointment is not ready for payment. Refresh and check your booking.');
     const provider=cents(ready.provider_amount),fee=cents(ready.commission_amount),total=cents(ready.customer_total);
