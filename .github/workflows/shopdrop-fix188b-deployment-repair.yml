@@ -1,1 +1,217 @@
 
+name: ShopDrop Fix 188B - Automatic Deployment Repair
+
+'on':
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix188b-deployment-repair.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    name: Preserve and repair integration deployment
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Backup and extend existing deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import textwrap
+
+          workflow = Path(
+              ".github/workflows/"
+              "shopdrop-integration-pages.yml"
+          )
+
+          backup = Path(
+              "backups/fix188b/"
+              "integration-pages-before-188b.yml"
+          )
+
+          expected_sha = (
+              "314083e37bc25148257cb8d8c867de0f7831d313"
+          )
+
+          actual_sha = subprocess.check_output(
+              ["git", "hash-object", str(workflow)],
+              text=True
+          ).strip()
+
+          if actual_sha != expected_sha:
+              raise SystemExit(
+                  "SAFETY STOP: Deployment workflow changed."
+              )
+
+          original = workflow.read_bytes()
+          source = original.decode("utf-8")
+
+          if backup.exists():
+              raise SystemExit(
+                  "SAFETY STOP: Backup already exists."
+              )
+
+          permission_anchor = (
+              "permissions:\n"
+              "  contents: read\n"
+          )
+
+          permission_updated = (
+              "permissions:\n"
+              "  contents: read\n"
+              "  actions: read\n"
+          )
+
+          if source.count(permission_anchor) != 1:
+              raise SystemExit(
+                  "SAFETY STOP: Permissions mismatch."
+              )
+
+          anchor = (
+              "      - name: Deploy integrated website\n"
+          )
+
+          if source.count(anchor) != 1:
+              raise SystemExit(
+                  "SAFETY STOP: Deployment step mismatch."
+              )
+
+          addition = r"""
+                - name: Wait for website artifact availability
+                  shell: bash
+                  env:
+                    GH_TOKEN: ${{ github.token }}
+                    ARTIFACT_ID: ${{ steps.website_artifact.outputs.artifact_id }}
+                  run: |
+                    set -euo pipefail
+
+                    READY=false
+
+                    for ATTEMPT in $(seq 1 18)
+                    do
+                      echo "Artifact availability check $ATTEMPT"
+
+                      if gh api \
+                        "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
+                        --paginate \
+                        --jq '.artifacts[] | select(.expired == false) | [.name, (.id | tostring)] | @tsv' \
+                        > "$RUNNER_TEMP/shopdrop-artifacts.txt"
+                      then
+                        if grep -Fxq \
+                          "$(printf '%s\t%s' "$PAGES_ARTIFACT_NAME" "$ARTIFACT_ID")" \
+                          "$RUNNER_TEMP/shopdrop-artifacts.txt"
+                        then
+                          READY=true
+                          echo "PASS: Correct artifact is available"
+                          break
+                        fi
+                      fi
+
+                      echo "Waiting for GitHub artifact registration."
+                      sleep 10
+                    done
+
+                    if [ "$READY" != "true" ]
+                    then
+                      echo "::error::Uploaded artifact is not retrievable."
+                      exit 1
+                    fi
+
+                    echo "Allowing artifact registration to settle."
+                    sleep 15
+
+          """
+
+          addition = textwrap.dedent(
+              addition
+          ).strip("\n")
+
+          addition = textwrap.indent(
+              addition, "      "
+          ) + "\n\n"
+
+          updated = source.replace(
+              permission_anchor,
+              permission_updated,
+              1
+          )
+
+          updated = updated.replace(
+              anchor,
+              addition + anchor,
+              1
+          )
+
+          restored = updated.replace(
+              addition, "", 1
+          ).replace(
+              permission_updated,
+              permission_anchor,
+              1
+          )
+
+          if restored != source:
+              raise SystemExit(
+                  "SAFETY STOP: Original code not preserved."
+              )
+
+          backup.parent.mkdir(
+              parents=True,
+              exist_ok=True
+          )
+
+          backup.write_bytes(original)
+
+          if backup.read_bytes() != original:
+              raise SystemExit(
+                  "SAFETY STOP: Backup failed."
+              )
+
+          workflow.write_bytes(
+              updated.encode("utf-8")
+          )
+
+          print("PASS: Complete deployment backup")
+          print("PASS: Existing deployment code preserved")
+          print("PASS: Automatic triggers preserved")
+          print("PASS: Artifact availability checks added")
+          print("PASS: Website source unchanged")
+          PY
+
+          git diff --check
+
+      - name: Commit deployment repair
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "ShopDrop Fix Bot"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            .github/workflows/shopdrop-integration-pages.yml \
+            backups/fix188b/integration-pages-before-188b.yml
+
+          git commit -m \
+            "Fix 188B verify artifact availability before deployment"
+
+          git push origin \
+            HEAD:shopdrop-phase6-integration
+
+          echo "PASS: Deployment repair committed"
+
