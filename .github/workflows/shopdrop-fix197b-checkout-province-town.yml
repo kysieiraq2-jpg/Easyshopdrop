@@ -1,0 +1,82 @@
+name: ShopDrop Fix 197B Checkout Province and Town
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix197b-checkout-province-town.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Correct checkout address labels and province selection
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import subprocess
+        SHAS = {'public/checkout.html': '825884981319f4626c604055134d89295a89b47e', 'public/shopdrop-location-182a.js': '0bca030982e856c800fe34ca79a5d2e162e5a6cd', 'public/shopdrop-cart-address-bridge.js': 'adfcac484afef7eec18184e760e19eb38b1c8646'}
+        PATCHES = {'public/checkout.html': [('  <label for="city">Town or city</label>\n  <input id="city" autocomplete="shipping address-level2" placeholder="Town or city">\n  <label for="region">Province (optional)</label>\n  <input id="region" autocomplete="shipping address-level1" placeholder="Province">', '  <label for="region">Province</label>\n  <input id="region" autocomplete="shipping address-level1" placeholder="Province" required>\n  <label for="city">Town or city</label>\n  <input id="city" autocomplete="shipping address-level2" placeholder="Town or city">'), ('<script src="./shopdrop-location-182a.js" defer>', '<script src="./shopdrop-location-182a.js?v=197b" defer>'), ('<script src="./shopdrop-cart-address-bridge.js">', '<script src="./shopdrop-cart-address-bridge.js?v=197b">')], 'public/shopdrop-location-182a.js': [('        originalProvince.before(\n          provinceLabel, province\n        );\n        originalTown.before(townLabel, town);', '        // Checkout only: reuse the original visible labels and keep\n        // the existing address fields for the save-address bridge.\n        const existingProvinceLabel = parent.querySelector(\'label[for="region"]\');\n        const existingTownLabel = parent.querySelector(\'label[for="city"]\');\n        if (existingProvinceLabel) {\n          existingProvinceLabel.htmlFor = province.id;\n          originalProvince.before(province);\n        } else {\n          originalProvince.before(provinceLabel, province);\n        }\n        if (existingTownLabel) {\n          existingTownLabel.htmlFor = town.id;\n          originalTown.before(town);\n        } else {\n          originalTown.before(townLabel, town);\n        }\n        province.required = true;\n        town.required = true;')], 'public/shopdrop-cart-address-bridge.js': [("      const required=['recipient','line1','city','country'];", "      // South African delivery addresses require a province.\n      if($('country').value.trim().toUpperCase()==='ZA'&&!$('region').value.trim())throw new Error('Choose your province before saving the delivery address.');\n      const required=['recipient','line1','city','country'];")]}
+        def blob(raw):
+            return subprocess.check_output(['git','hash-object','--stdin'],input=raw).decode().strip()
+        def revise(raw,name):
+            source=raw.decode('utf-8')
+            result=source
+            for old,new in PATCHES[name]:
+                if result.count(old)!=1: raise SystemExit('Unexpected checkout address anchor: '+name)
+                result=result.replace(old,new,1)
+            reverse=result
+            for old,new in reversed(PATCHES[name]):
+                if reverse.count(new)!=1: raise SystemExit('Unexpected revised anchor: '+name)
+                reverse=reverse.replace(new,old,1)
+            if reverse!=source: raise SystemExit('Original code differs outside approved changes: '+name)
+            return result.encode('utf-8')
+        planned={}
+        for name,expected in SHAS.items():
+            p=Path(name); backup=Path('backups/fix197b')/p.name; raw=p.read_bytes()
+            if blob(raw)==expected:
+                original=raw
+            elif backup.is_file() and blob(backup.read_bytes())==expected:
+                original=backup.read_bytes()
+                if raw!=revise(original,name): raise SystemExit('Unexpected installed version: '+name)
+                continue
+            else:
+                raise SystemExit('Unexpected source version; no changes installed: '+name)
+            if backup.exists() and backup.read_bytes()!=original: raise SystemExit('Unexpected backup: '+name)
+            planned[name]=(original,revise(original,name))
+        for name,(original,revised) in planned.items():
+            backup=Path('backups/fix197b')/Path(name).name
+            backup.parent.mkdir(parents=True,exist_ok=True)
+            if not backup.exists(): backup.write_bytes(original)
+            Path(name).write_bytes(revised)
+        print('Fix 197B: province-first checkout address, single labels and required province for ZA addresses. Other operations preserved.')
+        PYCODE
+        node --check public/shopdrop-location-182a.js
+        node --check public/shopdrop-cart-address-bridge.js
+        git diff --check
+        git config user.name "ShopDrop Integration"
+        git config user.email "actions@users.noreply.github.com"
+        git add public/checkout.html public/shopdrop-location-182a.js public/shopdrop-cart-address-bridge.js
+        if test -d backups/fix197b; then git add backups/fix197b; fi
+        if ! git diff --cached --quiet; then
+          git commit -m "Fix 197B checkout province-first address"
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
