@@ -1,1 +1,210 @@
 
+name: ShopDrop Fix 189A - Transport Advertisement Navigation
+
+'on':
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix189a-transport-navigation.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    name: Add compact transport navigation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+
+      - name: Preserve and improve transport navigation
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          page = Path(
+              "public/shopdrop-vehicle-draft-private.html"
+          )
+
+          backup = Path(
+              "backups/fix189a/"
+              "transport-advertisement-before-189a.html"
+          )
+
+          expected = (
+              "0cb312d52e3a44da49afa9959c9966677480b73b"
+          )
+
+          actual = subprocess.check_output(
+              ["git", "hash-object", str(page)],
+              text=True
+          ).strip()
+
+          if actual != expected:
+              raise SystemExit(
+                  "SAFETY STOP: Advertisement source changed."
+              )
+
+          original = page.read_bytes()
+          source = original.decode("utf-8")
+
+          if backup.exists():
+              raise SystemExit(
+                  "SAFETY STOP: Backup already exists."
+              )
+
+          for filename in (
+              "index.html",
+              "dispatching.html",
+              "account.html"
+          ):
+              if not Path("public", filename).is_file():
+                  raise SystemExit(
+                      "Missing navigation destination: "
+                      + filename
+                  )
+
+          if '<select id="title" required>' not in source:
+              raise SystemExit(
+                  "SAFETY STOP: Previous title fix missing."
+              )
+
+          province = source.index('id="province"')
+          town = source.index('id="town"')
+
+          if province >= town:
+              raise SystemExit(
+                  "SAFETY STOP: Previous province fix missing."
+              )
+
+          anchor = "</header>\n<main>"
+
+          if source.count(anchor) != 1:
+              raise SystemExit(
+                  "SAFETY STOP: Header structure changed."
+              )
+
+          navigation = """
+          <nav id="shopdropTransportNav189A"
+               aria-label="Advertisement navigation">
+            <a href="./index.html">Home</a>
+            <a href="./dispatching.html">Back to Transport &amp; Equipment Hire</a>
+            <a href="./account.html">My Account</a>
+          </nav>
+          """
+
+          css = """
+          #shopdropTransportNav189A{
+            display:flex;
+            flex-wrap:wrap;
+            align-items:center;
+            gap:8px 18px;
+            background:#101827;
+            padding:8px 18px 12px;
+            font-size:14px;
+            line-height:1.4
+          }
+          #shopdropTransportNav189A a{
+            color:#fff;
+            text-decoration:underline;
+            padding:4px 0
+          }
+          #shopdropTransportNav189A a:focus-visible{
+            outline:2px solid #fff;
+            outline-offset:3px
+          }
+          """
+
+          if source.count("</style>") != 1:
+              raise SystemExit(
+                  "SAFETY STOP: Style structure changed."
+              )
+
+          updated = source.replace(
+              "</style>",
+              css + "</style>",
+              1
+          )
+
+          updated = updated.replace(
+              anchor,
+              "</header>\n" + navigation + "<main>",
+              1
+          )
+
+          restored = updated.replace(
+              css, "", 1
+          ).replace(
+              navigation, "", 1
+          )
+
+          if restored != source:
+              raise SystemExit(
+                  "SAFETY STOP: Existing code not preserved."
+              )
+
+          backup.parent.mkdir(
+              parents=True,
+              exist_ok=True
+          )
+
+          backup.write_bytes(original)
+
+          if backup.read_bytes() != original:
+              raise SystemExit(
+                  "SAFETY STOP: Backup verification failed."
+              )
+
+          page.write_bytes(
+              updated.encode("utf-8")
+          )
+
+          print("PASS: Original advertisement backed up")
+          print("PASS: Title dropdown preserved")
+          print("PASS: Province before town preserved")
+          print("PASS: All existing form code preserved")
+          print("PASS: Compact navigation added")
+          print("PASS: Other Services unchanged")
+          PY
+
+          git diff --check
+
+      - name: Commit navigation correction
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "ShopDrop Fix Bot"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            public/shopdrop-vehicle-draft-private.html \
+            backups/fix189a/transport-advertisement-before-189a.html
+
+          git commit -m \
+            "Fix 189A add compact transport advertisement navigation"
+
+          git push origin \
+            HEAD:shopdrop-phase6-integration
+
+          echo "PASS: Transport navigation committed"
+
+  deploy:
+    needs: fix
+    permissions:
+      contents: read
+      actions: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+
