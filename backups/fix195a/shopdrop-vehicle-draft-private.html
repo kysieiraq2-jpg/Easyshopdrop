@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport"
+      content="width=device-width,initial-scale=1">
+<title>Dispatching Services for Hire | Shop&Drop</title>
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:#f4f6f8;
+  color:#17202a;
+  font:16px Arial,sans-serif
+}
+header{
+  background:#101827;
+  color:white;
+  padding:18px
+}
+main{
+  max-width:760px;
+  margin:20px auto;
+  padding:16px
+}
+section{
+  background:white;
+  padding:20px;
+  border-radius:12px
+}
+label{display:block;margin:14px 0}
+input,select,textarea,button{
+  display:block;
+  width:100%;
+  padding:12px;
+  margin-top:6px;
+  font:inherit;
+  border-radius:7px;
+  border:1px solid #cbd5e1
+}
+button{
+  background:#0f766e;
+  color:white;
+  border:0
+}
+button:disabled{opacity:.5}
+.muted{color:#64748b}
+#result{
+  white-space:pre-wrap;
+  overflow-wrap:anywhere
+}
+
+#shopdropTransportNav189A{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:8px 18px;
+  background:#101827;
+  padding:8px 18px 12px;
+  font-size:14px;
+  line-height:1.4
+}
+#shopdropTransportNav189A a{
+  color:#fff;
+  text-decoration:underline;
+  padding:4px 0
+}
+#shopdropTransportNav189A a:focus-visible{
+  outline:2px solid #fff;
+  outline-offset:3px
+}
+</style>
+</head>
+<body>
+<header>
+  <strong>Shop&Drop</strong>
+  <div>Dispatching Service Advertisement</div>
+</header>
+
+<nav id="shopdropTransportNav189A"
+     aria-label="Advertisement navigation">
+  <a href="./index.html">Home</a>
+  <a href="./dispatching.html">Back to Transport &amp; Equipment Hire</a>
+  <a href="./account.html">My Account</a>
+</nav>
+<main>
+<section>
+<h1>Advertise your transport or equipment service</h1>
+<p class="muted">
+  This service advertisement form is not yet
+  connected to the complete booking and checkout journey.
+  Eligible advertisements publish automatically after successful photograph submission.
+</p>
+
+<form id="draftForm">
+  <label>
+    Transport or equipment service title
+    <select id="title" required>
+      <option value="">Choose transport or equipment service</option>
+      <option value="Cars and light vehicles">Cars and light vehicles</option>
+      <option value="Delivery and commercial vehicles">Delivery and commercial vehicles</option>
+      <option value="Heavy trucks and long-distance transport">Heavy trucks and long-distance transport</option>
+      <option value="Trailers and abnormal loads">Trailers and abnormal loads</option>
+      <option value="Cranes and lifting equipment">Cranes and lifting equipment</option>
+      <option value="Earthmoving and construction equipment">Earthmoving and construction equipment</option>
+      <option value="Agricultural equipment">Agricultural equipment</option>
+      <option value="Mining and industrial equipment">Mining and industrial equipment</option>
+      <option value="Municipal and specialist vehicles">Municipal and specialist vehicles</option>
+      <option value="Other transport or equipment">Other transport or equipment</option>
+    </select>
+  </label>
+
+  <label>
+    Vehicle or equipment used for the service
+    <select id="type">
+      <option value="">Choose type</option>
+      <option>Delivery vehicle / van</option>
+      <option>Light truck</option>
+      <option>Heavy truck</option>
+      <option>Extra-heavy transport</option>
+      <option>Other / specialist transport</option>
+    </select>
+  </label>
+
+  <label>
+    Description
+    <textarea id="description"
+              maxlength="2000"
+              rows="4"></textarea>
+  </label>
+
+  <label>
+    Service provider base province
+    <input id="province" maxlength="120">
+  </label>
+
+  <label>
+    Service provider base town
+    <input id="town" maxlength="120">
+  </label>
+
+  <label>
+    Service coverage
+    <select id="coverage">
+      <option value="">Not selected</option>
+      <option value="local">Local</option>
+      <option value="selected">Selected areas</option>
+      <option value="nationwide">
+        Anywhere in South Africa
+      </option>
+    </select>
+  </label>
+
+  <label>
+  Choose photographs from your phone or computer (up to 6)
+  <input id="vehiclePhotos"
+         type="file"
+         accept="image/*,.heic,.heif,.avif"
+         multiple>
+</label>
+<label for="vehicleCamera">
+  Or take a photograph with your phone
+  <input id="vehicleCamera"
+         type="file"
+         accept="image/*"
+         capture="environment">
+</label>
+<div id="shopdropDispatchRates"></div>
+<p id="vehiclePhotoCount" class="muted" role="status">
+  No photographs selected yet.
+</p>
+<p class="muted">
+  Maximum 10 MB per photograph.
+</p>
+<button id="submit" type="submit">
+    Submit dispatching service advertisement
+  </button>
+</form>
+
+<p id="result" role="status"
+   aria-live="polite">
+  No draft created.
+</p>
+</section>
+</main>
+
+<script src="./shopdrop-shared-photo-reader.js"></script>
+<script src="./shopdrop-ad-gallery-uploader.js"></script>
+<script src="./shopdrop-shared-service-rates.js"></script>
+<script src="./shopdrop-dispatch-equipment-fields.js"></script>
+<script type="module">
+import {createClient} from
+  'https://esm.sh/@supabase/supabase-js@2';
+
+const client=createClient(
+  'https://dtkdvvxpwonywtsgqmdx.supabase.co',
+  'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q',
+  {
+    auth:{
+      persistSession:true,
+      autoRefreshToken:true,
+      detectSessionInUrl:true
+    }
+  }
+);
+
+window.ShopDropSharedServiceRates
+    ?.mount('shopdropDispatchRates','dispatch');
+
+const cameraPhotos=[];
+const galleryPhotos=[];
+const cameraInput=
+  document.getElementById('vehicleCamera');
+const galleryInput=
+  document.getElementById('vehiclePhotos');
+const photoCount=
+  document.getElementById('vehiclePhotoCount');
+
+let photosReading=false;
+
+function selectedPhotos(){
+  return [
+    ...galleryPhotos,
+    ...cameraPhotos
+  ];
+}
+
+function updatePhotoCount(){
+  const total=selectedPhotos().length;
+
+  photoCount.textContent=total
+    ?total+' of 6 photographs selected.'
+    :'No photographs selected yet.';
+}
+
+async function preparePhotos(files){
+  const reader=
+    window.ShopDropSharedPhotoReader;
+
+  if(!reader?.readOriginal){
+    throw Error(
+      'Picture reader unavailable. Please try again.'
+    );
+  }
+
+  const prepared=await Promise.all(
+    files.map(file=>reader.readOriginal(file))
+  );
+
+  return prepared.map((photo,index)=>
+    new File(
+      [photo.blob],
+      'vehicle-photo-'+index+'.'+photo.extension,
+      {type:photo.mime}
+    )
+  );
+}
+
+async function addPhotos(input,destination){
+  if(photosReading)return;
+
+  photosReading=true;
+  const submit=document.getElementById('submit');
+  const wasDisabled=submit.disabled;
+  submit.disabled=true;
+
+  try{
+    const files=Array.from(input.files||[]);
+
+    if(selectedPhotos().length+files.length>6){
+      throw Error(
+        'Maximum 6 pictures. Please choose fewer.'
+      );
+    }
+
+    if(!files.length)return;
+
+    photoCount.textContent=
+      'Preparing your pictures...';
+
+    const saved=await preparePhotos(files);
+
+    destination.push(...saved);
+    updatePhotoCount();
+
+  }catch(error){
+    photoCount.textContent=
+      error?.message||
+      'Please choose your pictures again.';
+  }finally{
+    input.value='';
+    photosReading=false;
+    submit.disabled=wasDisabled;
+  }
+}
+
+galleryInput.addEventListener(
+  'change',
+  ()=>addPhotos(galleryInput,galleryPhotos)
+);
+
+cameraInput.addEventListener(
+  'change',
+  ()=>addPhotos(cameraInput,cameraPhotos)
+);
+
+const form=document.getElementById('draftForm');
+const result=document.getElementById('result');
+const button=document.getElementById('submit');
+
+const value=id=>
+  document.getElementById(id).value.trim();
+
+form.addEventListener('submit',async event=>{
+  event.preventDefault();
+  if(button.disabled)return;
+
+  button.disabled=true;
+  result.textContent='Checking signed-in account...';
+
+  try{
+    const {data:userData,error:userError}=
+      await client.auth.getUser();
+
+    if(userError || !userData?.user?.id){
+      throw Error(
+        'Please sign in to Shop&Drop first.'
+      );
+    }
+
+    const title=value('title');
+
+    if(title.length<3 || title.length>120){
+      throw Error('Enter a valid vehicle title.');
+    }
+
+    if(photosReading){
+      throw Error('Please wait for your pictures.');
+    }
+
+    const photos=selectedPhotos();
+
+    if(photos.length<1||photos.length>6){
+      throw Error(
+        'Select between 1 and 6 photographs.'
+      );
+    }
+
+    const equipmentCollector=
+      window.ShopDropDispatchEquipment174;
+
+    if(!equipmentCollector?.collect){
+      throw Error(
+        'Equipment selection unavailable. Reload the page.'
+      );
+    }
+
+    const equipment=equipmentCollector.collect();
+
+    if(!value('type')||
+       !value('town')||
+       !value('province')||
+       !value('coverage')){
+      throw Error(
+        'Vehicle type, town, province and coverage are required.'
+      );
+    }
+
+    for(const photo of photos){
+      if(photo.size<1 || photo.size>10485760){
+        throw Error(
+          'Please choose a picture smaller than 10 MB.'
+        );
+      }
+    }
+
+    const offeredRates=
+      window.ShopDropSharedServiceRates
+        ?.collect('shopdropDispatchRates');
+
+    if(!Array.isArray(offeredRates)||
+       !offeredRates.length){
+      throw Error('Enter at least one valid rate.');
+    }
+
+    const record={
+      provider_id:userData.user.id,
+      vehicle_title:title,
+      vehicle_description:value('description')||null,
+      vehicle_type:value('type')||null,
+      dispatch_category:equipment.dispatch_category,
+      dispatch_subtype:equipment.dispatch_subtype,
+      hire_arrangement:equipment.hire_arrangement,
+      equipment_specifications:
+        equipment.equipment_specifications,
+      base_town:value('town')||null,
+      base_province:value('province')||null,
+      coverage_mode:value('coverage')||null,
+      covered_areas:[],
+      listing_status:'draft'
+    };
+
+    const {data,error}=await client
+      .from('shopdrop_vehicle_adverts')
+      .insert(record)
+      .select('id,listing_status')
+      .single();
+
+    if(error)throw Error(
+      error.message||'Draft could not be saved.'
+    );
+
+    try{
+      await window.ShopDropSharedServiceRates.save(
+        client,'dispatch',data.id,offeredRates
+      );
+    }catch(rateError){
+      throw Error(
+        'Service advertisement saved. Reference: '+
+        data.id+
+        '. Rates need attention: '+
+        rateError.message
+      );
+    }
+
+    result.textContent=
+      'Vehicle saved. Uploading photographs...';
+
+    const uploader=
+      window.ShopDropAdGalleryUploader;
+
+    if(!uploader?.uploadGallery){
+      throw Error(
+        'Photograph uploader unavailable. '+
+        'Advertisement ID: '+data.id
+      );
+    }
+
+    try{
+      const uploaded=
+        await uploader.uploadGallery({
+          client,
+          kind:'vehicle',
+          advertisementId:data.id,
+          files:photos
+        });
+
+      const {
+        data:published,
+        error:statusError
+      }=await client
+        .from('shopdrop_vehicle_adverts')
+        .select('listing_status')
+        .eq('id',data.id)
+        .single();
+
+      if(statusError)throw statusError;
+
+      result.textContent=
+        uploaded.savedCount+
+        ' photograph(s) uploaded.\n'+
+        'Advertisement ID: '+data.id+'\n'+
+        'Status: '+published.listing_status;
+
+      if(published.listing_status==='approved'){
+        result.textContent+=
+          '\nAutomatically published in browsing.';
+      }
+
+      form.reset();
+
+    }catch(uploadError){
+      result.textContent=
+        'Advertisement ID: '+data.id+
+        '\nPhotograph upload incomplete: '+
+        (uploadError?.message||'Unknown error')+
+        '\nKeep this ID. Do not create a duplicate.';
+    }
+
+  }catch(error){
+    result.textContent=
+      error?.message||'Draft creation failed.';
+  }finally{
+    button.disabled=false;
+  }
+});
+</script>
+<script src="./shopdrop-dispatch-compact-rates.js"></script>
+<script defer src="./shopdrop-dispatch-rate-management.js"></script>
+<script src="./shopdrop-location-dropdowns-181.js"></script>
+<script defer src="./shopdrop-provider-location-184a.js"></script></body>
+</html>

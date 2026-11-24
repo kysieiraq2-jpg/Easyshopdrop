@@ -17,6 +17,7 @@ button{cursor:pointer;background:#0f766e;color:white}
 .item{border-bottom:1px solid #eee;padding:12px 0}
 a{color:#0f766e}
 </style>
+<link rel="stylesheet" href="./shopdrop-payment-purpose-195a.css?v=195a">
 </head>
 <body>
 <header>
@@ -28,6 +29,20 @@ a{color:#0f766e}
 <h1>My account</h1><p><a href="./sell-item.html"><strong>Sell an Item — take photos and post</strong></a></p>
 
 <section class="panel" id="who">Loading…</section>
+<section class="panel shopdrop-purpose-195a" id="shopdropPaymentPurpose195a" aria-labelledby="shopdropPurposeTitle195a" hidden>
+<h2 id="shopdropPurposeTitle195a">Receive My Payment</h2>
+<p class="purpose-heading-195a">FOR PAYMENT PURPOSES</p>
+<div class="purpose-group-195a"><h3>New, Second-Hand &amp; Handmade Products</h3>
+<a class="purpose-action-195a" href="./account.html#seller-courier-pickup-panel">Enter Courier Reference Number After Pickup</a>
+<div class="purpose-note-195a"><p>The courier reference number must be obtained from the courier company when they physically collect your sold item. Enter this reference number using the button above.</p><p><strong>It is your responsibility to obtain this reference number for payment purposes.</strong></p></div></div>
+<div class="purpose-group-195a"><h3>Other Services</h3>
+<a class="purpose-action-195a" href="./shopdrop-provider-completion.html?booking_type=service">Enter Six-Digit Completion PIN After Completion of Service</a>
+<div class="purpose-note-195a"><p>The six-digit PIN must be obtained from the person who paid for your service, after completion of the agreed service, and entered using the button above.</p><p><strong>It is your responsibility to obtain this PIN for payment purposes.</strong></p></div></div>
+<div class="purpose-group-195a"><h3>Transport Services &amp; Equipment Hire</h3>
+<a class="purpose-action-195a" href="./shopdrop-provider-completion.html?booking_type=dispatch">Enter Six-Digit Completion PIN After Completion of Task</a>
+<div class="purpose-note-195a"><p>The six-digit PIN must be obtained from the person who paid for your transport or equipment hire service, after completion of the agreed task, and entered using the button above.</p><p><strong>It is your responsibility to obtain this PIN for payment purposes.</strong></p></div></div>
+<p class="muted">For a distant service or transport job, the paying customer may entrust the code to an authorized recipient. A courier reference alone cannot verify collection. Payment release requires the existing secure checks and confirmation from the approved payment provider. Live payments are not yet active.</p>
+</section>
 <section class="panel" id="shopdropPublicAdvertiserAccount"><h2>Your public advertiser name</h2><p class="muted">One unique name identifies all your products, second-hand items, services and vehicle offers. Your private account and contact details stay hidden.</p><label for="shopdropSellerAlias">Public advertiser name</label><input id="shopdropSellerAlias" type="text" maxlength="40" placeholder="e.g. Spooky One"><button id="shopdropSaveSellerAlias" type="button">Save public name</button><p id="shopdropSellerAliasStatus" role="status" class="muted">Sign in to choose your name and see your public reference.</p></section>
 
 <section class="panel">
@@ -380,6 +395,7 @@ if(error||!user){
  });
 
  who.append(signout);
+ document.getElementById('shopdropPaymentPurpose195a').hidden=false;
 // Fix39: seller records the courier reference; independent courier evidence is also mandatory.
 // Browser never authorizes payments or treats this reference as proof of collection.
 const pickupForm=document.getElementById('sellerCourierPickupForm');
