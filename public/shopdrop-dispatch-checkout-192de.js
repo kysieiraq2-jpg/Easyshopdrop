@@ -42,6 +42,9 @@
     if(!row)throw safe('This booking is not available in your account. Return to My Transport Appointments.');
     if(row.payment_status==='paid')throw safe('This booking is already paid. Return to My Transport Appointments.');
     if(row.status!=='confirmed'||row.booking_status!=='pending_payment'||row.payment_status!=='pending'||!(Date.parse(row.confirmed_at)>Date.now()))throw safe('A confirmed future appointment awaiting payment is required. Return to My Transport Appointments.');
+    const {data:locationState,error:locationError}=await db.rpc('shopdrop_dispatch_location_state_192df',{p_booking_id:booking});
+    if(locationError||typeof locationState?.ready!=='boolean')throw safe('Unable to verify the private service address. Refresh checkout and try again.');
+    if(locationState.ready!==true)throw safe('The provider still needs to save the service address. Return to My Transport Appointments and try again later.');
     const provider=cents(row.provider_amount), fee=cents(row.commission), total=cents(row.total);
     if(provider<=0||fee!==Math.round(provider*(provider<100000?10:7)/100)||total!==provider+fee)throw safe('The booking amount could not be verified. Do not pay.');
     return {row,provider,fee,total};

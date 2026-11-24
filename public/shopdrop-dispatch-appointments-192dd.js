@@ -85,6 +85,71 @@
     finally{busy=false;role.disabled=false;reload.disabled=false;controls.forEach((c,i)=>c.disabled=old[i]);}
     if(ok)await load(success);
   }
+  // Fix 192DF: service addresses are booking-specific and never publicly displayed.
+  async function providerLocationForm(card,row,open){
+    if(busy||card.querySelector('form'))return;
+    open.disabled=true;
+    const notice=feedback();notice.textContent='Loading your private service location…';card.append(notice);
+    try{
+      const [catalog,state]=await Promise.all([locations(),rpc('shopdrop_dispatch_location_state_192df',{p_booking_id:row.booking_id})]);
+      if(typeof state?.ready!=='boolean')throw Error('Invalid location response');
+      if(!card.isConnected)return;
+      notice.remove();
+      const form=el('form');form.className='appointment-form';
+      const where=place(form,'Your service or collection address',catalog);
+      const saved=state.own_location;
+      if(saved&&catalog[saved.province]){
+        where.province.value=saved.province;
+        where.province.dispatchEvent(new Event('change'));
+        where.town.value=saved.town;
+        where.address.value=saved.street_address||'';
+      }
+      form.append(el('p','Choose the address the customer will need for this booking. It will only be shared with the paying customer after verified payment.'));
+      const send=el('button','Save private service address');send.type='submit';
+      const msg=feedback();form.append(send,msg,button('Close form',()=>{form.remove();open.disabled=false;},true));
+      form.addEventListener('submit',async e=>{
+        e.preventDefault();if(busy||!form.reportValidity())return;
+        if(!where.province.value||!where.town.value||!where.address.value.trim()){msg.textContent='Choose a province and town, and enter your service address.';return;}
+        await action(msg,async()=>{
+          const ok=await rpc('shopdrop_dispatch_save_provider_location_192df',{p_booking_id:row.booking_id,p_province:where.province.value,p_town:where.town.value,p_address:where.address.value.trim()});
+          if(ok!==true)throw Error('Address not saved');
+        },'Private service address saved. The customer cannot see it before verified payment.');
+      });
+      card.append(form);
+    }catch(e){displayError(notice,e);open.disabled=false;}
+  }
+  function addPrivateBookingControls(card,actions,row,provider,pending){
+    if(!row.booking_id)return;
+    if(provider&&pending&&['awaiting_provider','alternative_proposed','confirmed'].includes(row.status)){
+      const note=feedback();note.textContent='Checking whether your service address is saved…';
+      const open=button('Save or update private service address',()=>providerLocationForm(card,row,open));
+      actions.append(note,open);
+      rpc('shopdrop_dispatch_location_state_192df',{p_booking_id:row.booking_id}).then(state=>{
+        note.textContent=state?.ready===true?'Service address saved privately.':'Save your service address before the customer can prepare payment.';
+      }).catch(()=>{note.textContent='Address status unavailable. Open the address form to check again.';});
+    }
+    if(row.payment_status==='paid'){
+      const privatePanel=el('section');privatePanel.hidden=true;privatePanel.setAttribute('aria-live','polite');
+      const toggle=button('View private booking contact details',async()=>{
+        if(!privatePanel.hidden){privatePanel.hidden=true;privatePanel.replaceChildren();toggle.textContent='View private booking contact details';return;}
+        toggle.disabled=true;privatePanel.hidden=false;privatePanel.replaceChildren(el('p','Checking verified payment…'));
+        try{
+          const d=await rpc('shopdrop_dispatch_paid_details_192df',{p_booking_id:row.booking_id});
+          privatePanel.replaceChildren();
+          if(d?.contacts_released!==true){privatePanel.append(el('p','Contact details are not available until payment is verified.'));return;}
+          privatePanel.append(el('h3','Private booking information'));
+          const add=(label,value)=>{if(typeof value==='string'&&value.trim())privatePanel.append(el('p',label+': '+value));};
+          add(provider?'Customer name':'Provider name',d.other_party?.name);
+          add('Mobile number',d.other_party?.mobile_number);
+          if(provider){add('Collection / work area',d.pickup_area);add('Collection / work address',d.pickup_address);add('Delivery / return area',d.dropoff_area);add('Delivery / return address',d.dropoff_address);add('Job instructions',d.job_instructions);}
+          else if(d.provider_location){add('Province',d.provider_location.province);add('Town or city',d.provider_location.town);add('Service or collection address',d.provider_location.street_address);}
+          else privatePanel.append(el('p','The provider service address is unavailable. Please contact Shop&Drop support.'));
+          privatePanel.append(el('p','Use these details only to arrange this paid booking.'));
+        }catch(e){displayError(privatePanel,e);}finally{toggle.disabled=false;toggle.textContent='Hide private booking contact details';}
+      });
+      actions.append(toggle,privatePanel);
+    }
+  }
   function render(row,provider){
     const card=el('article');card.append(el('h2',row.title||'Transport appointment'));
     card.append(el('p','Requested start: '+date(row.starts_at)),el('p','Quantity: '+row.quantity));
@@ -115,6 +180,7 @@
       }else card.append(el('p','Confirmed appointment time has passed. Do not pay.'));
     }
     if(row.booking_id){const ref=el('p','Booking reference: '+row.booking_id);ref.className='muted';card.append(ref);}
+    addPrivateBookingControls(card,actions,row,provider,pending);
     card.append(actions,msg);list.append(card);
   }
   async function load(notice=''){
