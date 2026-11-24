@@ -66,7 +66,7 @@
           if(uuid(row.booking_id)){
             const ref=el('p','Booking reference: '+row.booking_id);ref.className='booking-reference';card.append(ref);
             card.append(button('Copy booking reference',async()=>{try{await navigator.clipboard.writeText(row.booking_id);message(feedback,'Booking reference copied.');}catch(e){message(feedback,'Select and copy the booking reference shown above.');}}));
-            card.append(link('My Service Appointments','./account.html#shopdrop-service-schedule-ui'));
+            card.append(link('My Service Appointments','./service-appointments-193d.html?booking_id='+encodeURIComponent(row.booking_id)));
           }
           card.append(feedback);list.append(card);
         }
