@@ -1,1 +1,125 @@
 
+name: ShopDrop Fix 187A - Transport Recovery Backup
+
+'on':
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix187a-transport-backup.yml'
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  backup:
+    name: Preserve current integration website
+    if: github.ref_name == 'shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout current integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify transport and service files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test "$(git branch --show-current)" = \
+            "shopdrop-phase6-integration"
+
+          files=(
+            public/dispatching.html
+            public/shopdrop-vehicle-draft-private.html
+            public/shopdrop-dispatch-equipment-fields.js
+            public/shopdrop-dispatch-compact-rates.js
+            public/shopdrop-dispatch-rate-management.js
+            public/shopdrop-provider-location-184a.js
+            public/shopdrop-transport-location-182d.js
+            public/shopdrop-customer-equipment-184b.js
+            public/shopdrop-sa-towns-181.json
+            public/shopdrop-dispatch-offers.js
+            public/shopdrop-dispatch-customer-rates.js
+            public/shopdrop-shared-service-rates.js
+            public/supabase-adapter.js
+            public/services.html
+            public/seller.html
+          )
+
+          for file in "${files[@]}"; do
+            test -s "$file"
+            git ls-files --error-unmatch "$file"
+            echo "VERIFIED: $file"
+          done
+
+          git diff --exit-code
+          git diff --cached --exit-code
+
+          echo "PASS: Current source files verified"
+
+      - name: Create and verify recovery tag
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "ShopDrop Backup Bot"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          TAG="shopdrop-transport-before-187"
+          COMMIT="$(git rev-parse HEAD)"
+
+          if git ls-remote --exit-code \
+            --tags origin "refs/tags/$TAG" \
+            >/dev/null 2>&1
+          then
+            echo "SAFETY STOP: Recovery tag already exists"
+            exit 1
+          fi
+
+          git tag -a "$TAG" "$COMMIT" \
+            -m "Complete integration backup before Transport Fix 187"
+
+          git push origin "refs/tags/$TAG"
+
+          REMOTE_COMMIT="$(git ls-remote \
+            origin "refs/tags/$TAG^{}" | cut -f1)"
+
+          test "$REMOTE_COMMIT" = "$COMMIT"
+
+          echo "PASS: Recovery tag verified"
+          echo "Recovery tag: $TAG"
+          echo "Recovery commit: $COMMIT"
+
+          {
+            echo "## ShopDrop Recovery Backup"
+            echo ""
+            echo "Recovery tag: $TAG"
+            echo ""
+            echo "Recovery commit: $COMMIT"
+            echo ""
+            echo "All tracked integration files preserved."
+            echo ""
+            echo "No website source files changed."
+            echo "No website deployment performed."
+            echo "No Supabase changes."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Confirm website unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git diff --exit-code
+          git diff --cached --exit-code
+
+          echo "PASS: Website source unchanged"
+          echo "PASS: Backup completed"
+
