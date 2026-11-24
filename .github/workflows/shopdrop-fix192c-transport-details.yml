@@ -1,0 +1,126 @@
+name: ShopDrop Fix 192C Transport Details
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix192c-transport-details.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Install verified transport details
+      shell: bash
+      run: "set -euo pipefail\nfile=public/shopdrop-transport-results-192b.js\nmkdir\
+        \ -p backups/fix192c\nif [ \"$(git hash-object \"$file\")\" != \"dda2a7f149b97b7e639c739b74523b01ca46dab6\"\
+        \ ]; then\n  echo 'Unexpected source version; stopping without changes.';\
+        \ exit 1\nfi\ncp \"$file\" backups/fix192c/\ncat > \"$file\" <<'JS'\n(() =>\
+        \ {\n  'use strict';\n  const BASE = 'https://dtkdvvxpwonywtsgqmdx.supabase.co';\n\
+        \  const KEY = 'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';\n  const\
+        \ headers = {apikey: KEY, 'Content-Type': 'application/json'};\n  const params\
+        \ = new URLSearchParams(location.search);\n  const results = document.getElementById('transportResults');\n\
+        \  const status = document.getElementById('resultsStatus');\n  const next\
+        \ = document.getElementById('nextPage');\n  let offset = 0;\n  const limit\
+        \ = 40;\n  function node(tag, text, className) {\n    const element = document.createElement(tag);\n\
+        \    if (text != null) element.textContent = text;\n    if (className) element.className\
+        \ = className;\n    return element;\n  }\n  function money(value) {\n    return\
+        \ new Intl.NumberFormat('en-ZA', {style:'currency',currency:'ZAR'}).format(Number(value));\n\
+        \  }\n  async function rpc(body) {\n    const response = await fetch(BASE\
+        \ + '/rest/v1/rpc/shopdrop_search_transport_192a', {\n      method:'POST',\
+        \ headers, body:JSON.stringify(body)\n    });\n    if (!response.ok) throw\
+        \ Error('Search unavailable');\n    const data = await response.json();\n\
+        \    if (!Array.isArray(data)) throw Error('Invalid results');\n    return\
+        \ data;\n  }\n  async function loadPhoto(photo, img) {\n    try {\n      if\
+        \ (photo.bucket !== 'shopdrop-vehicle-ad-gallery') throw Error('Invalid gallery');\n\
+        \      const path = String(photo.path || '').split('/').map(encodeURIComponent).join('/');\n\
+        \      const response = await fetch(BASE + '/storage/v1/object/sign/' + photo.bucket\
+        \ + '/' + path, {\n        method:'POST', headers, body:JSON.stringify({expiresIn:3600})\n\
+        \      });\n      if (!response.ok) throw Error('Photo unavailable');\n  \
+        \    const data = await response.json();\n      const signed = data.signedURL\
+        \ || data.signedUrl;\n        if (typeof signed !== 'string' || !signed) throw\
+        \ Error('Missing photograph URL');\n        const url = new URL(signed.startsWith('/object/')\
+        \ ? '/storage/v1' + signed : signed, BASE);\n        if (!url.pathname.startsWith('/storage/v1/object/sign/'))\
+        \ throw Error('Invalid photograph URL');\n      if (url.origin !== BASE) throw\
+        \ Error('Invalid URL');\n      img.src = url.href;\n      img.hidden = false;\n\
+        \    } catch (_) {\n      img.replaceWith(node('p','Photograph temporarily\
+        \ unavailable.','muted'));\n    }\n  }\n  function photoElement(photo) {\n\
+        \    const img = node('img');\n    img.alt = 'Transport advertisement photograph';\n\
+        \    img.loading = 'lazy';\n    img.hidden = true;\n    loadPhoto(photo,img);\n\
+        \    return img;\n  }\n  function render(advert) {\n    const card = node('article');\n\
+        \    const photos = Array.isArray(advert.photos) ? advert.photos : [];\n \
+        \   const rates = Array.isArray(advert.rates) ? advert.rates : [];\n    if\
+        \ (photos.length) card.append(photoElement(photos[0]));\n    card.append(node('h2',advert.vehicle_title\
+        \ || 'Transport advertisement'));\n    card.append(node('p',[advert.dispatch_category,advert.dispatch_subtype].filter(Boolean).join('\
+        \ \u2014 ')));\n    card.append(node('p',[advert.base_town,advert.base_province].filter(Boolean).join(',\
+        \ '),'muted'));\n    if (rates.length) card.append(node('p','From '+money(rates[0].price_zar)+'\
+        \ / '+rates[0].pricing_unit.replaceAll('_',' ')));\n    const details = node('details');\n\
+        \    details.append(node('summary','View Details & Photographs'));\n    details.append(node('p',advert.vehicle_description\
+        \ || ''));\n    const gallery = node('div',null,'gallery');\n    for (const\
+        \ photo of photos) gallery.append(photoElement(photo));\n    details.append(gallery);\n\
+        \    for (const rate of rates) details.append(node('p',money(rate.price_zar)+'\
+        \ / '+rate.pricing_unit.replaceAll('_',' ')+' \u2014 Minimum: '+rate.minimum_units));\n\
+        \      if (advert.hire_arrangement) details.append(node('p','Arrangement:\
+        \ '+advert.hire_arrangement.replaceAll('_',' ')));\n      if (advert.coverage_mode)\
+        \ details.append(node('p','Coverage: '+advert.coverage_mode.replaceAll('_','\
+        \ ')));\n      if (rates.length) {\n        const label = node('label','Select\
+        \ advertised rate');\n        const select = node('select');\n        select.append(new\
+        \ Option('Choose a rate',''));\n        for (const rate of rates) select.append(new\
+        \ Option(money(rate.price_zar)+' / '+rate.pricing_unit.replaceAll('_',' '),rate.id));\n\
+        \        label.append(select);\n        const quantityLabel = node('label','Number\
+        \ of units');\n        const quantity = node('input');\n        quantity.type\
+        \ = 'number'; quantity.min = '1'; quantity.step = '1'; quantity.value = '1';\n\
+        \        quantityLabel.append(quantity);\n        const summary = node('p','Choose\
+        \ a rate to preview the price.','muted');\n        function update(reset)\
+        \ {\n          const rate = rates.find(r => r.id === select.value);\n    \
+        \      if (!rate) { summary.textContent = 'Choose a rate to preview the price.';\
+        \ return; }\n          const minimum = Math.max(1,Math.ceil(Number(rate.minimum_units)));\n\
+        \          quantity.min = String(minimum);\n          if (reset) quantity.value\
+        \ = String(minimum);\n          const n = Number(quantity.value);\n      \
+        \    if (!Number.isSafeInteger(n) || n < minimum || n > 100000) { summary.textContent\
+        \ = 'Enter a valid quantity of at least '+minimum+'.'; return; }\n       \
+        \   const amount = Math.round(Number(rate.price_zar)*n*100)/100;\n       \
+        \   summary.textContent = 'Provider price: '+money(amount)+' (before Shop&Drop\
+        \ fee). Booking and availability not yet confirmed.';\n          if (rate.available_from_time\
+        \ && rate.available_until_time) summary.textContent += ' Advertised hours:\
+        \ '+rate.available_from_time.slice(0,5)+'\u2013'+rate.available_until_time.slice(0,5)+'.';\n\
+        \          if (rate.package_description) summary.textContent += ' '+rate.package_description;\n\
+        \        }\n        select.addEventListener('change',()=>update(true));\n\
+        \        quantity.addEventListener('input',()=>update(false));\n        details.append(label,quantityLabel,summary);\n\
+        \      }\n    details.append(node('p','Advertisement reference: '+advert.id,'muted'));\n\
+        \    card.append(details);\n    results.append(card);\n  }\n  async function\
+        \ load() {\n    next.hidden = true;\n    next.disabled = true;\n    status.textContent\
+        \ = 'Searching advertisements...';\n    try {\n      const body = {p_limit:limit,p_offset:offset};\n\
+        \      for (const key of ['category','subtype','arrangement','province','town'])\
+        \ {\n        if (params.get(key)) body['p_'+key] = params.get(key);\n    \
+        \  }\n      const adverts = await rpc(body);\n      if (!adverts.length &&\
+        \ offset === 0) {\n        results.replaceChildren(node('div','No transport\
+        \ services or equipment hire advertisements are currently available for your\
+        \ selection. Please try another search or check again later.','empty'));\n\
+        \        status.textContent = '0 advertisements found.';\n        return;\n\
+        \      }\n      for (const advert of adverts) render(advert);\n      offset\
+        \ += adverts.length;\n      status.textContent = offset+' advertisement(s)\
+        \ displayed.';\n      next.textContent = 'Load More Advertisements';\n   \
+        \   next.hidden = adverts.length < limit;\n    } catch (_) {\n      status.textContent\
+        \ = 'Unable to load advertisements. Please try again.';\n      next.hidden\
+        \ = false;\n      next.textContent = 'Retry Search';\n    } finally {\n  \
+        \    next.disabled = false;\n    }\n  }\n  next.addEventListener('click',load);\n\
+        \  load();\n})();\nJS\nnode --check \"$file\"\ngit diff --check\ngit config\
+        \ user.name 'ShopDrop Integration'\ngit config user.email 'actions@users.noreply.github.com'\n\
+        git add \"$file\" backups/fix192c\ngit commit -m 'Fix 192C transport rate\
+        \ selection and photo handling'\ngit push origin HEAD:shopdrop-phase6-integration\n"
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
