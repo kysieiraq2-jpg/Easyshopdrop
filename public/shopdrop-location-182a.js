@@ -127,10 +127,24 @@
           townLabel, town
         );
       } else {
-        originalProvince.before(
-          provinceLabel, province
-        );
-        originalTown.before(townLabel, town);
+        // Checkout only: reuse the original visible labels and keep
+        // the existing address fields for the save-address bridge.
+        const existingProvinceLabel = parent.querySelector('label[for="region"]');
+        const existingTownLabel = parent.querySelector('label[for="city"]');
+        if (existingProvinceLabel) {
+          existingProvinceLabel.htmlFor = province.id;
+          originalProvince.before(province);
+        } else {
+          originalProvince.before(provinceLabel, province);
+        }
+        if (existingTownLabel) {
+          existingTownLabel.htmlFor = town.id;
+          originalTown.before(town);
+        } else {
+          originalTown.before(townLabel, town);
+        }
+        province.required = true;
+        town.required = true;
       }
 
       originalTown.type = 'hidden';

@@ -152,6 +152,8 @@
     saveButton.disabled=true;
     try{
       const {db,uid}=await current();
+      // South African delivery addresses require a province.
+      if($('country').value.trim().toUpperCase()==='ZA'&&!$('region').value.trim())throw new Error('Choose your province before saving the delivery address.');
       const required=['recipient','line1','city','country'];
       if(required.some(id=>!$(id).value.trim()))throw new Error('Enter recipient, street, city and country.');
       const data={user_id:uid,address_label:$('label').value.trim()||'Delivery',recipient_name:$('recipient').value.trim(),address_line_1:$('line1').value.trim(),city:$('city').value.trim(),state_province:$('region').value.trim()||null,postal_code:$('postal').value.trim()||null,country_code:$('country').value.trim().toUpperCase(),is_default:false};
