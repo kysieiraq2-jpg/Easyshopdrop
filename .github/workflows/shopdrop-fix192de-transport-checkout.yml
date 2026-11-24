@@ -1,0 +1,70 @@
+name: ShopDrop Fix 192DE Transport Checkout
+'on':
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - .github/workflows/shopdrop-fix192de-transport-checkout.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+      - name: Connect confirmed transport appointments to checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+          python3 <<'PYCODE'
+          from pathlib import Path
+          import subprocess
+          patches={'public/shopdrop-dispatch-appointments-192dd.js': ("    if(!provider&&pending&&row.status==='confirmed')card.append(el('p',Date.parse(row.confirmed_at)>Date.now()?'Appointment confirmed. Payment is not yet enabled on this screen.':'Confirmed appointment time has passed. Do not pay.'));", "    if(!provider&&pending&&row.status==='confirmed'){\n      if(Date.parse(row.confirmed_at)>Date.now()&&row.booking_id){\n        card.append(el('p','Appointment confirmed. Review your service payment. No courier charges apply.'));\n        actions.append(link('Continue to Transport Checkout','./dispatch-checkout-192de.html?booking_id='+encodeURIComponent(row.booking_id)));\n      }else card.append(el('p','Confirmed appointment time has passed. Do not pay.'));\n    }", 'ff9dbd876f071ece0aeea56bbd9d9aba9c3426ce'), 'public/dispatch-appointments-192dd.html': ('shopdrop-dispatch-appointments-192dd.js?v=192dd', 'shopdrop-dispatch-appointments-192dd.js?v=192de', 'c9c560efb66a12317356b1b17bce9a0ee11882be')}
+          new_files={'public/dispatch-checkout-192de.html': '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n<title>Transport Checkout | Shop&amp;Drop</title><link rel="stylesheet" href="./shopdrop-transport-search-192b.css">\n<style>dl{margin:16px 0}dl div{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #dbe2ea}dt{flex:1}dd{margin:0;text-align:right;font-weight:bold}.total{font-size:20px}#dispatchCheckoutStatus192de{line-height:1.5;overflow-wrap:anywhere}#dispatchCheckoutStatus192de a{margin-top:8px}</style>\n</head><body><header><a href="./index.html">Home</a><a href="./dispatch-appointments-192dd.html">My Transport Appointments</a><a href="./dispatch-bag-192dc.html">My Transport Bag</a><a href="./account.html">My Account</a></header>\n<main><section class="panel"><h1>Transport Services &amp; Equipment Hire Checkout</h1>\n<p class="muted">Review your confirmed booking and the Shop&amp;Drop service fee. No courier selection or courier charges apply.</p>\n<div id="dispatchCheckoutSummary192de" hidden></div>\n<button type="button" id="dispatchCheckoutPrepare192de" hidden disabled>Prepare payment</button>\n<p id="dispatchCheckoutStatus192de" role="status" aria-live="polite">Checking your confirmed appointment…</p>\n<button type="button" id="dispatchCheckoutReload192de">Refresh checkout</button>\n<a class="btn" href="./dispatch-appointments-192dd.html">Back to my appointments</a>\n</section></main><script src="./shopdrop-dispatch-checkout-192de.js?v=192de"></script></body></html>\n', 'public/shopdrop-dispatch-checkout-192de.js': "(() => {\n  'use strict';\n  const BASE='https://dtkdvvxpwonywtsgqmdx.supabase.co';\n  const KEY='sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';\n  const summary=document.getElementById('dispatchCheckoutSummary192de');\n  const prepare=document.getElementById('dispatchCheckoutPrepare192de');\n  const status=document.getElementById('dispatchCheckoutStatus192de');\n  const reload=document.getElementById('dispatchCheckoutReload192de');\n  if(!summary||!prepare||!status||!reload)return;\n  const booking=new URLSearchParams(location.search).get('booking_id');\n  const uuid=v=>typeof v==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);\n  const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};\n  const money=n=>new Intl.NumberFormat('en-ZA',{style:'currency',currency:'ZAR'}).format(n/100);\n  const date=v=>new Intl.DateTimeFormat('en-ZA',{dateStyle:'medium',timeStyle:'short',timeZone:'Africa/Johannesburg'}).format(new Date(v))+' SAST';\n  function cents(value){\n    if(typeof value!=='number'&&typeof value!=='string')throw Error('Invalid amount');\n    const n=Number(value), c=Math.round(n*100);\n    if(String(value).trim()===''||!Number.isFinite(n)||!Number.isSafeInteger(c)||c<0||Math.abs(n*100-c)>0.0001)throw Error('Invalid amount');\n    return c;\n  }\n  let clientPromise,busy=false,current=null,prepared=false;\n  function message(text){status.replaceChildren(document.createTextNode(text));}\n  function link(label,href){const a=el('a',label);a.href=href;a.className='btn';return a;}\n  function fail(error){\n    if(error?.needsSignIn){message('Please sign in to view your private checkout.');status.append(link('Sign in','./sign-in.html'),link('Register','./register.html'));}\n    else message(error?.safeMessage||'Unable to complete checkout. Refresh and try again. No payment has been collected by this screen.');\n  }\n  const safe=message=>Object.assign(new Error(message),{safeMessage:message});\n  async function session(){\n    if(!clientPromise)clientPromise=import('https://esm.sh/@supabase/supabase-js@2.49.4').then(({createClient})=>createClient(BASE,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}})).catch(e=>{clientPromise=undefined;throw e;});\n    const db=await clientPromise;\n    const {data:s,error:se}=await db.auth.getSession();\n    if(se||!s?.session?.access_token)throw Object.assign(new Error('Sign in required'),{needsSignIn:true});\n    const {data:u,error:ue}=await db.auth.getUser(s.session.access_token);\n    if(ue||!u?.user?.id)throw Object.assign(new Error('Sign in required'),{needsSignIn:true});\n    return {db,token:s.session.access_token};\n  }\n  async function verifiedSelection(db){\n    const {data,error}=await db.rpc('shopdrop_dispatch_bag_appointments_192dd',{p_as_provider:false});\n    if(error||!Array.isArray(data))throw safe('Your appointment could not be verified. Refresh and try again.');\n    const row=data.find(r=>r.booking_id===booking);\n    if(!row)throw safe('This booking is not available in your account. Return to My Transport Appointments.');\n    if(row.payment_status==='paid')throw safe('This booking is already paid. Return to My Transport Appointments.');\n    if(row.status!=='confirmed'||row.booking_status!=='pending_payment'||row.payment_status!=='pending'||!(Date.parse(row.confirmed_at)>Date.now()))throw safe('A confirmed future appointment awaiting payment is required. Return to My Transport Appointments.');\n    const provider=cents(row.provider_amount), fee=cents(row.commission), total=cents(row.total);\n    if(provider<=0||fee!==Math.round(provider*(provider<100000?10:7)/100)||total!==provider+fee)throw safe('The booking amount could not be verified. Do not pay.');\n    return {row,provider,fee,total};\n  }\n  function draw(s){\n    const dl=el('dl');\n    const entries=[['Provider amount',money(s.provider)],['Shop&Drop service fee ('+(s.provider<100000?'10%':'7%')+')',money(s.fee)],['Total payable',money(s.total)]];\n    entries.forEach(([label,value],i)=>{const d=el('div');if(i===2)d.className='total';d.append(el('dt',label),el('dd',value));dl.append(d);});\n    summary.replaceChildren(el('h2',s.row.title||'Transport booking'),el('p','Confirmed appointment: '+date(s.row.confirmed_at)),el('p','Quantity: '+s.row.quantity),dl,el('p','No courier charges. Payment provider activation is pending. Card and EFT payments are not yet available.'));\n    summary.hidden=false;\n  }\n  function controls(){reload.disabled=busy;prepare.disabled=busy||!current||prepared;prepare.hidden=!current;}\n  async function load(){\n    if(busy)return;\n    busy=true;current=null;prepared=false;summary.hidden=true;summary.replaceChildren();controls();message('Checking your confirmed appointment…');\n    try{if(!uuid(booking))throw safe('No valid booking selected. Return to My Transport Appointments.');const {db}=await session();current=await verifiedSelection(db);draw(current);message('Review the total. You can prepare the checkout, but no money will be collected until the financial service provider is activated.');}\n    catch(e){current=null;fail(e);}finally{busy=false;controls();}\n  }\n  async function submit(){\n    if(busy||!current||prepared)return;\n    busy=true;controls();message('Verifying the appointment and preparing checkout…');\n    try{\n      const {db,token}=await session();const fresh=await verifiedSelection(db);\n      if(fresh.total!==current.total||fresh.provider!==current.provider||fresh.fee!==current.fee||fresh.row.confirmed_at!==current.row.confirmed_at){current=fresh;draw(fresh);throw safe('Booking details changed. Review the updated details before preparing payment.');}\n      const response=await fetch(BASE+'/functions/v1/create-dispatch-checkout',{method:'POST',headers:{Authorization:'Bearer '+token,apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({booking_id:booking})});\n      if(!response.ok)throw safe('Checkout could not be prepared. Refresh your booking and try again.');\n      const result=await response.json();\n      if(result?.ok!==true||result.booking_id!==booking||!uuid(result.checkout_reference)||result.currency!=='ZAR'||cents(result.expected_amount)!==fresh.total||result.checkout_status!=='pending'||result.payment_provider_status!=='not_activated'||result.payment_url!==null)throw safe('The checkout response could not be verified. Do not pay. Refresh and try again.');\n      prepared=true;message('Checkout prepared successfully. No payment has been collected. The financial service provider is not yet activated.');\n      status.append(el('p','Checkout reference: '+result.checkout_reference));\n    }catch(e){fail(e);}finally{busy=false;controls();}\n  }\n  prepare.addEventListener('click',submit);reload.addEventListener('click',load);load();\n})();\n"}
+          planned={}
+          for name,(old,new,expected_hash) in patches.items():
+              p=Path(name)
+              original=p.read_text()
+              backup=Path('backups/fix192de')/p.name
+              if original.count(new)==1 and original.count(old)==0:
+                  if not backup.exists() or subprocess.check_output(['git','hash-object',str(backup)],text=True).strip()!=expected_hash or backup.read_text().replace(old,new,1)!=original: raise SystemExit(f'Unexpected previously patched file: {name}')
+                  continue
+              if original.count(old)!=1 or subprocess.check_output(['git','hash-object',name],text=True).strip()!=expected_hash: raise SystemExit(f'Unexpected source version: {name}')
+              if backup.exists() and backup.read_bytes()!=p.read_bytes(): raise SystemExit(f'Unexpected backup: {name}')
+              planned[name]=original.replace(old,new,1)
+          for name,content in new_files.items():
+              p=Path(name)
+              if p.exists() and p.read_text()!=content: raise SystemExit(f'Unexpected existing file: {name}')
+          for name,content in planned.items():
+              p=Path(name); backup=Path('backups/fix192de')/p.name
+              backup.parent.mkdir(parents=True,exist_ok=True)
+              if not backup.exists(): backup.write_bytes(p.read_bytes())
+              p.write_text(content)
+          for name,content in new_files.items():
+              if not Path(name).exists(): Path(name).write_text(content)
+          PYCODE
+          node --check public/shopdrop-dispatch-appointments-192dd.js
+          node --check public/shopdrop-dispatch-checkout-192de.js
+          git diff --check
+          git config user.name 'ShopDrop Integration'
+          git config user.email 'actions@users.noreply.github.com'
+          git add public/shopdrop-dispatch-appointments-192dd.js public/dispatch-appointments-192dd.html public/dispatch-checkout-192de.html public/shopdrop-dispatch-checkout-192de.js
+          if test -d backups/fix192de; then git add backups/fix192de; fi
+          if ! git diff --cached --quiet; then
+            git commit -m 'Fix 192DE Transport checkout preparation'
+            git push origin HEAD:shopdrop-phase6-integration
+          fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
