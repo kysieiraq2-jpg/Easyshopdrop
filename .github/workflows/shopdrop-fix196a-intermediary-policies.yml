@@ -1,0 +1,99 @@
+name: ShopDrop Fix 196A Intermediary Policies
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix196a-intermediary-policies.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Update policy text only
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import subprocess, re
+        SHAS = {'terms.html': '0b3d123447716ae224a573bc82dc3ad1383f1051', 'privacy.html': '96a181e556a6db3b7c017638e5ed9b850934099a', 'returns-policy.html': 'ab5cf392a5adbca09109f03bcd8f65f46e3e875f', 'seller-provider-rules.html': '4e813f1bfffee7ea8f44508cb47defc62b3d8d5a', 'restricted-listings.html': '50d164ddeea87e35fd0852b17db67553e3ca4692'}
+        PATCHES = {'terms.html': [('4. Other Services and Dispatching', '4. Other Services and Transport Services &amp; Equipment Hire'), ("service or dispatch provider's", "service, transport or equipment hire provider's"), ('For Dispatching, the milestone', 'For Transport Services &amp; Equipment Hire, the milestone'), ('10. Dispatch and Equipment Completion', '10. Completion of Transport Services &amp; Equipment Hire'), ('For ordinary dispatch bookings', 'For ordinary transport bookings'), ('For ordinary dispatch\nor transportation,', 'For ordinary transport services,'), ('Collection PINs, service', 'Courier collection references, buyer delivery PINs, service')], 'privacy.html': [('dispatch or delivery verification', 'transport or delivery verification'), ('Coordinate dispatch, transport and equipment bookings.', 'Coordinate transport services and equipment hire bookings.'), ('9. Dispatch and Equipment Evidence', '9. Transport Services &amp; Equipment Hire Evidence'), ('six-digit dispatch completion PIN', 'six-digit transport or equipment hire completion PIN'), ('Dispatch and transport completion', 'Transport and equipment hire completion'), ('completion for services and dispatch.', 'completion for Other Services and Transport Services &amp; Equipment Hire.')], 'returns-policy.html': [('and Dispatching, it is verified completion.', 'and Transport Services &amp; Equipment Hire, it is verified completion.'), ('transport and dispatch bookings arranged', 'transport and equipment hire bookings arranged'), ('Other Services and Dispatching bookings', 'Other Services and Transport Services &amp; Equipment Hire bookings'), ('For dispatch and transportation,', 'For transport services,'), ('<strong>Dispatch and equipment:</strong> For ordinary dispatch and transport,', '<strong>Transport Services &amp; Equipment Hire:</strong> For ordinary transport services,')], 'seller-provider-rules.html': [('dispatch providers and equipment operators.', 'transport providers and equipment hire operators.'), ('6. Dispatch, Transport and Equipment Providers', '6. Transport Services &amp; Equipment Hire Providers'), ('Independent dispatch providers', 'Independent transport and equipment hire providers'), ('<strong>Dispatch:</strong>', '<strong>Transport services:</strong>'), ('11. Service and Dispatch Completion Evidence', '11. Other Services and Transport Services &amp; Equipment Hire Completion Evidence'), ('Other Services and Dispatching bookings', 'Other Services and Transport Services &amp; Equipment Hire bookings'), ('Dispatch providers may', 'Transport providers may'), ('dispatch and equipment\nproviders', 'transport and equipment hire\nproviders')], 'restricted-listings.html': [('12. Transport and Dispatch Restrictions', '12. Transport Services &amp; Equipment Hire Restrictions'), ('Transport, courier and\ndispatch providers', 'Transport, courier and\nequipment hire providers'), ('service and dispatch completion PINs', 'service, transport and equipment hire completion PINs'), ('and Dispatching,', 'and Transport Services &amp; Equipment Hire,')]}
+        ADDS = {'terms.html': {'1. About Shop&amp;Drop': '<p><strong>Our role:</strong> Shop&amp;Drop supplies a marketplace facilitation service, not the independently advertised products, Other Services or Transport Services &amp; Equipment Hire. Its aim is to make buying, selling and arranging services easier, more convenient and more affordable. The underlying agreement is ordinarily between the independent buyer and seller, or customer and provider. Shop&amp;Drop does not take ownership of advertised goods, operate a return warehouse or undertake the independent provider’s work. This does not limit its own obligations as a marketplace intermediary.</p>', '8. Courier Collection and Seller Payment': '<p><strong>FOR PAYMENT PURPOSES:</strong> It is the product seller’s responsibility to obtain the genuine courier company reference when the authorized courier physically collects the sold item. After collection, enter it using My Account &rarr; Receive My Payment. Independent courier evidence remains necessary. No reference is required merely to advertise an item.</p>', '9. Completion of Other Services': '<p><strong>FOR PAYMENT PURPOSES:</strong> The assigned provider must obtain the six-digit Completion PIN from the paying customer or their authorized recipient after completing the agreed paid service, and submit it using My Account &rarr; Receive My Payment. No PIN is required merely to advertise a service.</p>', '10. Completion of Transport Services &amp; Equipment Hire': '<p><strong>FOR PAYMENT PURPOSES:</strong> The assigned transport or equipment hire provider must obtain the six-digit Completion PIN from the paying customer or authorized recipient after completing the agreed transport task, required handover or paid hire period, as applicable. Submit the PIN through My Account &rarr; Receive My Payment. GPS or arrival alone is not completion.</p>', '11. Returns, Refunds and Disputes': '<p>Ordinary product returns and claims concerning the goods are matters between the independent buyer and seller. Shop&amp;Drop does not receive returned goods or ordinarily fund refunds of another party’s sale proceeds from its own money. The buyer should report the problem through Complaints &amp; Suggestions or Returns &amp; Disputes. An administrator may review the records and, where appropriate, obtain permission for limited contact information to be exchanged between the parties, or disclose information where otherwise lawfully required. The parties arrange any lawful return or remedy between themselves; provider-managed refunds may be facilitated under the existing transaction safeguards. An administrator may exceptionally approve a refund of Shop&amp;Drop’s own service fee where appropriate, subject to mandatory law.</p>', '14. Responsibility and Consumer Rights': '<p>Shop&amp;Drop’s intermediary role does not displace applicable duties of disclosure, recordkeeping or fair dealing. Before live transactions begin, the required legal identity, contact details, intermediary disclosures and any applicable supplier disclosures must be finalized and made available as required by law, including section 27 of the Consumer Protection Act and its applicable regulations and section 43 of the Electronic Communications and Transactions Act where applicable. The scope of those duties must be assessed against the actual marketplace arrangements.</p>'}, 'privacy.html': {'1. Applicable Privacy Law': '<p>Personal information must be processed on an appropriate lawful basis under POPIA, such as consent, performance of a contract, a legal obligation or a relevant legitimate interest where permitted. Consent is not a blanket permission to share private information. Collect and disclose only what is reasonably necessary for the identified purpose.</p>', '6. Exceptional Disputes and Contact Disclosure': '<p>For disputes over independently supplied goods or services, the administrators may facilitate contact between the parties. Before voluntary exchange of private contact details, obtain the relevant person’s permission, document the purpose and disclose only the information needed. Disclosure without that permission requires another lawful basis, such as a legal obligation. This is separate from the necessary private booking and delivery information supplied to authorized participants in accordance with the existing verified-payment and assignment safeguards. Mandatory supplier disclosures remain subject to applicable law.</p>', '12. Information Retention and Security': '<p>Where a personal-information security compromise triggers section 22 of POPIA, Shop&amp;Drop must notify the Information Regulator and affected persons as required by law, subject to applicable exceptions. Retention schedules must also account for applicable intermediary recordkeeping obligations.</p>', '13. Your Privacy Rights': '<p>Subject to POPIA, individuals may object to certain processing, withdraw consent where processing is based on consent, and request correction or deletion where legally available. Mandatory records may still be retained on a lawful basis. Requests may be submitted through the official privacy contact when finalized. Individuals may complain to the Information Regulator; official information is available at inforegulator.org.za.</p>'}, 'returns-policy.html': {'1. Scope of This Policy': '<p><strong>Shop&amp;Drop is not a retail store.</strong> It supplies an intermediary marketplace service to make buying and selling easier, more convenient and more affordable. The seller supplies the product and the independent provider supplies the agreed service or hire. Shop&amp;Drop does not ordinarily take possession of returned goods or become the party responsible for another party’s underlying return, exchange or refund obligation. Its own legal duties are unaffected.</p>', '9. Reporting a Problem': '<p>Do not send returned goods to Shop&amp;Drop or its administrators. Report the complaint using the applicable Shop&amp;Drop order or booking reference. In an exceptional case, the administrator may arrange appropriate communication and, with relevant permission or another lawful basis, facilitate limited contact disclosure. The buyer and independent seller should agree the return arrangements directly, subject to applicable law and courier terms. Service complaints should similarly be addressed between the customer and assigned provider with appropriate assistance from Shop&amp;Drop.</p>', '8. Shop&amp;Drop Marketplace Fees': '<p>Shop&amp;Drop’s own marketplace fee is distinct from the independent seller’s proceeds and courier charge. Refunds of the marketplace fee are not routine; an administrator may consider exceptional circumstances. Any mandatory refund right takes precedence. Payment-provider or courier charges may only be retained or deducted where the relevant agreement and law permit.</p>', '12. Refund Processing': '<p>Facilitating a refund through the authorized payment provider or assisting the parties with a complaint does not itself mean that Shop&amp;Drop is the seller or assumes the seller’s financial obligations. The source of any refund and responsibility for it must follow the actual agreement, verified transaction records and applicable law. A buyer’s report of non-delivery must be investigated and any refund due handled without treating a seller’s earlier collection-based payment as a bar to a lawful claim.</p>'}, 'seller-provider-rules.html': {'2. Independent Seller and Provider Status': '<p>Shop&amp;Drop provides the intermediary service; the advertiser remains the independent supplier of the goods, services or equipment hire. Sellers and providers must cooperate with applicable legal disclosures and legitimate customer complaints. Shop&amp;Drop does not ordinarily accept returned items or perform the advertiser’s refund obligations.</p>', '10. Packaging and Courier Collection': '<p><strong>FOR PAYMENT PURPOSES:</strong> It is your responsibility as the seller to obtain the genuine courier company reference at physical pickup. Go to My Account &rarr; Receive My Payment and enter it after collection. The reference alone is insufficient: the existing independent collection verification must also succeed. This requirement is separate from advertising.</p>', '11. Other Services and Transport Services &amp; Equipment Hire Completion Evidence': '<p><strong>FOR PAYMENT PURPOSES:</strong> It is your responsibility as the assigned provider to obtain the six-digit Completion PIN from the paying customer or their authorized recipient after the agreed service, transport task or equipment hire period is completed. Go to My Account &rarr; Receive My Payment and choose the appropriate division. Never ask for the PIN merely because you have arrived, and never require it at advertising time.</p>', '12. Returns, Refunds and Disputes': '<p>Independent sellers and providers remain responsible for any remedies they owe under their own agreements and applicable law. Cooperate with genuine complaints submitted through Shop&amp;Drop. An administrator may assist communication and, when appropriate, arrange limited sharing of private contact details with permission or another lawful basis. Do not direct a customer to return goods to Shop&amp;Drop itself.</p>'}, 'restricted-listings.html': {'1. General Listing Requirements': '<p>A product or service category appearing on Shop&amp;Drop does not itself establish that every item or activity within it is lawful, safe or accepted by a courier. The advertiser remains responsible for checking applicable requirements. Shop&amp;Drop may restrict listings where required by law or its existing safety rules.</p>', '13. Second-Hand and Homemade Goods': '<p>Do not offer goods whose sale is prohibited because of a safety recall or other legal restriction. Where food, health-related products or age-restricted goods are otherwise permitted by Shop&amp;Drop, the advertiser must comply with applicable safety, labelling, licensing, age-verification and lawful delivery requirements. The presence of a category does not authorize unlawful sales or override courier restrictions.</p>', '12. Transport Services &amp; Equipment Hire Restrictions': '<p>Advertisers must describe safe operating limits, applicable operator qualifications and any legally required safety, licensing or insurance conditions accurately. These requirements apply to transport services, vehicle hire, machinery hire, equipment and tool hire. Do not treat an equipment or vehicle hire listing as authorization to sell a vehicle.</p>'}}
+
+        def blob(raw):
+            return subprocess.check_output(['git','hash-object','--stdin'], input=raw).decode().strip()
+
+        def split_main(source):
+            if source.count('<main ')!=1 or source.count('</main>')!=1:
+                raise SystemExit('Unexpected main element')
+            before, remainder=source.split('<main ',1)
+            body, after=remainder.split('</main>',1)
+            return before+'<main ',body,'</main>'+after
+
+        def transform(source,name):
+            before,body,after=split_main(source)
+            for old,new in PATCHES[name]:
+                if body.count(old)!=1: raise SystemExit('Unexpected terminology anchor: '+name+' '+old)
+                body=body.replace(old,new,1)
+            for heading,paragraph in ADDS[name].items():
+                marker='<h2>'+heading+'</h2>'
+                if body.count(marker)!=1: raise SystemExit('Unexpected policy heading: '+name+' '+heading)
+                pos=body.index('</section>',body.index(marker))
+                if re.search(r'<(?:script|style|form|input|button|a)\b|\son\w+=', paragraph,re.I): raise SystemExit('Unexpected executable or interactive addition')
+                body=body[:pos]+ '\n<!-- SHOPDROP_FIX196A_POLICY_CLARIFICATION -->\n'+paragraph+'\n'+body[pos:]
+            if re.search(r'\bdispatch(?:ing)?\b',body,re.I): raise SystemExit('Old division wording remains: '+name)
+            updated=before+body+after
+            def protected(s):
+                return [re.findall(p,s,re.I) for p in [r'<script\b[^>]*>[\s\S]*?</script>',r'<style\b[^>]*>[\s\S]*?</style>',r'<(?:form|button|select|textarea)\b[^>]*>[\s\S]*?</(?:form|button|select|textarea)>',r'<a\b[^>]*href=[\"\'][^\"\']+[\"\']',r'<link\b[^>]*>']]
+            if protected(source)!=protected(updated): raise SystemExit('Protected code or links differ: '+name)
+            return updated
+
+        planned={}
+        for name,expected in SHAS.items():
+            p=Path('public')/name
+            backup=Path('backups/fix196a')/name
+            raw=p.read_bytes()
+            if blob(raw)==expected:
+                original=raw
+            elif backup.is_file() and blob(backup.read_bytes())==expected:
+                original=backup.read_bytes()
+                if raw!=transform(original.decode('utf-8'),name).encode('utf-8'): raise SystemExit('Unexpected installed version: '+name)
+                continue
+            else:
+                raise SystemExit('Unexpected original source; no changes installed: '+name)
+            if backup.exists() and backup.read_bytes()!=original: raise SystemExit('Backup collision: '+name)
+            revised=transform(original.decode('utf-8'),name).encode('utf-8')
+            planned[name]=(original,revised)
+        for name,(original,revised) in planned.items():
+            backup=Path('backups/fix196a')/name
+            backup.parent.mkdir(parents=True,exist_ok=True)
+            if not backup.exists(): backup.write_bytes(original)
+            (Path('public')/name).write_bytes(revised)
+        print('Fix 196A: five prelaunch policy pages updated; existing operating code untouched.')
+        PYCODE
+        git diff --check
+        git config user.name "ShopDrop Integration"
+        git config user.email "actions@users.noreply.github.com"
+        git add public/terms.html public/privacy.html public/returns-policy.html public/seller-provider-rules.html public/restricted-listings.html
+        if test -d backups/fix196a; then git add backups/fix196a; fi
+        if ! git diff --cached --quiet; then
+          git commit -m "Fix 196A intermediary policy clarification"
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
