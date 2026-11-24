@@ -1,0 +1,74 @@
+name: ShopDrop Fix 193E Other Services Checkout
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix193e-service-checkout.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Install service checkout without changing existing product or dispatch checkout
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import subprocess
+        patches={'public/shopdrop-service-appointments-193d.js': [("    if(!provider&&pending&&row.status==='confirmed')actions.append(el('p',future(row.confirmed_date,row.confirmed_time)?'Appointment confirmed. Service checkout is not yet connected. No payment is required now.':'Confirmed appointment time has passed. Do not pay.'));", "    if(!provider&&pending&&row.status==='confirmed'){\n      if(future(row.confirmed_date,row.confirmed_time)){\n        actions.append(el('p','Appointment confirmed. Review your service payment. No courier charges apply.'),link('Continue to Service Checkout','./service-checkout-193e.html?booking_id='+encodeURIComponent(row.booking_id)));\n      }else actions.append(el('p','Confirmed appointment time has passed. Do not pay.'));\n    }")], 'public/service-appointments-193d.html': [('shopdrop-service-appointments-193d.js?v=193d', 'shopdrop-service-appointments-193d.js?v=193e')]}
+        shas={'public/shopdrop-service-appointments-193d.js': 'b391d5b4e57431a9e46d48d2e007b504db78aac0', 'public/service-appointments-193d.html': 'e3c3428594930fba3124d9cbe745f0b34cd0f1c7'}
+        new_files={'public/service-checkout-193e.html': '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n<title>Service Checkout | Shop&amp;Drop</title><link rel="stylesheet" href="./shopdrop-transport-search-192b.css">\n<style>dl{margin:16px 0}dl div{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #dbe2ea}dt{flex:1}dd{margin:0;text-align:right;font-weight:bold}.total{font-size:20px}#serviceCheckoutStatus193e{line-height:1.5;overflow-wrap:anywhere}#serviceCheckoutStatus193e a{margin-top:8px}</style>\n</head><body><header><a href="./index.html">Home</a><a href="./service-appointments-193d.html">My Service Appointments</a><a href="./service-bag-193c.html">My Service Bag</a><a href="./account.html">My Account</a></header>\n<main><section class="panel"><h1>Other Services Checkout</h1>\n<p class="muted">Review your confirmed booking and the Shop&amp;Drop service fee. No courier selection or courier charges apply.</p>\n<div id="serviceCheckoutSummary193e" hidden></div>\n<button type="button" id="serviceCheckoutPrepare193e" hidden disabled>Prepare payment</button>\n<p id="serviceCheckoutStatus193e" role="status" aria-live="polite">Checking your confirmed appointment…</p>\n<button type="button" id="serviceCheckoutReload193e">Refresh checkout</button>\n<a class="btn" href="./service-appointments-193d.html">Back to my appointments</a>\n</section></main><script src="./shopdrop-service-checkout-193e.js?v=193e"></script></body></html>\n', 'public/shopdrop-service-checkout-193e.js': "(() => {\n  'use strict';\n  const BASE='https://dtkdvvxpwonywtsgqmdx.supabase.co';\n  const KEY='sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';\n  const get=id=>document.getElementById(id);\n  const summary=get('serviceCheckoutSummary193e'),prepare=get('serviceCheckoutPrepare193e'),status=get('serviceCheckoutStatus193e'),reload=get('serviceCheckoutReload193e');\n  if(!summary||!prepare||!status||!reload)return;\n  const booking=new URLSearchParams(location.search).get('booking_id');\n  const uuid=v=>typeof v==='string'&&/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v);\n  const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};\n  const money=v=>new Intl.NumberFormat('en-ZA',{style:'currency',currency:'ZAR'}).format(v/100);\n  const safe=message=>Object.assign(Error(message),{safeMessage:message});\n  const authError=()=>Object.assign(Error('Sign in required'),{needsSignIn:true});\n  function cents(v){if(typeof v!=='number'&&typeof v!=='string')throw Error('Invalid amount');const x=Number(v),n=Math.round(x*100);if(String(v).trim()===''||!Number.isSafeInteger(n)||n<0||Math.abs(x*100-n)>0.0001)throw Error('Invalid amount');return n;}\n  const future=(d,t)=>typeof d==='string'&&typeof t==='string'&&Date.parse(d+'T'+t.slice(0,5)+':00+02:00')>Date.now();\n  let clientPromise,busy=false,current=null,prepared=false;\n  function message(text){status.replaceChildren(document.createTextNode(text));}\n  function link(text,href){const a=el('a',text);a.href=href;a.className='btn';return a;}\n  function fail(e){if(e?.needsSignIn){message('Please sign in to view your private checkout.');status.append(link('Sign in','./sign-in.html'),link('Register','./register.html'));}else message(e?.safeMessage||'Unable to prepare checkout. Refresh and try again. No payment has been collected.');}\n  async function session(){\n    if(!clientPromise)clientPromise=import('https://esm.sh/@supabase/supabase-js@2.49.4').then(({createClient})=>createClient(BASE,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}})).catch(e=>{clientPromise=undefined;throw e;});\n    const db=await clientPromise;\n    const {data:s,error:se}=await db.auth.getSession();if(se||!s?.session?.access_token)throw authError();\n    const {data:u,error:ue}=await db.auth.getUser(s.session.access_token);if(ue||!u?.user?.id)throw authError();return db;\n  }\n  async function rpc(db,name,args){const {data,error}=await db.rpc(name,args);if(error){if(error.code==='28000'||error.code==='PGRST301')throw authError();throw safe('Booking or payment preparation is unavailable. Return to My Service Appointments or refresh and try again.');}return data;}\n  async function verify(db){\n    const rows=await rpc(db,'shopdrop_service_appointments_193d',{p_as_provider:false});\n    if(!Array.isArray(rows))throw Error('Invalid appointments');\n    const row=rows.find(r=>r.booking_id===booking);\n    if(!row)throw safe('This booking is not available in your account. Return to My Service Appointments.');\n    if(row.status!=='confirmed'||row.booking_status!=='pending'||row.payment_status!=='pending'||!future(row.confirmed_date,row.confirmed_time))throw safe('A confirmed future appointment awaiting payment is required. Return to My Service Appointments.');\n    const ready=await rpc(db,'shopdrop_service_checkout_readiness',{p_booking_id:booking});\n    if(ready?.ok!==true||ready.ready_for_checkout!==true||ready.booking_id!==booking||ready.currency!=='ZAR'||ready.payment_collected!==false||ready.funds_moved!==false||ready.confirmed_date!==row.confirmed_date||String(ready.confirmed_arrival_time).slice(0,5)!==String(row.confirmed_time).slice(0,5))throw safe('This appointment is not ready for payment. Refresh and check your booking.');\n    const provider=cents(ready.provider_amount),fee=cents(ready.commission_amount),total=cents(ready.customer_total);\n    if(provider<=0||fee!==Math.round(provider*(provider<100000?10:7)/100)||total!==provider+fee||provider!==cents(row.provider_amount)||fee!==cents(row.commission)||total!==cents(row.total))throw safe('The service price could not be verified. Do not pay.');\n    return {row,provider,fee,total};\n  }\n  function draw(s){\n    const dl=el('dl');[['Provider amount',money(s.provider)],['Shop&Drop service fee ('+(s.provider<100000?'10%':'7%')+')',money(s.fee)],['Total payable',money(s.total)]].forEach(([label,value],i)=>{const d=el('div');if(i===2)d.className='total';d.append(el('dt',label),el('dd',value));dl.append(d);});\n    summary.replaceChildren(el('h2',s.row.title||'Service booking'),el('p','Confirmed appointment: '+s.row.confirmed_date+' at '+String(s.row.confirmed_time).slice(0,5)+' SAST'),el('p','Service area: '+[s.row.town,s.row.province].filter(Boolean).join(', ')),dl,el('p','No courier charges. Card and EFT payments will become available after the financial service provider is activated.'));\n    summary.hidden=false;\n  }\n  function controls(){reload.disabled=busy;prepare.disabled=busy||!current||prepared;prepare.hidden=!current;}\n  async function load(){if(busy)return;busy=true;current=null;prepared=false;summary.hidden=true;summary.replaceChildren();controls();message('Checking your confirmed appointment…');try{if(!uuid(booking))throw safe('Choose a booking in My Service Appointments.');current=await verify(await session());draw(current);message('Review the total. You may prepare payment, but no money will be collected.');}catch(e){current=null;fail(e);}finally{busy=false;controls();}}\n  async function submit(){\n    if(busy||!current||prepared)return;busy=true;controls();message('Verifying your appointment and preparing checkout…');\n    try{const db=await session(),fresh=await verify(db);\n      if(fresh.total!==current.total||fresh.provider!==current.provider||fresh.fee!==current.fee||fresh.row.confirmed_date!==current.row.confirmed_date||fresh.row.confirmed_time!==current.row.confirmed_time){current=fresh;draw(fresh);throw safe('Booking details changed. Review the updated booking before preparing payment.');}\n      const d=await rpc(db,'shopdrop_prepare_service_checkout_193e',{p_booking_id:booking});\n      if(d?.ok!==true||d.booking_id!==booking||!uuid(d.checkout_reference)||d.currency!=='ZAR'||cents(d.provider_amount)!==fresh.provider||cents(d.commission_amount)!==fresh.fee||cents(d.customer_total)!==fresh.total||d.checkout_status!=='pending'||d.payment_provider_status!=='not_activated'||d.payment_url!==null||d.payment_collected!==false)throw safe('The checkout response could not be verified. Do not pay.');\n      prepared=true;message('Checkout prepared successfully. No money has been collected. The financial service provider is not yet activated.');status.append(el('p','Checkout reference: '+d.checkout_reference));\n    }catch(e){fail(e);}finally{busy=false;controls();}\n  }\n  prepare.addEventListener('click',submit);reload.addEventListener('click',load);load();\n})();\n"}
+        planned={}
+        for name,changes in patches.items():
+            p=Path(name); source=p.read_text(encoding='utf-8')
+            if all(new in source for old,new in changes): continue
+            sha=subprocess.check_output(['git','hash-object',name],text=True).strip()
+            if sha!=shas[name]: raise SystemExit('Unexpected source version; no changes installed: '+name)
+            updated=source
+            for old,new in changes:
+                if updated.count(old)!=1: raise SystemExit('Unexpected patch anchor: '+name)
+                updated=updated.replace(old,new,1)
+            backup=Path('backups/fix193e')/p.name
+            if backup.exists() and backup.read_bytes()!=p.read_bytes(): raise SystemExit('Unexpected backup: '+name)
+            planned[name]=updated
+        for name,content in new_files.items():
+            p=Path(name)
+            if p.exists() and p.read_text(encoding='utf-8')!=content: raise SystemExit('Unexpected file collision: '+name)
+        for name,content in planned.items():
+            p=Path(name); backup=Path('backups/fix193e')/p.name
+            backup.parent.mkdir(parents=True,exist_ok=True)
+            if not backup.exists(): backup.write_bytes(p.read_bytes())
+            p.write_text(content,encoding='utf-8')
+        for name,content in new_files.items():
+            if not Path(name).exists(): Path(name).write_text(content,encoding='utf-8')
+        print('Fix 193E service checkout installed.')
+        PYCODE
+        node --check public/shopdrop-service-appointments-193d.js
+        node --check public/shopdrop-service-checkout-193e.js
+        git diff --check
+        git config user.name 'ShopDrop Integration'
+        git config user.email 'actions@users.noreply.github.com'
+        git add public/shopdrop-service-appointments-193d.js public/service-appointments-193d.html public/service-checkout-193e.html public/shopdrop-service-checkout-193e.js
+        if test -d backups/fix193e; then git add backups/fix193e; fi
+        if ! git diff --cached --quiet; then
+          git commit -m 'Fix 193E Other Services checkout preparation'
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
