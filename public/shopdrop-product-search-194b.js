@@ -2,11 +2,17 @@
  'use strict';
  const BASE='https://dtkdvvxpwonywtsgqmdx.supabase.co',KEY='sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';
  const PAGE=24, headers={apikey:KEY,Accept:'application/json'};
+ const HANDMADE_GROUP='__handmade_194c__';
+ const HANDMADE_DEPARTMENTS=['Arts, Crafts & Handmade','Homemade Food & Pantry'];
  // Query only public catalogue fields; no account, cart, payment or address writes.
  function queryFor(f,offset){
   const p=new URLSearchParams({select:'id,title,category,subcategory,condition,price,currency,location',listing_status:'eq.active',quantity:'gt.0',country_code:'eq.ZA',order:'created_at.desc,id.asc',limit:String(PAGE),offset:String(offset)});
-  if(f.category)p.set('category','eq.'+f.category);
-  if(f.subcategory)p.set('subcategory','eq.'+f.subcategory);
+  if(f.category===HANDMADE_GROUP){
+   p.set('category','in.('+HANDMADE_DEPARTMENTS.map(v=>JSON.stringify(v)).join(',')+')');
+  }else{
+   if(f.category)p.set('category','eq.'+f.category);
+   if(f.subcategory)p.set('subcategory','eq.'+f.subcategory);
+  }
   if(f.condition==='preowned')p.set('condition','not.ilike.new');
   else if(['new','used','like_new','refurbished'].includes(f.condition))p.set('condition','eq.'+f.condition);
   const like=s=>s.replace(/[\\%_]/g,c=>'\\'+c);
@@ -22,7 +28,7 @@
  function fill(s,values,label){s.replaceChildren(new Option(label,''));for(const value of sorted(values))s.add(new Option(value,value));}
  const catalog=new Map();let places={},current=null,offset=0,busy=false;
  async function get(url,opts){const r=await fetch(url,opts);if(!r.ok)throw Error('Catalogue unavailable');return r.json();}
- function updateSubs(){const values=catalog.get(category.value)||[];fill(sub,values,'All subcategories');sub.disabled=!category.value;}
+ function updateSubs(){const values=catalog.get(category.value)||[];fill(sub,values,'All subcategories');sub.disabled=!category.value||category.value===HANDMADE_GROUP;}
  function updateTowns(){const values=places[province.value]||[];fill(town,values,'All towns in province');town.disabled=!province.value;}
  function filters(){return {category:category.value,subcategory:sub.value,condition:condition.value,province:province.value,town:town.value,term:term.value};}
  function imageUrl(row){const path=String(row.storage_path||'');if(row.storage_bucket!=='listing-images'||!path||path.startsWith('/')||path.split('/').includes('..'))return null;return BASE+'/storage/v1/object/public/listing-images/'+path.split('/').map(encodeURIComponent).join('/');}
@@ -32,6 +38,6 @@
  function controls(on){busy=on;search.disabled=on;clear.disabled=on;more.disabled=on;}
  async function load(append=false){if(busy)return;if(!append){current=filters();offset=0;results.replaceChildren();}if(!current)return;controls(true);more.hidden=true;status.textContent='Loading available products…';try{const rows=await get(BASE+'/rest/v1/products?'+queryFor(current,offset),{headers});if(!Array.isArray(rows)||rows.some(p=>!uuid(p.id)))throw Error('Invalid catalogue response');const images=await photos(rows);for(const p of rows)results.append(card(p,images.get(p.id)));offset+=rows.length;status.textContent=offset?offset+' product(s) displayed.':'No available products match your filters. Try fewer filters.';more.hidden=rows.length<PAGE;}catch{status.textContent='Products are temporarily unavailable. Search again or use the original categories page.';more.hidden=!append;}finally{controls(false);}}
  category.addEventListener('change',updateSubs);province.addEventListener('change',updateTowns);form.addEventListener('submit',e=>{e.preventDefault();load();});more.addEventListener('click',()=>load(true));clear.addEventListener('click',()=>{if(busy)return;form.reset();updateSubs();updateTowns();load();});
- async function init(){try{const [tax,loc]=await Promise.all([get('./taxonomy.json'),get('./shopdrop-sa-towns-181.json')]);if(!Array.isArray(tax.departments)||loc.country!=='ZA'||!loc.provinces||typeof loc.provinces!=='object')throw Error('Invalid search options');for(const d of tax.departments)if(typeof d.name==='string'&&Array.isArray(d.subcategories))catalog.set(d.name,d.subcategories);places=loc.provinces;fill(category,[...catalog.keys()],'All categories');fill(province,Object.keys(places),'All provinces');const view=new URLSearchParams(location.search).get('view');if(['new','preowned'].includes(view))condition.value=view;updateSubs();updateTowns();controls(false);await load();}catch{status.textContent='Search options are unavailable. Use the original product categories or refresh this page.';}}
+ async function init(){try{const [tax,loc]=await Promise.all([get('./taxonomy.json'),get('./shopdrop-sa-towns-181.json')]);if(!Array.isArray(tax.departments)||loc.country!=='ZA'||!loc.provinces||typeof loc.provinces!=='object')throw Error('Invalid search options');for(const d of tax.departments)if(typeof d.name==='string'&&Array.isArray(d.subcategories))catalog.set(d.name,d.subcategories);places=loc.provinces;fill(category,[...catalog.keys()],'All categories');const handmadeAvailable=HANDMADE_DEPARTMENTS.every(name=>catalog.has(name));if(handmadeAvailable)category.add(new Option('Handmade & homemade categories (both)',HANDMADE_GROUP),1);fill(province,Object.keys(places),'All provinces');const view=new URLSearchParams(location.search).get('view');if(['new','preowned'].includes(view))condition.value=view;else if(view==='handmade'){if(!handmadeAvailable)throw Error('Handmade categories unavailable');category.value=HANDMADE_GROUP;}updateSubs();updateTowns();controls(false);await load();}catch{status.textContent='Search options are unavailable. Use the original product categories or refresh this page.';}}
  init();
 })();
