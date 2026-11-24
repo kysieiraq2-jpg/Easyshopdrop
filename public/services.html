@@ -120,6 +120,20 @@ main{max-width:1100px;margin:auto;padding:18px}
   overflow-wrap:anywhere;
 }
 
+
+/* Fix 193B: Other Services landing layout, matching Transport Services. */
+main{max-width:950px}
+.shopdrop-service-menu-193b{
+ display:block;background:#0f766e;color:#fff;text-align:center;
+ text-decoration:none;font-weight:bold;padding:14px;border-radius:8px;margin-top:14px;
+ line-height:1.25;overflow-wrap:anywhere;
+}
+.shopdrop-service-menu-193b:focus-visible{outline:3px solid #17202a;outline-offset:3px}
+.service-landing-view-193b #shopdropServiceSearch193b,
+.service-landing-view-193b #shopdropServiceCategories193b{display:none!important}
+.service-search-view-193b #shopdropServiceAdvertise193b,
+.service-search-view-193b #shopdropServiceMenu193b{display:none!important}
+
 </style>
 <link rel="stylesheet" href="./shopdrop-unified-cards.css?v=59">
 </head>
@@ -130,6 +144,14 @@ main{max-width:1100px;margin:auto;padding:18px}
 <a href="./account.html">Account</a>
 </header>
 
+<script>
+/* Keep the same services page and its existing booking/search scripts. */
+(()=>{
+ const p=new URLSearchParams(location.search);
+ const searchView=p.get('view')==='search'||(p.get('view')!=='home'&&(location.search!==''||location.hash!==''));
+ document.body.classList.add(searchView?'service-search-view-193b':'service-landing-view-193b');
+})();
+</script>
 <main>
 <section class="panel notice">
 <b>Browse Other Services — FREE:</b>
@@ -139,7 +161,25 @@ Registration is only required when booking or offering a service.
 Provider contact and banking details remain private.
 </section>
 
-<section class="panel">
+<section class="panel" id="shopdropServiceAdvertise193b">
+<h2>Advertise Your Services — FREE</h2>
+<p>Do you provide cleaning, gardening, repairs, catering, or other services?</p>
+<p>Advertise your service on Shop&amp;Drop. Choose your service category, operating area, photographs and your own rates.</p>
+<p>No listing fee. Your advertisement can publish automatically when the required information has passed the existing listing checks.</p>
+<a class="shopdrop-service-menu-193b" href="./seller.html#list-service">Advertise Your Services — FREE</a>
+<p class="muted">You may browse without registering. Sign in or register when submitting your advertisement.</p>
+</section>
+
+<section class="panel" id="shopdropServiceMenu193b">
+<h2>Find Other Services</h2>
+<p>Search available services and find a provider in your area.</p>
+<a class="shopdrop-service-menu-193b" href="./services.html?view=search">Search Other Services</a>
+<a class="shopdrop-service-menu-193b" href="./account.html#shopdrop-service-schedule-ui">My Service Appointments &amp; Provider Requests</a>
+<p class="muted">Browse service advertisements without registering. Sign in when making or managing a booking.</p>
+</section>
+
+<section class="panel" id="shopdropServiceSearch193b">
+<a class="shopdrop-service-menu-193b" href="./services.html?view=home">Back to Other Services</a>
 <h1>Other Services</h1>
 <p>Find independent service providers who have listed their services on Shop&Drop. Browse services by hour, day, kilometre, gig/event, job or treatment. Providers describe what is included, set availability and keep direct contact details private.</p>
 
@@ -168,7 +208,7 @@ Provider contact and banking details remain private.
 <div id="results" class="results" aria-live="polite"></div>
 </section>
 
-<section class="panel">
+<section class="panel" id="shopdropServiceCategories193b">
 <h2>Other Service categories</h2>
 <p class="muted">Select a category to view its subcategories and browse available advertisements. Transport and dispatch jobs have their own dedicated workflow under <a href="./dispatching.html">Transport Services &amp; Equipment Hire</a>.</p>
 
