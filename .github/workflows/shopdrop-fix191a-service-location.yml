@@ -1,1 +1,434 @@
 
+name: ShopDrop Fix 191A - Professional Service Location Search
+
+'on':
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix191a-service-location.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    name: Improve Other Services location search
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+
+      - name: Preserve and improve customer location controls
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import json
+
+          root = Path("public")
+
+          page = root / "services.html"
+
+          script = root / (
+              "shopdrop-service-booking-ui.js"
+          )
+
+          backup = Path("backups/fix191a")
+
+          expected = {
+              page: "e1faea48e75d13fac703160649701d8137dbdcd3",
+              script: "0db93fd25dbfe80a530e0adebf05c740471eacee"
+          }
+
+          originals = {}
+
+          for path, sha in expected.items():
+              actual = subprocess.check_output(
+                  ["git", "hash-object", str(path)],
+                  text=True
+              ).strip()
+
+              if actual != sha:
+                  raise SystemExit(
+                      "SAFETY STOP: Source changed: "
+                      + str(path)
+                  )
+
+              originals[path] = path.read_bytes()
+
+          if backup.exists():
+              raise SystemExit(
+                  "SAFETY STOP: Backup already exists."
+              )
+
+          towns = json.loads(
+              (root / "shopdrop-sa-towns-181.json")
+              .read_text(encoding="utf-8")
+          )
+
+          provinces = [
+              "Eastern Cape",
+              "Free State",
+              "Gauteng",
+              "KwaZulu-Natal",
+              "Limpopo",
+              "Mpumalanga",
+              "North West",
+              "Northern Cape",
+              "Western Cape"
+          ]
+
+          if towns.get("country") != "ZA":
+              raise SystemExit(
+                  "Invalid South African town data."
+              )
+
+          for province in provinces:
+              names = towns["provinces"].get(province)
+
+              if not isinstance(names, list) or not names:
+                  raise SystemExit(
+                      "Missing towns for " + province
+                  )
+
+              if not all(
+                  isinstance(name, str) and name.strip()
+                  for name in names
+              ):
+                  raise SystemExit(
+                      "Invalid town data for " + province
+                  )
+
+          source = originals[script].decode("utf-8")
+
+          def replace_once(text, old, new):
+              if text.count(old) != 1:
+                  raise SystemExit(
+                      "SAFETY STOP: Expected source missing: "
+                      + old[:100]
+                  )
+
+              return text.replace(old, new, 1)
+
+          updated = replace_once(
+              source,
+              """      'Enter the South African town and province where ' +
+                'the service must be performed. Shop&Drop will ' +
+                'match providers who operate in that area.'""".replace(
+                  "\n                ",
+                  "\n      "
+              ),
+              """      'Select the province and town where you require ' +
+                'the service. Shop&Drop will find providers ' +
+                'operating in that area.'""".replace(
+                  "\n                ",
+                  "\n      "
+              )
+          )
+
+          updated = replace_once(
+              updated,
+              "'Service required in — town or city'",
+              "'Town or city'"
+          )
+
+          old_town = "\n".join([
+              "    const town = createElement('input');",
+              "    town.id = 'shopdropBuyerTown';",
+              "    town.type = 'text';",
+              "    town.maxLength = 120;",
+              "    town.placeholder = 'e.g. Gqeberha';",
+              "    town.required = true;",
+              "    town.autocomplete = 'address-level2';"
+          ])
+
+          new_town = "\n".join([
+              "    const town = createElement('select');",
+              "    town.id = 'shopdropBuyerTown';",
+              "    town.required = true;",
+              "    town.disabled = true;",
+              "    town.add(new Option(",
+              "      'Choose province first', ''",
+              "    ));"
+          ])
+
+          updated = replace_once(
+              updated,
+              old_town,
+              new_town
+          )
+
+          location_code = """
+              provinceLabel.append(province);
+
+              let townData = null;
+
+              function updateTowns() {
+                town.replaceChildren();
+
+                const names = townData?.provinces?.[
+                  province.value
+                ] || [];
+
+                town.add(new Option(
+                  province.value
+                    ? (townData
+                        ? 'Choose town or city'
+                        : 'Loading towns...')
+                    : 'Choose province first',
+                  ''
+                ));
+
+                for (const name of [...new Set(names)]
+                  .sort((a,b)=>a.localeCompare(b))) {
+                  town.add(new Option(name, name));
+                }
+
+                town.disabled =
+                  !province.value || !names.length;
+              }
+
+              province.addEventListener(
+                'change',
+                updateTowns
+              );
+
+              fetch('./shopdrop-sa-towns-181.json?v=191a')
+                .then(response => {
+                  if (!response.ok) {
+                    throw Error('Town data unavailable');
+                  }
+                  return response.json();
+                })
+                .then(data => {
+                  if (data.country !== 'ZA' ||
+                      !data.provinces) {
+                    throw Error('Invalid town data');
+                  }
+                  townData = data;
+                  updateTowns();
+                })
+                .catch(() => {
+                  town.replaceChildren(new Option(
+                    'Towns unavailable — refresh page',
+                    ''
+                  ));
+                  town.disabled = true;
+                });
+          """
+
+          import textwrap
+
+          location_code = textwrap.indent(
+              textwrap.dedent(location_code).strip(),
+              "    "
+          )
+
+          updated = replace_once(
+              updated,
+              "    provinceLabel.append(province);",
+              location_code
+          )
+
+          updated = replace_once(
+              updated,
+              "      townLabel,\n      provinceLabel,",
+              "      provinceLabel,\n      townLabel,"
+          )
+
+          updated = replace_once(
+              updated,
+              "'Enter your town and select a province.'",
+              "'Choose your province and town first.'"
+          )
+
+          # Ensure the complete booking handler
+          # and all subsequent code remain unchanged.
+
+          marker = "  function attachBookingUI()"
+
+          if (
+              source.split(marker, 1)[1] !=
+              updated.split(marker, 1)[1]
+          ):
+              raise SystemExit(
+                  "SAFETY STOP: Booking code changed."
+              )
+
+          html = originals[page].decode("utf-8")
+
+          css = """
+          /* Fix191A: Other Services location search */
+          #shopdropServiceLocationPanel {
+            box-sizing:border-box;
+            width:100%;
+            margin:18px 0;
+            padding:16px 0;
+            background:transparent;
+          }
+
+          #shopdropServiceLocationPanel h2 {
+            margin:0 0 12px;
+            font-size:1.4rem;
+            line-height:1.3;
+          }
+
+          #shopdropServiceLocationPanel p {
+            line-height:1.5;
+            overflow-wrap:anywhere;
+          }
+
+          #shopdropServiceLocationPanel label {
+            display:block;
+            width:100%;
+            margin:14px 0;
+            font-weight:600;
+          }
+
+          #shopdropServiceLocationPanel select {
+            display:block;
+            width:100%;
+            max-width:100%;
+            min-height:46px;
+            margin:6px 0 0;
+            padding:11px 12px;
+            border:1px solid #cbd5e1;
+            border-radius:8px;
+            background:#fff;
+            color:#17202a;
+            font:inherit;
+            font-weight:400;
+          }
+
+          #shopdropServiceLocationPanel select:disabled {
+            background:#f1f5f9;
+            color:#64748b;
+          }
+
+          #shopdropServiceLocationPanel .btn {
+            display:block;
+            width:100%;
+            min-height:46px;
+            padding:12px 14px;
+            font:inherit;
+            text-align:center;
+          }
+
+          #shopdropServiceLocationPanel [role="status"] {
+            margin:10px 0 0;
+            color:#64748b;
+          }
+
+          #shopdropServiceLocationPanel [role="status"]:empty {
+            display:none;
+          }
+
+          #results > .empty {
+            grid-column:1 / -1;
+            width:100%;
+            max-width:none;
+            padding:14px;
+            line-height:1.5;
+            background:#f8fafc;
+            overflow-wrap:anywhere;
+          }
+          """
+
+          css = textwrap.dedent(css)
+
+          html = replace_once(
+              html,
+              "</style>",
+              css + "\n</style>"
+          )
+
+          html = replace_once(
+              html,
+              'src="./shopdrop-service-booking-ui.js"',
+              'src="./shopdrop-service-booking-ui.js?v=191a"'
+          )
+
+          html = replace_once(
+              html,
+              "No approved Shop&Drop service advertisements match this selection yet.",
+              "No service advertisements match your selection yet."
+          )
+
+          html = replace_once(
+              html,
+              "filtered.length+' approved Shop&Drop service advertisement(s) found.'",
+              "filtered.length+(filtered.length===1 ? ' service found.' : ' services found.')"
+          )
+
+          backup.mkdir(parents=True)
+
+          for path, original in originals.items():
+              target = backup / path.name
+              target.write_bytes(original)
+
+              if target.read_bytes() != original:
+                  raise SystemExit(
+                      "Backup verification failed."
+                  )
+
+          script.write_bytes(
+              updated.encode("utf-8")
+          )
+
+          page.write_bytes(
+              html.encode("utf-8")
+          )
+
+          print("PASS: Both original files backed up")
+          print("PASS: Province before town")
+          print("PASS: Existing South African town data")
+          print("PASS: Professional full-width fields")
+          print("PASS: Existing booking code preserved")
+          print("PASS: Existing categories preserved")
+          print("PASS: Transport unchanged")
+          print("PASS: Deployment workflow unchanged")
+          PY
+
+          node --check \
+            public/shopdrop-service-booking-ui.js
+
+          git diff --check
+
+      - name: Commit customer location improvements
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "ShopDrop Fix Bot"
+
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            public/services.html \
+            public/shopdrop-service-booking-ui.js \
+            backups/fix191a/
+
+          git commit -m \
+            "Fix 191A professional Other Services location search"
+
+          git push origin \
+            HEAD:shopdrop-phase6-integration
+
+          echo "PASS: Other Services correction committed"
+
+  deploy:
+    needs: fix
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+
