@@ -1,0 +1,67 @@
+name: ShopDrop Fix 194C Product Classification
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix194c-product-classification.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Install handmade category navigation
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import subprocess
+        patches={'public/product-shopping-194a.html': [('<a class="product-menu-194a" href="./product-search-194b.html">Search Products — Filters</a>', '<a class="product-menu-194a" href="./product-search-194b.html?view=handmade">Handmade &amp; Homemade Categories</a><a class="product-menu-194a" href="./product-search-194b.html">Search Products — Filters</a>')], 'public/product-search-194b.html': [('<label for="condition194b">Condition</label>', '<p class="muted">Handmade and homemade are product categories, not conditions. Choose the handmade and homemade group to browse both existing departments, or choose one specific category and its subcategories. These departments also include craft supplies and related items.</p><label for="condition194b">Condition</label>'), ('shopdrop-product-search-194b.js?v=194b', 'shopdrop-product-search-194b.js?v=194c')], 'public/shopdrop-product-search-194b.js': [(" const PAGE=24, headers={apikey:KEY,Accept:'application/json'};", " const PAGE=24, headers={apikey:KEY,Accept:'application/json'};\n const HANDMADE_GROUP='__handmade_194c__';\n const HANDMADE_DEPARTMENTS=['Arts, Crafts & Handmade','Homemade Food & Pantry'];"), ("  if(f.category)p.set('category','eq.'+f.category);\n  if(f.subcategory)p.set('subcategory','eq.'+f.subcategory);", "  if(f.category===HANDMADE_GROUP){\n   p.set('category','in.('+HANDMADE_DEPARTMENTS.map(v=>JSON.stringify(v)).join(',')+')');\n  }else{\n   if(f.category)p.set('category','eq.'+f.category);\n   if(f.subcategory)p.set('subcategory','eq.'+f.subcategory);\n  }"), (" function updateSubs(){const values=catalog.get(category.value)||[];fill(sub,values,'All subcategories');sub.disabled=!category.value;}", " function updateSubs(){const values=catalog.get(category.value)||[];fill(sub,values,'All subcategories');sub.disabled=!category.value||category.value===HANDMADE_GROUP;}"), ("fill(category,[...catalog.keys()],'All categories');fill(province,Object.keys(places),'All provinces');const view=new URLSearchParams(location.search).get('view');if(['new','preowned'].includes(view))condition.value=view;", "fill(category,[...catalog.keys()],'All categories');const handmadeAvailable=HANDMADE_DEPARTMENTS.every(name=>catalog.has(name));if(handmadeAvailable)category.add(new Option('Handmade & homemade categories (both)',HANDMADE_GROUP),1);fill(province,Object.keys(places),'All provinces');const view=new URLSearchParams(location.search).get('view');if(['new','preowned'].includes(view))condition.value=view;else if(view==='handmade'){if(!handmadeAvailable)throw Error('Handmade categories unavailable');category.value=HANDMADE_GROUP;}")]}
+        shas={'public/product-shopping-194a.html': '8a01331202bc602bc7a857d6767c7c8b8764850d', 'public/product-search-194b.html': '1600259296fb84a4c7d577f22a7db3aaa38e99ee', 'public/shopdrop-product-search-194b.js': '68232bd156e2e780a40f9bcdf93b50131208be53'}
+        planned={}
+        for name,changes in patches.items():
+            p=Path(name); source=p.read_text(encoding='utf-8')
+            if all(source.count(new)==1 for old,new in changes): continue
+            sha=subprocess.check_output(['git','hash-object',name],text=True).strip()
+            if sha!=shas[name]: raise SystemExit('Unexpected source version; no changes installed: '+name)
+            updated=source
+            for old,new in changes:
+                if updated.count(old)!=1: raise SystemExit('Unexpected patch anchor: '+name)
+                updated=updated.replace(old,new,1)
+            backup=Path('backups/fix194c')/p.name
+            if backup.exists() and backup.read_bytes()!=p.read_bytes(): raise SystemExit('Unexpected backup: '+name)
+            planned[name]=updated
+        for name,content in planned.items():
+            p=Path(name); backup=Path('backups/fix194c')/p.name
+            backup.parent.mkdir(parents=True,exist_ok=True)
+            if not backup.exists(): backup.write_bytes(p.read_bytes())
+            p.write_text(content,encoding='utf-8')
+        print('Fix 194C handmade category shortcuts installed. Existing listing and checkout untouched.')
+        PYCODE
+        node --check public/shopdrop-product-search-194b.js
+        git diff --check
+        git config user.name 'ShopDrop Integration'
+        git config user.email 'actions@users.noreply.github.com'
+        git add public/product-shopping-194a.html public/product-search-194b.html public/shopdrop-product-search-194b.js
+        if test -d backups/fix194c; then git add backups/fix194c; fi
+        if ! git diff --cached --quiet; then
+          git commit -m 'Fix 194C handmade category navigation'
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
