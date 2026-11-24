@@ -1,0 +1,73 @@
+name: ShopDrop Fix 194B Product Search
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix194b-product-search.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Install read-only product search
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import subprocess
+        patches={'public/product-shopping-194a.html': [('<a class="product-menu-194a" href="./categories.html">Products &amp; Categories / Search</a>', '<a class="product-menu-194a" href="./product-search-194b.html">Search Products — Filters</a><a class="product-menu-194a" href="./categories.html">Products &amp; Categories / Search</a>')]}
+        shas={'public/product-shopping-194a.html': 'eed8b58e32d99b082e2eb8164313389225579298'}
+        new_files={'public/product-search-194b.html': '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer">\n<title>Search Products | Shop&amp;Drop</title><link rel="stylesheet" href="./shopdrop-transport-search-192b.css">\n<link rel="stylesheet" href="./shopdrop-unified-cards.css?v=59">\n<style>input[type=search]{font:inherit;width:100%;padding:13px;border:1px solid #cbd5e1;border-radius:8px;margin-top:8px}#shopdropPublicProductResults{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:12px}#shopdropPublicProductResults a.card{display:block;text-decoration:none;color:#17202a;padding:12px;border:1px solid #dbe2ea;border-radius:10px;overflow-wrap:anywhere;background:white}#shopdropPublicProductResults img{width:100%;height:160px;object-fit:contain;background:#f4f6f8;border-radius:8px}.photo-empty{padding:24px 8px;background:#f4f6f8;text-align:center}.price{font-weight:bold;font-size:18px}a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #17202a;outline-offset:2px}button.secondary{background:#475569}</style></head>\n<body><header><a href="./index.html">Home</a><a href="./product-shopping-194a.html">Product Shopping &amp; Selling</a><a href="./checkout.html">My Bag</a></header>\n<main><section class="panel"><h1>Search Products</h1><p>Browse free without signing in. Choose any filters or leave them open to search all available products in South Africa.</p>\n<form id="productSearch194b"><label for="category194b">Category</label><select id="category194b"><option value="">All categories</option></select>\n<label for="subcategory194b">Subcategory</label><select id="subcategory194b" disabled><option value="">All subcategories</option></select>\n<label for="condition194b">Condition</label><select id="condition194b"><option value="">All conditions</option><option value="new">New</option><option value="preowned">All second-hand &amp; pre-owned</option><option value="used">Second-hand / Used</option><option value="like_new">Like new</option><option value="refurbished">Refurbished</option></select>\n<label for="province194b">Province</label><select id="province194b"><option value="">All provinces</option></select>\n<label for="town194b">Town or city</label><select id="town194b" disabled><option value="">All towns in province</option></select>\n<p class="muted">Location filters match the public town and province recorded on advertisements. Older advertisements without a matching location may be found by choosing all provinces.</p>\n<label for="term194b">Product name or keyword (optional)</label><input type="search" id="term194b" maxlength="100" placeholder="e.g. coffee table">\n<button type="submit" id="search194b" disabled>Search Products</button><button type="button" class="secondary" id="clear194b" disabled>Clear filters</button></form>\n<a class="btn" href="./categories.html">Browse Original Product Categories</a></section>\n<section class="panel"><h2>Available Products</h2><p id="status194b" role="status" aria-live="polite">Loading search options…</p><div id="shopdropPublicProductResults"></div><button type="button" id="more194b" hidden>Load more products</button></section>\n</main><script src="./shopdrop-product-search-194b.js?v=194b" defer></script><script src="./shopdrop-public-advertiser-ui.js?v=59" defer></script></body></html>\n', 'public/shopdrop-product-search-194b.js': "(() => {\n 'use strict';\n const BASE='https://dtkdvvxpwonywtsgqmdx.supabase.co',KEY='sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';\n const PAGE=24, headers={apikey:KEY,Accept:'application/json'};\n // Query only public catalogue fields; no account, cart, payment or address writes.\n function queryFor(f,offset){\n  const p=new URLSearchParams({select:'id,title,category,subcategory,condition,price,currency,location',listing_status:'eq.active',quantity:'gt.0',country_code:'eq.ZA',order:'created_at.desc,id.asc',limit:String(PAGE),offset:String(offset)});\n  if(f.category)p.set('category','eq.'+f.category);\n  if(f.subcategory)p.set('subcategory','eq.'+f.subcategory);\n  if(f.condition==='preowned')p.set('condition','not.ilike.new');\n  else if(['new','used','like_new','refurbished'].includes(f.condition))p.set('condition','eq.'+f.condition);\n  const like=s=>s.replace(/[\\\\%_]/g,c=>'\\\\'+c);\n  if(f.province)p.set('location','ilike.'+(f.town?like(f.town)+', '+like(f.province):'*, '+like(f.province)));\n  const term=String(f.term||'').replace(/[^\\p{L}\\p{N}\\s'-]/gu,' ').replace(/\\s+/g,' ').trim();\n  if(term)p.set('or','(title.ilike.*'+term+'*,description.ilike.*'+term+'*)');\n  return p;\n }\n const $=id=>document.getElementById(id), form=$('productSearch194b'), category=$('category194b'),sub=$('subcategory194b'),condition=$('condition194b'),province=$('province194b'),town=$('town194b'),term=$('term194b'),search=$('search194b'),clear=$('clear194b'),more=$('more194b'),status=$('status194b'),results=$('shopdropPublicProductResults');\n const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};\n const uuid=v=>typeof v==='string'&&/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v);\n const sorted=a=>[...new Set(a.filter(x=>typeof x==='string'&&x.trim()))].sort((a,b)=>a.localeCompare(b,'en-ZA',{sensitivity:'base'}));\n function fill(s,values,label){s.replaceChildren(new Option(label,''));for(const value of sorted(values))s.add(new Option(value,value));}\n const catalog=new Map();let places={},current=null,offset=0,busy=false;\n async function get(url,opts){const r=await fetch(url,opts);if(!r.ok)throw Error('Catalogue unavailable');return r.json();}\n function updateSubs(){const values=catalog.get(category.value)||[];fill(sub,values,'All subcategories');sub.disabled=!category.value;}\n function updateTowns(){const values=places[province.value]||[];fill(town,values,'All towns in province');town.disabled=!province.value;}\n function filters(){return {category:category.value,subcategory:sub.value,condition:condition.value,province:province.value,town:town.value,term:term.value};}\n function imageUrl(row){const path=String(row.storage_path||'');if(row.storage_bucket!=='listing-images'||!path||path.startsWith('/')||path.split('/').includes('..'))return null;return BASE+'/storage/v1/object/public/listing-images/'+path.split('/').map(encodeURIComponent).join('/');}\n async function photos(rows){const ids=rows.map(x=>x.id).filter(uuid),m=new Map();if(!ids.length)return m;const p=new URLSearchParams({select:'product_id,storage_bucket,storage_path,is_primary,image_position',product_id:'in.('+ids.join(',')+')',order:'image_position.asc'});try{const data=await get(BASE+'/rest/v1/listing_images?'+p,{headers});if(Array.isArray(data))for(const row of data){const url=imageUrl(row);if(url&&(!m.has(row.product_id)||(!m.get(row.product_id).primary&&row.is_primary===true)))m.set(row.product_id,{url,primary:row.is_primary===true});}}catch{}return m;}\n const names={new:'New',used:'Second-hand / Used',like_new:'Like new',refurbished:'Refurbished'};\n function card(p,img){const a=el('a');a.className='card';a.href='./product.html?id='+encodeURIComponent(p.id);const placeholder=el('div','Photograph unavailable');placeholder.className='photo-empty';if(img?.url){const i=el('img');i.src=img.url;i.alt='Photograph of '+(p.title||'product');i.loading='lazy';i.decoding='async';i.referrerPolicy='no-referrer';i.addEventListener('error',()=>i.replaceWith(placeholder),{once:true});a.append(i);}else a.append(placeholder);a.append(el('h3',p.title||'Product'),el('p',[p.category,p.subcategory,names[p.condition]||p.condition,p.location].filter(Boolean).join(' · ')));const value=Number(p.price);const price=el('p',Number.isFinite(value)?new Intl.NumberFormat('en-ZA',{style:'currency',currency:'ZAR'}).format(value):'Price unavailable');price.className='price';a.append(price,el('p','View product details'));return a;}\n function controls(on){busy=on;search.disabled=on;clear.disabled=on;more.disabled=on;}\n async function load(append=false){if(busy)return;if(!append){current=filters();offset=0;results.replaceChildren();}if(!current)return;controls(true);more.hidden=true;status.textContent='Loading available products…';try{const rows=await get(BASE+'/rest/v1/products?'+queryFor(current,offset),{headers});if(!Array.isArray(rows)||rows.some(p=>!uuid(p.id)))throw Error('Invalid catalogue response');const images=await photos(rows);for(const p of rows)results.append(card(p,images.get(p.id)));offset+=rows.length;status.textContent=offset?offset+' product(s) displayed.':'No available products match your filters. Try fewer filters.';more.hidden=rows.length<PAGE;}catch{status.textContent='Products are temporarily unavailable. Search again or use the original categories page.';more.hidden=!append;}finally{controls(false);}}\n category.addEventListener('change',updateSubs);province.addEventListener('change',updateTowns);form.addEventListener('submit',e=>{e.preventDefault();load();});more.addEventListener('click',()=>load(true));clear.addEventListener('click',()=>{if(busy)return;form.reset();updateSubs();updateTowns();load();});\n async function init(){try{const [tax,loc]=await Promise.all([get('./taxonomy.json'),get('./shopdrop-sa-towns-181.json')]);if(!Array.isArray(tax.departments)||loc.country!=='ZA'||!loc.provinces||typeof loc.provinces!=='object')throw Error('Invalid search options');for(const d of tax.departments)if(typeof d.name==='string'&&Array.isArray(d.subcategories))catalog.set(d.name,d.subcategories);places=loc.provinces;fill(category,[...catalog.keys()],'All categories');fill(province,Object.keys(places),'All provinces');const view=new URLSearchParams(location.search).get('view');if(['new','preowned'].includes(view))condition.value=view;updateSubs();updateTowns();controls(false);await load();}catch{status.textContent='Search options are unavailable. Use the original product categories or refresh this page.';}}\n init();\n})();\n"}
+        planned={}
+        for name,changes in patches.items():
+            p=Path(name); source=p.read_text(encoding='utf-8')
+            if all(source.count(new)==1 for old,new in changes): continue
+            sha=subprocess.check_output(['git','hash-object',name],text=True).strip()
+            if sha!=shas[name]: raise SystemExit('Unexpected source version; no changes installed: '+name)
+            updated=source
+            for old,new in changes:
+                if updated.count(old)!=1: raise SystemExit('Unexpected patch anchor: '+name)
+                updated=updated.replace(old,new,1)
+            backup=Path('backups/fix194b')/p.name
+            if backup.exists() and backup.read_bytes()!=p.read_bytes(): raise SystemExit('Unexpected backup: '+name)
+            planned[name]=updated
+        for name,content in new_files.items():
+            p=Path(name)
+            if p.exists() and p.read_text(encoding='utf-8')!=content: raise SystemExit('Unexpected file collision: '+name)
+        for name,content in planned.items():
+            p=Path(name); backup=Path('backups/fix194b')/p.name
+            backup.parent.mkdir(parents=True,exist_ok=True)
+            if not backup.exists(): backup.write_bytes(p.read_bytes())
+            p.write_text(content,encoding='utf-8')
+        for name,content in new_files.items():
+            if not Path(name).exists(): Path(name).write_text(content,encoding='utf-8')
+        print('Fix 194B read-only product search; original product pages and backend untouched.')
+        PYCODE
+        git diff --check
+        git config user.name 'ShopDrop Integration'
+        git config user.email 'actions@users.noreply.github.com'
+        node --check public/shopdrop-product-search-194b.js
+        git add public/product-shopping-194a.html public/product-search-194b.html public/shopdrop-product-search-194b.js
+        if test -d backups/fix194b; then git add backups/fix194b; fi
+        if ! git diff --cached --quiet; then
+          git commit -m 'Fix 194B product read-only product search'
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
