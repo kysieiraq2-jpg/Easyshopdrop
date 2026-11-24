@@ -1,0 +1,581 @@
+{
+  "source_commit": "1a35277e5d5adacb6a11239f0535c1d841b8fba0",
+  "files": [
+    {
+      "path": "public/account.html",
+      "sha256": "0df757bbd1ffb06a849dff52635bd39586c656c8719e81c23c6ce7cbea190d3e"
+    },
+    {
+      "path": "public/admin-change-request.html",
+      "sha256": "4fbd0f2a9b4d27afee247c1b6fd28fd8e7a90efcf99ab0d10fb00018d9918548"
+    },
+    {
+      "path": "public/admin-login.html",
+      "sha256": "96a5ea3048032493a5e4effd60f1d236f9902fb27d13cd4e60f4c3178cc40d2c"
+    },
+    {
+      "path": "public/admin-marketplace.html",
+      "sha256": "84642de36a04be7051206ab080d5c4568c9bbe75355560f79a0af6ac9120b5e9"
+    },
+    {
+      "path": "public/admin-review-cases.html",
+      "sha256": "c60428402b184b774aabaab87571051716d671208c9580f42e83f4b531af140c"
+    },
+    {
+      "path": "public/admin-tracking.html",
+      "sha256": "8bb39a6eb835bf6515578f32ad546f42632cc6fd3341253392c3e08285c54c7a"
+    },
+    {
+      "path": "public/admin.html",
+      "sha256": "316445d6e43a9770b39008a31ce3e76e880f31d2559609883b85425e0194aa8c"
+    },
+    {
+      "path": "public/availability.html",
+      "sha256": "0e6b661ece88ea3a423252aef2a244ce4f6aefe90fcaff566aaeedf49a46defd"
+    },
+    {
+      "path": "public/cancellations.html",
+      "sha256": "8451f92180c7a073e1afc23cd84c2628ac641269e6dc85a21d94d5e93921f22f"
+    },
+    {
+      "path": "public/categories.html",
+      "sha256": "365c5de235554c58f185e80bf630cf95ecd768630fc47c45cd223f6a2770677e"
+    },
+    {
+      "path": "public/category-results.html",
+      "sha256": "5f6d5f312435819f1330729b8e5368e31738cf62a03ba34752b251a32271208b"
+    },
+    {
+      "path": "public/checkout.html",
+      "sha256": "d42caf898a05b8f5034a133d3024a9f0f2e41e931fe076d0a20c4ff54949f80e"
+    },
+    {
+      "path": "public/common.js",
+      "sha256": "1297f86e6af25a4601dec0f547a0b85eb369876caacb302f0a06b02131145d29"
+    },
+    {
+      "path": "public/dispatching.html",
+      "sha256": "4928f42843059bdb015c9c53101edef7645a0a2c948e1e5bc171e8bb4263940c"
+    },
+    {
+      "path": "public/dispute-evidence.html",
+      "sha256": "98850b9b25f1659e245cde16ded68b55e98de52516288ca4e77d8fe622931701"
+    },
+    {
+      "path": "public/feedback.html",
+      "sha256": "e5e719310a815e1e7c2486b93ea43ade4c4f1aed56edf31f53b1177b2af66f9c"
+    },
+    {
+      "path": "public/financial-statement.html",
+      "sha256": "fef5740b7eb85555c931cafb19bd808d143b893f20886f138aeff02b26195520"
+    },
+    {
+      "path": "public/fulfilment-deadlines.html",
+      "sha256": "0792c009548243d1e6e65da312c15ca5563900ac7241b51e493f2c4a8f4522d3"
+    },
+    {
+      "path": "public/geo.js",
+      "sha256": "ab887a2e3ee9fc622c4c3f464ee2f74dfb96d651a1be1069cfaa5904357c66ee"
+    },
+    {
+      "path": "public/help.html",
+      "sha256": "69d0599b1a561c3c57138c973b9183fce4b7a8780c3f5ad3add45100573bce77"
+    },
+    {
+      "path": "public/index.html",
+      "sha256": "ed3ad3b2d539f55389de031f8442328601fb17584130ec15ea8832a0065d742c"
+    },
+    {
+      "path": "public/integration-planning.html",
+      "sha256": "8c830f7c54dafaf0d8118e512976c47d44ddc90e5a57a59b72870271ef21e172"
+    },
+    {
+      "path": "public/inventory-reservations.html",
+      "sha256": "508493bbccb8a610efc38bd3650dff9ee4fe39a069ea6ba0f9ceaefaeba06c13"
+    },
+    {
+      "path": "public/marketing.html",
+      "sha256": "2da7de272b7eea1350d99b3ee058f3a1588425fcc31c0cb5f3580a5a29e806c9"
+    },
+    {
+      "path": "public/operations.html",
+      "sha256": "2940d4e7db0616e5f1cbc0f430086a6b2587be96bedd2925dfd5e5ad0f412eb2"
+    },
+    {
+      "path": "public/order.html",
+      "sha256": "a6bc5e02e3f079fe65e1bc7f87f3464479a4defcc0f8bb95cc3765c96dab74ff"
+    },
+    {
+      "path": "public/payment-disputes.html",
+      "sha256": "37255a4229f8f80ab0e90e1cb7c67afad43db2e0fbeb3913d03cdf5b98e1b5ab"
+    },
+    {
+      "path": "public/payout-statement.html",
+      "sha256": "5bc6dac9869f063f029ed78c533bb8056bec8e6c2dde077311560edff6ce6af4"
+    },
+    {
+      "path": "public/placeholder.txt",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "public/privacy.html",
+      "sha256": "e6d4c2a978ec708a3f75282a9fa8fe3b678974d05c764244bffbf9f372d14640"
+    },
+    {
+      "path": "public/product.html",
+      "sha256": "db4293ed4367b11fe7dbbe7ee929528f5c932bb28f694b81474648e85b3d37c9"
+    },
+    {
+      "path": "public/proof-of-delivery.html",
+      "sha256": "e3c0da7b800d0a756b68f866b23df15b6b285d9a65ec71730b2094a00eef0ac9"
+    },
+    {
+      "path": "public/r4-cancellations-browser-test-v2.html",
+      "sha256": "815aa06e40ef11986c8b8cad630b6bdb622ee062c29c8367c9595a70d194f0ea"
+    },
+    {
+      "path": "public/r4-cancellations-browser-test.html",
+      "sha256": "8088e2f486e72ac7c7c7a72bafba2390f75237d0850050a4a8f05ed94045a52a"
+    },
+    {
+      "path": "public/r4-dispute-evidence-browser-test.html",
+      "sha256": "68320276d9c0e4c8ee29fc1fdc37f88f2b0205c059df2021ba5a87230b2dfe03"
+    },
+    {
+      "path": "public/r4-disputes-browser-test.html",
+      "sha256": "04d6513d2eccd8a885424606bdb46ceb74e297bf80bc49fb4b99d292b7ac72f3"
+    },
+    {
+      "path": "public/r4-listing-reports-browser-test.html",
+      "sha256": "9929a0d090c4451aa4c254f635aeb04c36d9c509dc5211de53997f97633b1b97"
+    },
+    {
+      "path": "public/r5-change-requests-active-admin-test.html",
+      "sha256": "5635ed6e8be03726a13a5fe4d77b9034e6e3cb873b7a5338d33c0d784c5a9a46"
+    },
+    {
+      "path": "public/r5-change-requests-admin-403-test.html",
+      "sha256": "772261ca18615db05475c4e2a121f286534a79452777c62788b21480e6759b27"
+    },
+    {
+      "path": "public/r5-change-requests-browser-test.html",
+      "sha256": "119b17a551281467480512c74fb54cadb04eb5d1d70970b83db8559bdd8677be"
+    },
+    {
+      "path": "public/r6-create-signed-upload-authenticated-test.html",
+      "sha256": "1d9963a7ea91a25290e3bc509e81392e8921909bcda5c1141c10141a33c886a0"
+    },
+    {
+      "path": "public/r6-create-signed-upload-browser-test.html",
+      "sha256": "dd43334f263b3a0647c5afa756463a0ce58bb9682ffce2fca372075c36857433"
+    },
+    {
+      "path": "public/r6-create-signed-upload-real-photo-test.html",
+      "sha256": "570a029f2091b5955dc4f8e04bac0817d5071cb7dffb39ac8981bb5885a1b9bd"
+    },
+    {
+      "path": "public/receipts.html",
+      "sha256": "fd89ef03b703b14d3d9930a882e8db20798429db8156f1e1a1dbfcc2ce525d34"
+    },
+    {
+      "path": "public/register.html",
+      "sha256": "bc93d866fc2713615eba4b88190b53c6fd6a6ad2fa85d0efea9a715b62fd3775"
+    },
+    {
+      "path": "public/report-listing.html",
+      "sha256": "6f7d1bc3531f84857896b5e798fdaedee1cf25c4ab511f4a5fa5d93e8343040a"
+    },
+    {
+      "path": "public/restricted-listings.html",
+      "sha256": "55954ab25cb9532b35ac723c386b32e150ef659ca12fcac4ec870aa2e96f72cf"
+    },
+    {
+      "path": "public/returns-policy.html",
+      "sha256": "13b1de2426a718ae53aff703892c577922cbeb3a79dc6d5e052fe463bf3d6a38"
+    },
+    {
+      "path": "public/returns.html",
+      "sha256": "0885892550289dc65ba1eb18409e9e697cc3b28282301f814a8862890ed1a400"
+    },
+    {
+      "path": "public/sell-item.html",
+      "sha256": "9c5022866d6e87f610fc61d59709fabb109d257fd0d744bf0843d9d5c679d371"
+    },
+    {
+      "path": "public/seller-apply.html",
+      "sha256": "777ef7392beb1dfd280bf19224ee787709a400df9ffb0304b9a22f5674af8af4"
+    },
+    {
+      "path": "public/seller-products.html",
+      "sha256": "c00b7ddb282bd3e4f368fff0da8c3d205041288faf3c9be4a6809dd91d4b7e27"
+    },
+    {
+      "path": "public/seller-provider-rules.html",
+      "sha256": "4b0479c8836eb3fe261a8a81f9f00f2bbbf395bedf836cc48c868888d84f684b"
+    },
+    {
+      "path": "public/seller.html",
+      "sha256": "becebde1d20ff3448d17304cf151446770339e46b932b860866a33a4bec8d657"
+    },
+    {
+      "path": "public/service-taxonomy.js",
+      "sha256": "a8c6d97ff231cc3d8b6e8e7de07ad146bd9830968ec042bd608265cc34270fad"
+    },
+    {
+      "path": "public/services.html",
+      "sha256": "a910094d9ee88194d807d37a1b286901fbc970c4385b5c971eafd68a0e10c62e"
+    },
+    {
+      "path": "public/shopdrop-a155-courier-quotes-ui.js",
+      "sha256": "7306b0b6a2fc261ab4df264221881dcaae2b8d89b8f932f62b0b02c5fb9955cc"
+    },
+    {
+      "path": "public/shopdrop-account-language.js",
+      "sha256": "e53b301167eb2042e22b7b7e185e1d4436d5790ba098714c6d36b5474153e768"
+    },
+    {
+      "path": "public/shopdrop-ad-gallery-preparation.html",
+      "sha256": "e37ed88cd915741d570f66ae9d359ab0a6de2dd2885feae9f14b245b002a1b55"
+    },
+    {
+      "path": "public/shopdrop-ad-gallery-private-test.html",
+      "sha256": "6580c49b797c670ef57dc80d718c90b0345488b2db449774529b16a2eababaef"
+    },
+    {
+      "path": "public/shopdrop-ad-gallery-uploader.js",
+      "sha256": "23106bde30c430cf8dd46e209067a60c5817a6db2d0a86dffb7b0601f7cc7987"
+    },
+    {
+      "path": "public/shopdrop-buyer-language.js",
+      "sha256": "b57fe7f2f3eab5cc451fed548be3ecc7d370ab98c270c4950f17b3c18f246d2d"
+    },
+    {
+      "path": "public/shopdrop-cart-address-bridge.js",
+      "sha256": "4b661179aa023055318034bd50ab38fe56a2591a9611c1b1425bb7564f0efe97"
+    },
+    {
+      "path": "public/shopdrop-checkout-connector.js",
+      "sha256": "7dd24ff752d39eaea38aa6a15fd648733e888e45b83995f2130ec202fd6d923e"
+    },
+    {
+      "path": "public/shopdrop-checkout-countdown.js",
+      "sha256": "061efc7e85f26dbdabd5230187ae795f2d433eeaad5fcbc232b28a35ec97e3be"
+    },
+    {
+      "path": "public/shopdrop-combined-service-cards.js",
+      "sha256": "dcf2175702dec97be4f7ce95d7707bc83caab7d8770bd20fff28bb5451fb5458"
+    },
+    {
+      "path": "public/shopdrop-courier-quote-bridge.js",
+      "sha256": "4a8ed1a5ff9b73ea95bbb6b8bd4ff34a6ee8b97cc0246685e494787f3622949c"
+    },
+    {
+      "path": "public/shopdrop-courier-search.js",
+      "sha256": "88d9051a92e165635b72a11b89534af81dfcd8d88696136d3f728b676e3c17f3"
+    },
+    {
+      "path": "public/shopdrop-customer-equipment-184b.js",
+      "sha256": "a571984b18bc4bbe999a08e80c87c09dff9a3e054585cfc5e94e71a51bcce042"
+    },
+    {
+      "path": "public/shopdrop-customer-service-rates.js",
+      "sha256": "b14642e5695d9df5af9ca35885c6ed5046dc41b0e402a2842b33dea3b8fb7ab4"
+    },
+    {
+      "path": "public/shopdrop-dispatch-compact-rates.js",
+      "sha256": "72617b04b1dc94fd08c9261f483db11ac0cf51018f028af4ac52e493a871fb39"
+    },
+    {
+      "path": "public/shopdrop-dispatch-customer-rates.js",
+      "sha256": "a7366097277432c5053163d0593699cf0afdaad052062172def829e5b1a3c65e"
+    },
+    {
+      "path": "public/shopdrop-dispatch-equipment-fields.js",
+      "sha256": "8e6ee7c0612c70ae318cd817309b14cead92e509ec4bbfdfaf2f627e3fd239f8"
+    },
+    {
+      "path": "public/shopdrop-dispatch-offers.js",
+      "sha256": "5513330d78f0fea27c133e639601344956acb2c3083bfcbd85c80979f41fc133"
+    },
+    {
+      "path": "public/shopdrop-dispatch-provider-job.js",
+      "sha256": "f46e6a139a643643ef8ec3cd2e21042d8cdea5ab1ace8ad40880e6b568cc7baa"
+    },
+    {
+      "path": "public/shopdrop-dispatch-provider-offer-history.js",
+      "sha256": "08a0356f27c73b9082f32b048d4bbdc5a87da8204250d386fab1e5ef367bf81e"
+    },
+    {
+      "path": "public/shopdrop-dispatch-provider-offers.js",
+      "sha256": "f3fd6680520c29e40d9bfe413567563bd03a0832f427c4cd08eec33fd4976a69"
+    },
+    {
+      "path": "public/shopdrop-dispatch-rate-management.js",
+      "sha256": "9b32c5867caecea3881fdd10239c5c353985d28874c4776aa9a8eaa897b6d38a"
+    },
+    {
+      "path": "public/shopdrop-dispatch-required-time.js",
+      "sha256": "947872670781542aea01f720fa3880301361a765fde40c2aa6787c24a5e8e6a7"
+    },
+    {
+      "path": "public/shopdrop-dispatch-schedule-ui.js",
+      "sha256": "5543d30f3a03e50b76567b958ea3b14499c4d8d4a8799c9eded15fdc4be80e42"
+    },
+    {
+      "path": "public/shopdrop-form-language.js",
+      "sha256": "6b13b877ab3de87133e88f703fe683cb8d1df936dbaa73a1dfc0c2e37baf73fd"
+    },
+    {
+      "path": "public/shopdrop-free-photo-screen.mjs",
+      "sha256": "533b0c9409ba8ac8daf5e37ff54d2b90bb31d7175828cc5d9d9c18e5387151fc"
+    },
+    {
+      "path": "public/shopdrop-info-language.js",
+      "sha256": "7b54556f749755747e5c1a161cedf5279e534e300b20759ae9c754205c6b1e91"
+    },
+    {
+      "path": "public/shopdrop-integration-check.html",
+      "sha256": "d33d714eff6f922e5fbfff4fefd1a0698dc92870cf18f32bc04ba0a198bafa44"
+    },
+    {
+      "path": "public/shopdrop-language.js",
+      "sha256": "fc2bac8650dfc1d9e20f9ea3741286df1b7fbe11326c505bb7f9ef4afff90666"
+    },
+    {
+      "path": "public/shopdrop-legal-language.js",
+      "sha256": "faed9c1ee0fe8279ea339c9da86298bd9c01e94590e5f1e1da5b32008f51e36c"
+    },
+    {
+      "path": "public/shopdrop-location-182a.js",
+      "sha256": "9e9f6d5d136ec6dc89b5245deca9048d99ccad481829773ff61dae1e269aba17"
+    },
+    {
+      "path": "public/shopdrop-location-dropdowns-181.js",
+      "sha256": "706b764fc2d596c81f43405b49357da37d8e5842b5adce385139b67428503120"
+    },
+    {
+      "path": "public/shopdrop-order-stage.js",
+      "sha256": "7b06b67960d9c27ee2c90614d34a6392567ee402aba5ef4616e1a5965518f23a"
+    },
+    {
+      "path": "public/shopdrop-paid-booking-contacts.js",
+      "sha256": "15ce5da69b344a5b2295d3d8c494b8fb87378131d84f4b1b8f5e64eff4e6435a"
+    },
+    {
+      "path": "public/shopdrop-payment-preview.js",
+      "sha256": "8934e076a4235e03e8e7e70e71a620dd9c29ee8a67b4befa10af909c78428b45"
+    },
+    {
+      "path": "public/shopdrop-payment-selection.js",
+      "sha256": "af06356882ff6ef0304ce5252ff52f02a1b20f3e7a00d1d5f5c86ce2937ec100"
+    },
+    {
+      "path": "public/shopdrop-photo-scan-status.js",
+      "sha256": "8d8fe619fd65207051dfe5ff7ddbbb0c5be9e7660c587b8fa42eb65c79e96007"
+    },
+    {
+      "path": "public/shopdrop-photo-scan-test.html",
+      "sha256": "b29a666c07b34ab1540be58c46a1b6b5947e02818d614b07333b07e34951b8bc"
+    },
+    {
+      "path": "public/shopdrop-photo-scan-visible.mjs",
+      "sha256": "d16be9f5417c5ab78381ba93215258293c965024ad6feee681d45e1faacc18d1"
+    },
+    {
+      "path": "public/shopdrop-private-contact.js",
+      "sha256": "2f1a6828b9fca056c27b38219fff6a7201a76d56b847163f4d738e9b849cee1a"
+    },
+    {
+      "path": "public/shopdrop-product-detail-supabase.js",
+      "sha256": "718c4ced89b20094d4ce7e4b14509f6ebf5ad2b2d18b27f678e4e62b4d5b5bac"
+    },
+    {
+      "path": "public/shopdrop-product-photos.js",
+      "sha256": "7636560844582bd1cbe7894e5eb8aadf83806cf5b726d967fb38359676cd4451"
+    },
+    {
+      "path": "public/shopdrop-product-seller-alias.js",
+      "sha256": "c7e786e0b975930f4b0dc58620a1d8a5b3440cda78f1e477b01a188662ca7442"
+    },
+    {
+      "path": "public/shopdrop-provider-completion.html",
+      "sha256": "e6b5db5b5827a7fcedaca4426a8f41cad5b1e93d2092b289d9b5d9bf678fc56f"
+    },
+    {
+      "path": "public/shopdrop-provider-location-184a.js",
+      "sha256": "971b034644b468bfbf3ca732ff9660b7bb8054da990a6973f4ece9cf3e46f842"
+    },
+    {
+      "path": "public/shopdrop-public-advertiser-ui.js",
+      "sha256": "840a12ea2db32e58d48bf1679649b5b24e9547c4faf3b40d006c1ec343bf1f58"
+    },
+    {
+      "path": "public/shopdrop-public-seller-products.js",
+      "sha256": "45dd367265a5228dceb8712f7c587f94e096b8e2812851e2206a1d631d25ed4c"
+    },
+    {
+      "path": "public/shopdrop-sa-courier-choices.js",
+      "sha256": "e7ac13f40ef579d369af83a8e0edac0d09ee5dea884318a3fb304afaadbcbfdd"
+    },
+    {
+      "path": "public/shopdrop-sa-towns-181.json",
+      "sha256": "705789e2c32277babdcbc1e39898434ec9f6bd17ba6a1c5727a8ec2763939d31"
+    },
+    {
+      "path": "public/shopdrop-seller-alias.js",
+      "sha256": "653782f5c6a4d536d23049c74bc3d26ebb1fc0fdde05026527c29be4f8756326"
+    },
+    {
+      "path": "public/shopdrop-seller-facelift.css",
+      "sha256": "d98286be369c6ff0854a677bb628b7096857dc02c46c37da3469e5aa1a2849d1"
+    },
+    {
+      "path": "public/shopdrop-seller-language.js",
+      "sha256": "84489f8d419eea249787309b1d0f64f631ce41c4dc21c82bcccaba333bfe97c4"
+    },
+    {
+      "path": "public/shopdrop-seller-product-supabase.js",
+      "sha256": "26951da0c4ad07b93ea80c855e9a87c458e1225ddebc01ea70276cdde99fb982"
+    },
+    {
+      "path": "public/shopdrop-service-booking-ui.js",
+      "sha256": "315622aa32730cab080befc0345e93ded9f6475fd74bef8b09b587ec65b6db03"
+    },
+    {
+      "path": "public/shopdrop-service-completion.html",
+      "sha256": "a51202864dce663b714d92171b83d95267def36cb85e96a96347bd8db006f93f"
+    },
+    {
+      "path": "public/shopdrop-service-locations-182b.js",
+      "sha256": "8ed971e21627b4e73ca781fba91b476cca69179a983d7465038aecd4e452c938"
+    },
+    {
+      "path": "public/shopdrop-service-schedule-ui.js",
+      "sha256": "da361f560cccdc7edff8f502708ed7c9267ef37f334a389ed106ac4ffcb6e039"
+    },
+    {
+      "path": "public/shopdrop-services-connector.js",
+      "sha256": "71b236905d8daae52b183f3144124c157fb0f3430647fba281091645efffe197"
+    },
+    {
+      "path": "public/shopdrop-shared-photo-reader.js",
+      "sha256": "e3169b583f71d6a790b0afd739ccc732ea7c53a535bce60194bd7c354c2568e7"
+    },
+    {
+      "path": "public/shopdrop-shared-service-rates.js",
+      "sha256": "125512e00949aaa617b1118ddb04b53fdf0b76fc03fcda85e00fdb4fd6ff5e70"
+    },
+    {
+      "path": "public/shopdrop-transport-location-182c.js",
+      "sha256": "5e8923ce78e4bcae7cf544de24105da30ef01c2d6051132bdafabea85e144fdf"
+    },
+    {
+      "path": "public/shopdrop-transport-location-182d.js",
+      "sha256": "c40367da23c0737e0c01b2ebf9628ba85b44104e3e28a711d9a88d708a3eeed6"
+    },
+    {
+      "path": "public/shopdrop-transport-title-185a.js",
+      "sha256": "69e9610135f6f99c5b0fa183b2a928dc39f76d97fff4cb280d8c00041cc8a384"
+    },
+    {
+      "path": "public/shopdrop-unified-cards.css",
+      "sha256": "152e950af261a847e70600f6b93da99e0ccb968dfe3824d4249532f70f104c99"
+    },
+    {
+      "path": "public/shopdrop-vehicle-draft-private.html",
+      "sha256": "46854c77f1ff5e381844726981c2d680d623ea2a691eaeca2386b4fd6fb8e3ac"
+    },
+    {
+      "path": "public/sign-in.html",
+      "sha256": "b6fd25cc99f45942965a3b248f4f803978135e0963a0fba5b9914357f47d5e04"
+    },
+    {
+      "path": "public/supabase-adapter.js",
+      "sha256": "d238333641a9e96a230957545b639d76bc6c7eef93c268e6b31573f093e8a105"
+    },
+    {
+      "path": "public/supabase-auth-r2b-test.html",
+      "sha256": "03e231b215bfbbd252c30559d3c32f4389838cd23f9b621d32b4b5514431c600"
+    },
+    {
+      "path": "public/supabase-auth-r2b.js",
+      "sha256": "7d6583ea429ba68930d9bf0619b11039f57dbfe5987bd47938b2c85e7dbf0d9e"
+    },
+    {
+      "path": "public/supabase-auth-session.js",
+      "sha256": "b5afa5b31b1db5c06330498a27ce50cce36d40d2b26bec5d6730a4d79f0f734b"
+    },
+    {
+      "path": "public/supabase-auth-test.html",
+      "sha256": "e3b803fe4ab648869d4be260581f18783bf2f54a6394c0e7c5d258d3464154d8"
+    },
+    {
+      "path": "public/supabase-connection-test-v2.html",
+      "sha256": "aa83e9c48e9cdc1e44020f3af23673158a7ea437802afc2903d00219546892e3"
+    },
+    {
+      "path": "public/supabase-connection-test-v3.html",
+      "sha256": "7b9f72ef2ab504045d03bb17e3d854bd73961bfe2d107c32ebb7c92646fd527d"
+    },
+    {
+      "path": "public/supabase-connection-test.html",
+      "sha256": "1b3bf035b56610c7b11902a3b37a99c73fca9ed5ad925ac18ec4f9dc87d09bba"
+    },
+    {
+      "path": "public/supabase-edge-function-test.html",
+      "sha256": "13abf9bf6bedaf0f243fb3def8308d88e2febadd0383a9f580493815247bb723"
+    },
+    {
+      "path": "public/supabase-r3-profile-rls-test.html",
+      "sha256": "6b7529ee0a2cc3df2a904f98f69e09dbdbb1d3688e9e4e82f8789e7c03cdc6ac"
+    },
+    {
+      "path": "public/supabase-r3-profile-rls.js",
+      "sha256": "c74ad29dada648a22ca2e36975a5b1be58ebd8503fbacf367f36f9c305645794"
+    },
+    {
+      "path": "public/supabase-r3-profile-update-test.html",
+      "sha256": "ed8f8ace88775b628b52cb2f7befb2daae147843a87c9faf7a74a89c9d9951ba"
+    },
+    {
+      "path": "public/supabase-r3-profile-update.js",
+      "sha256": "f9f24a925c2134ec95ca463b5d45c8491ecfdec07dc8b6f685ca5726cfc1a71a"
+    },
+    {
+      "path": "public/supabase/functions/payment-webhook/index.ts",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "public/taxonomy.json",
+      "sha256": "0137e9e064c27e3f72f4622a862fd1f4d7456d17a3046beb4262499f34c7a185"
+    },
+    {
+      "path": "public/terms.html",
+      "sha256": "52a8abf4d953c2770cb4c3812d322b975380d3ae77c2e42a879d64b6321cedc8"
+    },
+    {
+      "path": "public/tracking.html",
+      "sha256": "abaa131f169f57e12cc3afd8195416bcfbecd077999056c102c0d7301a3d7e13"
+    },
+    {
+      "path": "public/v26-admin-runtime.js",
+      "sha256": "6054043a4ec8160d7a86de2932959c7e308778015dd815b62c71041067dd210b"
+    },
+    {
+      "path": "public/v26-bridge.js",
+      "sha256": "a8d3b476129e350faa971f7a4a723f3ecca47bee712b04b22314edb3eaf25365"
+    },
+    {
+      "path": "public/v26-consolidated.js",
+      "sha256": "4c3cdbe265c5c4035040fe7675276fa025e0e5ce6f3a52f6b250e74797b87ee7"
+    },
+    {
+      "path": "public/v26-homepage-layout.js",
+      "sha256": "d6ad4a2ec733c56b32f51692a4b7bb207a56e3f8392c4a57bfe2e27445b86719"
+    },
+    {
+      "path": "public/v26-professional.css",
+      "sha256": "7b30add1c5f89528de37f2483c7a0319924f19a0f3a6f064f19ba84c7f54bf32"
+    }
+  ]
+}

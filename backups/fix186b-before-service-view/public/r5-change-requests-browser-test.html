@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shop&Drop R5 Change Requests Test</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:760px;margin:auto;padding:24px;line-height:1.5}
+button{display:block;margin:16px 0;padding:14px 18px;font:inherit}
+pre{white-space:pre-wrap;word-break:break-word;background:#f5f5f5;padding:16px}
+.note{background:#f7f2e9;padding:14px}
+</style>
+</head>
+<body>
+<h1>Shop&amp;Drop R5 Change Requests Browser Test</h1>
+<p class="note"><b>Non-destructive diagnostic.</b> No authenticated user token is supplied, so no change request can be created. This file does not modify V26.24.</p>
+<button id="test">1. Test Browser CORS + Unauthenticated Protection</button>
+<pre id="out">READY.</pre>
+<script>
+const endpoint='https://dtkdvvxpwonywtsgqmdx.supabase.co/functions/v1/change-requests';
+const apikey='sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';
+const out=document.getElementById("out");
+
+document.getElementById("test").onclick=async()=>{
+  out.textContent="TESTING...";
+  try {
+    const r=await fetch(endpoint,{
+      method:"POST",
+      mode:"cors",
+      headers:{
+        "apikey":apikey,
+        "content-type":"application/json",
+        "x-client-info":"shopdrop-r5-change-requests-test"
+      },
+      body:JSON.stringify({diagnostic_only:true}),
+      cache:"no-store"
+    });
+    const text=await r.text();
+    out.textContent=(r.status===401)
+      ? "R5 CHANGE REQUESTS AUTH PASS\nBrowser cross-origin request completed.\nUnauthenticated request blocked.\nHTTP status: 401\nResponse: "+text
+      : "R5 CHANGE REQUESTS REVIEW REQUIRED\nHTTP status: "+r.status+"\nResponse: "+text;
+  } catch(e) {
+    out.textContent="R5 CHANGE REQUESTS REVIEW REQUIRED\nBrowser blocked the cross-origin request.\nError: "+String(e);
+  }
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shop&Drop R4 Cancellations Test</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:760px;margin:auto;padding:24px;line-height:1.5}
+button{display:block;margin:16px 0;padding:14px 18px;font:inherit}
+pre{white-space:pre-wrap;word-break:break-word;background:#f5f5f5;padding:16px}
+.note{background:#f7f2e9;padding:14px}
+</style></head><body>
+<h1>Shop&amp;Drop R4 Cancellations Browser Test</h1>
+<p class="note"><b>Non-destructive diagnostic.</b> This page does not submit a real cancellation and does not modify V26.24.</p>
+<button id="cors">1. Test CORS / OPTIONS</button>
+<button id="auth">2. Test Unauthenticated Protection</button>
+<pre id="out">READY.</pre>
+<script>
+const endpoint='https://dtkdvvxpwonywtsgqmdx.supabase.co/functions/v1/cancellations';
+const apikey='sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';
+const out=document.getElementById("out");
+
+document.getElementById("cors").onclick=async()=>{
+  out.textContent="TESTING OPTIONS...";
+  try {
+    const r=await fetch(endpoint,{
+      method:"OPTIONS",
+      headers:{
+        "apikey":apikey,
+        "content-type":"application/json",
+        "x-client-info":"shopdrop-r4-diagnostic"
+      },
+      cache:"no-store"
+    });
+    const allowOrigin=r.headers.get("access-control-allow-origin");
+    const allowMethods=r.headers.get("access-control-allow-methods");
+    out.textContent=(r.ok && allowOrigin && (allowMethods||"").includes("POST"))
+      ? "CORS PASS\nOPTIONS accepted.\nHTTP status: "+r.status+"\nAllow-Origin: "+allowOrigin+"\nAllow-Methods: "+allowMethods
+      : "CORS REVIEW REQUIRED\nHTTP status: "+r.status+"\nAllow-Origin: "+allowOrigin+"\nAllow-Methods: "+allowMethods;
+  } catch(e) {
+    out.textContent="CORS REVIEW REQUIRED\nBrowser error: "+String(e);
+  }
+};
+
+document.getElementById("auth").onclick=async()=>{
+  out.textContent="TESTING UNAUTHENTICATED REQUEST...";
+  try {
+    const r=await fetch(endpoint,{
+      method:"POST",
+      headers:{"apikey":apikey,"content-type":"application/json"},
+      body:JSON.stringify({diagnostic_only:true}),
+      cache:"no-store"
+    });
+    const text=await r.text();
+    out.textContent=(r.status===401)
+      ? "AUTH PROTECTION PASS\nUnauthenticated request blocked.\nHTTP status: 401\nResponse: "+text
+      : "AUTH PROTECTION REVIEW REQUIRED\nHTTP status: "+r.status+"\nResponse: "+text;
+  } catch(e) {
+    out.textContent="AUTH PROTECTION REVIEW REQUIRED\nBrowser error: "+String(e);
+  }
+};
+</script></body></html>

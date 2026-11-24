@@ -1,0 +1,46 @@
+/* ShopDrop Fix52: visible listing cards only; forms and booking rules untouched. */
+.shopdrop-public-identity{border-top:1px solid #e2e8f0;padding:9px 0 3px;margin-top:8px;font-size:12px;line-height:1.45;overflow-wrap:anywhere}
+.shopdrop-public-identity strong{display:block;font-size:14px;font-weight:800;color:#17202a}
+.shopdrop-public-identity small{display:block;color:#475569;font-size:11px;margin-top:3px}
+.shopdrop-service-photo{width:100%;aspect-ratio:1/1;object-fit:contain;border-radius:9px;background:#f1f5f9}
+#shopdropPublicProductResults.grid,#productGrid.grid,#sellerProducts.grid,#results.results,.shopdrop-dispatch-offer-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:stretch}
+#results.results>.result,#shopdropPublicProductResults.grid>.card,#productGrid.grid>.card,#sellerProducts.grid>.item,.shopdrop-dispatch-offer-grid>.panel{min-width:0;overflow-wrap:anywhere}
+.shopdrop-dispatch-offer-grid .panel{border:1px solid #dbe3ea;margin:0}
+@media(min-width:700px){#shopdropPublicProductResults.grid,#productGrid.grid,#sellerProducts.grid,#results.results,.shopdrop-dispatch-offer-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(min-width:1100px){#shopdropPublicProductResults.grid,#productGrid.grid,#sellerProducts.grid,#results.results,.shopdrop-dispatch-offer-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:699px){#results.results>.result,#shopdropPublicProductResults.grid>.card,#productGrid.grid>.card,#sellerProducts.grid>.item,.shopdrop-dispatch-offer-grid>.panel{padding:9px;font-size:13px}#results.results h3,.shopdrop-dispatch-offer-grid h3{font-size:15px}.shopdrop-dispatch-offer-grid button{width:100%;font-size:13px;white-space:normal}}
+
+/* Fix58: same identity-first treatment across marketplace cards. */
+.shopdrop-public-identity.shopdrop-identity-top,
+.shopdrop-dispatch-offer-grid .shopdrop-public-identity,
+#results .shopdrop-public-identity,
+#items .shopdrop-public-identity,
+#productGrid .shopdrop-public-identity,
+#shopdropPublicProductResults .shopdrop-public-identity,
+#sellerProducts .shopdrop-public-identity{
+  background:#f0fdfa;
+  border:1px solid #99f6e4;
+  border-radius:8px;
+  margin:0 0 9px;
+  padding:8px;
+  overflow-wrap:anywhere;
+}
+.shopdrop-public-identity strong{font-weight:800}
+#detail .shopdrop-detail-advertiser{margin:12px 0}
+.shopdrop-payment-preview label{
+  display:block;
+  font-weight:700;
+  margin:12px 0 6px;
+}
+.shopdrop-payment-preview select{
+  width:100%;
+  min-height:45px;
+  padding:10px;
+  border:1px solid #cbd5e1;
+  border-radius:8px;
+  background:#fff;
+}
+.shopdrop-payment-preview .shopdrop-preview-status{
+  font-weight:600;
+  color:#0f766e;
+}

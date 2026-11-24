@@ -1,0 +1,145 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Checkout | Shop&Drop</title><style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;background:#f3f5f8;color:#17202a}header{background:#101827;color:white;padding:18px}header a{color:white;margin-right:20px}main{max-width:980px;margin:25px auto;padding:0 16px}.panel{background:white;padding:22px;border-radius:12px;margin:15px 0}button,input,select{padding:10px;margin:5px 0;border-radius:6px;border:1px solid #cbd5e1;max-width:100%}.panel input,.panel select{width:100%}.panel label{display:block;margin-top:6px}button{cursor:pointer;background:#0f766e;color:white}.muted{color:#64748b}.item{border-bottom:1px solid #eee;padding:12px 0}a{color:#0f766e}
+/* Fix55: clear delivery address controls, no empty select for new buyers */
+#deliveryAddressPanel label{display:block;margin:12px 0 5px;font-weight:700}
+#deliveryAddressPanel input,#deliveryAddressPanel select{display:block;width:100%;min-height:46px;padding:11px;border:1px solid #cbd5e1;border-radius:9px;box-sizing:border-box;background:#fff}
+#deliveryAddressPanel select:disabled{background:#f1f5f9;color:#334155;opacity:1}
+#deliveryAddressPanel button{margin:12px 9px 0 0;min-height:45px}
+#deliveryAddressPanel #addAnotherAddressButton,#deliveryAddressPanel #cancelAddAddress{background:#e2e8f0;color:#17202a}
+#deliveryAddressPanel #selectedAddressSummary{padding:12px;background:#f0fdfa;border:1px solid #99f6e4;border-radius:9px;font-weight:700}
+#deliveryAddressPanel #addressStatus{color:#0f766e;font-weight:600}
+#deliveryAddressPanel [hidden]{display:none!important}
+
+/* Fix62: Three door-to-door courier choices */
+.shopdrop-sa-courier-grid {
+  display:grid;
+  grid-template-columns:repeat(
+    auto-fit,minmax(145px,1fr)
+  );
+  gap:10px;
+  margin:12px 0;
+}
+
+.shopdrop-sa-courier-grid a {
+  display:block;
+  text-decoration:none;
+  width:100%;
+  min-width:0;
+  min-height:85px;
+  margin:0;
+  padding:12px;
+  background:#f0fdfa;
+  color:#134e4a;
+  border:1px solid #99d9cc;
+  border-radius:10px;
+  text-align:left;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+
+.shopdrop-sa-courier-grid strong {
+  display:block;
+  font-size:15px;
+}
+
+.shopdrop-sa-courier-grid small {
+  display:block;
+  margin-top:7px;
+  font-size:12px;
+  line-height:1.4;
+  color:#526273;
+}
+
+.shopdrop-sa-courier-grid a:hover {
+  background:#ccf5e7;
+  border:2px solid #0f766e;
+}
+
+.shopdrop-sa-courier-grid a:focus-visible {
+  outline:3px solid #0f766e;
+  outline-offset:2px;
+}
+
+#phase6CourierSearch button:disabled {
+  background:#e2e8f0;
+  color:#64748b;
+  border-color:#cbd5e1;
+  cursor:not-allowed;
+}
+</style></head><body><header><a href="./index.html">Shop&Drop</a><a href="./checkout.html">Checkout</a><a href="./account.html">My Account</a></header><main><h1>Checkout</h1><section class="panel"><h2>Shopping bag</h2><div id="items"></div><h3 id="total"></h3><p id="quote" class="muted">Delivery fee: not quoted. Final payable total: unavailable.</p></section><section class="panel" id="deliveryAddressPanel">
+<h2>Where should we deliver?</h2>
+<p class="muted">Enter the address where you want to receive the parcel.</p>
+<div id="savedAddressArea" hidden>
+  <p id="selectedAddressSummary" role="status" aria-live="polite"></p>
+  <div id="savedAddressPicker" hidden>
+    <label for="addresses">Choose a saved delivery address</label>
+    <select id="addresses" aria-label="Choose a saved delivery address"></select>
+  </div>
+  <button id="addAnotherAddressButton" type="button">Add another delivery address</button>
+</div>
+<div id="newAddressFields">
+  <h3>Add your delivery address</h3>
+  <label for="label">Address type</label>
+  <select id="label"><option value="Home">Home</option><option value="Other">Other delivery address</option></select>
+  <label for="recipient">Person receiving the parcel</label>
+  <input id="recipient" autocomplete="shipping name" placeholder="Full name">
+  <label for="line1">House number and street</label>
+  <input id="line1" autocomplete="shipping address-line1" placeholder="Street address">
+  <label for="city">Town or city</label>
+  <input id="city" autocomplete="shipping address-level2" placeholder="Town or city">
+  <label for="region">Province (optional)</label>
+  <input id="region" autocomplete="shipping address-level1" placeholder="Province">
+  <label for="postal">Postal code (optional)</label>
+  <input id="postal" autocomplete="shipping postal-code" placeholder="Postal code">
+  <label for="country">Country</label>
+  <select id="country" disabled aria-label="South Africa"></select>
+  <button id="saveDeliveryAddressButton" type="button" onclick="saveAddress()">Save delivery address</button>
+  <button id="cancelAddAddress" type="button" hidden>Cancel</button>
+</div>
+<p id="addressStatus" role="status" aria-live="polite"></p>
+<p class="muted">Delivery options and the full payable price will appear before payment. Courier booking and payment are not yet active.</p>
+</section><section class="panel" id="phase6PaymentMethods" aria-labelledby="phase6PaymentTitle">
+<h2 id="phase6PaymentTitle">Payment method</h2>
+<label for="phase6PaymentMethod">Choose a payment method</label>
+<select id="phase6PaymentMethod" name="payment_method" autocomplete="off" aria-describedby="phase6PaymentNotice">
+<option value="" selected disabled hidden>Select payment method</option>
+<option value="visa_debit">Visa debit card</option>
+<option value="visa_credit">Visa credit card</option>
+<option value="mastercard_debit">Mastercard debit card</option>
+<option value="mastercard_credit">Mastercard credit card</option>
+<option value="instant_eft">Instant EFT (secure bank payment)</option>
+</select>
+<p class="muted" id="phase6PaymentNotice" role="status">Select a method to see the available choices. Payments are not active. Instant EFT will use an approved secure provider, never a direct transfer to Shop&amp;Drop. Do not send money or enter banking details.</p>
+</section><section class="panel" id="phase6CourierSearch" aria-labelledby="phase6CourierSearchTitle">
+<h2 id="phase6CourierSearchTitle">Find a courier</h2>
+<p class="muted">These are the three South African door-to-door courier companies shortlisted by Shop&Drop. Their official websites are available for information only. Shop&Drop bookings, payments and verified pickup tracking are not active yet.</p>
+<div id="shopdropSaCourierPanel">
+    <h3>Door-to-door courier options</h3>
+    <p class="muted">Tap a company to visit its official website. Do not book or pay directly, or enter buyer or seller details. Shop&Drop must arrange verified courier bookings after activation.</p>
+    <div id="shopdropSaCourierGrid"
+         class="shopdrop-sa-courier-grid"
+         role="group"
+         aria-label="South African door-to-door couriers"></div>
+    <p id="shopdropSaCourierMessage"
+       class="muted"
+       role="status"
+       aria-live="polite"></p>
+    </div>
+<div id="phase6CourierResults" role="status" aria-live="polite"></div>
+<p class="muted" id="phase6CourierSelection">Courier quotations, bookings and pickup tracking will be available after approved provider activation.</p>
+</section><section class="panel"><h2>Order confirmation</h2><p>Preview checkout only: no payment or courier booking occurs on GitHub Pages. The live checkout will show the chosen seller items, eligible courier options and delivery charge, applicable taxes where required, the complete Shop&Drop order total and available payment methods before confirmation. One buyer payment is preferred where supported.</p><button id="previewOrderButton" onclick="place()">Preview order</button><div id="orderStatus" role="status" aria-live="polite"></div></section></main><script src="./common.js"></script>
+<script src="./v26-consolidated.js"></script><script src="./geo.js"></script><script src="./shopdrop-payment-selection.js"></script>
+<script src="./supabase-adapter.js"></script>
+<script src="./shopdrop-checkout-connector.js"></script>
+<script src="./shopdrop-order-stage.js"></script><script>const {api,esc,money}=ShopDrop;let cart=[];const orderStatus=document.getElementById('orderStatus');async function legacyCheckoutLoad(){if(ShopDrop.isStatic){items.textContent='No live bag items are loaded in this preview.';total.textContent='Product subtotal: available when the backend is connected';quote.textContent='Delivery quote and final payable total will be shown here when items are added to your Bag in the live checkout.';orderStatus.textContent='Preview mode: checkout layout can be tested here; no order or payment will be created.';return}try{const d=await api('/api/cart');cart=d.items;items.innerHTML=cart.map(x=>`<div class="item">${esc(x.name)} × ${x.quantity} — ${money(x.price_cents*x.quantity)} <button onclick="legacyCheckoutChange('${x.product_id}',${x.quantity-1})">−</button><button onclick="legacyCheckoutChange('${x.product_id}',${x.quantity+1})">+</button></div>`).join('')||'Your cart is empty';total.textContent='Total (excluding delivery): '+money(cart.reduce((s,x)=>s+x.price_cents*x.quantity,0));const a=await api('/api/addresses');addresses.innerHTML='<option value="">Choose delivery address</option>'+a.addresses.map(x=>`<option value="${x.id}">${esc(x.label)} — ${esc(x.line1)}, ${esc(x.city)}</option>`).join('')}catch(e){orderStatus.textContent=e.message}}async function legacyCheckoutChange(id,quantity){await api('/api/cart',{method:'POST',body:JSON.stringify({productId:id,quantity})});load()}async function legacyCheckoutSaveAddress(){try{if(!recipient.value.trim()||!line1.value.trim()||!city.value.trim()||!country.value.trim())throw Error('Enter recipient name, street address, city and country.');if(ShopDrop.isStatic)throw Error('Preview mode: address saving requires the Shop&Drop backend.');const b={label:label.value,recipientName:recipient.value,line1:line1.value,city:city.value,province:region.value,postalCode:postal.value,country:country.value,isDefault:true};await api('/api/addresses',{method:'POST',body:JSON.stringify(b)});legacyCheckoutLoad();orderStatus.textContent='Address saved'}catch(e){orderStatus.textContent=e.message}}async function legacyCheckoutPlace(){try{throw Error('Checkout is disabled until secure inventory, courier quotation and payment gates are verified.');const selectedPayment=window.ShopDropPaymentSelection?.read();if(!selectedPayment)throw Error('Choose a payment method first');if(ShopDrop.isStatic){orderStatus.textContent='Preview order unavailable: your shopping bag is empty. Add a product or book a service first.';orderStatus.style.cssText='padding:12px;background:#fff7ed;border-radius:8px;font-weight:700';orderStatus.scrollIntoView({block:'nearest'});return}if(!cart.length)throw Error('Cart is empty');if(!addresses.value)throw Error('Select a delivery address first');const preview=await api('/api/checkout/preview?addressId='+encodeURIComponent(addresses.value));if(preview.productSubtotalCents!=null){quote.textContent='Products (published prices): '+money(preview.productSubtotalCents)+' · Delivery: pending eligible courier selection · Applicable taxes: calculated before payment · Final Shop&Drop order total: pending. Shop&Drop service-fee and seller-proceeds allocations remain visible on the seller statement, not exposed as a surprise buyer checkout charge.';}if(!preview.address)throw Error('Address invalid');const d=await api('/api/orders',{method:'POST',body:JSON.stringify({addressId:addresses.value,items:cart.map(x=>({productId:x.product_id,quantity:x.quantity}))})});orderStatus.textContent='Order '+d.order.id+' created. Demo order only: no payment collected or courier booked. Delivery address saved; delivery fee and final payable total unavailable.';load()}catch(e){orderStatus.textContent=e.message}}country.innerHTML=ShopDropGeo.countryOptions('ZA');/* Supabase bridge performs authenticated load. */</script><script src="./shopdrop-cart-address-bridge.js"></script><script src="v26-bridge.js"></script>
+<section id="v26CheckoutExtension">
+  <!-- V26_CHECKOUT_EXTENSION -->
+  <h2>V26 Checkout & Fulfilment</h2>
+  <p><strong>IMPORTANT: ONE SELLER PER CHECKOUT.</strong> You may buy several items from the same seller in one order. Items from another seller require a separate shopping bag and checkout.</p>
+  <p>Order, payment, shipment and payout references are carried through the transaction chain. Payment methods are selected according to supported country/currency/provider capabilities.</p>
+  <p>The existing V25.24 progressive/configurable marketplace service-fee and trusted server-side checkout calculations remain authoritative.</p>
+</section>
+
+<section id="v262ReservationNote"><!-- V26_2_RESERVATION_NOTE --><p>Stock may be temporarily reserved while payment is pending. Unpaid reservations expire and stock is released automatically according to the configured backend reservation window.</p></section>
+<script src="./shopdrop-sa-courier-choices.js?v=63" defer></script>
+<script src="./shopdrop-courier-quote-bridge.js" defer></script>
+<script src="./shopdrop-a155-courier-quotes-ui.js" defer></script><script src="./shopdrop-checkout-countdown.js" defer></script><script defer src="shopdrop-buyer-language.js"></script><script defer src="shopdrop-form-language.js"></script><script src="./shopdrop-location-182a.js" defer></script></body></html>
