@@ -99,7 +99,37 @@
         }
         select.addEventListener('change',()=>update(true));
         quantity.addEventListener('input',()=>update(false));
-        details.append(label,quantityLabel,summary);
+        const dateLabel = node('label','Requested booking date and time (South Africa)');
+        const appointment = node('input');
+        appointment.type = 'datetime-local';
+        appointment.required = true;
+        appointment.min = new Date(Date.now()+7200000).toISOString().slice(0,16);
+        dateLabel.append(appointment);
+        const check = node('p','Choose a rate, quantity and future appointment.','muted');
+        function checkAppointment() {
+          const rate = rates.find(r => r.id === select.value);
+          const n = Number(quantity.value);
+          const value = appointment.value;
+          const time = Date.parse(value+'+02:00');
+          if (!rate || !Number.isSafeInteger(n) || n < Math.max(1,Math.ceil(Number(rate.minimum_units))) || n > 100000 || !value || !Number.isFinite(time) || time <= Date.now()) {
+            check.textContent = 'Choose a valid rate, quantity and future appointment.'; return;
+          }
+          const day = new Date(value+'Z').getUTCDay();
+          const clock = value.slice(11,16);
+          if (Array.isArray(rate.availability_days) && rate.availability_days.length && !rate.availability_days.map(Number).includes(day)) {
+            check.textContent = 'The selected day is outside the advertised operating days.'; return;
+          }
+          if (rate.available_from_time && rate.available_until_time) {
+            const from = rate.available_from_time.slice(0,5), until = rate.available_until_time.slice(0,5);
+            const within = from < until ? clock >= from && clock < until : from > until && (clock >= from || clock < until);
+            if (!within) { check.textContent = 'Choose a time within the advertised operating hours.'; return; }
+          }
+          check.textContent = 'Requested appointment: '+value.replace('T',' ')+' SAST. This is a preliminary selection only; provider confirmation and server availability checks are still required.';
+        }
+        select.addEventListener('change',checkAppointment);
+        quantity.addEventListener('input',checkAppointment);
+        appointment.addEventListener('input',checkAppointment);
+        details.append(label,quantityLabel,summary,dateLabel,check);
       }
     details.append(node('p','Advertisement reference: '+advert.id,'muted'));
     card.append(details);
