@@ -36,7 +36,10 @@
       });
       if (!response.ok) throw Error('Photo unavailable');
       const data = await response.json();
-      const url = new URL(BASE + '/storage/v1' + data.signedURL);
+      const signed = data.signedURL || data.signedUrl;
+        if (typeof signed !== 'string' || !signed) throw Error('Missing photograph URL');
+        const url = new URL(signed.startsWith('/object/') ? '/storage/v1' + signed : signed, BASE);
+        if (!url.pathname.startsWith('/storage/v1/object/sign/')) throw Error('Invalid photograph URL');
       if (url.origin !== BASE) throw Error('Invalid URL');
       img.src = url.href;
       img.hidden = false;
@@ -68,6 +71,36 @@
     for (const photo of photos) gallery.append(photoElement(photo));
     details.append(gallery);
     for (const rate of rates) details.append(node('p',money(rate.price_zar)+' / '+rate.pricing_unit.replaceAll('_',' ')+' — Minimum: '+rate.minimum_units));
+      if (advert.hire_arrangement) details.append(node('p','Arrangement: '+advert.hire_arrangement.replaceAll('_',' ')));
+      if (advert.coverage_mode) details.append(node('p','Coverage: '+advert.coverage_mode.replaceAll('_',' ')));
+      if (rates.length) {
+        const label = node('label','Select advertised rate');
+        const select = node('select');
+        select.append(new Option('Choose a rate',''));
+        for (const rate of rates) select.append(new Option(money(rate.price_zar)+' / '+rate.pricing_unit.replaceAll('_',' '),rate.id));
+        label.append(select);
+        const quantityLabel = node('label','Number of units');
+        const quantity = node('input');
+        quantity.type = 'number'; quantity.min = '1'; quantity.step = '1'; quantity.value = '1';
+        quantityLabel.append(quantity);
+        const summary = node('p','Choose a rate to preview the price.','muted');
+        function update(reset) {
+          const rate = rates.find(r => r.id === select.value);
+          if (!rate) { summary.textContent = 'Choose a rate to preview the price.'; return; }
+          const minimum = Math.max(1,Math.ceil(Number(rate.minimum_units)));
+          quantity.min = String(minimum);
+          if (reset) quantity.value = String(minimum);
+          const n = Number(quantity.value);
+          if (!Number.isSafeInteger(n) || n < minimum || n > 100000) { summary.textContent = 'Enter a valid quantity of at least '+minimum+'.'; return; }
+          const amount = Math.round(Number(rate.price_zar)*n*100)/100;
+          summary.textContent = 'Provider price: '+money(amount)+' (before Shop&Drop fee). Booking and availability not yet confirmed.';
+          if (rate.available_from_time && rate.available_until_time) summary.textContent += ' Advertised hours: '+rate.available_from_time.slice(0,5)+'–'+rate.available_until_time.slice(0,5)+'.';
+          if (rate.package_description) summary.textContent += ' '+rate.package_description;
+        }
+        select.addEventListener('change',()=>update(true));
+        quantity.addEventListener('input',()=>update(false));
+        details.append(label,quantityLabel,summary);
+      }
     details.append(node('p','Advertisement reference: '+advert.id,'muted'));
     card.append(details);
     results.append(card);
