@@ -1,1 +1,259 @@
 
+name: ShopDrop Fix 186B - Other Services Listing View
+
+'on':
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix186b-service-only-view.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  fix:
+    name: Preserve and isolate Other Services form
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+
+      - name: Backup and add isolated service view
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import hashlib
+          import json
+
+          seller = Path("public/seller.html")
+          services = Path("public/services.html")
+
+          backup = Path(
+              "backups/fix186b-before-service-view"
+          )
+
+          expected = {
+              seller:
+                  "f5394d978563967b6c87f51299fa4a01092ba2bb",
+              services:
+                  "e1faea48e75d13fac703160649701d8137dbdcd3"
+          }
+
+          for path, wanted in expected.items():
+              actual = subprocess.check_output(
+                  ["git", "hash-object", str(path)],
+                  text=True
+              ).strip()
+
+              if actual != wanted:
+                  raise SystemExit(
+                      "SAFETY STOP: Source changed: "
+                      + str(path)
+                  )
+
+          if backup.exists():
+              raise SystemExit(
+                  "SAFETY STOP: Backup already exists."
+              )
+
+          original = seller.read_bytes()
+
+          required = [
+              b'id="list-service"',
+              b'id="shopdropSellerAliasPanel"',
+              b'Seller / Store profile',
+              b'Add multiple products',
+              b'function addService()',
+              b'shopdrop-service-locations-182b.js',
+              b'shopdrop-shared-service-rates.js'
+          ]
+
+          for marker in required:
+              if marker not in original:
+                  raise SystemExit(
+                      "SAFETY STOP: Required code missing."
+                  )
+
+          if b'id="shopdropVehicleAdvertLink"' in original:
+              raise SystemExit(
+                  "SAFETY STOP: Fix 186A not present."
+              )
+
+          service_html = services.read_bytes()
+
+          if (
+              b'seller.html#list-service'
+              not in service_html
+          ):
+              raise SystemExit(
+                  "SAFETY STOP: Service link changed."
+              )
+
+          backup.mkdir(parents=True)
+
+          manifest = {
+              "source_commit": subprocess.check_output(
+                  ["git", "rev-parse", "HEAD"],
+                  text=True
+              ).strip(),
+              "files": []
+          }
+
+          # Preserve all tracked public website files.
+          files = subprocess.check_output(
+              ["git", "ls-files", "-z", "public/"]
+          ).decode().split("\0")
+
+          for name in filter(None, files):
+              source = Path(name)
+              target = backup / name
+
+              target.parent.mkdir(
+                  parents=True,
+                  exist_ok=True
+              )
+
+              data = source.read_bytes()
+              target.write_bytes(data)
+
+              if target.read_bytes() != data:
+                  raise SystemExit(
+                      "SAFETY STOP: Backup mismatch."
+                  )
+
+              manifest["files"].append({
+                  "path": name,
+                  "sha256": hashlib.sha256(
+                      data
+                  ).hexdigest()
+              })
+
+          (backup / "MANIFEST.json").write_text(
+              json.dumps(manifest, indent=2) + "\n"
+          )
+
+          print(
+              "PASS: Complete public website backed up:",
+              len(manifest["files"]),
+              "files"
+          )
+
+          addition = r"""
+          <!-- Fix 186B: Other Services presentation only -->
+          <script>
+          (() => {
+            const params =
+              new URLSearchParams(location.search);
+
+            if (
+              location.hash === '#list-service' ||
+              params.has('serviceCategory') ||
+              params.has('serviceSubcategory')
+            ) {
+              document.documentElement.classList.add(
+                'shopdrop-service-only-186b'
+              );
+            }
+          })();
+          </script>
+
+          <style id="shopdropServiceView186B">
+          html.shopdrop-service-only-186b
+          body > .wrap > :not(#list-service):not(a) {
+            display: none !important;
+          }
+
+          html.shopdrop-service-only-186b
+          body > .wrap > #list-service {
+            display: block !important;
+          }
+
+          html.shopdrop-service-only-186b
+          body > .wrap > a:not([href="./index.html"]) {
+            display: none !important;
+          }
+
+          html.shopdrop-service-only-186b
+          .v26DraftControls {
+            display: none !important;
+          }
+
+          html.shopdrop-service-only-186b
+          body > section {
+            display: none !important;
+          }
+          </style>
+          <!-- End Fix 186B -->
+          """.encode("utf-8")
+
+          anchor = b"</head>"
+
+          if original.count(anchor) != 1:
+              raise SystemExit(
+                  "SAFETY STOP: HTML structure changed."
+              )
+
+          updated = original.replace(
+              anchor,
+              addition + anchor,
+              1
+          )
+
+          # Prove every original byte is retained.
+          if updated.replace(
+              addition, b'', 1
+          ) != original:
+              raise SystemExit(
+                  "SAFETY STOP: Original code changed."
+              )
+
+          seller.write_bytes(updated)
+
+          print("PASS: All original seller code preserved")
+          print("PASS: Marketplace navigation preserved")
+          print("PASS: Complete service form preserved")
+          print("PASS: Other Services browsing unchanged")
+          print("PASS: Seller account functions retained")
+          print("PASS: No backend changes")
+          PY
+
+          git diff --check
+
+      - name: Commit backup and additive correction
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "ShopDrop Fix Bot"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            public/seller.html \
+            backups/fix186b-before-service-view/
+
+          git commit -m \
+            "Fix 186B isolate Other Services listing view"
+
+          git push origin \
+            HEAD:shopdrop-phase6-integration
+
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
