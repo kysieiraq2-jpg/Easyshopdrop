@@ -1,0 +1,79 @@
+name: ShopDrop Fix 195B Clear Division Navigation
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix195b-clear-division-navigation.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Clarify division navigation only
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import subprocess, re
+        shas={'public/services.html': '5bb06614b1af991a54bd11cb32a775ab3644d7eb', 'public/dispatching.html': '009befebb23cd53dd605e2cb24cf4b10c470192a', 'public/transport-search.html': '0889b11c790ec49c39367083b7cb94841643ac8b', 'public/transport-results.html': '39181aa7eab95deb7bb75d4f380be95252c8c563', 'public/product.html': '38cf8550356f211544d705ce9848bd6ba035a747', 'public/category-results.html': '0ca5c1ea2baf682769b66f92c416bdc2837ffa1c', 'public/sell-item.html': '0eb5dc47e44fb8c54e6e75d3c5e0701f0dd4f004', 'public/checkout.html': '0288dff06cbe3b844b8daa9cbf0f46e69d0bc3a0'}
+        patches={'public/services.html': [('<header>\n<a href="./index.html">Shop&Drop</a>\n<a href="./checkout.html">Bag</a>\n<a href="./account.html">Account</a>\n</header>', '<header>\n<a href="./index.html">Shop&Drop</a>\n<a href="./services.html?view=home">Other Services Home</a>\n<a href="./service-bag-193c.html">My Service Bag</a>\n<a href="./checkout.html">Product Bag</a>\n<a href="./account.html">Account</a>\n</header>')], 'public/dispatching.html': [('<header>\n<a href="./index.html">Shop&Drop</a>\n<a href="./services.html">Other Services</a>\n<a href="./checkout.html">Bag</a>\n<a href="./account.html">Account</a>\n</header>', '<header>\n<a href="./index.html">Shop&Drop</a>\n<a href="./services.html">Other Services</a>\n<a href="./dispatch-bag-192dc.html">My Transport Bag</a>\n<a href="./checkout.html">Product Bag</a>\n<a href="./account.html">Account</a>\n</header>')], 'public/transport-search.html': [('<header>\n<a href="./index.html">Home</a>\n<a href="./dispatching.html">Back to Transport</a>\n<a href="./account.html">My Account</a>\n<a href="./checkout.html">Bag</a>\n<a href="./dispatch-bag-192dc.html">Transport Bag</a>\n</header>', '<header>\n<a href="./index.html">Home</a>\n<a href="./dispatching.html">Back to Transport</a>\n<a href="./account.html">My Account</a>\n<a href="./dispatch-bag-192dc.html">My Transport Bag</a>\n<a href="./checkout.html">Product Bag</a>\n</header>')], 'public/transport-results.html': [('<header>\n<a href="./index.html">Home</a>\n<a href="./dispatching.html">Back to Transport</a>\n<a href="./account.html">My Account</a>\n<a href="./checkout.html">Bag</a>\n<a href="./dispatch-bag-192dc.html">Transport Bag</a>\n</header>', '<header>\n<a href="./index.html">Home</a>\n<a href="./dispatching.html">Back to Transport</a>\n<a href="./account.html">My Account</a>\n<a href="./dispatch-bag-192dc.html">My Transport Bag</a>\n<a href="./checkout.html">Product Bag</a>\n</header>')], 'public/product.html': [('<header><a href="./index.html">Shop&Drop</a><a href="./checkout.html">Shopping Bag</a><a href="./account.html">Account</a></header>', '<header><a href="./index.html">Shop&Drop</a><a href="./product-shopping-194a.html">Back to Shop Products</a> <a href="./checkout.html">Shopping Bag</a><a href="./account.html">Account</a></header>')], 'public/category-results.html': [('<header><a href="./index.html">Shop&amp;Drop</a><a href="./categories.html">All Categories</a><a href="./checkout.html">Shopping Bag</a></header>', '<header><a href="./index.html">Shop&amp;Drop</a><a href="./product-shopping-194a.html">Shop Products</a> <a href="./categories.html">All Categories</a><a href="./checkout.html">Shopping Bag</a></header>')], 'public/sell-item.html': [('<main>\n<a href="./index.html">← Shop&Drop</a>\n<h1>Sell an item — FREE</h1>', '<main>\n<a href="./index.html">← Shop&Drop</a>\n<p><a href="./product-shopping-194a.html">Back to Product Shopping &amp; Selling</a></p>\n<h1>Sell an item — FREE</h1>')], 'public/checkout.html': [('<header><a href="./index.html">Shop&Drop</a><a href="./checkout.html">Checkout</a><a href="./account.html">My Account</a></header>', '<header><a href="./index.html">Shop&Drop</a><a href="./product-shopping-194a.html">Continue Shopping</a> <a href="./checkout.html">Checkout</a><a href="./account.html">My Account</a></header>')]}
+        planned={}
+        for name,changes in patches.items():
+            p=Path(name); source=p.read_bytes().decode('utf-8')
+            sha=subprocess.check_output(['git','hash-object',name],text=True).strip()
+            if all(source.count(new)==1 for old,new in changes):
+                original=source
+                for old,new in reversed(changes): original=original.replace(new,old,1)
+                original_hash=subprocess.check_output(['git','hash-object','--stdin'],input=original.encode('utf-8')).decode().strip()
+                if original_hash!=shas[name]: raise SystemExit('Unexpected installed version: '+name)
+                continue
+            if sha!=shas[name]: raise SystemExit('Unexpected source version; nothing installed: '+name)
+            updated=source
+            for old,new in changes:
+                if updated.count(old)!=1: raise SystemExit('Unexpected navigation anchor: '+name)
+                updated=updated.replace(old,new,1)
+            # Check existing scripts, form markup and existing link destinations have not changed.
+            for pattern in [r'<script\b[^>]*>[\s\S]*?</script>',r'<form\b[^>]*>[\s\S]*?</form>']:
+                if re.findall(pattern,source,re.I)!=re.findall(pattern,updated,re.I): raise SystemExit('Protected code differs: '+name)
+            original_links=set(re.findall(r'<a\b[^>]*href="([^"]+)"',source,re.I))
+            updated_links=set(re.findall(r'<a\b[^>]*href="([^"]+)"',updated,re.I))
+            if not original_links<=updated_links: raise SystemExit('Existing link removed: '+name)
+            for dest in updated_links-original_links:
+                if dest.startswith('./') and not (Path('public')/dest[2:].split('?')[0].split('#')[0]).is_file(): raise SystemExit('Missing new destination: '+dest)
+            backup=Path('backups/fix195b')/p.name
+            if backup.exists() and backup.read_bytes()!=p.read_bytes(): raise SystemExit('Unexpected backup: '+name)
+            planned[name]=updated
+        for name,content in planned.items():
+            p=Path(name); backup=Path('backups/fix195b')/p.name
+            backup.parent.mkdir(parents=True,exist_ok=True)
+            if not backup.exists(): backup.write_bytes(p.read_bytes())
+            p.write_bytes(content.encode('utf-8'))
+        print('Fix 195B: clearer navigation only. Existing scripts, forms and link destinations preserved.')
+        PYCODE
+        git diff --check
+        git config user.name "ShopDrop Integration"
+        git config user.email "actions@users.noreply.github.com"
+        git add public/services.html public/dispatching.html public/transport-search.html public/transport-results.html public/product.html public/category-results.html public/sell-item.html public/checkout.html
+        if test -d backups/fix195b; then git add backups/fix195b; fi
+        if ! git diff --cached --quiet; then
+          git commit -m "Fix 195B clear division navigation"
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
