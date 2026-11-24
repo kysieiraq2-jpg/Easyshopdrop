@@ -56,23 +56,23 @@
 
     const explanation = createElement(
       'p',
-      'Enter the South African town and province where ' +
-      'the service must be performed. Shop&Drop will ' +
-      'match providers who operate in that area.'
+      'Select the province and town where you require ' +
+      'the service. Shop&Drop will find providers ' +
+      'operating in that area.'
     );
 
     const townLabel = createElement(
       'label',
-      'Service required in — town or city'
+      'Town or city'
     );
 
-    const town = createElement('input');
+    const town = createElement('select');
     town.id = 'shopdropBuyerTown';
-    town.type = 'text';
-    town.maxLength = 120;
-    town.placeholder = 'e.g. Gqeberha';
     town.required = true;
-    town.autocomplete = 'address-level2';
+    town.disabled = true;
+    town.add(new Option(
+      'Choose province first', ''
+    ));
 
     townLabel.append(town);
 
@@ -109,6 +109,61 @@
 
     provinceLabel.append(province);
 
+    let townData = null;
+
+    function updateTowns() {
+      town.replaceChildren();
+
+      const names = townData?.provinces?.[
+        province.value
+      ] || [];
+
+      town.add(new Option(
+        province.value
+          ? (townData
+              ? 'Choose town or city'
+              : 'Loading towns...')
+          : 'Choose province first',
+        ''
+      ));
+
+      for (const name of [...new Set(names)]
+        .sort((a,b)=>a.localeCompare(b))) {
+        town.add(new Option(name, name));
+      }
+
+      town.disabled =
+        !province.value || !names.length;
+    }
+
+    province.addEventListener(
+      'change',
+      updateTowns
+    );
+
+    fetch('./shopdrop-sa-towns-181.json?v=191a')
+      .then(response => {
+        if (!response.ok) {
+          throw Error('Town data unavailable');
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (data.country !== 'ZA' ||
+            !data.provinces) {
+          throw Error('Invalid town data');
+        }
+        townData = data;
+        updateTowns();
+      })
+      .catch(() => {
+        town.replaceChildren(new Option(
+          'Towns unavailable — refresh page',
+          ''
+        ));
+        town.disabled = true;
+      });
+
     const searchButton = createElement(
       'button',
       'Find services in this area'
@@ -129,7 +184,7 @@
         !location.province
       ) {
         message.textContent =
-          'Enter your town and select a province.';
+          'Choose your province and town first.';
         return;
       }
 
@@ -145,8 +200,8 @@
     panel.append(
       heading,
       explanation,
-      townLabel,
       provinceLabel,
+      townLabel,
       searchButton,
       message
     );
