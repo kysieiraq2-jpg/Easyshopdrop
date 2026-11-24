@@ -23,19 +23,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Publish integrated ShopDrop website
+  build:
+    name: Prepare and verify integrated website
 
     if: github.ref_name == 'shopdrop-phase6-integration'
 
     runs-on: ubuntu-latest
 
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    env:
-      PAGES_ARTIFACT_NAME: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
+    outputs:
+      source_commit: ${{ steps.source.outputs.commit }}
+      source_hash: ${{ steps.source.outputs.hash }}
+      artifact_id: ${{ steps.website_artifact.outputs.artifact_id }}
+      artifact_name: ${{ steps.source.outputs.artifact_name }}
 
     steps:
       - name: Checkout integration branch
@@ -93,7 +92,8 @@ jobs:
           then
             test -s public/shopdrop-location-182a.js
 
-            node --check public/shopdrop-location-182a.js
+            node --check \
+              public/shopdrop-location-182a.js
           fi
 
           echo "Normal item script verification passed."
@@ -130,17 +130,29 @@ jobs:
           node --check \
             public/shopdrop-dispatch-equipment-fields.js
 
+          echo "Provider advertisement source verified."
+
+      - name: Record actual website source
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+
           SOURCE_COMMIT="$(git rev-parse HEAD)"
 
-          echo "SOURCE_COMMIT=$SOURCE_COMMIT" \
-            >> "$GITHUB_ENV"
+          SOURCE_HASH="$(sha256sum \
+            public/shopdrop-vehicle-draft-private.html \
+            | cut -d' ' -f1)"
+
+          ARTIFACT_NAME="github-pages-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+          echo "commit=$SOURCE_COMMIT" >> "$GITHUB_OUTPUT"
+          echo "hash=$SOURCE_HASH" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=$ARTIFACT_NAME" >> "$GITHUB_OUTPUT"
 
           echo "Actual source commit: $SOURCE_COMMIT"
-
-          sha256sum \
-            public/shopdrop-vehicle-draft-private.html
-
-          echo "PASS: Provider advertisement source verified"
+          echo "Advertisement checksum: $SOURCE_HASH"
+          echo "Artifact name: $ARTIFACT_NAME"
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
@@ -149,7 +161,7 @@ jobs:
         id: website_artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          name: ${{ env.PAGES_ARTIFACT_NAME }}
+          name: ${{ steps.source.outputs.artifact_name }}
           path: ./public
           retention-days: 3
 
@@ -157,6 +169,7 @@ jobs:
         shell: bash
         env:
           ARTIFACT_ID: ${{ steps.website_artifact.outputs.artifact_id }}
+          ARTIFACT_NAME: ${{ steps.source.outputs.artifact_name }}
         run: |
           set -euo pipefail
 
@@ -166,17 +179,57 @@ jobs:
             exit 1
           fi
 
-          echo "PASS: Website artifact upload returned an ID"
-          echo "Artifact name: $PAGES_ARTIFACT_NAME"
+          echo "PASS: Website artifact upload completed"
+          echo "Artifact name: $ARTIFACT_NAME"
           echo "Artifact ID: $ARTIFACT_ID"
           echo "Workflow run: $GITHUB_RUN_ID"
           echo "Run attempt: $GITHUB_RUN_ATTEMPT"
+
+  deploy:
+    name: Publish integrated ShopDrop website
+
+    needs: build
+
+    if: github.ref_name == 'shopdrop-phase6-integration'
+
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    env:
+      SOURCE_COMMIT: ${{ needs.build.outputs.source_commit }}
+      SOURCE_HASH: ${{ needs.build.outputs.source_hash }}
+      ARTIFACT_ID: ${{ needs.build.outputs.artifact_id }}
+      PAGES_ARTIFACT_NAME: ${{ needs.build.outputs.artifact_name }}
+
+    steps:
+      - name: Verify completed website build
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -n "$SOURCE_COMMIT"
+          test -n "$SOURCE_HASH"
+          test -n "$PAGES_ARTIFACT_NAME"
+
+          if [[ ! "$ARTIFACT_ID" =~ ^[0-9]+$ ]]
+          then
+            echo "::error::Missing website artifact ID."
+            exit 1
+          fi
+
+          echo "PASS: Website build completed"
+          echo "Source commit: $SOURCE_COMMIT"
+          echo "Artifact ID: $ARTIFACT_ID"
+          echo "Artifact name: $PAGES_ARTIFACT_NAME"
 
       - name: Deploy integrated website
         id: deployment
         uses: actions/deploy-pages@v4
         with:
-          artifact_name: ${{ env.PAGES_ARTIFACT_NAME }}
+          artifact_name: ${{ needs.build.outputs.artifact_name }}
 
       - name: Confirm deployment completed
         shell: bash
@@ -185,7 +238,7 @@ jobs:
 
           echo "ShopDrop integration deployment completed."
           echo "Branch: shopdrop-phase6-integration"
-          echo "Commit: ${GITHUB_SHA}"
+          echo "Trigger commit: ${GITHUB_SHA}"
           echo "Published source commit: ${SOURCE_COMMIT}"
           echo "Artifact: ${PAGES_ARTIFACT_NAME}"
 
@@ -196,7 +249,7 @@ jobs:
 
           FILE="shopdrop-vehicle-draft-private.html"
 
-          EXPECTED="$(sha256sum "public/$FILE" | cut -d' ' -f1)"
+          EXPECTED="$SOURCE_HASH"
 
           LIVE_FILE="$RUNNER_TEMP/shopdrop-live-verification.html"
 
