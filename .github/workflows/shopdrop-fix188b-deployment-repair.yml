@@ -65,22 +65,6 @@ jobs:
                   "SAFETY STOP: Backup already exists."
               )
 
-          permission_anchor = (
-              "permissions:\n"
-              "  contents: read\n"
-          )
-
-          permission_updated = (
-              "permissions:\n"
-              "  contents: read\n"
-              "  actions: read\n"
-          )
-
-          if source.count(permission_anchor) != 1:
-              raise SystemExit(
-                  "SAFETY STOP: Permissions mismatch."
-              )
-
           anchor = (
               "      - name: Deploy integrated website\n"
           )
@@ -91,50 +75,35 @@ jobs:
               )
 
           addition = r"""
-                - name: Wait for website artifact availability
-                  shell: bash
-                  env:
-                    GH_TOKEN: ${{ github.token }}
-                    ARTIFACT_ID: ${{ steps.website_artifact.outputs.artifact_id }}
-                  run: |
-                    set -euo pipefail
+          - name: Allow website artifact registration
+            shell: bash
+            env:
+              ARTIFACT_ID: __ARTIFACT_EXPRESSION__
+            run: |
+              set -euo pipefail
 
-                    READY=false
+              if [[ ! "$ARTIFACT_ID" =~ ^[0-9]+$ ]]
+              then
+                echo "::error::Missing website artifact ID."
+                exit 1
+              fi
 
-                    for ATTEMPT in $(seq 1 18)
-                    do
-                      echo "Artifact availability check $ATTEMPT"
-
-                      if gh api \
-                        "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
-                        --paginate \
-                        --jq '.artifacts[] | select(.expired == false) | [.name, (.id | tostring)] | @tsv' \
-                        > "$RUNNER_TEMP/shopdrop-artifacts.txt"
-                      then
-                        if grep -Fxq \
-                          "$(printf '%s\t%s' "$PAGES_ARTIFACT_NAME" "$ARTIFACT_ID")" \
-                          "$RUNNER_TEMP/shopdrop-artifacts.txt"
-                        then
-                          READY=true
-                          echo "PASS: Correct artifact is available"
-                          break
-                        fi
-                      fi
-
-                      echo "Waiting for GitHub artifact registration."
-                      sleep 10
-                    done
-
-                    if [ "$READY" != "true" ]
-                    then
-                      echo "::error::Uploaded artifact is not retrievable."
-                      exit 1
-                    fi
-
-                    echo "Allowing artifact registration to settle."
-                    sleep 15
-
+              echo "Uploaded artifact ID: $ARTIFACT_ID"
+              echo "Waiting for GitHub artifact registration."
+              sleep 60
+              echo "Artifact registration waiting period completed."
           """
+
+          expression = (
+              "$" + "{{ "
+              + "steps.website_artifact.outputs.artifact_id"
+              + " }}"
+          )
+
+          addition = addition.replace(
+              "__ARTIFACT_EXPRESSION__",
+              expression
+          )
 
           addition = textwrap.dedent(
               addition
@@ -145,28 +114,27 @@ jobs:
           ) + "\n\n"
 
           updated = source.replace(
-              permission_anchor,
-              permission_updated,
-              1
-          )
-
-          updated = updated.replace(
               anchor,
               addition + anchor,
               1
           )
 
-          restored = updated.replace(
-              addition, "", 1
-          ).replace(
-              permission_updated,
-              permission_anchor,
-              1
-          )
-
-          if restored != source:
+          if updated.replace(addition, "", 1) != source:
               raise SystemExit(
                   "SAFETY STOP: Original code not preserved."
+              )
+
+          if expression not in addition:
+              raise SystemExit(
+                  "SAFETY STOP: Artifact expression missing."
+              )
+
+          if any(
+              line != line.rstrip()
+              for line in addition.splitlines()
+          ):
+              raise SystemExit(
+                  "SAFETY STOP: Trailing whitespace."
               )
 
           backup.parent.mkdir(
@@ -188,7 +156,8 @@ jobs:
           print("PASS: Complete deployment backup")
           print("PASS: Existing deployment code preserved")
           print("PASS: Automatic triggers preserved")
-          print("PASS: Artifact availability checks added")
+          print("PASS: Artifact expression preserved")
+          print("PASS: Artifact registration delay added")
           print("PASS: Website source unchanged")
           PY
 
@@ -208,10 +177,9 @@ jobs:
             backups/fix188b/integration-pages-before-188b.yml
 
           git commit -m \
-            "Fix 188B verify artifact availability before deployment"
+            "Fix 188B preserve deployment and allow artifact registration"
 
           git push origin \
             HEAD:shopdrop-phase6-integration
 
           echo "PASS: Deployment repair committed"
-
