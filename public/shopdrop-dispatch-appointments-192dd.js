@@ -108,7 +108,12 @@
       actions.append(button('Suggest alternative appointment',()=>{const t=Date.parse(alt.value+'+02:00');if(!Number.isFinite(t)||t<=Date.now()){msg.textContent='Choose a valid future date and time.';return;}providerReply('propose',new Date(t).toISOString());},true));
     }
     if(!provider&&pending&&row.status==='alternative_proposed'&&Date.parse(row.proposed_at)>Date.now())actions.append(button('Accept alternative appointment',()=>customerReply('accept')),button('Decline alternative appointment',()=>{if(window.confirm('Decline the alternative appointment?'))customerReply('reject');},true));
-    if(!provider&&pending&&row.status==='confirmed')card.append(el('p',Date.parse(row.confirmed_at)>Date.now()?'Appointment confirmed. Payment is not yet enabled on this screen.':'Confirmed appointment time has passed. Do not pay.'));
+    if(!provider&&pending&&row.status==='confirmed'){
+      if(Date.parse(row.confirmed_at)>Date.now()&&row.booking_id){
+        card.append(el('p','Appointment confirmed. Review your service payment. No courier charges apply.'));
+        actions.append(link('Continue to Transport Checkout','./dispatch-checkout-192de.html?booking_id='+encodeURIComponent(row.booking_id)));
+      }else card.append(el('p','Confirmed appointment time has passed. Do not pay.'));
+    }
     if(row.booking_id){const ref=el('p','Booking reference: '+row.booking_id);ref.className='muted';card.append(ref);}
     card.append(actions,msg);list.append(card);
   }
