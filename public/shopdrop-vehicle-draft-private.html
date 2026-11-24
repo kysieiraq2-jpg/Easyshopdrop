@@ -68,9 +68,19 @@ button:disabled{opacity:.5}
 <form id="draftForm">
   <label>
     Transport or equipment service title
-    <input id="title" required minlength="3"
-           maxlength="120"
-           placeholder="Example: Bakkie transport">
+    <select id="title" required>
+      <option value="">Choose transport or equipment service</option>
+      <option value="Cars and light vehicles">Cars and light vehicles</option>
+      <option value="Delivery and commercial vehicles">Delivery and commercial vehicles</option>
+      <option value="Heavy trucks and long-distance transport">Heavy trucks and long-distance transport</option>
+      <option value="Trailers and abnormal loads">Trailers and abnormal loads</option>
+      <option value="Cranes and lifting equipment">Cranes and lifting equipment</option>
+      <option value="Earthmoving and construction equipment">Earthmoving and construction equipment</option>
+      <option value="Agricultural equipment">Agricultural equipment</option>
+      <option value="Mining and industrial equipment">Mining and industrial equipment</option>
+      <option value="Municipal and specialist vehicles">Municipal and specialist vehicles</option>
+      <option value="Other transport or equipment">Other transport or equipment</option>
+    </select>
   </label>
 
   <label>
@@ -93,13 +103,13 @@ button:disabled{opacity:.5}
   </label>
 
   <label>
-    Service provider base town
-    <input id="town" maxlength="120">
+    Service provider base province
+    <input id="province" maxlength="120">
   </label>
 
   <label>
-    Service provider base province
-    <input id="province" maxlength="120">
+    Service provider base town
+    <input id="town" maxlength="120">
   </label>
 
   <label>
