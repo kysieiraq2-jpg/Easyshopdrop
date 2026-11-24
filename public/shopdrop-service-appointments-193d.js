@@ -75,7 +75,11 @@
       else actions.append(el('p','The proposed time has passed. Do not accept it.'));
       actions.append(button('Decline alternative appointment',()=>{if(window.confirm('Decline this alternative appointment?'))customerReply('reject');},true));
     }
-    if(!provider&&pending&&row.status==='confirmed')actions.append(el('p',future(row.confirmed_date,row.confirmed_time)?'Appointment confirmed. Service checkout is not yet connected. No payment is required now.':'Confirmed appointment time has passed. Do not pay.'));
+    if(!provider&&pending&&row.status==='confirmed'){
+      if(future(row.confirmed_date,row.confirmed_time)){
+        actions.append(el('p','Appointment confirmed. Review your service payment. No courier charges apply.'),link('Continue to Service Checkout','./service-checkout-193e.html?booking_id='+encodeURIComponent(row.booking_id)));
+      }else actions.append(el('p','Confirmed appointment time has passed. Do not pay.'));
+    }
     if(!inactive&&row.payment_status==='paid'){
       actions.append(link('My Account – completion information','./account.html#service-arrival-pin-panel'));
       if(provider)actions.append(link('Optional completion photographs','./shopdrop-service-completion.html?booking_id='+encodeURIComponent(row.booking_id)),link('Submit Completion PIN','./shopdrop-provider-completion.html?booking_type=service'));
