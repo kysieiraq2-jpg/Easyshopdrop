@@ -160,6 +160,7 @@
           } finally {verify.disabled=false;}
         });
         details.append(verify,serverStatus);
+        if (window.ShopDropDispatchBag192DC) window.ShopDropDispatchBag192DC.attach(details,advert,select,quantity,appointment);
 
       }
     details.append(node('p','Advertisement reference: '+advert.id,'muted'));
