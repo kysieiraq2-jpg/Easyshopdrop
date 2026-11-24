@@ -124,7 +124,7 @@
       "Sell / Offer - FREE"
     ]);
 
-    const categories=firstExisting([
+    const categories=document.getElementById("shopdropHomeCategories197a")||firstExisting([
       "Shop by category",
       "Shop by Category"
     ]);

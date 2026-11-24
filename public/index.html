@@ -132,10 +132,10 @@ footer{padding:30px;text-align:center;color:#64748b}
     <div class="shopdrop-header-top">
       <a class="brand shopdrop-header-brand" href="./index.html">Shop&amp;Drop</a>
     </div>
-    <div class="shopdrop-header-search">
-      <input class="search" id="search" type="search" placeholder="Search products" aria-label="Search products">
-      <button class="btn searchbtn" id="searchButton" type="button">Search</button>
-    </div>
+    <form class="shopdrop-header-search" action="./product-search-194b.html" method="get">
+      <input class="search" id="search" name="q" type="search" maxlength="100" placeholder="Search products" aria-label="Search products">
+      <button class="btn searchbtn" id="searchButton" type="submit">Search</button>
+    </form>
     <div class="shopdrop-header-actions">
       <div class="shopdrop-header-secondary">
       <div class="menuwrap shopdrop-menuwrap">
@@ -204,10 +204,8 @@ footer{padding:30px;text-align:center;color:#64748b}
     </div>
   </section>
 </section>
-<section class="section">
-<h2>Shop by category</h2>
-<div class="cats" id="cats"></div>
-<p><button class="btn" id="preownedButton" type="button">Second-Hand & Pre-Owned</button> <span class="muted">Browse used and refurbished products across all categories.</span></p>
+<section class="section" id="shopdropHomeCategories197a" aria-label="Products and categories" style="margin:10px 0 18px;">
+<a id="shopdropHomeCategoryLink197a" href="./categories.html#cats" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%;min-height:100px;padding:16px 12px;box-sizing:border-box;background:#0f766e;color:#fff;border:1px solid #0f766e;border-radius:12px;font-size:16px;font-weight:700;line-height:1.35;text-align:center;text-decoration:none;overflow-wrap:anywhere;"><strong>Products &amp; Categories</strong><small style="font-size:13px;font-weight:400;color:#fff;">Search for items by category</small></a>
 </section>
 <section class="section" id="products">
 <h2>New & featured products</h2>
@@ -452,36 +450,14 @@ document.addEventListener('keydown',e=>{
   setProductsCategories(false);
  }
 });
-searchButton.onclick=()=>loadProducts(true);
-async function loadHomeCategories(){
- try{
-  const r=await fetch('./taxonomy.json',{cache:'force-cache'});
-  const t=await r.json();
-  const ds=[...t.departments].sort((a,b)=>a.name.localeCompare(b.name));
-  cats.innerHTML=ds.map(d=>`<button type="button" data-category="${esc(d.name)}">${esc(d.name)}</button>`).join('');
-  cats.querySelectorAll('button').forEach(b=>()=>{
-   location.href='./categories.html?category='+encodeURIComponent(b.dataset.category);
-  });
- }catch(e){
-  cats.innerHTML='<span class="muted">Categories could not be loaded.</span>';
- }
-}
-loadHomeCategories();
+// Fix 197A: the homepage search uses a native GET form; categories use the existing category page.
 ['./categories.html','./services.html','./dispatching.html','./seller-apply.html','./seller.html'].forEach(h=>{
  const l=document.createElement('link');
  l.rel='prefetch';
  l.href=h;
  document.head.appendChild(l);
 });
-preownedButton.onclick=()=>{
- window.location.href='./categories.html?view=preowned';
-};
-search.addEventListener('keydown',e=>{
- if(e.key==='Enter'){
-  e.preventDefault();
-  loadProducts(true);
- }
-});
+// Fix 197A: Search button and Enter both submit the native search form.
 // V26_15_PRODUCT_PREVIEW_FEEDBACK_REPAIR — keep the existing appearance; add visible feedback only.
 const featuredProductsSection=document.getElementById('products');
 if(featuredProductsSection){
@@ -550,7 +526,7 @@ window.ShopDropPublicContact = Object.freeze({
 })();
 </script>
 
-<script src="v26-homepage-layout.js"></script>
+<script src="v26-homepage-layout.js?v=197a"></script>
 <script defer src="shopdrop-language.js"></script>
 <script defer src="./shopdrop-public-advertiser-ui.js?v=59"></script>
 </body>
