@@ -34,6 +34,9 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
+    env:
+      PAGES_ARTIFACT_NAME: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
+
     steps:
       - name: Checkout integration branch
         uses: actions/checkout@v4
@@ -90,8 +93,7 @@ jobs:
           then
             test -s public/shopdrop-location-182a.js
 
-            node --check \
-              public/shopdrop-location-182a.js
+            node --check public/shopdrop-location-182a.js
           fi
 
           echo "Normal item script verification passed."
@@ -113,17 +115,68 @@ jobs:
 
           echo "Customer equipment dropdown verification passed."
 
+      - name: Verify provider advertisement source
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -s public/shopdrop-vehicle-draft-private.html
+          test -s public/shopdrop-provider-location-184a.js
+          test -s public/shopdrop-dispatch-equipment-fields.js
+
+          node --check \
+            public/shopdrop-provider-location-184a.js
+
+          node --check \
+            public/shopdrop-dispatch-equipment-fields.js
+
+          SOURCE_COMMIT="$(git rev-parse HEAD)"
+
+          echo "SOURCE_COMMIT=$SOURCE_COMMIT" \
+            >> "$GITHUB_ENV"
+
+          echo "Actual source commit: $SOURCE_COMMIT"
+
+          sha256sum \
+            public/shopdrop-vehicle-draft-private.html
+
+          echo "PASS: Provider advertisement source verified"
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
       - name: Upload integrated website
+        id: website_artifact
         uses: actions/upload-pages-artifact@v3
         with:
+          name: ${{ env.PAGES_ARTIFACT_NAME }}
           path: ./public
+          retention-days: 3
+
+      - name: Verify website artifact upload
+        shell: bash
+        env:
+          ARTIFACT_ID: ${{ steps.website_artifact.outputs.artifact_id }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$ARTIFACT_ID" =~ ^[0-9]+$ ]]
+          then
+            echo "::error::Website artifact upload did not return a valid artifact ID."
+            exit 1
+          fi
+
+          echo "PASS: Website artifact upload returned an ID"
+          echo "Artifact name: $PAGES_ARTIFACT_NAME"
+          echo "Artifact ID: $ARTIFACT_ID"
+          echo "Workflow run: $GITHUB_RUN_ID"
+          echo "Run attempt: $GITHUB_RUN_ATTEMPT"
 
       - name: Deploy integrated website
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: ${{ env.PAGES_ARTIFACT_NAME }}
 
       - name: Confirm deployment completed
         shell: bash
@@ -133,3 +186,65 @@ jobs:
           echo "ShopDrop integration deployment completed."
           echo "Branch: shopdrop-phase6-integration"
           echo "Commit: ${GITHUB_SHA}"
+          echo "Published source commit: ${SOURCE_COMMIT}"
+          echo "Artifact: ${PAGES_ARTIFACT_NAME}"
+
+      - name: Verify published advertisement page
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          FILE="shopdrop-vehicle-draft-private.html"
+
+          EXPECTED="$(sha256sum "public/$FILE" | cut -d' ' -f1)"
+
+          LIVE_FILE="$RUNNER_TEMP/shopdrop-live-verification.html"
+
+          MATCHED=false
+
+          for ATTEMPT in $(seq 1 12)
+          do
+            URL="https://shopadrop.co.za/$FILE?verify=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${ATTEMPT}"
+
+            if curl --fail --silent --show-error \
+              --location \
+              --max-time 20 \
+              -H "Cache-Control: no-cache" \
+              "$URL" \
+              -o "$LIVE_FILE"
+            then
+              ACTUAL="$(sha256sum "$LIVE_FILE" | cut -d' ' -f1)"
+
+              echo "Expected: $EXPECTED"
+              echo "Published: $ACTUAL"
+
+              if [ "$EXPECTED" = "$ACTUAL" ]
+              then
+                MATCHED=true
+                break
+              fi
+            fi
+
+            echo "Waiting for published website update."
+            sleep 10
+          done
+
+          if [ "$MATCHED" != "true" ]
+          then
+            echo "::error::Deployment completed but the live advertisement page could not be verified against GitHub."
+            exit 1
+          fi
+
+          echo "PASS: Live advertisement matches GitHub"
+
+          {
+            echo "## ShopDrop Deployment Verification"
+            echo ""
+            echo "Published source: $SOURCE_COMMIT"
+            echo ""
+            echo "Artifact: $PAGES_ARTIFACT_NAME"
+            echo ""
+            echo "Live transport advertisement verified."
+            echo ""
+            echo "Website publication successful."
+          } >> "$GITHUB_STEP_SUMMARY"
