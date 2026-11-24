@@ -1,0 +1,86 @@
+name: ShopDrop Fix 193B Other Services Layout
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix193b-other-services-layout.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Install matching Other Services layout
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import subprocess
+        p=Path('public/services.html')
+        source=p.read_text(encoding='utf-8')
+        patches = [('</style>\n<link rel="stylesheet" href="./shopdrop-unified-cards.css?v=59">', '\n/* Fix 193B: Other Services landing layout, matching Transport Services. */\nmain{max-width:950px}\n.shopdrop-service-menu-193b{\n display:block;background:#0f766e;color:#fff;text-align:center;\n text-decoration:none;font-weight:bold;padding:14px;border-radius:8px;margin-top:14px;\n line-height:1.25;overflow-wrap:anywhere;\n}\n.shopdrop-service-menu-193b:focus-visible{outline:3px solid #17202a;outline-offset:3px}\n.service-landing-view-193b #shopdropServiceSearch193b,\n.service-landing-view-193b #shopdropServiceCategories193b{display:none!important}\n.service-search-view-193b #shopdropServiceAdvertise193b,\n.service-search-view-193b #shopdropServiceMenu193b{display:none!important}\n\n</style>\n<link rel="stylesheet" href="./shopdrop-unified-cards.css?v=59">'), ('<main>\n<section class="panel notice">', '<script>\n/* Keep the same services page and its existing booking/search scripts. */\n(()=>{\n const p=new URLSearchParams(location.search);\n const searchView=p.get(\'view\')===\'search\'||(p.get(\'view\')!==\'home\'&&(location.search!==\'\'||location.hash!==\'\'));\n document.body.classList.add(searchView?\'service-search-view-193b\':\'service-landing-view-193b\');\n})();\n</script>\n<main>\n<section class="panel notice">'), ('<section class="panel">\n<h1>Other Services</h1>', '<section class="panel" id="shopdropServiceAdvertise193b">\n<h2>Advertise Your Services — FREE</h2>\n<p>Do you provide cleaning, gardening, repairs, catering, or other services?</p>\n<p>Advertise your service on Shop&amp;Drop. Choose your service category, operating area, photographs and your own rates.</p>\n<p>No listing fee. Your advertisement can publish automatically when the required information has passed the existing listing checks.</p>\n<a class="shopdrop-service-menu-193b" href="./seller.html#list-service">Advertise Your Services — FREE</a>\n<p class="muted">You may browse without registering. Sign in or register when submitting your advertisement.</p>\n</section>\n\n<section class="panel" id="shopdropServiceMenu193b">\n<h2>Find Other Services</h2>\n<p>Search available services and find a provider in your area.</p>\n<a class="shopdrop-service-menu-193b" href="./services.html?view=search">Search Other Services</a>\n<a class="shopdrop-service-menu-193b" href="./account.html#shopdrop-service-schedule-ui">My Service Appointments &amp; Provider Requests</a>\n<p class="muted">Browse service advertisements without registering. Sign in when making or managing a booking.</p>\n</section>\n\n<section class="panel" id="shopdropServiceSearch193b">\n<a class="shopdrop-service-menu-193b" href="./services.html?view=home">Back to Other Services</a>\n<h1>Other Services</h1>'), ('<section class="panel">\n<h2>Other Service categories</h2>', '<section class="panel" id="shopdropServiceCategories193b">\n<h2>Other Service categories</h2>')]
+        if all(new in source for old,new in patches):
+            print('Fix 193B already installed.')
+            raise SystemExit(0)
+        sha=subprocess.check_output(['git','hash-object',str(p)],text=True).strip()
+        if sha!='dccd15ee394289327f21de2dd66c68a3cfcb509f':
+            raise SystemExit('Unexpected services.html version; no changes installed.')
+        updated=source
+        for old,new in patches:
+            if updated.count(old)!=1:
+                raise SystemExit('Unexpected patch anchor; no changes installed: '+old[:80])
+            updated=updated.replace(old,new,1)
+        backup=Path('backups/fix193b/services.html')
+        if backup.exists() and backup.read_bytes()!=p.read_bytes():
+            raise SystemExit('Unexpected backup; no changes installed.')
+        backup.parent.mkdir(parents=True,exist_ok=True)
+        if not backup.exists(): backup.write_bytes(p.read_bytes())
+        p.write_text(updated,encoding='utf-8')
+        print('Fix 193B installed; existing service search and booking code retained.')
+        PYCODE
+        node --check public/shopdrop-services-connector.js
+        node --check public/shopdrop-service-booking-ui.js
+        python3 <<'PYCODE'
+        from pathlib import Path
+        from html.parser import HTMLParser
+        import subprocess,tempfile
+        class Scripts(HTMLParser):
+            def __init__(self):
+                super().__init__(); self.parts=[]; self.current=None
+            def handle_starttag(self,tag,attrs):
+                if tag=='script' and 'src' not in dict(attrs): self.current=[]
+            def handle_data(self,data):
+                if self.current is not None: self.current.append(data)
+            def handle_endtag(self,tag):
+                if tag=='script' and self.current is not None:
+                    self.parts.append(''.join(self.current)); self.current=None
+        p=Scripts(); p.feed(Path('public/services.html').read_text())
+        with tempfile.TemporaryDirectory() as d:
+            for i,s in enumerate(p.parts):
+                f=Path(d)/f'{i}.js'; f.write_text(s); subprocess.run(['node','--check',str(f)],check=True)
+        PYCODE
+        git diff --check
+        git config user.name 'ShopDrop Integration'
+        git config user.email 'actions@users.noreply.github.com'
+        git add public/services.html backups/fix193b/services.html
+        if ! git diff --cached --quiet; then
+          git commit -m 'Fix 193B Other Services matching navigation layout'
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
