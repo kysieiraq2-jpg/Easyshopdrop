@@ -95,16 +95,22 @@
       if(loading) return;
       loading=true;reload.disabled=true;list.replaceChildren();message(status,'Loading your private Transport Bag…');
       try {
-        const rows=await rpc('shopdrop_transport_bag_list_192dc',{});
+        const rows=await rpc('shopdrop_dispatch_bag_appointments_192dd',{p_as_provider:false});
         if(!Array.isArray(rows)) throw new Error('Invalid bag response');
         message(status,rows.length ? `${rows.length} saved selection${rows.length===1?'':'s'}.` : 'Your Transport Bag is empty.');
         for(const row of rows) {
           const card=el('article');
           card.append(el('h2',row.title||'Transport selection'));
-          card.append(el('p',`Requested start: ${date(row.starts_at)} SAST`),el('p',`Estimated end: ${date(row.ends_at)} SAST`),el('p',`Quantity: ${row.quantity}`));
+          card.append(el('p',`Requested start: ${date(row.starts_at)} SAST`),el('p',`Quantity: ${row.quantity}`));
+          if(!row.booking_id) card.append(el('p',`Estimated end: ${date(row.ends_at)} SAST`));
+          if(row.confirmed_at&&row.status==='confirmed') card.append(el('p',`Confirmed appointment: ${date(row.confirmed_at)} SAST`));
           card.append(el('p',`Provider price: ${money(row.provider_amount)}`),el('p',`Shop&Drop service fee: ${money(row.commission)}`));
           const total=el('p');total.append(el('strong',`Estimated total: ${money(row.total)}`));card.append(total);
-          card.append(el('p',row.status==='expired'?'Expired — choose a new appointment.':'Saved only — not reserved or confirmed.'));
+          const appointmentLabels={saved:'Saved — send appointment request.',expired:'Expired — choose a new appointment.',awaiting_provider:'Awaiting provider confirmation.',alternative_proposed:'Provider has proposed another appointment.',confirmed:'Appointment confirmed.',declined:'Appointment declined.'};
+          card.append(el('p',appointmentLabels[row.status]||'Check appointment status.'));
+          if(row.booking_id) card.append(el('p','Payment status: '+(row.payment_status||'pending')));
+          if(row.status==='saved'||row.booking_id) card.append(link(row.booking_id?'View appointment':'Request appointment','./dispatch-appointments-192dd.html?item='+encodeURIComponent(row.id)));
+          if(row.booking_id){list.append(card);continue;}
           const remove=el('button','Remove from Transport Bag');remove.type='button';
           const feedback=live();
           remove.addEventListener('click',async()=>{
