@@ -1,0 +1,70 @@
+name: ShopDrop Fix 192DF Transport Private Details
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix192df-transport-private-details.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Install private transport details and preserve previous code
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import subprocess
+        expected = {'public/shopdrop-dispatch-appointments-192dd.js': '7a4d3a8a7b40f03a9931fe299ed71302249b065c', 'public/dispatch-appointments-192dd.html': '363a40a8339051a15ceaa778c9c2610b28fb767a', 'public/shopdrop-dispatch-checkout-192de.js': 'ad6f252c25ea4e4898f8cd361acbcdee71fefcd2', 'public/dispatch-checkout-192de.html': '2c2b34a9979d58cf9859247ae1cbde687c9bd25d'}
+        updated = {'public/shopdrop-dispatch-appointments-192dd.js': '0c7f07ec00692c1fda83300956ae7090ec1fc642', 'public/dispatch-appointments-192dd.html': 'c7cbac1fe61861ea6d7bd616dba5cbed22fc3dd8', 'public/shopdrop-dispatch-checkout-192de.js': '8a97f5fe178b7a12fd1e1cd61391ae56bb2157cd', 'public/dispatch-checkout-192de.html': '3052b437251a5f9a00db378b1e610ca6e241d856'}
+        patches = {'public/shopdrop-dispatch-appointments-192dd.js': [('  function render(row,provider){', "  // Fix 192DF: service addresses are booking-specific and never publicly displayed.\n  async function providerLocationForm(card,row,open){\n    if(busy||card.querySelector('form'))return;\n    open.disabled=true;\n    const notice=feedback();notice.textContent='Loading your private service location…';card.append(notice);\n    try{\n      const [catalog,state]=await Promise.all([locations(),rpc('shopdrop_dispatch_location_state_192df',{p_booking_id:row.booking_id})]);\n      if(typeof state?.ready!=='boolean')throw Error('Invalid location response');\n      if(!card.isConnected)return;\n      notice.remove();\n      const form=el('form');form.className='appointment-form';\n      const where=place(form,'Your service or collection address',catalog);\n      const saved=state.own_location;\n      if(saved&&catalog[saved.province]){\n        where.province.value=saved.province;\n        where.province.dispatchEvent(new Event('change'));\n        where.town.value=saved.town;\n        where.address.value=saved.street_address||'';\n      }\n      form.append(el('p','Choose the address the customer will need for this booking. It will only be shared with the paying customer after verified payment.'));\n      const send=el('button','Save private service address');send.type='submit';\n      const msg=feedback();form.append(send,msg,button('Close form',()=>{form.remove();open.disabled=false;},true));\n      form.addEventListener('submit',async e=>{\n        e.preventDefault();if(busy||!form.reportValidity())return;\n        if(!where.province.value||!where.town.value||!where.address.value.trim()){msg.textContent='Choose a province and town, and enter your service address.';return;}\n        await action(msg,async()=>{\n          const ok=await rpc('shopdrop_dispatch_save_provider_location_192df',{p_booking_id:row.booking_id,p_province:where.province.value,p_town:where.town.value,p_address:where.address.value.trim()});\n          if(ok!==true)throw Error('Address not saved');\n        },'Private service address saved. The customer cannot see it before verified payment.');\n      });\n      card.append(form);\n    }catch(e){displayError(notice,e);open.disabled=false;}\n  }\n  function addPrivateBookingControls(card,actions,row,provider,pending){\n    if(!row.booking_id)return;\n    if(provider&&pending&&['awaiting_provider','alternative_proposed','confirmed'].includes(row.status)){\n      const note=feedback();note.textContent='Checking whether your service address is saved…';\n      const open=button('Save or update private service address',()=>providerLocationForm(card,row,open));\n      actions.append(note,open);\n      rpc('shopdrop_dispatch_location_state_192df',{p_booking_id:row.booking_id}).then(state=>{\n        note.textContent=state?.ready===true?'Service address saved privately.':'Save your service address before the customer can prepare payment.';\n      }).catch(()=>{note.textContent='Address status unavailable. Open the address form to check again.';});\n    }\n    if(row.payment_status==='paid'){\n      const privatePanel=el('section');privatePanel.hidden=true;privatePanel.setAttribute('aria-live','polite');\n      const toggle=button('View private booking contact details',async()=>{\n        if(!privatePanel.hidden){privatePanel.hidden=true;privatePanel.replaceChildren();toggle.textContent='View private booking contact details';return;}\n        toggle.disabled=true;privatePanel.hidden=false;privatePanel.replaceChildren(el('p','Checking verified payment…'));\n        try{\n          const d=await rpc('shopdrop_dispatch_paid_details_192df',{p_booking_id:row.booking_id});\n          privatePanel.replaceChildren();\n          if(d?.contacts_released!==true){privatePanel.append(el('p','Contact details are not available until payment is verified.'));return;}\n          privatePanel.append(el('h3','Private booking information'));\n          const add=(label,value)=>{if(typeof value==='string'&&value.trim())privatePanel.append(el('p',label+': '+value));};\n          add(provider?'Customer name':'Provider name',d.other_party?.name);\n          add('Mobile number',d.other_party?.mobile_number);\n          if(provider){add('Collection / work area',d.pickup_area);add('Collection / work address',d.pickup_address);add('Delivery / return area',d.dropoff_area);add('Delivery / return address',d.dropoff_address);add('Job instructions',d.job_instructions);}\n          else if(d.provider_location){add('Province',d.provider_location.province);add('Town or city',d.provider_location.town);add('Service or collection address',d.provider_location.street_address);}\n          else privatePanel.append(el('p','The provider service address is unavailable. Please contact Shop&Drop support.'));\n          privatePanel.append(el('p','Use these details only to arrange this paid booking.'));\n        }catch(e){displayError(privatePanel,e);}finally{toggle.disabled=false;toggle.textContent='Hide private booking contact details';}\n      });\n      actions.append(toggle,privatePanel);\n    }\n  }\n  function render(row,provider){"), ('    card.append(actions,msg);list.append(card);', '    addPrivateBookingControls(card,actions,row,provider,pending);\n    card.append(actions,msg);list.append(card);')], 'public/dispatch-appointments-192dd.html': [('shopdrop-dispatch-appointments-192dd.js?v=192de', 'shopdrop-dispatch-appointments-192dd.js?v=192df')], 'public/shopdrop-dispatch-checkout-192de.js': [('    const provider=cents(row.provider_amount), fee=cents(row.commission), total=cents(row.total);', "    const {data:locationState,error:locationError}=await db.rpc('shopdrop_dispatch_location_state_192df',{p_booking_id:booking});\n    if(locationError||typeof locationState?.ready!=='boolean')throw safe('Unable to verify the private service address. Refresh checkout and try again.');\n    if(locationState.ready!==true)throw safe('The provider still needs to save the service address. Return to My Transport Appointments and try again later.');\n    const provider=cents(row.provider_amount), fee=cents(row.commission), total=cents(row.total);")], 'public/dispatch-checkout-192de.html': [('shopdrop-dispatch-checkout-192de.js?v=192de', 'shopdrop-dispatch-checkout-192de.js?v=192df')]}
+        def sha(p):
+            return subprocess.check_output(['git','hash-object',str(p)],text=True).strip()
+        planned={}
+        for name,pairs in patches.items():
+            p=Path(name)
+            actual=sha(p)
+            if actual==updated[name]: continue
+            if actual!=expected[name]: raise SystemExit('Unexpected source version: '+name)
+            s=p.read_text()
+            for a,b in pairs:
+                if s.count(a)!=1: raise SystemExit('Unexpected patch anchor: '+name)
+                s=s.replace(a,b,1)
+            backup=Path('backups/fix192df')/p.name
+            if backup.exists() and sha(backup)!=expected[name]: raise SystemExit('Unexpected backup: '+name)
+            planned[name]=(s,backup)
+        for name,(s,backup) in planned.items():
+            p=Path(name);backup.parent.mkdir(parents=True,exist_ok=True)
+            if not backup.exists(): backup.write_bytes(p.read_bytes())
+            p.write_text(s)
+            if sha(p)!=updated[name]: raise SystemExit('Patched hash mismatch: '+name)
+        PYCODE
+        node --check public/shopdrop-dispatch-appointments-192dd.js
+        node --check public/shopdrop-dispatch-checkout-192de.js
+        git diff --check
+        git config user.name 'ShopDrop Integration'
+        git config user.email 'actions@users.noreply.github.com'
+        git add public/shopdrop-dispatch-appointments-192dd.js public/dispatch-appointments-192dd.html public/shopdrop-dispatch-checkout-192de.js public/dispatch-checkout-192de.html
+        if test -d backups/fix192df; then git add backups/fix192df; fi
+        if ! git diff --cached --quiet; then
+          git commit -m 'Fix 192DF private transport booking details'
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
