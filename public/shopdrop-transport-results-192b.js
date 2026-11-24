@@ -130,6 +130,37 @@
         quantity.addEventListener('input',checkAppointment);
         appointment.addEventListener('input',checkAppointment);
         details.append(label,quantityLabel,summary,dateLabel,check);
+        const verify = node('button','Check availability');
+        verify.type = 'button';
+        const serverStatus = node('p','','muted');
+        let revision = 0;
+        for (const control of [select,quantity,appointment]) {
+          control.addEventListener('input',()=>{revision++;serverStatus.textContent='';});
+          control.addEventListener('change',()=>{revision++;serverStatus.textContent='';});
+        }
+        verify.addEventListener('click',async()=>{
+          const n = Number(quantity.value);
+          const start = Date.parse(appointment.value+'+02:00');
+          if (!select.value || !Number.isInteger(n) || n<1 || n>365 || !Number.isFinite(start) || start<=Date.now()) {
+            serverStatus.textContent='Choose a rate, future appointment and 1–365 units.'; return;
+          }
+          const token = ++revision;
+          verify.disabled = true;
+          serverStatus.textContent='Checking availability…';
+          try {
+            const response = await fetch(BASE+'/rest/v1/rpc/shopdrop_transport_availability_192db',{
+              method:'POST',headers,body:JSON.stringify({p_advert_id:advert.id,p_rate_id:select.value,p_quantity:n,p_start:new Date(start).toISOString()})
+            });
+            if (!response.ok) throw Error('Availability check failed');
+            const data = await response.json();
+            if (token!==revision) return;
+            serverStatus.textContent = data.ok===true ? 'Available at time of check. Provider amount: '+money(data.provider_amount_zar)+'. Not reserved; provider confirmation required.' : 'Unavailable: '+(data.reason||'Please choose another appointment.');
+          } catch (_) {
+            if(token===revision) serverStatus.textContent='Unable to check availability. Please retry.';
+          } finally {verify.disabled=false;}
+        });
+        details.append(verify,serverStatus);
+
       }
     details.append(node('p','Advertisement reference: '+advert.id,'muted'));
     card.append(details);
