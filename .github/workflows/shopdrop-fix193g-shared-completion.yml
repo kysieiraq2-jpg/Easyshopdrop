@@ -1,0 +1,75 @@
+name: ShopDrop Fix 193G Shared Service Completion
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix193g-shared-completion.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Install shared completion controls
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import subprocess
+        patches={'public/shopdrop-service-appointments-193d.js': [("      actions.append(link('My Account – completion information','./account.html#service-arrival-pin-panel'));\n      if(provider)actions.append(link('Optional completion photographs','./shopdrop-service-completion.html?booking_id='+encodeURIComponent(row.booking_id)),link('Submit Completion PIN','./shopdrop-provider-completion.html?booking_type=service'));", "      actions.append(link(provider?'Confirm completion and view payment release':'My Completion PIN and payment release','./service-completion-status-193g.html?booking_type=service&booking_id='+encodeURIComponent(row.booking_id)));\n      if(provider)actions.append(link('Optional completion photographs','./shopdrop-service-completion.html?booking_id='+encodeURIComponent(row.booking_id)));"), ('    card.append(actions,feedback);list.append(card);', "    if(row.booking_status==='completed'&&row.payment_status==='paid')actions.append(link('View completion and payment release','./service-completion-status-193g.html?booking_type=service&booking_id='+encodeURIComponent(row.booking_id)));\n    card.append(actions,feedback);list.append(card);")], 'public/service-appointments-193d.html': [('shopdrop-service-appointments-193d.js?v=193f', 'shopdrop-service-appointments-193d.js?v=193g')], 'public/shopdrop-dispatch-appointments-192dd.js': [('    addPrivateBookingControls(card,actions,row,provider,pending);', "    addPrivateBookingControls(card,actions,row,provider,pending);\n    if(row.booking_id&&row.payment_status==='paid'&&['confirmed','arrival_pending','arrival_verified','completed'].includes(row.booking_status)){\n      actions.append(link(provider?'Confirm completion and view payment release':'My Completion PIN and payment release','./service-completion-status-193g.html?booking_type=dispatch&booking_id='+encodeURIComponent(row.booking_id)));\n    }")], 'public/dispatch-appointments-192dd.html': [('shopdrop-dispatch-appointments-192dd.js?v=192df', 'shopdrop-dispatch-appointments-192dd.js?v=193g')]}
+        shas={'public/shopdrop-service-appointments-193d.js': '255de95744c9a93c35017edc187b8698c710a20e', 'public/service-appointments-193d.html': '7a7aa8920f078186779aaeba4864193cfe0b5e98', 'public/shopdrop-dispatch-appointments-192dd.js': '0c7f07ec00692c1fda83300956ae7090ec1fc642', 'public/dispatch-appointments-192dd.html': 'c7cbac1fe61861ea6d7bd616dba5cbed22fc3dd8'}
+        new_files={'public/service-completion-status-193g.html': '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer">\n<title>Service Completion | Shop&amp;Drop</title><link rel="stylesheet" href="./shopdrop-transport-search-192b.css">\n<style>#completionCode193g{font-size:32px;font-weight:700;letter-spacing:4px;overflow-wrap:anywhere}#completionStatus193g{overflow-wrap:anywhere}</style></head>\n<body><header><a href="./index.html">Home</a><a href="./services.html">Other Services</a><a href="./dispatching.html">Transport Services &amp; Equipment Hire</a></header>\n<main><section class="panel"><h1>Service Completion</h1><p id="completionTitle193g"></p>\n<p><strong>Only share the six-digit Completion PIN after all agreed work, transport or equipment hire is finished and you are satisfied with the service.</strong> Never share the PIN on arrival or before completion. A verified PIN prepares the release of provider-held funds.</p>\n<p id="completionStatus193g" role="status" aria-live="polite">Checking your private booking…</p>\n<div id="completionActions193g" hidden><button type="button" id="completionReveal193g" hidden>Show my Completion PIN</button><p id="completionCode193g" hidden></p><a class="btn" id="completionSubmit193g" hidden>Submit customer\'s Completion PIN</a></div>\n<button type="button" id="completionRefresh193g">Refresh completion status</button>\n<a class="btn" id="completionBack193g" href="./account.html">Back to appointments</a>\n<p class="muted">Payment provider activation and confirmed settlement are required before any actual fund transfer. No courier charges apply.</p>\n</section></main><script src="./shopdrop-completion-status-193g.js?v=193g"></script></body></html>\n', 'public/shopdrop-completion-status-193g.js': "(() => {\n  'use strict';\n  const BASE='https://dtkdvvxpwonywtsgqmdx.supabase.co',KEY='sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';\n  const get=id=>document.getElementById(id),params=new URLSearchParams(location.search),kind=params.get('booking_type'),booking=params.get('booking_id');\n  const title=get('completionTitle193g'),status=get('completionStatus193g'),actions=get('completionActions193g'),reveal=get('completionReveal193g'),code=get('completionCode193g'),submit=get('completionSubmit193g'),refresh=get('completionRefresh193g'),back=get('completionBack193g');\n  const valid=['service','dispatch'].includes(kind)&&/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(booking||'');\n  let clientPromise,busy=false,generation=0;\n  const signIn=()=>Object.assign(Error('Sign in required'),{signIn:true});\n  const message=t=>{status.textContent=t;};\n  function clearCode(){generation++;code.textContent='';code.hidden=true;reveal.textContent='Show my Completion PIN';}\n  function clear(){clearCode();actions.hidden=true;reveal.hidden=true;submit.hidden=true;submit.removeAttribute('href');}\n  function fail(e){clear();message(e?.signIn?'Please sign in to view your private booking.':'Completion information unavailable. Refresh or return to your appointments.');if(e?.signIn){const a=document.createElement('a');a.href='./sign-in.html';a.textContent=' Sign in';status.append(a);}}\n  async function rpc(name){\n    if(!clientPromise)clientPromise=import('https://esm.sh/@supabase/supabase-js@2.49.4').then(({createClient})=>createClient(BASE,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}})).catch(e=>{clientPromise=undefined;throw e;});\n    const db=await clientPromise;\n    const {data:s,error:se}=await db.auth.getSession();if(se||!s?.session?.access_token)throw signIn();\n    const {data:u,error:ue}=await db.auth.getUser(s.session.access_token);if(ue||!u?.user?.id)throw signIn();\n    const {data,error}=await db.rpc(name,{p_booking_type:kind,p_booking_id:booking});if(error){if(error.code==='28000'||error.code==='PGRST301')throw signIn();throw Error('Unavailable');}return data;\n  }\n  async function state(){const s=await rpc('shopdrop_completion_state_193g');if(s?.booking_id!==booking||s.booking_type!==kind||!['customer','provider'].includes(s.my_role)||typeof s.payment_verified!=='boolean'||typeof s.completion_verified!=='boolean'||typeof s.pin_available!=='boolean')throw Error('Invalid response');return s;}\n  const releaseLabels={awaiting_activation:'Release request prepared. Financial provider activation pending.',eligible:'Release request eligible; settlement not confirmed.',held:'Release request on hold.',processing:'Release request processing.',submitted:'Release request submitted; settlement not confirmed.',confirmed:'Payment release confirmed.',failed:'Release request failed. Contact Shop&Drop support.'};\n  async function load(){\n    if(busy)return;busy=true;refresh.disabled=true;clear();message('Checking your private booking…');\n    try{if(!valid)throw Error('Invalid booking');const s=await state();title.textContent=kind==='service'?'Other Services':'Transport Services & Equipment Hire';\n      back.href=(kind==='service'?'./service-appointments-193d.html':'./dispatch-appointments-192dd.html')+(s.my_role==='provider'?'?role=provider':'');\n      if(!s.payment_verified){message('Completion PIN and payout are unavailable until payment has been verified.');return;}\n      if(s.completion_verified){message('Completion verified. '+(releaseLabels[s.release_status]||'Payment release status unavailable. Contact Shop&Drop support.'));return;}\n      if(s.my_role==='customer'){if(!s.pin_available){message('Your Completion PIN is not available or has expired. Contact Shop&Drop support.');return;}actions.hidden=false;reveal.hidden=false;message('Your Completion PIN is private. Reveal it only when you need it. Give it to the provider only after satisfactory completion.');}\n      else{actions.hidden=false;submit.hidden=false;submit.href='./shopdrop-provider-completion.html?booking_type='+encodeURIComponent(kind)+'&booking_id='+encodeURIComponent(booking);message('When the agreed work is complete, request the customer’s six-digit PIN and submit it.');}\n    }catch(e){fail(e);}finally{busy=false;refresh.disabled=false;}\n  }\n  reveal.addEventListener('click',async()=>{if(busy)return;if(!code.hidden){clearCode();return;}busy=true;refresh.disabled=true;reveal.disabled=true;const request=generation;try{const s=await state();if(!s.pin_available||s.my_role!=='customer'||!s.payment_verified||s.completion_verified)throw Error('PIN unavailable');const pin=await rpc('shopdrop_customer_completion_pin_193g');if(typeof pin!=='string'||!/^[0-9]{6}$/.test(pin))throw Error('Invalid PIN');if(request!==generation||document.hidden)return;code.textContent=pin;code.hidden=false;reveal.textContent='Hide my Completion PIN';}catch(e){fail(e);}finally{busy=false;refresh.disabled=false;reveal.disabled=false;}});\n  document.addEventListener('visibilitychange',()=>{if(document.hidden)clearCode();});window.addEventListener('pagehide',clearCode);\n  refresh.addEventListener('click',load);load();\n})();\n"}
+        planned={}
+        for name,changes in patches.items():
+            p=Path(name); source=p.read_text(encoding='utf-8')
+            if all(new in source for old,new in changes): continue
+            sha=subprocess.check_output(['git','hash-object',name],text=True).strip()
+            if sha!=shas[name]: raise SystemExit('Unexpected source version; no changes installed: '+name)
+            updated=source
+            for old,new in changes:
+                if updated.count(old)!=1: raise SystemExit('Unexpected patch anchor: '+name)
+                updated=updated.replace(old,new,1)
+            backup=Path('backups/fix193g')/p.name
+            if backup.exists() and backup.read_bytes()!=p.read_bytes(): raise SystemExit('Unexpected backup: '+name)
+            planned[name]=updated
+        for name,content in new_files.items():
+            p=Path(name)
+            if p.exists() and p.read_text(encoding='utf-8')!=content: raise SystemExit('Unexpected file collision: '+name)
+        for name,content in planned.items():
+            p=Path(name); backup=Path('backups/fix193g')/p.name
+            backup.parent.mkdir(parents=True,exist_ok=True)
+            if not backup.exists(): backup.write_bytes(p.read_bytes())
+            p.write_text(content,encoding='utf-8')
+        for name,content in new_files.items():
+            if not Path(name).exists(): Path(name).write_text(content,encoding='utf-8')
+        print('Fix 193G shared completion controls installed.')
+        PYCODE
+        node --check public/shopdrop-service-appointments-193d.js
+        node --check public/shopdrop-dispatch-appointments-192dd.js
+        node --check public/shopdrop-completion-status-193g.js
+        git diff --check
+        git config user.name 'ShopDrop Integration'
+        git config user.email 'actions@users.noreply.github.com'
+        git add public/shopdrop-service-appointments-193d.js public/service-appointments-193d.html public/shopdrop-dispatch-appointments-192dd.js public/dispatch-appointments-192dd.html public/service-completion-status-193g.html public/shopdrop-completion-status-193g.js
+        if test -d backups/fix193g; then git add backups/fix193g; fi
+        if ! git diff --cached --quiet; then
+          git commit -m 'Fix 193G shared service and transport completion controls'
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
