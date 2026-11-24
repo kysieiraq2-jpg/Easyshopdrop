@@ -1,0 +1,72 @@
+name: ShopDrop Fix 195A Payment Purpose Navigation
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix195a-payment-purpose-navigation.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Install payment purpose navigation and reminders
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import subprocess
+        shas={'public/account.html': 'ba60fb6f60f9bd91a70892242c2b27fdbd728790', 'public/register.html': '784a58c885376eb3624fc1c5e19da9752e7640e2', 'public/sell-item.html': '5a5e6485969f03b0c72d6642ba97e7a40cd2bd7e', 'public/seller.html': 'cb0bf18489473abb6bcfc3a3b3c9b3dc75670080', 'public/shopdrop-vehicle-draft-private.html': '733008a61d99d5f4148301e24b98a5e1737034db'}
+        patches={'public/account.html': [('</style>\n</head>', '</style>\n<link rel="stylesheet" href="./shopdrop-payment-purpose-195a.css?v=195a">\n</head>'), ('<section class="panel" id="who">Loading…</section>', '<section class="panel" id="who">Loading…</section>\n<section class="panel shopdrop-purpose-195a" id="shopdropPaymentPurpose195a" aria-labelledby="shopdropPurposeTitle195a" hidden>\n<h2 id="shopdropPurposeTitle195a">Receive My Payment</h2>\n<p class="purpose-heading-195a">FOR PAYMENT PURPOSES</p>\n<div class="purpose-group-195a"><h3>New, Second-Hand &amp; Handmade Products</h3>\n<a class="purpose-action-195a" href="./account.html#seller-courier-pickup-panel">Enter Courier Reference Number After Pickup</a>\n<div class="purpose-note-195a"><p>The courier reference number must be obtained from the courier company when they physically collect your sold item. Enter this reference number using the button above.</p><p><strong>It is your responsibility to obtain this reference number for payment purposes.</strong></p></div></div>\n<div class="purpose-group-195a"><h3>Other Services</h3>\n<a class="purpose-action-195a" href="./shopdrop-provider-completion.html?booking_type=service">Enter Six-Digit Completion PIN After Completion of Service</a>\n<div class="purpose-note-195a"><p>The six-digit PIN must be obtained from the person who paid for your service, after completion of the agreed service, and entered using the button above.</p><p><strong>It is your responsibility to obtain this PIN for payment purposes.</strong></p></div></div>\n<div class="purpose-group-195a"><h3>Transport Services &amp; Equipment Hire</h3>\n<a class="purpose-action-195a" href="./shopdrop-provider-completion.html?booking_type=dispatch">Enter Six-Digit Completion PIN After Completion of Task</a>\n<div class="purpose-note-195a"><p>The six-digit PIN must be obtained from the person who paid for your transport or equipment hire service, after completion of the agreed task, and entered using the button above.</p><p><strong>It is your responsibility to obtain this PIN for payment purposes.</strong></p></div></div>\n<p class="muted">For a distant service or transport job, the paying customer may entrust the code to an authorized recipient. A courier reference alone cannot verify collection. Payment release requires the existing secure checks and confirmation from the approved payment provider. Live payments are not yet active.</p>\n</section>'), (' who.append(signout);', " who.append(signout);\n document.getElementById('shopdropPaymentPurpose195a').hidden=false;")], 'public/register.html': [('</style></head>', '</style><link rel="stylesheet" href="./shopdrop-payment-purpose-195a.css?v=195a"></head>'), ('<section class=card><form id=form>', '<aside class="shopdrop-purpose-195a"><div class="purpose-note-195a"><strong>FOR PAYMENT PURPOSES</strong><p><strong>New, Second-Hand &amp; Handmade Products:</strong> Obtain the courier company’s own booking, waybill or tracking reference when the courier physically collects your sold item. It is your responsibility to obtain this reference number for payment purposes.</p><p><strong>Other Services:</strong> Obtain the six-digit Completion PIN from the person who paid for your service, after completing the agreed service. It is your responsibility to obtain this PIN for payment purposes.</p><p><strong>Transport Services &amp; Equipment Hire:</strong> Obtain the six-digit Completion PIN from the person who paid for your transport or equipment hire service, after completing the agreed task. It is your responsibility to obtain this PIN for payment purposes.</p><p>No reference number or PIN is needed to register or advertise. After pickup or completion, sign in and use Receive My Payment in My Account.</p></div></aside><section class=card><form id=form>')], 'public/sell-item.html': [('</head>', '<link rel="stylesheet" href="./shopdrop-payment-purpose-195a.css?v=195a">\n</head>'), ('<button id="postButton" type="submit">Post My Item</button>', '<aside class="shopdrop-purpose-195a"><div class="purpose-note-195a"><strong>FOR PAYMENT PURPOSES</strong><p><strong>New, Second-Hand &amp; Handmade Products:</strong> Obtain the courier company’s own booking, waybill or tracking reference when the courier physically collects your sold item. It is your responsibility to obtain this reference number for payment purposes.</p><p>No reference number or PIN is needed to register or advertise. After pickup or completion, sign in and use Receive My Payment in My Account.</p></div></aside>\n<button id="postButton" type="submit">Post My Item</button>')], 'public/seller.html': [('</head>', '<link rel="stylesheet" href="./shopdrop-payment-purpose-195a.css?v=195a">\n</head>'), ('<div class=box id="list-service"><h2>List a service — FREE</h2>', '<div class=box id="list-service"><h2>List a service — FREE</h2><aside class="shopdrop-purpose-195a"><div class="purpose-note-195a"><strong>FOR PAYMENT PURPOSES</strong><p><strong>Other Services:</strong> Obtain the six-digit Completion PIN from the person who paid for your service, after completing the agreed service. It is your responsibility to obtain this PIN for payment purposes.</p><p>No reference number or PIN is needed to register or advertise. After pickup or completion, sign in and use Receive My Payment in My Account.</p></div></aside>')], 'public/shopdrop-vehicle-draft-private.html': [('</head>', '<link rel="stylesheet" href="./shopdrop-payment-purpose-195a.css?v=195a">\n</head>'), ('<button id="submit" type="submit">', '<aside class="shopdrop-purpose-195a"><div class="purpose-note-195a"><strong>FOR PAYMENT PURPOSES</strong><p><strong>Transport Services &amp; Equipment Hire:</strong> Obtain the six-digit Completion PIN from the person who paid for your transport or equipment hire service, after completing the agreed task. It is your responsibility to obtain this PIN for payment purposes.</p><p>No reference number or PIN is needed to register or advertise. After pickup or completion, sign in and use Receive My Payment in My Account.</p></div></aside>\n<button id="submit" type="submit">')]}
+        new_files={'public/shopdrop-payment-purpose-195a.css': '/* Fix 195A: payment instructions and navigation only. */\n#shopdropPaymentPurpose195a[hidden]{display:none!important}\n.shopdrop-purpose-195a{box-sizing:border-box;color:#17202a;line-height:1.5;overflow-wrap:anywhere}\n.shopdrop-purpose-195a h2{font-size:23px;line-height:1.3;margin:0 0 6px;text-align:center}\n.shopdrop-purpose-195a h3{font-size:18px;line-height:1.4;margin:12px 0 8px}\n.shopdrop-purpose-195a .purpose-heading-195a{display:block;font-size:18px;font-weight:700;text-align:center;margin:4px 0 14px}\n.shopdrop-purpose-195a .purpose-action-195a{display:flex;box-sizing:border-box;align-items:center;justify-content:center;min-height:54px;padding:14px;background:#0f766e;color:#fff;text-decoration:none;text-align:center;font-weight:700;border-radius:8px;margin:8px 0}\n.shopdrop-purpose-195a .purpose-action-195a:focus-visible{outline:3px solid #17202a;outline-offset:3px}\n.shopdrop-purpose-195a .purpose-note-195a{box-sizing:border-box;background:#dce1e7;color:#17202a;padding:12px;border-radius:8px;margin:8px 0 12px}\n.shopdrop-purpose-195a .purpose-group-195a{border-bottom:1px solid #dce1e7;padding-bottom:12px;margin-bottom:12px}\n.shopdrop-purpose-195a .purpose-group-195a:last-of-type{border-bottom:0}\n.shopdrop-purpose-195a .purpose-note-195a p{margin:0 0 8px}\n.shopdrop-purpose-195a .purpose-note-195a p:last-child{margin:0}\n'}
+        planned={}
+        for name,changes in patches.items():
+            p=Path(name); source=p.read_bytes().decode('utf-8')
+            if all(source.count(new)==1 for old,new in changes): continue
+            sha=subprocess.check_output(['git','hash-object',name],text=True).strip()
+            if sha!=shas[name]: raise SystemExit('Unexpected source version; nothing installed: '+name)
+            updated=source
+            for old,new in changes:
+                if updated.count(old)!=1: raise SystemExit('Unexpected anchor: '+name)
+                updated=updated.replace(old,new,1)
+            backup=Path('backups/fix195a')/p.name
+            if backup.exists() and backup.read_bytes()!=p.read_bytes(): raise SystemExit('Unexpected backup: '+name)
+            planned[name]=updated
+        for name,content in new_files.items():
+            p=Path(name)
+            if p.exists() and p.read_bytes()!=content.encode('utf-8'): raise SystemExit('Unexpected file collision: '+name)
+        for name,content in planned.items():
+            p=Path(name); backup=Path('backups/fix195a')/p.name
+            backup.parent.mkdir(parents=True,exist_ok=True)
+            if not backup.exists(): backup.write_bytes(p.read_bytes())
+            p.write_bytes(content.encode('utf-8'))
+        for name,content in new_files.items():
+            if not Path(name).exists(): Path(name).write_bytes(content.encode('utf-8'))
+        print('Fix 195A payment instructions and signed-in account links installed. Existing verification functions unchanged.')
+        PYCODE
+        git diff --check
+        git config user.name "ShopDrop Integration"
+        git config user.email "actions@users.noreply.github.com"
+        git add public/account.html public/register.html public/sell-item.html public/seller.html public/shopdrop-vehicle-draft-private.html public/shopdrop-payment-purpose-195a.css
+        if test -d backups/fix195a; then git add backups/fix195a; fi
+        if ! git diff --cached --quiet; then
+          git commit -m "Fix 195A payment purpose navigation and reminders"
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
