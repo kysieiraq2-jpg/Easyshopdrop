@@ -148,6 +148,13 @@ Provider contact and banking details remain private.
 <p class="muted">No company or website required. Choose a service category and subcategory, then describe and price your service.</p>
 </div>
 
+<div id="shopdropServiceCategory193a" style="margin:16px 0">
+<label for="serviceCategory193a" style="display:block;font-weight:600;margin-bottom:6px">Service category</label>
+<select id="serviceCategory193a" style="width:100%;min-height:46px;font:inherit;padding:10px;border:1px solid #cbd5e1;border-radius:8px"><option value="">All categories</option></select>
+<label for="serviceSubcategory193a" style="display:block;font-weight:600;margin:12px 0 6px">Type of service</label>
+<select id="serviceSubcategory193a" disabled style="width:100%;min-height:46px;font:inherit;padding:10px;border:1px solid #cbd5e1;border-radius:8px"><option value="">Choose a category first</option></select>
+<p class="muted">Choose a category or type of service. You can also search by words below.</p>
+</div>
 <div class="search">
 <input id="q" type="search" placeholder="Search services — e.g. cleaning, pest control, DJ">
 <button class="btn" id="go" type="button">Search Other Services</button>
@@ -163,7 +170,7 @@ Provider contact and banking details remain private.
 
 <section class="panel">
 <h2>Other Service categories</h2>
-<p class="muted">Select a category to view its subcategories and browse available advertisements. Transport and dispatch jobs have their own dedicated workflow under <a href="./dispatching.html">Dispatching & Transport</a>.</p>
+<p class="muted">Select a category to view its subcategories and browse available advertisements. Transport and dispatch jobs have their own dedicated workflow under <a href="./dispatching.html">Transport Services &amp; Equipment Hire</a>.</p>
 
 <div class="grid">
 <button class="card service-card" data-category="Automotive Services"><b>Automotive Services</b><p>Mechanical, repair and related vehicle services.</p></button>
@@ -217,7 +224,7 @@ Provider contact and banking details remain private.
 <script src="./v26-consolidated.js"></script>
 <script src="./geo.js"></script>
 <script src="./service-taxonomy.js"></script>
-<script src="./shopdrop-services-connector.js"></script>
+<script src="./shopdrop-services-connector.js?v=193a"></script>
 <script src="./shopdrop-service-booking-ui.js?v=191a"></script>
 
 <script>
@@ -226,6 +233,33 @@ const serviceResults=document.getElementById('results');
 const serviceMessage=document.getElementById('msg');
 const serviceQuery=document.getElementById('q');
 let serviceSearchSequence=0;
+const serviceCategory193a=document.getElementById('serviceCategory193a');
+const serviceSubcategory193a=document.getElementById('serviceSubcategory193a');
+const serviceTaxonomy193a=window.ShopDropServiceTaxonomy||{};
+function fillService193a(select,values,placeholder){
+ select.replaceChildren(new Option(placeholder,''));
+ for(const value of [...new Set(values)].sort((a,b)=>a.localeCompare(b)))select.add(new Option(value,value));
+}
+function selectService193a(category='',subcategory=''){
+ serviceCategory193a.value=Object.hasOwn(serviceTaxonomy193a,category)?category:'';
+ const values=serviceTaxonomy193a[serviceCategory193a.value]||[];
+ fillService193a(serviceSubcategory193a,values,serviceCategory193a.value?'All service types':'Choose a category first');
+ serviceSubcategory193a.disabled=!serviceCategory193a.value;
+ serviceSubcategory193a.value=values.includes(subcategory)?subcategory:'';
+}
+fillService193a(serviceCategory193a,Object.keys(serviceTaxonomy193a),'All categories');
+selectService193a();
+serviceCategory193a.addEventListener('change',()=>{
+ selectService193a(serviceCategory193a.value);
+ serviceQuery.value='';
+ document.querySelectorAll('.subcat.selected').forEach(x=>x.classList.remove('selected'));
+ search('');
+});
+serviceSubcategory193a.addEventListener('change',()=>{
+ serviceQuery.value='';
+ document.querySelectorAll('.subcat.selected').forEach(x=>x.classList.remove('selected'));
+ search('');
+});
 
 const previewListings=[
  {title:'Example Pest Control Service',category:'Pest Control',description:'Approved Shop&Drop provider listing preview.',pricing_unit:'treatment',unit_price_cents:108000,currency_code:'ZAR',minimum_units:1,service_area:'Example service area'},
@@ -359,18 +393,16 @@ function render(list,term=''){
  });
 }
 
-async function search(term,category=''){
+async function search(term,category=serviceCategory193a.value,subcategory=serviceSubcategory193a.value){
  const sequence=++serviceSearchSequence;
  term=String(term||'').trim();
  serviceMessage.textContent='Loading approved Shop&Drop services…';
 
  try{
-  const list=await window.ShopDropServicesConnector.search(term);
+  const list=await window.ShopDropServicesConnector.search(term,{}, {category,subcategory});
   if(sequence!==serviceSearchSequence)return;
 
-  const filtered=category
-   ?list.filter(x=>String(x.category||'').toLowerCase()===category.toLowerCase())
-   :list;
+  const filtered=list.filter(x=>(!category||x.category===category)&&(!subcategory||x.subcategory===subcategory));
 
   serviceMessage.textContent=
    filtered.length+(filtered.length===1 ? ' service found.' : ' services found.');
@@ -393,6 +425,7 @@ serviceQuery.addEventListener('keydown',e=>{
 });
 
 document.getElementById('browseAllServices').onclick=()=>{
+ selectService193a();
  serviceQuery.value='';
  document.querySelectorAll('.subcat.selected')
   .forEach(x=>x.classList.remove('selected'));
@@ -419,7 +452,8 @@ document.querySelectorAll('.service-card').forEach(card=>{
    document.querySelectorAll('.subcat.selected')
     .forEach(x=>x.classList.remove('selected'));
    b.classList.add('selected');
-   serviceQuery.value=name;
+   selectService193a(card.dataset.category,name);
+   serviceQuery.value='';
 
    let oldChoice=wrap.querySelector('.provider-choice');
    if(oldChoice)oldChoice.remove();
@@ -436,12 +470,13 @@ document.querySelectorAll('.service-card').forEach(card=>{
    subs.before(choice);
 
    choice.querySelector('.find-service').onclick=()=>{
-    serviceQuery.value=name;
-    search(name);
+    selectService193a(card.dataset.category,name);
+    serviceQuery.value='';
+    search('');
     serviceResults.scrollIntoView({behavior:'smooth',block:'start'});
    };
 
-   search(name);
+   search('');
    choice.scrollIntoView({behavior:'smooth',block:'nearest'});
   };
 
@@ -458,8 +493,9 @@ document.querySelectorAll('.service-card').forEach(card=>{
   subs.classList.toggle('open');
 
   if(subs.classList.contains('open')){
+   selectService193a(card.dataset.category);
    serviceQuery.value='';
-   search('',card.dataset.category);
+   search('');
   }
  };
 });
@@ -511,7 +547,7 @@ search('');
 <!-- V26_SERVICE_EXTENSION -->
 <h2>Service Attendance</h2>
 <p>Booking Confirmed → Provider En Route → Arrival Pending Verification → Provider Arrived.</p>
-<p>Objectively verified provider arrival is the normal payout milestone.</p>
+<p>Verified service completion using the customer-held Completion PIN is required before held proceeds can be released, subject to payment-provider activation and safeguards.</p>
 </section>
 
 <section class="v26DraftControls">

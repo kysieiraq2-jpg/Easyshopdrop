@@ -99,7 +99,7 @@
   // Uses the customer's selected town and province.
   // Supabase RLS remains authoritative.
 
-  async function search(term, location = {}) {
+  async function search(term, location = {}, filters = {}) {
     const query = new URLSearchParams();
 
     query.set(
@@ -112,8 +112,10 @@
     );
 
     query.set('listing_status', 'eq.approved');
-    query.set('order', 'created_at.desc');
+    query.set('order', 'created_at.desc,id.asc');
     query.set('limit', '50');
+    if (filters.category) query.set('category', 'eq.' + filters.category);
+    if (filters.subcategory) query.set('subcategory', 'eq.' + filters.subcategory);
 
     const response = await fetch(
       url + '/rest/v1/services?' + query,
@@ -208,6 +210,7 @@
           title: row.title,
           description: row.description,
           category: row.category,
+          subcategory: row.subcategory,
 
           pricing_unit:
             row.pricing_unit || 'service',
