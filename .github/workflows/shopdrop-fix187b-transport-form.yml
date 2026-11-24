@@ -1,1 +1,265 @@
 
+name: ShopDrop Fix 187B - Transport Form Dropdowns
+
+'on':
+  push:
+    branches:
+      - shopdrop-phase6-integration
+    paths:
+      - '.github/workflows/shopdrop-fix187b-transport-form.yml'
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  fix:
+    name: Correct only two transport form fields
+    if: github.ref_name == 'shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify recovery backup
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git rev-parse --verify \
+            refs/tags/shopdrop-transport-before-187
+
+          echo "PASS: Recovery backup exists"
+
+      - name: Preserve and correct two fields
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import re
+          import html
+
+          page = Path(
+              "public/shopdrop-vehicle-draft-private.html"
+          )
+
+          equipment = Path(
+              "public/shopdrop-dispatch-equipment-fields.js"
+          )
+
+          backup = Path(
+              "backups/fix187b/"
+              "transport-form-before-187b.html"
+          )
+
+          expected = {
+              page:
+                  "59b554729c3e223b37f2e53bc14850a50e4ff1fb",
+              equipment:
+                  "558f95e04fe81a5b284f2c8c9f51649521ed601f"
+          }
+
+          for path, wanted in expected.items():
+              actual = subprocess.check_output(
+                  ["git", "hash-object", str(path)],
+                  text=True
+              ).strip()
+
+              if actual != wanted:
+                  raise SystemExit(
+                      "SAFETY STOP: Source changed: "
+                      + str(path)
+                  )
+
+          original = page.read_bytes()
+          source = original.decode("utf-8")
+
+          equipment_source = equipment.read_text(
+              encoding="utf-8"
+          )
+
+          # Reuse existing main equipment categories.
+          category_block = re.search(
+              r"const CATEGORIES\s*=\s*\{(.*?)\n\s*\};",
+              equipment_source,
+              re.S
+          )
+
+          if not category_block:
+              raise SystemExit(
+                  "SAFETY STOP: Categories not found."
+              )
+
+          categories = re.findall(
+              r"^\s*'([^']+)'\s*:\s*\[",
+              category_block.group(1),
+              re.M
+          )
+
+          if (
+              len(categories) != 10
+              or len(set(categories)) != 10
+          ):
+              raise SystemExit(
+                  "SAFETY STOP: Category list mismatch."
+              )
+
+          # Change only the original title field.
+          old_title = (
+              '<input id="title" required minlength="3"\n'
+              '           maxlength="120"\n'
+              '           placeholder="Example: Bakkie transport">'
+          )
+
+          options = [
+              '      <option value="">'
+              'Choose transport or equipment service'
+              '</option>'
+          ]
+
+          for category in categories:
+              safe = html.escape(category, quote=True)
+
+              options.append(
+                  '      <option value="' + safe + '">'
+                  + safe + '</option>'
+              )
+
+          new_title = (
+              '<select id="title" required>\n'
+              + '\n'.join(options)
+              + '\n    </select>'
+          )
+
+          if source.count(old_title) != 1:
+              raise SystemExit(
+                  "SAFETY STOP: Original title field mismatch."
+              )
+
+          # Preserve complete existing location fields.
+          town = (
+              '  <label>\n'
+              '    Service provider base town\n'
+              '    <input id="town" maxlength="120">\n'
+              '  </label>'
+          )
+
+          province = (
+              '  <label>\n'
+              '    Service provider base province\n'
+              '    <input id="province" maxlength="120">\n'
+              '  </label>'
+          )
+
+          old_order = town + '\n\n' + province
+          new_order = province + '\n\n' + town
+
+          if source.count(old_order) != 1:
+              raise SystemExit(
+                  "SAFETY STOP: Location fields mismatch."
+              )
+
+          updated = source.replace(
+              old_title, new_title, 1
+          )
+
+          updated = updated.replace(
+              old_order, new_order, 1
+          )
+
+          # Verify that reversing these two changes
+          # reproduces the complete original file.
+          reconstructed = updated.replace(
+              new_order, old_order, 1
+          ).replace(
+              new_title, old_title, 1
+          )
+
+          if reconstructed != source:
+              raise SystemExit(
+                  "SAFETY STOP: Unrelated code changed."
+              )
+
+          for field in (
+              'id="title"',
+              'id="type"',
+              'id="province"',
+              'id="town"',
+              'id="coverage"'
+          ):
+              if updated.count(field) != 1:
+                  raise SystemExit(
+                      "SAFETY STOP: Field duplication: "
+                      + field
+                  )
+
+          if backup.exists():
+              raise SystemExit(
+                  "SAFETY STOP: Backup already exists."
+              )
+
+          backup.parent.mkdir(
+              parents=True,
+              exist_ok=True
+          )
+
+          backup.write_bytes(original)
+
+          if backup.read_bytes() != original:
+              raise SystemExit(
+                  "SAFETY STOP: Backup failed."
+              )
+
+          page.write_bytes(
+              updated.encode("utf-8")
+          )
+
+          print("PASS: Original form backed up")
+          print("PASS: Title dropdown created")
+          print("PASS: All ten categories included")
+          print("PASS: Province above Town")
+          print("PASS: Existing field IDs preserved")
+          print("PASS: Existing scripts unchanged")
+          print("PASS: All unrelated code preserved")
+          PY
+
+          git diff --check
+
+      - name: Commit isolated correction
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "ShopDrop Fix Bot"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            public/shopdrop-vehicle-draft-private.html \
+            backups/fix187b/transport-form-before-187b.html
+
+          git commit -m \
+            "Fix 187B transport title and location order"
+
+          git push origin \
+            HEAD:shopdrop-phase6-integration
+
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
