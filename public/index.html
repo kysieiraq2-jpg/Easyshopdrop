@@ -303,7 +303,9 @@ function setMainMenu(open){
 }
 mainMenuButton.addEventListener('click',e=>{
  e.stopPropagation();
- setMainMenu(mainMenu.hidden);
+ const level=homeHistory197c().level;
+ if(level) return homeBack197c(level);
+ homeNavigate197c(1);
 });
 mainMenu.addEventListener('click',e=>e.stopPropagation());
 const productsCategoriesButton=document.getElementById('productsCategoriesButton');
@@ -439,17 +441,78 @@ function setProductsCategories(open){
   shopdropPopulateCategoryMenu();
  }
 }
-productsCategoriesButton.addEventListener('click',()=>setProductsCategories(productsCategoriesPanel.hidden));
-document.addEventListener('click',()=>{
- setMainMenu(false);
- setProductsCategories(false);
+// Fix 197C: real browser history for the three levels of the existing menu.
+// No automatic history entries, no interference with ordinary page links.
+const homeHistoryKey197c='shopdropHomeNavigation197c';
+let homeBackPending197c=false;
+function homeHistory197c(){
+ const entry=history.state?.[homeHistoryKey197c];
+ return entry&&entry.path===location.pathname&&[1,2,3].includes(entry.level)
+  ?entry:{level:0,category:''};
+}
+function homeDetails197c(){
+ const entry=homeHistory197c();
+ document.querySelectorAll('#mainMenuCategories details').forEach(item=>{
+  const name=item.querySelector('summary')?.textContent.trim();
+  item.open=entry.level===3&&name===entry.category;
+ });
+}
+function homeRender197c(){
+ const entry=homeHistory197c();
+ setMainMenu(entry.level>=1);
+ setProductsCategories(entry.level>=2);
+ homeDetails197c();
+}
+function homeNavigate197c(level,category='',replace=false){
+ if(homeBackPending197c)return;
+ const next={...(history.state||{}),[homeHistoryKey197c]:{path:location.pathname,level,category}};
+ if(replace)history.replaceState(next,'');
+ else history.pushState(next,'');
+ homeRender197c();
+}
+function homeBack197c(steps=1){
+ if(homeBackPending197c||homeHistory197c().level<steps)return;
+ homeBackPending197c=true;
+ history.go(-steps);
+}
+productsCategoriesButton.addEventListener('click',()=>{
+ const level=homeHistory197c().level;
+ if(level>=2)homeBack197c(level-1);
+ else if(level===1)homeNavigate197c(2);
 });
-document.addEventListener('keydown',e=>{
- if(e.key==='Escape'){
-  setMainMenu(false);
-  setProductsCategories(false);
+const homeCategoryHost197c=document.getElementById('mainMenuCategories');
+homeCategoryHost197c.addEventListener('click',event=>{
+ const summary=event.target.closest('summary');
+ if(!summary||!homeCategoryHost197c.contains(summary))return;
+ const name=summary.textContent.trim();
+ if(!name)return;
+ event.preventDefault();
+ const entry=homeHistory197c();
+ if(entry.level===3&&entry.category===name)homeBack197c();
+ else if(entry.level>=2)homeNavigate197c(3,name,entry.level===3);
+});
+// Both existing taxonomy renderers may finish asynchronously; restore only the view.
+new MutationObserver(homeDetails197c).observe(homeCategoryHost197c,{childList:true});
+window.addEventListener('popstate',()=>{
+ homeBackPending197c=false;
+ homeRender197c();
+});
+window.addEventListener('pageshow',()=>{
+ homeBackPending197c=false;
+ homeRender197c();
+});
+document.addEventListener('click',event=>{
+ const level=homeHistory197c().level;
+ // Do not race a normal link, button, or form submission against history.go().
+ if(level&&!event.target.closest('a[href],button,input,select,textarea,label,form'))homeBack197c(level);
+});
+document.addEventListener('keydown',event=>{
+ if(event.key==='Escape'&&homeHistory197c().level){
+  event.preventDefault();
+  homeBack197c();
  }
 });
+homeRender197c();
 // Fix 197A: the homepage search uses a native GET form; categories use the existing category page.
 ['./categories.html','./services.html','./dispatching.html','./seller-apply.html','./seller.html'].forEach(h=>{
  const l=document.createElement('link');
