@@ -1,0 +1,85 @@
+name: ShopDrop Fix 197C Browser Back Navigation
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix197c-browser-back-navigation.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Repair menu and category browser navigation
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import subprocess
+        SHAS = {'public/index.html': '502cfa587b3ece50902e2c12494bb3d81eda555c', 'public/categories.html': '7f64f7f214103a6b2fbb0aa9a3276e21e5dbb784'}
+        PATCHES = {'public/index.html': [("mainMenuButton.addEventListener('click',e=>{\n e.stopPropagation();\n setMainMenu(mainMenu.hidden);\n});", "mainMenuButton.addEventListener('click',e=>{\n e.stopPropagation();\n const level=homeHistory197c().level;\n if(level) return homeBack197c(level);\n homeNavigate197c(1);\n});"), ("productsCategoriesButton.addEventListener('click',()=>setProductsCategories(productsCategoriesPanel.hidden));\ndocument.addEventListener('click',()=>{\n setMainMenu(false);\n setProductsCategories(false);\n});\ndocument.addEventListener('keydown',e=>{\n if(e.key==='Escape'){\n  setMainMenu(false);\n  setProductsCategories(false);\n }\n});", "// Fix 197C: real browser history for the three levels of the existing menu.\n// No automatic history entries, no interference with ordinary page links.\nconst homeHistoryKey197c='shopdropHomeNavigation197c';\nlet homeBackPending197c=false;\nfunction homeHistory197c(){\n const entry=history.state?.[homeHistoryKey197c];\n return entry&&entry.path===location.pathname&&[1,2,3].includes(entry.level)\n  ?entry:{level:0,category:''};\n}\nfunction homeDetails197c(){\n const entry=homeHistory197c();\n document.querySelectorAll('#mainMenuCategories details').forEach(item=>{\n  const name=item.querySelector('summary')?.textContent.trim();\n  item.open=entry.level===3&&name===entry.category;\n });\n}\nfunction homeRender197c(){\n const entry=homeHistory197c();\n setMainMenu(entry.level>=1);\n setProductsCategories(entry.level>=2);\n homeDetails197c();\n}\nfunction homeNavigate197c(level,category='',replace=false){\n if(homeBackPending197c)return;\n const next={...(history.state||{}),[homeHistoryKey197c]:{path:location.pathname,level,category}};\n if(replace)history.replaceState(next,'');\n else history.pushState(next,'');\n homeRender197c();\n}\nfunction homeBack197c(steps=1){\n if(homeBackPending197c||homeHistory197c().level<steps)return;\n homeBackPending197c=true;\n history.go(-steps);\n}\nproductsCategoriesButton.addEventListener('click',()=>{\n const level=homeHistory197c().level;\n if(level>=2)homeBack197c(level-1);\n else if(level===1)homeNavigate197c(2);\n});\nconst homeCategoryHost197c=document.getElementById('mainMenuCategories');\nhomeCategoryHost197c.addEventListener('click',event=>{\n const summary=event.target.closest('summary');\n if(!summary||!homeCategoryHost197c.contains(summary))return;\n const name=summary.textContent.trim();\n if(!name)return;\n event.preventDefault();\n const entry=homeHistory197c();\n if(entry.level===3&&entry.category===name)homeBack197c();\n else if(entry.level>=2)homeNavigate197c(3,name,entry.level===3);\n});\n// Both existing taxonomy renderers may finish asynchronously; restore only the view.\nnew MutationObserver(homeDetails197c).observe(homeCategoryHost197c,{childList:true});\nwindow.addEventListener('popstate',()=>{\n homeBackPending197c=false;\n homeRender197c();\n});\nwindow.addEventListener('pageshow',()=>{\n homeBackPending197c=false;\n homeRender197c();\n});\ndocument.addEventListener('click',event=>{\n const level=homeHistory197c().level;\n // Do not race a normal link, button, or form submission against history.go().\n if(level&&!event.target.closest('a[href],button,input,select,textarea,label,form'))homeBack197c(level);\n});\ndocument.addEventListener('keydown',event=>{\n if(event.key==='Escape'&&homeHistory197c().level){\n  event.preventDefault();\n  homeBack197c();\n }\n});\nhomeRender197c();")], 'public/categories.html': [('async function loadCats(){', "// Fix 197C: a category expansion is one real browser navigation step.\n// Preserve the incoming URL, filters, browse results and subcategory destinations.\nconst categoryHistoryKey197c='shopdropCategoryNavigation197c';\nconst requestedCategory197c=new URLSearchParams(location.search).get('category')||'';\nlet categoryBackPending197c=false;\nfunction categoryHistory197c(){\n const entry=history.state?.[categoryHistoryKey197c];\n return entry&&entry.path===location.pathname&&[0,1].includes(entry.depth)\n  ?entry:{depth:0,category:requestedCategory197c};\n}\nfunction categoryRender197c(scroll=false){\n const entry=categoryHistory197c();\n let selected=null;\n browseCategories.querySelectorAll('.cat').forEach(box=>{\n  const open=box.dataset.name===entry.category;\n  box.classList.toggle('open',open);\n  const button=box.querySelector('button');\n  if(button)button.setAttribute('aria-expanded',String(open));\n  if(open)selected=box;\n });\n browseCategoryMessage.textContent=selected\n  ?selected.dataset.name+': choose a subcategory to see its advertised items.':'';\n if(scroll&&selected)selected.scrollIntoView({behavior:'auto',block:'start'});\n}\nfunction categoryNavigate197c(category,depth,replace=false){\n const next={...(history.state||{}),[categoryHistoryKey197c]:{path:location.pathname,depth,category}};\n if(replace)history.replaceState(next,'');\n else history.pushState(next,'');\n categoryRender197c(true);\n}\nwindow.addEventListener('popstate',()=>{\n categoryBackPending197c=false;\n categoryRender197c();\n});\nwindow.addEventListener('pageshow',()=>{\n categoryBackPending197c=false;\n if(browseCategories.querySelector('.cat'))categoryRender197c();\n});\n\nasync function loadCats(){"), ("  document.querySelectorAll('.cat>button').forEach(button=>{\n button.onclick=()=>{\n  const box=button.closest('.cat');\n  const opening=!box.classList.contains('open');\n  document.querySelectorAll('.cat.open').forEach(other=>{\n   if(other!==box)other.classList.remove('open');\n  });\n  box.classList.toggle('open',opening);\n  browseCategoryMessage.textContent=opening\n   ?box.dataset.name+': choose a subcategory to see its advertised items.':'';\n  if(opening)box.scrollIntoView({behavior:'smooth',block:'start'});\n };\n});", "  document.querySelectorAll('.cat>button').forEach(button=>{\n button.onclick=()=>{\n  const box=button.closest('.cat');\n  const entry=categoryHistory197c();\n  const name=box.dataset.name;\n  if(categoryBackPending197c)return;\n  if(entry.category===name){\n   if(entry.depth===1){categoryBackPending197c=true;history.back();}\n   else categoryNavigate197c('',0,true);\n  }else{\n   categoryNavigate197c(name,1,entry.depth===1);\n  }\n };\n});"), ("  const requested=new URLSearchParams(location.search).get('category');\nif(requested){\n const box=[...document.querySelectorAll('.cat')]\n  .find(x=>x.dataset.name===requested);\n if(box){\n  box.classList.add('open');\n  browseCategoryMessage.textContent=box.dataset.name+\n   ': choose a subcategory to see advertised products.';\n  requestAnimationFrame(()=>\n   box.scrollIntoView({behavior:'auto',block:'start'})\n  );\n }\n}", '  categoryRender197c(true);')]}
+        def blob(data):
+            return subprocess.check_output(['git','hash-object','--stdin'],input=data).decode().strip()
+        def revise(raw,name):
+            source=raw.decode('utf-8'); updated=source
+            for old,new in PATCHES[name]:
+                if updated.count(old)!=1: raise SystemExit('Unexpected navigation anchor: '+name)
+                updated=updated.replace(old,new,1)
+            restored=updated
+            for old,new in reversed(PATCHES[name]):
+                if restored.count(new)!=1: raise SystemExit('Unexpected replacement: '+name)
+                restored=restored.replace(new,old,1)
+            if restored!=source: raise SystemExit('Original bytes changed outside permitted navigation: '+name)
+            return updated.encode('utf-8')
+        planned={}
+        for name,expected in SHAS.items():
+            p=Path(name); backup=Path('backups/fix197c')/p.name; raw=p.read_bytes()
+            if blob(raw)==expected:
+                original=raw
+            elif backup.is_file() and blob(backup.read_bytes())==expected:
+                if raw!=revise(backup.read_bytes(),name): raise SystemExit('Unexpected installed version: '+name)
+                continue
+            else:
+                raise SystemExit('Unexpected source version; nothing changed: '+name)
+            if backup.exists() and backup.read_bytes()!=original: raise SystemExit('Unexpected backup: '+name)
+            revised=revise(original,name)
+            planned[name]=(original,revised)
+        # Check syntax of modified inline scripts before writing anything.
+        import re
+        for name,(original,revised) in planned.items():
+            for code in re.findall(r'<script\b[^>]*>([\s\S]*?)</script>',revised.decode('utf-8'),re.I):
+                if 'History197c' in code:
+                    subprocess.run(['node','--check','-'],input=code.encode('utf-8'),check=True)
+        for name,(original,revised) in planned.items():
+            p=Path(name); backup=Path('backups/fix197c')/p.name
+            backup.parent.mkdir(parents=True,exist_ok=True)
+            if not backup.exists(): backup.write_bytes(original)
+            p.write_bytes(revised)
+        print('Fix 197C: browser navigation only; original links and all other code preserved.')
+        PYCODE
+        git diff --check
+        git config user.name "ShopDrop Integration"
+        git config user.email "actions@users.noreply.github.com"
+        git add public/index.html public/categories.html
+        if test -d backups/fix197c; then git add backups/fix197c; fi
+        if ! git diff --cached --quiet; then
+          git commit -m "Fix 197C browser back navigation"
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
