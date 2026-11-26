@@ -1,0 +1,84 @@
+name: ShopDrop Fix 198B Direct Category Entry
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix198b-category-entry.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Fix homepage category destination and list
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import os,re,json,hashlib,subprocess
+        SHAS = {'public/index.html': '8aa61109207c03b1dab2743709ea2a481ceb9591', 'public/categories.html': 'b5306d7a6fcce253472a5f2fe00963ed6dfd54ff'}
+        PATCHES = {'public/index.html': [('id="shopdropHomeCategoryLink197a" href="./categories.html#cats"', 'id="shopdropHomeCategoryLink197a" href="./categories.html?entry=categories&amp;v=198b#shopdropCategoryList198b"')], 'public/categories.html': [('.cats{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px}\n.cat{padding:11px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;text-align:left;cursor:pointer}\n.subcats{display:none;padding:8px 4px 2px 14px}\n.cat.open .subcats{display:block}\n.subcat{display:block;width:100%;border:0;border-top:1px solid #e2e8f0;background:#fff;text-align:left;padding:10px 4px;cursor:pointer;color:#334155}', "/* Fix 198B: simple, full-width alphabetical list, matching menu terminology. */\n#shopdropCategoryList198b{scroll-margin-top:12px}\n.cats{display:block}\n.cat{padding:0;border:0;border-bottom:1px solid #e2e8f0;background:#fff;text-align:left}\n.cat>button{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:12px 4px;border:0;background:#fff;color:#17202a;font:inherit;text-align:left;cursor:pointer}\n.cat>button b{flex:1;font-weight:600;overflow-wrap:anywhere}\n.cat>button::after{content:'\\25B8';font-size:17px;color:#0f766e}\n.cat.open>button{color:#0f766e;background:#ecfdf5}\n.cat.open>button::after{content:'\\25BE'}\n.cat>button:focus-visible,.subcat:focus-visible{outline:2px solid #0f766e;outline-offset:-2px}\n.subcats{display:none;padding:2px 4px 6px 14px}\n.cat.open .subcats{display:block}\n.subcat{display:block;width:100%;min-height:44px;border:0;border-top:1px solid #e2e8f0;background:#fff;text-align:left;padding:10px 4px;cursor:pointer;color:#334155;font:inherit;overflow-wrap:anywhere}"), ('<h2>Browse categories A–Z</h2>\n<div id="cats" class="cats"></div>\n<p id="result" class="muted"></p>\n</section>\n</main>\n<script src="./common.js"></script>', '</section>\n<section class="panel" id="shopdropCategoryList198b" aria-labelledby="shopdropCategoryHeading198b">\n<h2 id="shopdropCategoryHeading198b">Browse categories A–Z</h2>\n<div id="cats" class="cats"></div>\n<p id="result" class="muted"></p>\n</section>\n</main>\n<script>\n/* Fix 198B: category entry starts with categories, before asynchronous adverts.\n   No history changes, timers, or forced scroll when opening other browse routes. */\n(function(){\n const params=new URLSearchParams(location.search);\n if(params.get(\'entry\')!==\'categories\'&&location.hash!==\'#cats\')return;\n const panel=document.getElementById(\'shopdropCategoryList198b\');\n const main=document.querySelector(\'main\');\n if(panel&&main&&panel.parentElement===main)main.prepend(panel);\n})();\n</script>\n<script src="./common.js"></script>'), ("  const response=await fetch('./taxonomy.json',{cache:'no-store'});", "  const response=await fetch('./taxonomy.json?v=198a',{cache:'no-store'});"), ('  browseTax198a=taxonomy;', "  if(!Array.isArray(taxonomy.publicDepartments)||!taxonomy.publicDepartments.length)throw Error('Updated categories unavailable. Refresh and try again.');\n  browseTax198a=taxonomy;"), ('     <b>${ShopDrop.esc(d.name)}</b><br>\n     <span class="muted">${d.subcategories.length} subcategories</span><br>\n     <span class="hint">Tap to view subcategories</span>', '     <b>${ShopDrop.esc(d.name)}</b>'), ("  window.location.assign('./category-results.html?'+query.toString());", "  window.location.assign('./category-results.html?v=198a&'+query.toString());")]}
+        BACKUP=Path('backups/fix198b')
+        def blob(b):return hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()
+        def revise(name,raw):
+            src=raw.decode('utf-8'); updated=src
+            for old,new in PATCHES[name]:
+                if updated.count(old)!=1:raise SystemExit('Unexpected source anchor: '+name)
+                updated=updated.replace(old,new,1)
+            restored=updated
+            for old,new in reversed(PATCHES[name]):
+                if restored.count(new)!=1:raise SystemExit('Unexpected replacement: '+name)
+                restored=restored.replace(new,old,1)
+            if restored!=src:raise SystemExit('Unapproved changes: '+name)
+            return updated.encode('utf-8')
+        def syntax(name,data):
+            for code in re.findall(r'<script\b[^>]*>([\s\S]*?)</script>',data.decode('utf-8'),re.I):
+                if code.strip():subprocess.run(['node','--check','-'],input=code.encode('utf-8'),check=True)
+        def prepare():
+            if os.environ.get('GITHUB_REF_NAME')!='shopdrop-phase6-integration':raise SystemExit('Wrong branch')
+            tax=json.loads(Path('public/taxonomy.json').read_bytes())
+            if len(tax.get('publicDepartments',[]))!=101 or sum(len(d['subcategories']) for d in tax['publicDepartments'])!=865 or len(tax.get('legacyMap',[]))!=320:raise SystemExit('Unexpected taxonomy; no files changed')
+            plan={}
+            for name,expected in SHAS.items():
+                p=Path(name); raw=p.read_bytes(); backup=BACKUP/p.name
+                if blob(raw)==expected:
+                    if backup.exists() and backup.read_bytes()!=raw:raise SystemExit('Backup collision: '+name)
+                    new=revise(name,raw); syntax(name,new);plan[name]=(raw,new)
+                elif backup.is_file() and blob(backup.read_bytes())==expected and raw==revise(name,backup.read_bytes()):
+                    syntax(name,raw)
+                else:raise SystemExit('Unexpected source version: '+name)
+            return plan
+        def main():
+            plan=prepare()
+            for name,(raw,new) in plan.items():
+                p=Path(name); backup=BACKUP/p.name; backup.parent.mkdir(parents=True,exist_ok=True)
+                if not backup.exists():backup.write_bytes(raw)
+                p.write_bytes(new)
+            print('Fix 198B: direct category entry and simple list; existing navigation and 198A taxonomy retained.')
+        if __name__=='__main__':main()
+        PYCODE
+        git diff --check
+        git config user.name "ShopDrop Integration"
+        git config user.email "actions@users.noreply.github.com"
+        git add -- public/index.html public/categories.html backups/fix198b/index.html backups/fix198b/categories.html
+        if ! git diff --cached --quiet; then
+          git commit -m "Fix 198B direct category entry and simple list"
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
