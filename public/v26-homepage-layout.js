@@ -100,7 +100,7 @@
   document.addEventListener("DOMContentLoaded", function(){
     const main=document.querySelector("main") || document.body;
 
-    const how=firstExisting(["How Shop&Drop Works"]);
+    const how=document.getElementById("help")||firstExisting(["How Shop&Drop Works"]);
     const contact=firstExisting(["Contact Shop&Drop Admin"]);
     const intro=firstExisting(["Shop&Drop"]);
 
