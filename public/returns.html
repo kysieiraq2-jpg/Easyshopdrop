@@ -286,7 +286,7 @@
 <section
  class="v263PodLink shopdrop-returns-card shopdrop-returns-links"
 >
- <a href="proof-of-delivery.html">
+ <a href="proof-of-delivery.html" id="shopdropReturnsPod199c">
   Proof of Delivery
  </a>
 </section>
@@ -306,6 +306,17 @@
  Connect dispute submission through existing Supabase adapter.
  Do not initiate payouts, refunds or payout holds here.
 */
+// Fix 199C: prefill the existing form and maintain the POD link; no dispute or upload changes.
+(function(){
+ const field=document.getElementById('orderId');
+ const link=document.getElementById('shopdropReturnsPod199c');
+ const value=new URLSearchParams(location.search).get('order');
+ if(value&&value.length<=80)field.value=value;
+ const sync=()=>{const ref=field.value.trim();link.href='./proof-of-delivery.html'+(ref&&ref.length<=80?'?order='+encodeURIComponent(ref):'');};
+ field.addEventListener('input',sync);
+ link.addEventListener('click',sync);
+ sync();
+})();
 document.getElementById('open').onclick=async()=>{
  const orderId=document.getElementById('orderId');
  const reason=document.getElementById('reason');

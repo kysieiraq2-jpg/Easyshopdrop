@@ -329,6 +329,13 @@ async function loadOrder(reference){
      }catch{}
     }
 
+    // Fix 199C: existing buyer tracking permission is not extended to sellers.
+    if(order.buyer_id===user.id){
+     const podLink199c=document.createElement('a');
+     podLink199c.textContent='View Proof of Delivery';
+     podLink199c.href='./proof-of-delivery.html?order='+encodeURIComponent(order.order_reference||order.id)+(shipment.shipment_reference?'&shipment='+encodeURIComponent(shipment.shipment_reference):'');
+     div.append(podLink199c);
+    }
     shipments.append(div);
    }
   }

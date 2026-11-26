@@ -142,10 +142,10 @@ the authorised scanner process and the buyer's six-digit PIN.
 Delivery information will appear after loading your order.
 </div>
 <div class="actions">
-<a href="./proof-of-delivery.html">
+<a href="./proof-of-delivery.html" data-shopdrop-pod-link>
 Proof of Delivery information
 </a>
-<a href="./report-listing.html">
+<a href="./returns.html" id="shopdropDeliveryProblem199c">
 Report a problem
 </a>
 </div>
@@ -560,6 +560,12 @@ function renderEvents(data){
 function renderDelivery(data){
  const target=$('deliverySummary');
  target.replaceChildren();
+ // Fix 199C: carry only the authorised order reference into existing links.
+ const podOrder199c=String(data.order_reference||data.order_id||'');
+ if(podOrder199c){
+  document.querySelectorAll('[data-shopdrop-pod-link]').forEach(a=>{a.href='./proof-of-delivery.html?order='+encodeURIComponent(podOrder199c);});
+  $('shopdropDeliveryProblem199c').href='./returns.html?order='+encodeURIComponent(podOrder199c);
+ }
 
  const shipments=Array.isArray(data.shipments)
   ?data.shipments:[];
@@ -623,6 +629,12 @@ function renderDelivery(data){
    );
   }
 
+  if(podOrder199c){
+   const podLink199c=node('a','View Proof of Delivery');
+   const shipmentRef199c=String(shipment.shipment_reference||shipment.id||'');
+   podLink199c.href='./proof-of-delivery.html?order='+encodeURIComponent(podOrder199c)+(shipmentRef199c?'&shipment='+encodeURIComponent(shipmentRef199c):'');
+   div.append(podLink199c);
+  }
   target.append(div);
  }
 }
@@ -637,6 +649,8 @@ function resetView(){
 
  $('deliverySummary').textContent=
   'Delivery information will appear after loading your order.';
+ document.querySelectorAll('[data-shopdrop-pod-link]').forEach(a=>{a.href='./proof-of-delivery.html';});
+ $('shopdropDeliveryProblem199c').href='./returns.html';
 
  const tbody=$('v263TrackingEvents');
  tbody.replaceChildren();
@@ -723,7 +737,7 @@ if(reference){
 
 <section class="v263PodLink hidden">
 <p>
-<a href="./proof-of-delivery.html">
+<a href="./proof-of-delivery.html" data-shopdrop-pod-link>
 Proof of Delivery
 </a>
 </p>
