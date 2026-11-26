@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Provider Completion | Shop&amp;Drop</title>
+<style>
+*{box-sizing:border-box}
+body{font:16px Arial,system-ui,sans-serif;line-height:1.55;margin:0;background:#f3f5f8;color:#17202a}
+header{background:#101827;padding:18px;color:white}
+header a{color:white;margin-right:18px}
+main{max-width:820px;margin:auto;padding:20px 14px 48px}
+.panel{background:white;padding:22px;border:1px solid #e2e8f0;border-radius:12px;margin:16px 0}
+h1{font-size:clamp(25px,5vw,36px)}
+h2{font-size:21px}
+.muted{color:#536477}
+label{display:block;font-weight:700;margin:14px 0 5px}
+select,input,button{font:inherit;min-height:46px;border-radius:8px}
+select,input{width:100%;padding:11px;border:1px solid #cbd5e1}
+button{padding:11px 16px;background:#0f766e;color:white;border:0;cursor:pointer;margin-top:14px}
+button:disabled{opacity:.55;cursor:default}
+a{color:#0f766e}
+.notice{border-left:4px solid #0f766e;padding-left:14px}
+.check{display:flex;align-items:flex-start;gap:10px;font-weight:400}
+.check input{min-height:auto;width:auto;flex:none;margin-top:5px}
+#status{font-weight:700;overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<header>
+<a href="./index.html">Shop&amp;Drop</a>
+<a href="./account.html">My Account</a>
+<a href="./services.html">Other Services</a>
+<a href="./dispatching.html">Dispatching</a>
+</header>
+<main>
+<h1>Confirm Completed Job</h1>
+<section class="panel">
+<p class="notice"><strong>For the assigned service or dispatch provider only.</strong> First finish the agreed work or delivery. Then ask the paying customer or authorized receiving person for the six-digit Completion PIN.</p>
+<p>The code is issued privately to the paying customer after verified payment. The customer may give it to a trusted receiving person for a distant delivery.</p>
+<p class="muted">One valid completion code per booking. Service photographs and dispatch GPS records remain optional supporting information. Do not submit a code before completing the job.</p>
+</section>
+<section class="panel">
+<h2>Submit customer completion PIN</h2>
+<p id="loginStatus" role="status" aria-live="polite">Checking your Shop&amp;Drop sign-in…</p>
+<form id="completionForm">
+<label for="bookingType">Type of completed job</label>
+<select id="bookingType" required>
+<option value="">Choose a category</option>
+<option value="service">Other Services</option>
+<option value="dispatch">Dispatching &amp; Transport</option>
+</select>
+<label for="savedBookings">My paid assigned bookings (optional)</label>
+<select id="savedBookings">
+<option value="">Select a booking or enter the ID below</option>
+</select>
+<button type="button" id="refresh">Refresh my paid bookings</button>
+<label for="bookingId">Completed booking ID</label>
+<input id="bookingId" type="text" autocomplete="off" spellcheck="false" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required>
+<label for="completionPin">Six-digit PIN received from the customer</label>
+<input id="completionPin" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{6}" maxlength="6" placeholder="Six digits" required>
+<label class="check">
+<input type="checkbox" id="workCompleted" required>
+I confirm that I am the assigned provider, that the agreed job has been completed, and that the customer or authorized receiving person supplied this code after completion.
+</label>
+<button type="submit" id="submitButton">Confirm Completed Job</button>
+</form>
+<p id="status" role="status" aria-live="polite"></p>
+<p class="muted">Successful verification records completion and prepares the payment-release request. Funds are not transferred until an approved payment provider is activated and confirms settlement.</p>
+</section>
+</main>
+<script type="module">
+import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
+const sb=createClient(
+  'https://dtkdvvxpwonywtsgqmdx.supabase.co',
+  'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q',
+  {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}
+);
+const $=id=>document.getElementById(id);
+const UUID=/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+let user=null;
+let working=false;
+function message(text){$('status').textContent=text;}
+async function loadBookings(){
+  const kind=$('bookingType').value;
+  const choices=$('savedBookings');
+  choices.replaceChildren(new Option('Select a booking or enter its ID',''));
+  if(!user||!['service','dispatch'].includes(kind))return;
+  const table=kind==='service'?'service_bookings':'dispatch_bookings';
+  const {data,error}=await sb.from(table)
+    .select('id,created_at,booking_status')
+    .eq('provider_id',user.id)
+    .eq('payment_status','paid')
+    .order('created_at',{ascending:false})
+    .limit(40);
+  if(error){
+    message('Booking list unavailable. You can enter your assigned paid booking ID manually.');
+    return;
+  }
+  for(const b of data||[]){
+    choices.append(new Option(
+      String(b.booking_status||'Paid')+' — '+b.id,b.id
+    ));
+  }
+  if(!(data||[]).length){
+    message('No paid assigned bookings listed. Enter your booking ID manually if you have one.');
+  }else{message('Choose your completed booking or enter its ID.');}
+}
+$('bookingType').addEventListener('change',loadBookings);
+$('savedBookings').addEventListener('change',()=>{
+  if($('savedBookings').value){
+    $('bookingId').value=$('savedBookings').value;
+  }
+});
+$('refresh').addEventListener('click',loadBookings);
+$('completionForm').addEventListener('submit',async event=>{
+  event.preventDefault();
+  if(working)return;
+  const kind=$('bookingType').value;
+  const id=$('bookingId').value.trim().toLowerCase();
+  const pin=$('completionPin').value.trim();
+  if(!user||!['service','dispatch'].includes(kind)||
+    !UUID.test(id)||!/^[0-9]{6}$/.test(pin)||
+    !$('workCompleted').checked){
+    message('Sign in, select a valid booking, enter the six-digit PIN and confirm that the job is finished.');
+    return;
+  }
+  working=true;
+  $('submitButton').disabled=true;
+  message('Checking your customer completion PIN…');
+  try{
+    const {data:auth,error:authError}=await sb.auth.getUser();
+    if(authError||!auth.user||auth.user.id!==user.id){
+      throw new Error('sign_in_required');
+    }
+    const {data,error}=await sb.functions.invoke(
+      'confirm-provider-completion-pin',
+      {body:{
+        booking_type:kind,
+        booking_id:id,
+        completion_pin:pin,
+        work_completed:true
+      }}
+    );
+    if(error||data?.verified!==true){
+      throw new Error('completion_not_accepted');
+    }
+    message(
+      'Completion verified. Your provider-held payment release request is prepared. The payment provider must be approved and activated before funds can be transferred.'
+    );
+    $('workCompleted').checked=false;
+  }catch{
+    message('Completion was not confirmed. Check your assigned paid booking, customer PIN and completion status. Contact Shop&Drop support if the issue continues.');
+  }finally{
+    $('completionPin').value='';
+    $('submitButton').disabled=false;
+    working=false;
+  }
+});
+try{
+  const {data,error}=await sb.auth.getUser();
+  if(error||!data.user)throw new Error('not_signed_in');
+  user=data.user;
+  $('loginStatus').textContent='Signed in. Select your paid job below.';
+  const params=new URLSearchParams(location.search);
+  const type=params.get('booking_type');
+  const id=params.get('booking_id');
+  if(type==='service'||type==='dispatch')$('bookingType').value=type;
+  if(id&&UUID.test(id))$('bookingId').value=id.toLowerCase();
+  await loadBookings();
+}catch{
+  $('loginStatus').replaceChildren();
+  $('loginStatus').append('Please sign in before confirming completed work. ');
+  const a=document.createElement('a');
+  a.href='./sign-in.html';
+  a.textContent='Sign in';
+  $('loginStatus').append(a);
+  $('submitButton').disabled=true;
+}
+</script>
+</body>
+</html>

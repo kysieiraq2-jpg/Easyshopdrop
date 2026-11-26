@@ -1,0 +1,797 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Categories & Search | Shop&Drop</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font:16px Arial;background:#f4f6f8;color:#17202a}
+header{background:#101827;padding:16px}
+header a{color:#fff;margin-right:16px}
+main{max-width:1100px;margin:auto;padding:18px}
+.panel{background:#fff;border-radius:12px;padding:20px;margin:14px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
+.card{display:block;border:1px solid #dbe3ea;border-radius:10px;padding:14px;background:#fff;color:#17202a;text-decoration:none}
+.card button{width:100%;text-align:left;border:0;background:none;font:inherit;cursor:pointer}
+.muted{color:#64748b}
+.notice{background:#fff7ed;border:1px solid #fed7aa}
+.search{display:flex;gap:8px}
+.search input{flex:1;padding:11px}
+.btn{background:#0f766e;color:#fff;border:0;border-radius:8px;padding:11px 14px;cursor:pointer;display:inline-block;max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.4;text-align:center;text-decoration:none}
+/* Fix 198B: simple, full-width alphabetical list, matching menu terminology. */
+#shopdropCategoryList198b{scroll-margin-top:12px}
+.cats{display:block}
+.cat{padding:0;border:0;border-bottom:1px solid #e2e8f0;background:#fff;text-align:left}
+.cat>button{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:12px 4px;border:0;background:#fff;color:#17202a;font:inherit;text-align:left;cursor:pointer}
+.cat>button b{flex:1;font-weight:600;overflow-wrap:anywhere}
+.cat>button::after{content:'\25B8';font-size:17px;color:#0f766e}
+.cat.open>button{color:#0f766e;background:#ecfdf5}
+.cat.open>button::after{content:'\25BE'}
+.cat>button:focus-visible,.subcat:focus-visible{outline:2px solid #0f766e;outline-offset:-2px}
+.subcats{display:none;padding:2px 4px 6px 14px}
+.cat.open .subcats{display:block}
+.subcat{display:block;width:100%;min-height:44px;border:0;border-top:1px solid #e2e8f0;background:#fff;text-align:left;padding:10px 4px;cursor:pointer;color:#334155;font:inherit;overflow-wrap:anywhere}
+.subcat.selected{background:#ecfdf5;font-weight:700;outline:2px solid #0f766e;outline-offset:-2px}
+.hint{font-size:14px;color:#64748b}
+select,input,button{max-width:100%;box-sizing:border-box}
+#buyerCountry,#locationScope{width:100%;padding:10px;margin:4px 0;border:1px solid #cbd5e1;border-radius:8px}
+#shopdropPublicProductResults{margin-top:14px}
+#shopdropPublicProductResults .card{min-height:140px}
+#shopdropPublicProductResults h3{margin:0 0 8px}
+#shopdropPublicProductResults strong{display:block;margin-top:10px;color:#0f766e;font-size:20px}
+
+/* Product photographs — additive browsing enhancement */
+.shopdrop-product-image{
+ display:block;
+ width:100%;
+ height:190px;
+ object-fit:contain;
+ background:#f1f5f9;
+ border-radius:8px;
+ margin-bottom:12px;
+}
+.shopdrop-product-image-placeholder{
+ display:flex;
+ width:100%;
+ height:190px;
+ align-items:center;
+ justify-content:center;
+ text-align:center;
+ background:#f1f5f9;
+ border-radius:8px;
+ margin-bottom:12px;
+ color:#64748b;
+ font-size:14px;
+ padding:12px;
+}
+@media(max-width:650px){
+.search{display:block}
+.search input,.search button{width:100%;margin:4px 0}
+.shopdrop-product-image,
+.shopdrop-product-image-placeholder{height:175px}
+}
+</style>
+<link rel="stylesheet" href="./shopdrop-unified-cards.css?v=59">
+<link rel="stylesheet" href="./shopdrop-category-search-198d.css?v=198d">
+<script defer src="./shopdrop-category-search-198d.js?v=198d"></script>
+</head>
+<body>
+<header>
+<a href="./index.html">Shop&Drop</a>
+<a href="./checkout.html">Bag</a>
+<a href="./account.html">Account</a>
+</header>
+<main>
+<section class="panel notice">
+<b>Browse Shop&Drop:</b> Explore available advertisements without registering. Registration is FREE when you are ready to buy, book or advertise.
+</section>
+<section class="panel">
+<h1>Categories & Search</h1>
+<section class="panel">
+<h2>Where do you want to shop?</h2>
+<select id="buyerCountry"></select>
+<select id="locationScope">
+<option value="my">South Africa</option>
+</select>
+<p id="currencyHint" class="muted"></p>
+<p class="muted">Shop&Drop currently operates in South Africa. International marketplace functionality is reserved for future expansion.</p>
+</section>
+<div class="search">
+<input id="q" placeholder="Search Shop&Drop products">
+<button class="btn" id="go" type="button">Search Products</button>
+</div>
+<p id="msg" class="muted" role="status" aria-live="polite"></p>
+</section>
+<section class="panel">
+<h2>What are you looking for?</h2>
+<div class="grid">
+<a class="card" href="./categories.html#browse-all-items"><b>BROWSE ALL ITEMS</b><p>Explore all available products with photographs, across every category.</p></a>
+<a class="card" href="./categories.html?view=new"><b>New Products</b><p>Browse new products across Shop&Drop departments.</p></a>
+<a class="card" href="./categories.html?view=preowned"><b>Second-Hand & Pre-Owned</b><p>Used, like-new and refurbished products across the same catalogue.</p></a>
+<a class="card" href="./services.html"><b>Other Services</b><p>Independent service providers who list on Shop&Drop for FREE.</p></a>
+<a class="card" href="./dispatching.html"><b>Transport Services &amp; Equipment Hire</b><p>Dedicated transport and dispatch requests.</p></a>
+</div>
+</section>
+<section class="panel" id="browse-all-items">
+<h2>Available advertisements</h2>
+<p id="shopdropCurrentSelection" class="muted" aria-live="polite"></p>
+<div id="shopdropPublicProductResults" class="grid" aria-live="polite"></div>
+<button id="shopdropLoadMore" class="btn" type="button" hidden>Load more products</button>
+<div id="shopdropCombinedServicesPanel"
+style="margin-top:24px">
+<h2>Other Services advertisements</h2>
+<p id="shopdropCombinedServicesStatus"
+   class="muted" aria-live="polite">
+Loading approved services...
+</p>
+<div id="shopdropCombinedServices"
+     class="grid" aria-live="polite"></div>
+<p>
+<a class="btn" href="./services.html">
+Browse all Other Services
+</a>
+</p>
+</div>
+<div id="shopdropVehicleBrowsePanel"
+style="margin-top:24px">
+<h2>Transport Services &amp; Equipment Hire advertisements</h2>
+<p id="shopdropVehicleBrowseStatus"
+   class="muted" aria-live="polite">
+Loading vehicle advertisements...
+</p>
+<div id="shopdropVehicleBrowseResults"
+     class="grid" aria-live="polite"></div>
+<p><a class="btn" href="./dispatching.html">
+Browse Transport Services &amp; Equipment Hire
+</a></p>
+</div>
+</section>
+<section class="panel" id="shopdropCategoryList198b" aria-labelledby="shopdropCategoryHeading198b">
+<h2 id="shopdropCategoryHeading198b">Browse categories A–Z</h2>
+<div class="shopdrop-category-search198d">
+  <label for="shopdropPageCategory198dInput">Find a category</label>
+  <div class="shopdrop-category-search-row198d">
+    <input type="search" id="shopdropPageCategory198dInput" placeholder="Type a category name…" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="100" enterkeyhint="done" aria-controls="cats" aria-describedby="shopdropPageCategory198dStatus">
+    <button type="button" id="shopdropPageCategory198dClear" hidden>Clear</button>
+  </div>
+  <p id="shopdropPageCategory198dStatus" role="status" aria-live="polite"></p>
+</div>
+<div id="cats" class="cats"></div>
+<p id="result" class="muted"></p>
+</section>
+</main>
+<script>
+/* Fix 198B: category entry starts with categories, before asynchronous adverts.
+   No history changes, timers, or forced scroll when opening other browse routes. */
+(function(){
+ const params=new URLSearchParams(location.search);
+ if(params.get('entry')!=='categories'&&location.hash!=='#cats')return;
+ const panel=document.getElementById('shopdropCategoryList198b');
+ const main=document.querySelector('main');
+ if(panel&&main&&panel.parentElement===main)main.prepend(panel);
+})();
+</script>
+<script src="./common.js"></script>
+<script src="./v26-consolidated.js?v=198a"></script>
+<script src="./geo.js"></script>
+<script src="./shopdrop-category-198a.js?v=198a"></script>
+<script>
+const SHOPDROP_PUBLIC_PRODUCTS_ENDPOINT =
+ 'https://dtkdvvxpwonywtsgqmdx.supabase.co/rest/v1/products';
+const SHOPDROP_PUBLIC_PRODUCTS_KEY =
+ 'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';
+
+const SHOPDROP_PUBLIC_IMAGES_ENDPOINT =
+ 'https://dtkdvvxpwonywtsgqmdx.supabase.co/rest/v1/listing_images';
+const SHOPDROP_PUBLIC_STORAGE_URL =
+ 'https://dtkdvvxpwonywtsgqmdx.supabase.co/storage/v1/object/public/';
+
+const browseResults=document.getElementById('shopdropPublicProductResults');
+const browseMore=document.getElementById('shopdropLoadMore');
+const browseMessage=document.getElementById('msg');
+const browseCategoryMessage=document.getElementById('result');
+const browseQuery=document.getElementById('q');
+const browseCategories=document.getElementById('cats');
+const browseView=new URLSearchParams(location.search).get('view')||'';
+let browseFilters={view:browseView};
+let browseTax198a=null;
+let browseOffset=0;
+let browseRequest=0;
+const browsePageSize=24;
+
+function browsePrice(value,currency){
+ const amount=Number(value);
+ if(!Number.isFinite(amount))return 'Price unavailable';
+ const code=/^[A-Z]{3}$/.test(String(currency||''))?currency:'ZAR';
+ try{
+  return new Intl.NumberFormat('en-ZA',{
+   style:'currency',currency:code
+  }).format(amount);
+ }catch(e){
+  return 'R '+amount.toFixed(2);
+ }
+}
+
+// Build public image URLs from trusted storage metadata.
+// Never display private collection addresses.
+function browseImageUrl(image){
+ if(!image||image.storage_bucket!=='listing-images')return null;
+ const path=String(image.storage_path||'');
+ if(!path||path.startsWith('/')||path.split('/').includes('..'))return null;
+ return SHOPDROP_PUBLIC_STORAGE_URL+
+  encodeURIComponent(image.storage_bucket)+'/'+
+  path.split('/').map(encodeURIComponent).join('/');
+}
+
+// Retrieve the primary image for products on the current page.
+// Image failure does not prevent the product listing from appearing.
+async function browseProductImages(products){
+ const images=new Map();
+ const ids=products.map(p=>p.id).filter(id=>
+  /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(String(id))
+ );
+ if(!ids.length)return images;
+
+ const params=new URLSearchParams({
+  select:'product_id,storage_bucket,storage_path,is_primary,image_position',
+  product_id:'in.('+ids.join(',')+')',
+  order:'image_position.asc'
+ });
+
+ try{
+  const response=await fetch(
+   SHOPDROP_PUBLIC_IMAGES_ENDPOINT+'?'+params.toString(),
+   {headers:{
+    apikey:SHOPDROP_PUBLIC_PRODUCTS_KEY,
+    Accept:'application/json'
+   }}
+  );
+  if(!response.ok)return images;
+
+  const rows=await response.json();
+  if(!Array.isArray(rows))return images;
+
+  for(const image of rows){
+   const url=browseImageUrl(image);
+   if(!url)continue;
+   const existing=images.get(image.product_id);
+   if(!existing||(!existing.is_primary&&image.is_primary)){
+    images.set(image.product_id,{
+     url,
+     is_primary:image.is_primary===true
+    });
+   }
+  }
+ }catch(error){
+  console.warn('Product photographs unavailable:',error);
+ }
+ return images;
+}
+
+function browseCard(p,imageInfo){
+ const card=document.createElement('a');
+ card.className='card';
+ card.href='./product.html?id='+encodeURIComponent(p.id);
+
+ // Display the primary photograph before the product title.
+ const placeholder=document.createElement('div');
+ placeholder.className='shopdrop-product-image-placeholder';
+ placeholder.textContent='Photograph unavailable';
+
+ if(imageInfo?.url){
+  const image=document.createElement('img');
+  image.className='shopdrop-product-image';
+  image.alt='Photograph of '+(p.title||'product');
+  image.loading='lazy';
+  image.decoding='async';
+  image.referrerPolicy='no-referrer';
+  image.onerror=()=>{
+   if(image.isConnected)image.replaceWith(placeholder);
+  };
+  image.src=imageInfo.url;
+  card.appendChild(image);
+ }else{
+  card.appendChild(placeholder);
+ }
+
+ const heading=document.createElement('h3');
+ heading.textContent=p.title||'Product';
+
+ const info=document.createElement('p');
+ info.className='muted';
+ info.textContent=[
+  ...ShopDropCategory198a.label(browseTax198a,p.category,p.subcategory),p.condition,p.location
+ ].filter(Boolean).join(' · ');
+
+ const price=document.createElement('strong');
+ price.textContent=browsePrice(p.price,p.currency);
+
+ const detail=document.createElement('p');
+ detail.textContent='View advertisement details';
+
+ card.append(heading,info,price,detail);
+ return card;
+}
+
+async function browsePublicProducts(filters={},append=false){
+ const request=++browseRequest;
+ if(!append){
+  browseFilters={...filters};
+  browseOffset=0;
+  browseResults.replaceChildren();
+ }
+ browseMore.hidden=true;
+ const selections=[browseFilters.category,browseFilters.subcategory].filter(Boolean);
+ if(browseFilters.view==='new')selections.push('New Products');
+ if(browseFilters.view==='preowned')selections.push('Second-Hand & Pre-Owned');
+ document.getElementById('shopdropCurrentSelection').textContent=
+   selections.length?'Showing: '+selections.join(' → '):'Showing all available products';
+ browseMessage.textContent='Loading available advertisements…';
+
+ const params=new URLSearchParams({
+  select:'id,title,category,subcategory,condition,price,currency,location',
+  listing_status:'eq.active',
+  quantity:'gt.0',
+  country_code:'eq.ZA',
+  order:'created_at.desc',
+  limit:String(browsePageSize),
+  offset:String(browseOffset)
+ });
+
+ if(browseFilters.category)ShopDropCategory198a.applyCategory(params,browseTax198a,browseFilters.category,browseFilters.subcategory);
+ if(browseFilters.view==='new'){
+  params.set('condition','ilike.new');
+ }
+ if(browseFilters.view==='preowned'){
+  params.set('condition','not.ilike.new');
+ }
+ if(browseFilters.term)ShopDropCategory198a.applySearch(params,browseFilters.term);
+
+ try{
+  const response=await fetch(
+   SHOPDROP_PUBLIC_PRODUCTS_ENDPOINT+'?'+params.toString(),
+   {headers:{
+    apikey:SHOPDROP_PUBLIC_PRODUCTS_KEY,
+    Accept:'application/json'
+   }}
+  );
+  if(!response.ok){
+   throw Error('Public product listings are temporarily unavailable.');
+  }
+  const rows=await response.json();
+  if(request!==browseRequest)return;
+  if(!Array.isArray(rows))throw Error('Invalid catalogue response.');
+
+  const images=await browseProductImages(rows);
+  if(request!==browseRequest)return;
+
+  rows.forEach(p=>{
+   browseResults.appendChild(
+    browseCard(p,images.get(p.id))
+   );
+  });
+  browseOffset+=rows.length;
+
+  browseMessage.textContent=
+   browseOffset+' available advertisement(s) displayed.';
+
+  if(!browseOffset){
+   browseResults.textContent=
+    'No available advertisements match this selection yet.';
+  }
+  browseMore.hidden=rows.length<browsePageSize;
+ }catch(e){
+  if(request!==browseRequest)return;
+  browseMessage.textContent=
+   e.message||'Unable to load public advertisements.';
+ }
+}
+
+// Fix 197C: a category expansion is one real browser navigation step.
+// Preserve the incoming URL, filters, browse results and subcategory destinations.
+const categoryHistoryKey197c='shopdropCategoryNavigation197c';
+const requestedCategory197c=new URLSearchParams(location.search).get('category')||'';
+let categoryBackPending197c=false;
+function categoryHistory197c(){
+ const entry=history.state?.[categoryHistoryKey197c];
+ return entry&&entry.path===location.pathname&&[0,1].includes(entry.depth)
+  ?entry:{depth:0,category:requestedCategory197c};
+}
+function categoryRender197c(scroll=false){
+ const entry=categoryHistory197c();
+ let selected=null;
+ browseCategories.querySelectorAll('.cat').forEach(box=>{
+  const open=box.dataset.name===entry.category;
+  box.classList.toggle('open',open);
+  const button=box.querySelector('button');
+  if(button)button.setAttribute('aria-expanded',String(open));
+  if(open)selected=box;
+ });
+ browseCategoryMessage.textContent=selected
+  ?selected.dataset.name+': choose a subcategory to see its advertised items.':'';
+ if(scroll&&selected)selected.scrollIntoView({behavior:'auto',block:'start'});
+}
+function categoryNavigate197c(category,depth,replace=false){
+ const next={...(history.state||{}),[categoryHistoryKey197c]:{path:location.pathname,depth,category}};
+ if(replace)history.replaceState(next,'');
+ else history.pushState(next,'');
+ categoryRender197c(true);
+}
+window.addEventListener('popstate',()=>{
+ categoryBackPending197c=false;
+ categoryRender197c();
+});
+window.addEventListener('pageshow',()=>{
+ categoryBackPending197c=false;
+ if(browseCategories.querySelector('.cat'))categoryRender197c();
+});
+
+async function loadCats(){
+ try{
+  const response=await fetch('./taxonomy.json?v=198a',{cache:'no-store'});
+  if(!response.ok)throw Error('Categories unavailable.');
+  const taxonomy=await response.json();
+  if(!Array.isArray(taxonomy.publicDepartments)||!taxonomy.publicDepartments.length)throw Error('Updated categories unavailable. Refresh and try again.');
+  browseTax198a=taxonomy;
+  const departments=[...ShopDropCategory198a.publicDepartments(taxonomy)]
+   .sort((a,b)=>a.name.localeCompare(b.name));
+
+  browseCategories.innerHTML=departments.map(d=>`
+   <div class="cat" data-name="${ShopDrop.esc(d.name)}">
+    <button type="button">
+     <b>${ShopDrop.esc(d.name)}</b>
+    </button>
+    <div class="subcats">
+     ${[...d.subcategories].sort((a,b)=>a.localeCompare(b,"en",{sensitivity:"base"})).map(sc=>`
+      <button class="subcat" type="button"
+       data-parent="${ShopDrop.esc(d.name)}"
+       data-sub="${ShopDrop.esc(sc)}">${ShopDrop.esc(sc)}</button>
+     `).join('')}
+     ${ShopDropCategory198a.related(taxonomy,d.name).map(name=>`<p><a href="./categories.html?category=${encodeURIComponent(name)}">See also: ${ShopDrop.esc(name)}</a></p>`).join('')}
+    </div>
+   </div>
+  `).join('');
+
+  document.querySelectorAll('.cat>button').forEach(button=>{
+ button.onclick=()=>{
+  const box=button.closest('.cat');
+  const entry=categoryHistory197c();
+  const name=box.dataset.name;
+  if(categoryBackPending197c)return;
+  if(entry.category===name){
+   if(entry.depth===1){categoryBackPending197c=true;history.back();}
+   else categoryNavigate197c('',0,true);
+  }else{
+   categoryNavigate197c(name,1,entry.depth===1);
+  }
+ };
+});
+
+  document.querySelectorAll('.subcat').forEach(button=>{
+ button.onclick=event=>{
+  event.preventDefault();
+  event.stopPropagation();
+  const query=new URLSearchParams({
+   category:button.dataset.parent,
+   subcategory:button.dataset.sub
+  });
+  if(browseView==='new'||browseView==='preowned'){
+   query.set('view',browseView);
+  }
+  window.location.assign('./category-results.html?v=198a&'+query.toString());
+ };
+});
+
+  categoryRender197c(true);
+  if(requestedCategory197c&&!departments.some(d=>d.name===requestedCategory197c)){
+   const old=(taxonomy.legacyDepartments||[]).find(d=>d.name===requestedCategory197c);
+   if(old){
+    browseCategoryMessage.textContent='This older category has been split into clearer categories. Your existing advertisements remain available below.';
+    await browsePublicProducts({category:requestedCategory197c,view:browseView});
+   }
+  }
+ }catch(e){
+  browseCategoryMessage.textContent='Categories could not be loaded.';
+ }
+}
+
+function search(){
+ browsePublicProducts({term:browseQuery.value.trim(),view:browseView});
+}
+document.getElementById('go').onclick=search;
+browseQuery.onkeydown=e=>{
+ if(e.key==='Enter'){
+  e.preventDefault();
+  search();
+ }
+};
+browseMore.onclick=()=>browsePublicProducts(browseFilters,true);
+
+loadCats();
+if(!new URLSearchParams(location.search).get('category')){
+ browsePublicProducts({view:browseView});
+}
+
+const country=document.getElementById('buyerCountry');
+const currencyHint=document.getElementById('currencyHint');
+country.innerHTML=ShopDropGeo.countryOptions('ZA');
+country.value='ZA';
+country.disabled=true;
+currencyHint.textContent='South African marketplace — prices shown in the listing currency.';
+</script>
+<script>
+/* Fix79: navigation only; existing product
+   retrieval and photo code remains unchanged. */
+(function(){
+  if(location.hash!=='#browse-all-items')return;
+
+  const section=document.getElementById(
+    'browse-all-items'
+  );
+  const results=document.getElementById(
+    'shopdropPublicProductResults'
+  );
+
+  if(!section||!results)return;
+
+  function jump(){
+    requestAnimationFrame(()=>{
+      requestAnimationFrame(()=>{
+        section.scrollIntoView({
+          behavior:'auto',
+          block:'start'
+        });
+      });
+    });
+  }
+
+  // Position at advertisements immediately.
+  jump();
+
+  // Reposition once the asynchronous
+  // product cards have been rendered.
+  if(results.children.length){
+    jump();
+  }else{
+    const observer=new MutationObserver(()=>{
+      if(results.children.length){
+        observer.disconnect();
+        jump();
+      }
+    });
+
+    observer.observe(results,{
+      childList:true
+    });
+  }
+
+  window.addEventListener('load',jump,{
+    once:true
+  });
+})();
+</script>
+<script src="./shopdrop-services-connector.js"></script>
+<script src="./shopdrop-combined-service-cards.js"></script>
+<script>
+/* Fix96: isolated services display.
+   Existing product browsing remains unchanged. */
+(function(){
+  const container=document.getElementById(
+    'shopdropCombinedServices'
+  );
+  const status=document.getElementById(
+    'shopdropCombinedServicesStatus'
+  );
+
+  if(!container||!status)return;
+
+  const component=window.ShopDropCombinedServiceCards;
+
+  if(!component||typeof component.render!=='function'){
+    status.textContent=
+      'Service advertisements are temporarily unavailable.';
+    return;
+  }
+
+  component.render(container)
+    .then(count=>{
+      status.textContent=count
+        ?count+' approved service advertisement(s).'
+        :'No approved service advertisements yet.';
+    })
+    .catch(()=>{
+      status.textContent=
+        'Service advertisements are temporarily unavailable.';
+    });
+})();
+</script>
+<script>
+/* Fix101: Public approved vehicle advertisements.
+   Existing products and services are unchanged. */
+(async function(){
+  const results=document.getElementById(
+    'shopdropVehicleBrowseResults'
+  );
+  const status=document.getElementById(
+    'shopdropVehicleBrowseStatus'
+  );
+  if(!results||!status)return;
+
+  try{
+    const endpoint=
+      'https://dtkdvvxpwonywtsgqmdx.supabase.co' +
+      '/rest/v1/shopdrop_public_vehicle_adverts' +
+      '?select=id,vehicle_title,vehicle_description,' +
+      'vehicle_type,base_town,base_province,' +
+      'coverage_mode,created_at' +
+      '&order=created_at.desc&limit=50';
+
+    const response=await fetch(endpoint,{
+      headers:{
+        apikey:
+          'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q',
+        Accept:'application/json'
+      }
+    });
+
+    if(!response.ok)throw Error('Request failed');
+
+    const items=await response.json();
+    if(!Array.isArray(items)){
+      throw Error('Invalid response');
+    }
+
+    const fragment=document.createDocumentFragment();
+
+    items.forEach(item=>{
+      const card=document.createElement('article');
+      card.className='result';
+
+      const type=document.createElement('small');
+      type.textContent='DISPATCHING & TRANSPORT';
+
+      const title=document.createElement('h3');
+      title.textContent=
+        item.vehicle_title||'Vehicle advertisement';
+
+      const area=document.createElement('p');
+      area.className='muted';
+      area.textContent=[
+        item.vehicle_type,
+        item.base_town,
+        item.base_province
+      ].filter(Boolean).join(' · ');
+
+      const description=document.createElement('p');
+      description.textContent=
+        item.vehicle_description||'';
+
+      const link=document.createElement('a');
+      link.className='btn';
+      link.href='./dispatching.html';
+      link.textContent='View dispatch options';
+
+      card.append(
+        type,title,area,description,link
+      );
+
+      // Fix105B: Only published vehicle photos.
+      (async()=>{
+        try{
+          const base=
+            'https://dtkdvvxpwonywtsgqmdx.supabase.co';
+          const key=
+            'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';
+
+          const query=new URLSearchParams({
+            select:
+              'photo_position,storage_bucket,storage_path',
+            vehicle_advert_id:'eq.'+item.id,
+            order:'photo_position.asc',
+            limit:'6'
+          });
+
+          const response=await fetch(
+            base+
+            '/rest/v1/shopdrop_public_vehicle_ad_photos?'+
+            query.toString(),
+            {
+              headers:{
+                apikey:key,
+                Accept:'application/json'
+              }
+            }
+          );
+
+          if(!response.ok)return;
+
+          const photos=await response.json();
+          if(!Array.isArray(photos))return;
+
+          const gallery=document.createElement('div');
+          gallery.className='shopdropVehiclePhotoGallery';
+          gallery.style.cssText=
+            'display:flex;gap:8px;overflow-x:auto;'+
+            'margin:12px 0;';
+
+          for(const photo of photos.slice(0,6)){
+            if(
+              photo.storage_bucket!==
+                'shopdrop-vehicle-ad-gallery'||
+              !photo.storage_path
+            )continue;
+
+            const path=photo.storage_path
+              .split('/')
+              .map(encodeURIComponent)
+              .join('/');
+
+            const signed=await fetch(
+              base+
+              '/storage/v1/object/sign/'+
+              'shopdrop-vehicle-ad-gallery/'+path,
+              {
+                method:'POST',
+                headers:{
+                  apikey:key,
+                  'Content-Type':'application/json'
+                },
+                body:JSON.stringify({
+                  expiresIn:3600
+                })
+              }
+            );
+
+            if(!signed.ok)continue;
+
+            const data=await signed.json();
+            if(!data.signedURL)continue;
+
+            const imageURL=new URL(
+              data.signedURL,base
+            );
+
+            if(imageURL.origin!==base)continue;
+
+            const img=document.createElement('img');
+            img.src=imageURL.href;
+            img.alt='Vehicle advertisement photograph';
+            img.loading='lazy';
+            img.style.cssText=
+              'width:150px;height:120px;'+
+              'object-fit:cover;border-radius:8px;'+
+              'flex-shrink:0;';
+
+            gallery.append(img);
+          }
+
+          if(gallery.childElementCount){
+            card.insertBefore(gallery,area);
+          }
+        }catch(_){
+          // Existing cards remain functional.
+        }
+      })();
+
+      fragment.append(card);
+    });
+
+    results.replaceChildren(fragment);
+    status.textContent=items.length
+      ?items.length+' vehicle advertisement(s) available.'
+      :'No vehicle advertisements yet.';
+
+  }catch(_){
+    status.textContent=
+      'Vehicle advertisements temporarily unavailable.';
+  }
+})();
+</script>
+<script src="v26-bridge.js"></script>
+
+<script defer src="shopdrop-buyer-language.js"></script>
+<script defer src="./shopdrop-public-advertiser-ui.js?v=59"></script>
+</body>
+</html>
