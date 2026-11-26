@@ -20,11 +20,19 @@ main{max-width:1100px;margin:auto;padding:18px}
 .search{display:flex;gap:8px}
 .search input{flex:1;padding:11px}
 .btn{background:#0f766e;color:#fff;border:0;border-radius:8px;padding:11px 14px;cursor:pointer;display:inline-block;max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.4;text-align:center;text-decoration:none}
-.cats{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px}
-.cat{padding:11px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;text-align:left;cursor:pointer}
-.subcats{display:none;padding:8px 4px 2px 14px}
+/* Fix 198B: simple, full-width alphabetical list, matching menu terminology. */
+#shopdropCategoryList198b{scroll-margin-top:12px}
+.cats{display:block}
+.cat{padding:0;border:0;border-bottom:1px solid #e2e8f0;background:#fff;text-align:left}
+.cat>button{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:12px 4px;border:0;background:#fff;color:#17202a;font:inherit;text-align:left;cursor:pointer}
+.cat>button b{flex:1;font-weight:600;overflow-wrap:anywhere}
+.cat>button::after{content:'\25B8';font-size:17px;color:#0f766e}
+.cat.open>button{color:#0f766e;background:#ecfdf5}
+.cat.open>button::after{content:'\25BE'}
+.cat>button:focus-visible,.subcat:focus-visible{outline:2px solid #0f766e;outline-offset:-2px}
+.subcats{display:none;padding:2px 4px 6px 14px}
 .cat.open .subcats{display:block}
-.subcat{display:block;width:100%;border:0;border-top:1px solid #e2e8f0;background:#fff;text-align:left;padding:10px 4px;cursor:pointer;color:#334155}
+.subcat{display:block;width:100%;min-height:44px;border:0;border-top:1px solid #e2e8f0;background:#fff;text-align:left;padding:10px 4px;cursor:pointer;color:#334155;font:inherit;overflow-wrap:anywhere}
 .subcat.selected{background:#ecfdf5;font-weight:700;outline:2px solid #0f766e;outline-offset:-2px}
 .hint{font-size:14px;color:#64748b}
 select,input,button{max-width:100%;box-sizing:border-box}
@@ -137,11 +145,24 @@ Loading vehicle advertisements...
 Browse Transport Services &amp; Equipment Hire
 </a></p>
 </div>
-<h2>Browse categories A–Z</h2>
+</section>
+<section class="panel" id="shopdropCategoryList198b" aria-labelledby="shopdropCategoryHeading198b">
+<h2 id="shopdropCategoryHeading198b">Browse categories A–Z</h2>
 <div id="cats" class="cats"></div>
 <p id="result" class="muted"></p>
 </section>
 </main>
+<script>
+/* Fix 198B: category entry starts with categories, before asynchronous adverts.
+   No history changes, timers, or forced scroll when opening other browse routes. */
+(function(){
+ const params=new URLSearchParams(location.search);
+ if(params.get('entry')!=='categories'&&location.hash!=='#cats')return;
+ const panel=document.getElementById('shopdropCategoryList198b');
+ const main=document.querySelector('main');
+ if(panel&&main&&panel.parentElement===main)main.prepend(panel);
+})();
+</script>
 <script src="./common.js"></script>
 <script src="./v26-consolidated.js?v=198a"></script>
 <script src="./geo.js"></script>
@@ -399,9 +420,10 @@ window.addEventListener('pageshow',()=>{
 
 async function loadCats(){
  try{
-  const response=await fetch('./taxonomy.json',{cache:'no-store'});
+  const response=await fetch('./taxonomy.json?v=198a',{cache:'no-store'});
   if(!response.ok)throw Error('Categories unavailable.');
   const taxonomy=await response.json();
+  if(!Array.isArray(taxonomy.publicDepartments)||!taxonomy.publicDepartments.length)throw Error('Updated categories unavailable. Refresh and try again.');
   browseTax198a=taxonomy;
   const departments=[...ShopDropCategory198a.publicDepartments(taxonomy)]
    .sort((a,b)=>a.name.localeCompare(b.name));
@@ -409,9 +431,7 @@ async function loadCats(){
   browseCategories.innerHTML=departments.map(d=>`
    <div class="cat" data-name="${ShopDrop.esc(d.name)}">
     <button type="button">
-     <b>${ShopDrop.esc(d.name)}</b><br>
-     <span class="muted">${d.subcategories.length} subcategories</span><br>
-     <span class="hint">Tap to view subcategories</span>
+     <b>${ShopDrop.esc(d.name)}</b>
     </button>
     <div class="subcats">
      ${[...d.subcategories].sort((a,b)=>a.localeCompare(b,"en",{sensitivity:"base"})).map(sc=>`
@@ -450,7 +470,7 @@ async function loadCats(){
   if(browseView==='new'||browseView==='preowned'){
    query.set('view',browseView);
   }
-  window.location.assign('./category-results.html?'+query.toString());
+  window.location.assign('./category-results.html?v=198a&'+query.toString());
  };
 });
 
