@@ -89,6 +89,8 @@
       if(provider)actions.append(link('Optional completion photographs','./shopdrop-service-completion.html?booking_id='+encodeURIComponent(row.booking_id)));
     }
     if(row.booking_status==='completed'&&row.payment_status==='paid')actions.append(link('View completion and payment release','./service-completion-status-193g.html?booking_type=service&booking_id='+encodeURIComponent(row.booking_id)));
+    card.append(el('p','Booking reference: '+row.booking_id));
+    if(!inactive&&!['arrival_verified','completed'].includes(row.booking_status))actions.append(link('Request Cancellation','./cancellations.html?kind=service&reference='+encodeURIComponent(row.booking_id)));
     card.append(actions,feedback);list.append(card);
   }
   async function load(notice=''){

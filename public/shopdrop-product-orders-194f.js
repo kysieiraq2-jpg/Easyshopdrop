@@ -36,6 +36,7 @@
   if(items.error)a.append(el('p','Item details unavailable. Open order details to retry.'));
   else {const rows=items.data.filter(r=>r.order_id===o.id);if(rows.length){const ul=el('ul');for(const r of rows)ul.append(el('li',String(r.product_name||'Product')+' × '+String(r.quantity??'?')));a.append(ul);}else a.append(el('p','No item details returned.'));}
   a.append(link('View Order Details','./order.html?id='+encodeURIComponent(o.id)));
+  if(!['cancelled','canceled','refunded','completed','delivered','disputed','expired','failed'].includes(String(o.order_status||'').toLowerCase())&&!['delivered','dispatched','shipped','in_transit','collected','picked_up'].includes(String(o.fulfilment_status||'').toLowerCase()))a.append(link('Request Cancellation','./cancellations.html?kind=product&reference='+encodeURIComponent(o.order_reference||o.id)));
   if(kind==='buyer'&&o.order_reference)a.append(link('Track My Order','./tracking.html?order='+encodeURIComponent(o.order_reference)));
   if(kind==='seller'){
    if(shipments.error)a.append(el('p','Shipment details unavailable. Check the existing collection form.'));

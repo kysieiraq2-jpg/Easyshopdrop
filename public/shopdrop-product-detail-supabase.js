@@ -184,6 +184,9 @@
         return;
       }
 
+      // Fix 199B: report the exact loaded public item, without changing purchase controls.
+      const reportLink199b=document.querySelector('.v26ReportListing a');
+      if(reportLink199b)reportLink199b.href='./report-listing.html?kind=product&reference='+encodeURIComponent(p.listing_reference||p.id);
       const title=document.createElement('h1');
       title.textContent=p.title||'Product';
 

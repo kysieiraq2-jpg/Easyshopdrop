@@ -184,6 +184,7 @@
     if(row.booking_id&&row.payment_status==='paid'&&['confirmed','arrival_pending','arrival_verified','completed'].includes(row.booking_status)){
       actions.append(link(provider?'Confirm completion and view payment release':'My Completion PIN and payment release','./service-completion-status-193g.html?booking_type=dispatch&booking_id='+encodeURIComponent(row.booking_id)));
     }
+    if(row.booking_id&&['pending_payment','confirmed'].includes(row.booking_status))actions.append(link('Request Cancellation','./cancellations.html?kind=transport&reference='+encodeURIComponent(row.booking_id)));
     card.append(actions,msg);list.append(card);
   }
   async function load(notice=''){

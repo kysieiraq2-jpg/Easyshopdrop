@@ -858,6 +858,9 @@
           status
         );
 
+        if(typeof offer.offer_id==='string'&&/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(offer.offer_id)){
+          const report199b=document.createElement('a');report199b.href='./report-listing.html?kind=dispatch_offer&reference='+encodeURIComponent(offer.offer_id);report199b.textContent='Report this Offer';card.append(report199b);
+        }
         offerGrid.append(card);
 
         // Add rates without replacing the

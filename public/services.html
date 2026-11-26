@@ -439,6 +439,10 @@ function render(list,term=''){
     updateTotal();
   }
 
+  // Fix 199B: report this specific service advertisement.
+  if(typeof x.id==='string'&&/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(x.id)){
+   const report199b=document.createElement('a');report199b.href='./report-listing.html?kind=service&reference='+encodeURIComponent(x.id);report199b.textContent='Report this Listing';el.append(report199b);
+  }
   serviceResults.append(el);
  });
 }
@@ -613,7 +617,7 @@ search('');
 
 <section class="v26ReportListing">
 <!-- V26_LIVE_REPORT_LISTING -->
-<p><a href="report-listing.html">Report Listing</a></p>
+<p><a href="report-listing.html?kind=service">Report Listing</a></p>
 </section>
 
 <script defer src="shopdrop-info-language.js"></script>

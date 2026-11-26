@@ -164,6 +164,9 @@
 
       }
     details.append(node('p','Advertisement reference: '+advert.id,'muted'));
+    if(typeof advert.id==='string'&&/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(advert.id)){
+      const report199b=node('a','Report this Listing','btn');report199b.href='./report-listing.html?kind=transport&reference='+encodeURIComponent(advert.id);details.append(report199b);
+    }
     card.append(details);
     results.append(card);
   }

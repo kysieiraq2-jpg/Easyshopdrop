@@ -1,7 +1,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const VERSION = "SHOPDROP-R7-CANCELLATIONS-V2";
+const VERSION = "SHOPDROP-R7-CANCELLATIONS-V3-199B";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY =
@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
     error: authError,
   } = await db.auth.getUser(token);
 
-  if (authError || !user) {
+  if (authError || !user || user.is_anonymous === true) {
     return reply(
       { ok: false, error: "invalid_authentication" },
       401,
@@ -89,6 +89,7 @@ Deno.serve(async (req) => {
 
   try {
     input = await req.json();
+    if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Invalid JSON object");
   } catch {
     return reply(
       { ok: false, error: "invalid_json" },
@@ -140,75 +141,22 @@ Deno.serve(async (req) => {
     );
   }
 
-  /*
-   * Cancellation request reference is generated
-   * server-side. It does not alter the original
-   * SD-ORD / SD-PAY transaction references.
-   */
-
-  const cancellationReference =
-    `SD-CAN-${crypto.randomUUID()}`;
-
-  const payload = {
-    user_id: user.id,
-
-    cancellation_reference:
-      cancellationReference,
-
-    order_id:
-      orderId || null,
-
-    transaction_reference:
-      transactionReference || null,
-
-    reason,
-
-    details:
-      details || null,
-
-    requested_at:
-      new Date().toISOString(),
-  };
-
-  /*
-   * This records the REQUEST only.
-   *
-   * It does not directly cancel a paid order,
-   * issue a refund, alter inventory or release funds.
-   * Those financial/state transitions remain protected
-   * backend operations.
-   */
-
-  const { error: insertError } =
-    await db
-      .from("integration_events")
-      .insert({
-        event_type: "cancellation_requested",
-        external_reference: cancellationReference,
-        payload,
-        status: "received",
-      });
-
-  if (insertError) {
-    console.error(
-      VERSION,
-      "cancellation storage failed",
-      insertError,
-    );
-
-    return reply(
-      {
-        ok: false,
-        error: "cancellation_storage_failed",
-      },
-      500,
-    );
-  }
-
-  return reply({
-    ok: true,
-    reference: cancellationReference,
-    status: "submitted",
+  // Fix 199B: existing authenticated caller, owned transaction, atomic request only.
+  const { data, error } = await db.rpc("shopdrop_submit_cancellation_199b", {
+    p_user_id: user.id,
+    p_kind: cleanText(input.transaction_type ?? input.booking_type ?? input.kind, 40),
+    p_reference: transactionReference,
+    p_order_id: orderId,
+    p_reason: reason,
+    p_details: details,
   });
+  if (error) {
+    console.error(VERSION, "cancellation storage failed", error.code);
+    return reply({ ok: false, error: "cancellation_storage_failed" }, 500);
+  }
+  if (data?.ok !== true || typeof data.reference !== "string") {
+    return reply({ ok: false, error: data?.error || "Cancellation request could not be submitted." }, 400);
+  }
+  return reply(data);
 });
 
