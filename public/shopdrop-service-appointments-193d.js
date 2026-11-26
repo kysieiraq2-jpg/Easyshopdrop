@@ -47,6 +47,7 @@
     if(!uuid(row.booking_id))return;
     const card=el('article');card.id='service-booking-'+row.booking_id;
     card.append(el('h2',row.title||'Service appointment'),el('p','Requested: '+format(row.requested_date,row.requested_time)));
+    window.ShopDropReferences199dc?.lines(card,row);
     if(row.town||row.province)card.append(el('p','Service area: '+[row.town,row.province].filter(Boolean).join(', ')));
     if(row.quantity!=null)card.append(el('p','Quantity: '+row.quantity+' × '+String(row.pricing_unit||'unit').replaceAll('_',' ')));
     card.append(el('p','Provider amount: '+money(row.provider_amount)));
@@ -99,6 +100,7 @@
     try{
       const rows=await rpc('shopdrop_service_appointments_193d',{p_as_provider:provider});
       if(!Array.isArray(rows))throw Error('Invalid appointment response');
+      await window.ShopDropReferences199dc?.attach(rows,rpc,'service_booking','booking_id');
       message(status,(notice?notice+' ':'')+(rows.length?rows.length+' appointment(s).':provider?'No requests for your service advertisements.':'You have no service appointments yet.'));
       if(!rows.length&&!provider)list.append(link('Search Other Services','./services.html?view=search'));
       const target=params.get('booking_id');const ordered=uuid(target)&&!provider?[...rows].sort((a,b)=>Number(b.booking_id===target)-Number(a.booking_id===target)):rows;

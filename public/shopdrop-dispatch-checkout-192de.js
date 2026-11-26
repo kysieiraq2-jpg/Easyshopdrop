@@ -39,6 +39,7 @@
     const {data,error}=await db.rpc('shopdrop_dispatch_bag_appointments_192dd',{p_as_provider:false});
     if(error||!Array.isArray(data))throw safe('Your appointment could not be verified. Refresh and try again.');
     const row=data.find(r=>r.booking_id===booking);
+    if(row)await window.ShopDropReferences199dc?.attach([row],window.ShopDropReferences199dc.dbRPC(db),'dispatch_booking','booking_id');
     if(!row)throw safe('This booking is not available in your account. Return to My Transport Appointments.');
     if(row.payment_status==='paid')throw safe('This booking is already paid. Return to My Transport Appointments.');
     if(row.status!=='confirmed'||row.booking_status!=='pending_payment'||row.payment_status!=='pending'||!(Date.parse(row.confirmed_at)>Date.now()))throw safe('A confirmed future appointment awaiting payment is required. Return to My Transport Appointments.');
@@ -54,6 +55,7 @@
     const entries=[['Provider amount',money(s.provider)],['Shop&Drop service fee ('+(s.provider<100000?'10%':'7%')+')',money(s.fee)],['Total payable',money(s.total)]];
     entries.forEach(([label,value],i)=>{const d=el('div');if(i===2)d.className='total';d.append(el('dt',label),el('dd',value));dl.append(d);});
     summary.replaceChildren(el('h2',s.row.title||'Transport booking'),el('p','Confirmed appointment: '+date(s.row.confirmed_at)),el('p','Quantity: '+s.row.quantity),dl,el('p','No courier charges. Payment provider activation is pending. Card and EFT payments are not yet available.'));
+    window.ShopDropReferences199dc?.lines(summary,s.row);
     summary.hidden=false;
   }
   function controls(){reload.disabled=busy;prepare.disabled=busy||!current||prepared;prepare.hidden=!current;}

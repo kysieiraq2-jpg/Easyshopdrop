@@ -152,6 +152,7 @@
   }
   function render(row,provider){
     const card=el('article');card.append(el('h2',row.title||'Transport appointment'));
+    window.ShopDropReferences199dc?.lines(card,row);
     card.append(el('p','Requested start: '+date(row.starts_at)),el('p','Quantity: '+row.quantity));
     if(!row.booking_id)card.append(el('p','Estimated end: '+date(row.ends_at)));
     if(row.pickup_area)card.append(el('p','Collection / work area: '+row.pickup_area));
@@ -189,7 +190,8 @@
   }
   async function load(notice=''){
     if(busy)return;busy=true;role.disabled=true;reload.disabled=true;list.replaceChildren();status.textContent='Loading your private appointments…';
-    try{const provider=role.value==='provider';const rows=await rpc('shopdrop_dispatch_bag_appointments_192dd',{p_as_provider:provider});if(!Array.isArray(rows))throw Error('Invalid response');status.textContent=(notice?notice+' ':'')+(rows.length?`${rows.length} appointment selection(s).`:provider?'No appointment requests for your advertisements.':'No Transport Bag selections yet.');if(!rows.length&&!provider)list.append(link('Search Transport Services & Equipment Hire','./transport-search.html'));const target=params.get('item');const ordered=target&&!provider?[...rows].sort((a,b)=>Number(b.id===target)-Number(a.id===target)):rows;for(const row of ordered)render(row,provider);}
+    try{const provider=role.value==='provider';const rows=await rpc('shopdrop_dispatch_bag_appointments_192dd',{p_as_provider:provider});if(!Array.isArray(rows))throw Error('Invalid response');
+      await window.ShopDropReferences199dc?.dispatch(rows,rpc);status.textContent=(notice?notice+' ':'')+(rows.length?`${rows.length} appointment selection(s).`:provider?'No appointment requests for your advertisements.':'No Transport Bag selections yet.');if(!rows.length&&!provider)list.append(link('Search Transport Services & Equipment Hire','./transport-search.html'));const target=params.get('item');const ordered=target&&!provider?[...rows].sort((a,b)=>Number(b.id===target)-Number(a.id===target)):rows;for(const row of ordered)render(row,provider);}
     catch(e){displayError(status,e);}finally{busy=false;role.disabled=false;reload.disabled=false;}
   }
   role.addEventListener('change',()=>load());reload.addEventListener('click',()=>load());load();

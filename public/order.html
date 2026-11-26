@@ -214,7 +214,7 @@ async function loadOrder(reference){
   // Read-only queries; existing Supabase policies enforce ownership.
   const results=await Promise.all([
    supabase.from('order_items')
-    .select('product_name,quantity,unit_price,line_total')
+    .select('product_name,quantity,unit_price,line_total,listing_reference_snapshot,seller_alias_snapshot')
     .eq('order_id',order.id)
     .limit(100),
 
@@ -252,6 +252,8 @@ async function loadOrder(reference){
     const div=document.createElement('div');
     div.className='item';
     addLine(div,'Item',row.product_name||'Product');
+    addLine(div,'Item reference',row.listing_reference_snapshot||'Not available');
+    if(row.seller_alias_snapshot)addLine(div,'Seller',row.seller_alias_snapshot);
     addLine(div,'Quantity',row.quantity);
     addLine(div,'Unit price',formatMoney(row.unit_price,order.currency));
     addLine(div,'Line total',formatMoney(row.line_total,order.currency));

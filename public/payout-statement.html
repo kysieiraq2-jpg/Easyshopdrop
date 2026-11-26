@@ -58,6 +58,7 @@ a{color:#0f766e}
 <script src="common.js"></script>
 <script src="v26-consolidated.js"></script>
 <script src="v26-bridge.js"></script>
+<script src="./shopdrop-reference-display-199dc.js?v=199dc"></script>
 <script type="module">
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -143,6 +144,15 @@ async function loadPayouts(userId){
   const sellerHoldMap=latestHoldMap(sellerHolds.data,'seller_payout_id');
   const providerHoldMap=latestHoldMap(providerHolds.data,'service_provider_payout_id');
 
+  const R=window.ShopDropReferences199dc;
+  const [productRefs,serviceRefs,extra]=await Promise.all([
+    R.orderRefs(supabase,sellers.map(r=>r.order_id)),
+    R.collect(R.dbRPC(supabase),'service_booking',providers.map(r=>r.booking_id)),
+    R.financial(supabase,'payout')
+  ]);
+  if(extra.error)errors.push('Provider release request records');
+  const {data:currentUser,error:currentUserError}=await supabase.auth.getUser();
+  if(currentUserError||currentUser?.user?.id!==userId){clearRows('Sign-in changed. Reload to view your own records.');message.textContent='Sign in to view your payout statement.';return;}
   const combined=[
    ...sellers.map(row=>({kind:'Seller',row,hold:sellerHoldMap.get(row.id),holdError:!!sellerHolds.error})),
    ...providers.map(row=>({kind:'Service provider',row,hold:providerHoldMap.get(row.id),holdError:!!providerHolds.error}))
@@ -166,6 +176,8 @@ async function loadPayouts(userId){
    }else{
     orderCell.textContent=label(p.booking_id||p.order_id);
    }
+   const itemRef=entry.kind==='Seller'?productRefs.get(p.order_id):serviceRefs.get(p.booking_id)?.advertisement_reference;
+   if(itemRef){const original=document.createElement('small');original.textContent='Original item / advertisement reference: '+itemRef;orderCell.append(original);}
    cell(tr,money(p.payout_amount));
    const statusCell=cell(tr,label(p.payout_status,'Pending'));
    if(p.eligible_at){
@@ -185,10 +197,19 @@ async function loadPayouts(userId){
    cell(tr,p.paid_at?'Recorded paid: '+formatDate(p.paid_at):'No payment date recorded');
    rows.append(tr);
   }
-  if(!combined.length)clearRows(errors.length?'Payout records could not all be loaded.':'No payout records yet.');
+  for(const record of extra.data){
+   const tr=document.createElement('tr');
+   const reference=cell(tr,label(record.release_reference,record.record_id));
+   const type=document.createElement('small');type.textContent=R.kindLabel(record.record_kind)+' — request record';reference.append(type);
+   const booking=cell(tr,label(record.booking_id));
+   for(const [name,value] of [['Advertisement',record.advertisement_reference],['Transport offer',record.offer_reference],['Payment',record.payment_reference]])if(value){const detail=document.createElement('small');detail.textContent=name+': '+value;booking.append(detail);}
+   const amountText=record.recorded_amount==null||!Number.isFinite(Number(record.recorded_amount))?'Not recorded':String(record.currency||'')+' '+Number(record.recorded_amount).toFixed(2);
+   cell(tr,amountText);cell(tr,label(record.recorded_status));cell(tr,'Release request only');cell(tr,'Not independent bank settlement confirmation');rows.append(tr);
+  }
+  if(!combined.length&&!extra.data.length)clearRows(errors.length?'Payout records could not all be loaded.':'No payout records yet.');
   message.textContent=errors.length
    ?'Some sections are temporarily unavailable: '+errors.join(', ')+'. Please refresh.'
-   :combined.length+' payout record(s) displayed. Only your own records are available.';
+   :(combined.length+extra.data.length)+' payout or release request record(s) displayed. Only your own records are available.';
  }catch{
   message.textContent='Unable to load your payout statement right now. Please retry.';
   clearRows('Payout history unavailable.');

@@ -61,6 +61,7 @@
     const rates = Array.isArray(advert.rates) ? advert.rates : [];
     if (photos.length) card.append(photoElement(photos[0]));
     card.append(node('h2',advert.vehicle_title || 'Transport advertisement'));
+    card.append(node('p','Advertisement reference: '+(advert.advertisement_reference||'Not available'),'muted'));
     card.append(node('p',[advert.dispatch_category,advert.dispatch_subtype].filter(Boolean).join(' — ')));
     card.append(node('p',[advert.base_town,advert.base_province].filter(Boolean).join(', '),'muted'));
     if (rates.length) card.append(node('p','From '+money(rates[0].price_zar)+' / '+rates[0].pricing_unit.replaceAll('_',' ')));
@@ -163,9 +164,9 @@
         if (window.ShopDropDispatchBag192DC) window.ShopDropDispatchBag192DC.attach(details,advert,select,quantity,appointment);
 
       }
-    details.append(node('p','Advertisement reference: '+advert.id,'muted'));
+    details.append(node('p','Advertisement reference: '+(advert.advertisement_reference||'Not available'),'muted'));
     if(typeof advert.id==='string'&&/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(advert.id)){
-      const report199b=node('a','Report this Listing','btn');report199b.href='./report-listing.html?kind=transport&reference='+encodeURIComponent(advert.id);details.append(report199b);
+      const report199b=node('a','Report this Listing','btn');report199b.href='./report-listing.html?kind=transport&reference='+encodeURIComponent(advert.advertisement_reference||advert.id);details.append(report199b);
     }
     card.append(details);
     results.append(card);
@@ -180,6 +181,18 @@
         if (params.get(key)) body['p_'+key] = params.get(key);
       }
       const adverts = await rpc(body);
+      // Listing identity is public for approved transport adverts only. No contacts are read.
+      try {
+        const p_ids=adverts.map(a=>a.id).filter(id=>typeof id==='string'&&/^[0-9a-f-]{36}$/i.test(id));
+        if(p_ids.length){
+          const response=await fetch(BASE+'/rest/v1/rpc/shopdrop_public_listing_identity',{method:'POST',headers,body:JSON.stringify({p_kind:'vehicle_advert',p_listing_ids:p_ids})});
+          if(response.ok){
+            const rows=await response.json();
+            const byId=new Map((Array.isArray(rows)?rows:[]).filter(r=>p_ids.includes(r.listing_id)).map(r=>[r.listing_id,r.listing_reference]));
+            for(const advert of adverts){const ref=byId.get(advert.id);if(typeof ref==='string'&&ref.startsWith('SD-TRN-AD-'))advert.advertisement_reference=ref;}
+          }
+        }
+      }catch(_){/* Public listing remains available when reference lookup is unavailable. */}
       if (!adverts.length && offset === 0) {
         results.replaceChildren(node('div','No transport services or equipment hire advertisements are currently available for your selection. Please try another search or check again later.','empty'));
         status.textContent = '0 advertisements found.';

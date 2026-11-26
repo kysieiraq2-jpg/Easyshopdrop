@@ -97,10 +97,12 @@
       try {
         const rows=await rpc('shopdrop_dispatch_bag_appointments_192dd',{p_as_provider:false});
         if(!Array.isArray(rows)) throw new Error('Invalid bag response');
+      await window.ShopDropReferences199dc?.dispatch(rows,rpc);
         message(status,rows.length ? `${rows.length} saved selection${rows.length===1?'':'s'}.` : 'Your Transport Bag is empty.');
         for(const row of rows) {
           const card=el('article');
           card.append(el('h2',row.title||'Transport selection'));
+    window.ShopDropReferences199dc?.lines(card,row);
           card.append(el('p',`Requested start: ${date(row.starts_at)} SAST`),el('p',`Quantity: ${row.quantity}`));
           if(!row.booking_id) card.append(el('p',`Estimated end: ${date(row.ends_at)} SAST`));
           if(row.confirmed_at&&row.status==='confirmed') card.append(el('p',`Confirmed appointment: ${date(row.confirmed_at)} SAST`));

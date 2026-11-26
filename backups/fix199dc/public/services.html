@@ -1,0 +1,698 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Other Services | Shop&Drop</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font:16px Arial;background:#f4f6f8;color:#17202a}
+header{background:#101827;padding:16px}
+header a{color:#fff;margin-right:18px}
+main{max-width:1100px;margin:auto;padding:18px}
+.panel{background:#fff;border-radius:12px;padding:20px;margin:14px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.card{border:1px solid #dbe3ea;border-radius:10px;padding:15px;background:#fff}
+.service-card{width:100%;text-align:left;color:inherit;cursor:pointer;font:inherit}
+.service-wrap{display:flex;flex-direction:column;gap:8px}
+.subcats{display:none;flex-wrap:wrap;gap:8px;padding:4px 2px 10px}
+.subcats.open{display:flex}
+.subcat{border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:9px 11px;cursor:pointer;font:inherit}
+.subcat:hover,.subcat:focus{background:#f1f5f9}
+.subcat.selected{background:#e0f2fe;border-color:#0284c7;font-weight:700}
+.provider-choice{margin:8px 0 12px;padding:14px;border:1px solid #99f6e4;background:#f0fdfa;border-radius:10px}
+.provider-choice p{margin:0 0 10px}
+.provider-actions{display:flex;flex-wrap:wrap;gap:8px}
+.provider-actions .btn{flex:1;min-width:190px;text-align:center}
+.provider-cta{margin:16px 0;padding:16px;border:1px solid #99f6e4;background:#f0fdfa;border-radius:10px}
+.provider-cta .btn{font-weight:700}
+.results{display:grid;gap:12px;margin-top:14px}
+.result{border:1px solid #dbe3ea;border-radius:10px;padding:14px;background:#fff}
+.result h3{margin:0 0 8px}
+.price{font-weight:700}
+.empty{padding:12px;border:1px dashed #cbd5e1;border-radius:8px}
+.btn{display:inline-block;background:#0f766e;color:#fff;border:0;border-radius:8px;padding:10px 14px;text-decoration:none;cursor:pointer}
+.muted{color:#64748b}
+.notice{background:#f0fdfa;border:1px solid #99f6e4}
+.search{display:flex;gap:8px}
+.search input{flex:1;padding:11px;border:1px solid #cbd5e1;border-radius:8px}
+.browse-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.browse-status{margin:12px 0}
+.result-description{white-space:pre-wrap}
+@media(max-width:650px){
+.search{display:block}
+.search input,.search button{width:100%;margin:5px 0}
+}
+
+/* Fix191A: Other Services location search */
+#shopdropServiceLocationPanel {
+  box-sizing:border-box;
+  width:100%;
+  margin:18px 0;
+  padding:16px 0;
+  background:transparent;
+}
+
+#shopdropServiceLocationPanel h2 {
+  margin:0 0 12px;
+  font-size:1.4rem;
+  line-height:1.3;
+}
+
+#shopdropServiceLocationPanel p {
+  line-height:1.5;
+  overflow-wrap:anywhere;
+}
+
+#shopdropServiceLocationPanel label {
+  display:block;
+  width:100%;
+  margin:14px 0;
+  font-weight:600;
+}
+
+#shopdropServiceLocationPanel select {
+  display:block;
+  width:100%;
+  max-width:100%;
+  min-height:46px;
+  margin:6px 0 0;
+  padding:11px 12px;
+  border:1px solid #cbd5e1;
+  border-radius:8px;
+  background:#fff;
+  color:#17202a;
+  font:inherit;
+  font-weight:400;
+}
+
+#shopdropServiceLocationPanel select:disabled {
+  background:#f1f5f9;
+  color:#64748b;
+}
+
+#shopdropServiceLocationPanel .btn {
+  display:block;
+  width:100%;
+  min-height:46px;
+  padding:12px 14px;
+  font:inherit;
+  text-align:center;
+}
+
+#shopdropServiceLocationPanel [role="status"] {
+  margin:10px 0 0;
+  color:#64748b;
+}
+
+#shopdropServiceLocationPanel [role="status"]:empty {
+  display:none;
+}
+
+#results > .empty {
+  grid-column:1 / -1;
+  width:100%;
+  max-width:none;
+  padding:14px;
+  line-height:1.5;
+  background:#f8fafc;
+  overflow-wrap:anywhere;
+}
+
+
+/* Fix 193B: Other Services landing layout, matching Transport Services. */
+main{max-width:950px}
+.shopdrop-service-menu-193b{
+ display:block;background:#0f766e;color:#fff;text-align:center;
+ text-decoration:none;font-weight:bold;padding:14px;border-radius:8px;margin-top:14px;
+ line-height:1.25;overflow-wrap:anywhere;
+}
+.shopdrop-service-menu-193b:focus-visible{outline:3px solid #17202a;outline-offset:3px}
+.service-landing-view-193b #shopdropServiceSearch193b,
+.service-landing-view-193b #shopdropServiceCategories193b{display:none!important}
+.service-search-view-193b #shopdropServiceAdvertise193b,
+.service-search-view-193b #shopdropServiceMenu193b{display:none!important}
+
+</style>
+<link rel="stylesheet" href="./shopdrop-unified-cards.css?v=59">
+<link rel="stylesheet" href="./shopdrop-division-layout-195d.css?v=195d">
+</head>
+<body>
+<header>
+<a href="./index.html">Shop&Drop</a>
+<a href="./services.html?view=home">Other Services Home</a>
+<a href="./service-bag-193c.html">My Service Bag</a>
+<a href="./checkout.html">Product Bag</a>
+<a href="./my-purchases-sales-198j.html?v=199a">My Account</a>
+</header>
+
+<script>
+/* Keep the same services page and its existing booking/search scripts. */
+(()=>{
+ const p=new URLSearchParams(location.search);
+ const searchView=p.get('view')==='search'||(p.get('view')!=='home'&&(location.search!==''||location.hash!==''));
+ document.body.classList.add(searchView?'service-search-view-193b':'service-landing-view-193b');
+})();
+</script>
+<main>
+<section class="panel notice">
+<b>Browse Other Services — FREE:</b>
+Explore approved service advertisements without registering.
+Choose a category, view the available services and read their descriptions and prices.
+Registration is only required when booking or offering a service.
+Provider contact and banking details remain private.
+</section>
+
+<section class="panel" id="shopdropServiceAdvertise193b">
+<h2>Advertise Your Services — FREE</h2>
+<p>Do you provide cleaning, gardening, repairs, catering, or other services?</p>
+<p>Advertise your service on Shop&amp;Drop. Choose your service category, operating area, photographs and your own rates.</p>
+<p>No listing fee. Your advertisement can publish automatically when the required information has passed the existing listing checks.</p>
+<div class="shopdrop-steps-195e"><p><strong>How to advertise your service</strong></p><ol><li>Sign in or create your free account.</li><li>Tap Advertise Your Services — FREE. Choose your service, area and rates, and add photos.</li><li>Submit your advertisement. Use Requests for My Service Advertisements to manage requests.</li><li>After completing a paid service, get the six-digit Completion PIN from the paying customer. Go to My Account — Receive My Payment.</li></ol></div>
+
+<a class="shopdrop-service-menu-193b" href="./seller.html#list-service">Advertise Your Services — FREE</a>
+<p class="muted">You may browse without registering. Sign in or register when submitting your advertisement.</p>
+</section>
+
+<section class="panel" id="shopdropServiceMenu193b">
+<h2>Find Other Services</h2>
+<p>Search available services and find a provider in your area.</p>
+<div class="shopdrop-steps-195e"><p><strong>How to book a service</strong></p><ol><li>Tap Search Other Services and choose a service, rate and appointment time.</li><li>Sign in and add your choice to My Service Bag. Send an appointment request.</li><li>Wait for the appointment to be agreed. Open My Service Appointments, complete the required address details and follow checkout instructions.</li><li>Give the six-digit Completion PIN to the person doing the work only after the agreed service is finished and you are satisfied.</li></ol></div>
+
+<a class="shopdrop-service-menu-193b" href="./services.html?view=search">Search Other Services</a>
+<a class="shopdrop-service-menu-193b" href="./service-bag-193c.html">My Service Bag</a>
+<a class="shopdrop-service-menu-193b" href="./service-appointments-193d.html">My Service Appointments</a>
+<a class="shopdrop-service-menu-193b" href="./service-appointments-193d.html?role=provider">Requests for My Service Advertisements</a>
+<p class="muted">Browse service advertisements without registering. Sign in when making or managing a booking.</p>
+</section>
+
+<section class="panel" id="shopdropServiceSearch193b">
+<a class="shopdrop-service-menu-193b" href="./services.html?view=home">Back to Other Services</a>
+<h1>Other Services</h1>
+<p>Find independent service providers who have listed their services on Shop&Drop. Browse services by hour, day, kilometre, gig/event, job or treatment. Providers describe what is included, set availability and keep direct contact details private.</p>
+
+<div class="provider-cta">
+<a class="btn" href="./seller.html#list-service">OFFER / LIST A SERVICE — FREE</a>
+<p class="muted">No company or website required. Choose a service category and subcategory, then describe and price your service.</p>
+</div>
+
+<div id="shopdropServiceCategory193a" style="margin:16px 0">
+<label for="serviceCategory193a" style="display:block;font-weight:600;margin-bottom:6px">Service category</label>
+<select id="serviceCategory193a" style="width:100%;min-height:46px;font:inherit;padding:10px;border:1px solid #cbd5e1;border-radius:8px"><option value="">All categories</option></select>
+<label for="serviceSubcategory193a" style="display:block;font-weight:600;margin:12px 0 6px">Type of service</label>
+<select id="serviceSubcategory193a" disabled style="width:100%;min-height:46px;font:inherit;padding:10px;border:1px solid #cbd5e1;border-radius:8px"><option value="">Choose a category first</option></select>
+<p class="muted">Choose a category or type of service. You can also search by words below.</p>
+</div>
+<div class="search">
+<input id="q" type="search" placeholder="Search services — e.g. cleaning, pest control, DJ">
+<button class="btn" id="go" type="button">Search Other Services</button>
+</div>
+
+<div class="browse-actions">
+<button class="btn" id="browseAllServices" type="button">Browse All Services</button>
+</div>
+
+<p id="msg" class="muted browse-status" role="status" aria-live="polite"></p>
+<div id="results" class="results" aria-live="polite"></div>
+</section>
+
+<section class="panel" id="shopdropServiceCategories193b">
+<h2>Other Service categories</h2>
+<p class="muted">Select a category to view its subcategories and browse available advertisements. Transport and dispatch jobs have their own dedicated workflow under <a href="./dispatching.html">Transport Services &amp; Equipment Hire</a>.</p>
+
+<div class="grid">
+<button class="card service-card" data-category="Automotive Services"><b>Automotive Services</b><p>Mechanical, repair and related vehicle services.</p></button>
+<button class="card service-card" data-category="Catering & Food Services"><b>Catering & Food Services</b><p>General catering, home catering and baking.</p></button>
+<button class="card service-card" data-category="Childcare & Household Services"><b>Childcare & Household Services</b><p>Childcare and household assistance.</p></button>
+<button class="card service-card" data-category="Cleaning Services"><b>Cleaning Services</b><p>Home, store, move-in/move-out and property cleaning.</p></button>
+<button class="card service-card" data-category="Computer & IT Services"><b>Computer & IT Services</b><p>Computer repairs, networking and IT support.</p></button>
+<button class="card service-card" data-category="Entertainment & Performers"><b>Entertainment & Performers</b><p>DJs, bands, singers and musicians.</p></button>
+<button class="card service-card" data-category="Equipment Hire"><b>Equipment Hire</b><p>Suitable equipment with clearly defined rates.</p></button>
+<button class="card service-card" data-category="Event & Party Services"><b>Event & Party Services</b><p>Party planning, decoration and event setup.</p></button>
+<button class="card service-card" data-category="Financial Administration Services"><b>Financial Administration Services</b><p>Bookkeeping and financial administration.</p></button>
+<button class="card service-card" data-category="Furniture & Woodwork Services"><b>Furniture & Woodwork Services</b><p>Furniture repairs, restoration and woodwork.</p></button>
+<button class="card service-card" data-category="Gardening & Outdoor Services"><b>Gardening & Outdoor Services</b><p>Garden and outdoor work with clear pricing.</p></button>
+<button class="card service-card" data-category="House & Pet Sitting Services"><b>House & Pet Sitting Services</b><p>House sitting and pet sitting services.</p></button>
+<button class="card service-card" data-category="Lessons, Training & Tutoring"><b>Lessons, Training & Tutoring</b><p>Clearly defined teaching and training services.</p></button>
+<button class="card service-card" data-category="Moving & Removals Services"><b>Moving & Removals Services</b><p>Furniture moving, small loads and removals.</p></button>
+<button class="card service-card" data-category="Other Service — requires approval"><b>Other Service — additional category</b><p>For genuine services not listed above. Automated listing rules apply; physical-goods advertising is not allowed here.</p></button>
+<button class="card service-card" data-category="Personal & Beauty Services"><b>Personal & Beauty Services</b><p>Hair, grooming, nails and related services.</p></button>
+<button class="card service-card" data-category="Pest Control"><b>Pest Control</b><p>Clearly priced treatments and services.</p></button>
+<button class="card service-card" data-category="Pet Services"><b>Pet Services</b><p>Service work for pets; physical pet products remain in Product listings.</p></button>
+<button class="card service-card" data-category="Photography & Event Services"><b>Photography & Event Services</b><p>Photography and defined event services.</p></button>
+<button class="card service-card" data-category="Professional & Administrative Services"><b>Professional & Administrative Services</b><p>Defined professional or administrative work.</p></button>
+<button class="card service-card" data-category="Repair & Maintenance Services"><b>Repair & Maintenance Services</b><p>Defined repair and maintenance work.</p></button>
+<button class="card service-card" data-category="Sewing & Clothing Services"><b>Sewing & Clothing Services</b><p>Alterations, dressmaking and upholstery.</p></button>
+<button class="card service-card" data-category="Solar & Backup Power Services"><b>Solar & Backup Power Services</b><p>Solar and backup-power maintenance services.</p></button>
+<button class="card service-card" data-category="Special Occasion Vehicles"><b>Special Occasion Vehicles</b><p>Classic, vintage or special vehicles for events.</p></button>
+</div>
+</section>
+
+<section class="panel shopdrop-payment-preview" data-shopdrop-payment-preview="service">
+<h2>Payment method</h2>
+<p>Visa, Mastercard and Instant EFT are planned for this division. Payment is not active, and no banking details or money are required.</p>
+<div class="shopdrop-preview-controls"></div>
+</section>
+<section class="panel">
+<h2>How an Other Service booking works</h2>
+<p>Choose service → agree on date, time, location and price → pay through Shop&amp;Drop → receive a private six-digit Completion PIN → provider completes the work → customer or authorized recipient gives PIN to provider → provider submits PIN through Shop&amp;Drop → verified completion prepares held proceeds for automatic release, subject to provider approval and safeguards → feedback. Photographs are optional supporting evidence.</p>
+<p class="muted">Open-ended quotation-heavy building/painting projects are outside the initial service scope.</p>
+</section>
+
+<section class="panel">
+<h2>Can't find the right category?</h2>
+<input id="cat" style="width:100%;padding:10px" placeholder="Suggest a product or service category">
+<textarea id="desc" style="width:100%;padding:10px;margin-top:8px" placeholder="Tell Shop&Drop what should be added"></textarea>
+<button class="btn" id="request" type="button">Send suggestion</button>
+<p id="reqmsg" class="muted"></p>
+</section>
+</main>
+
+<script src="./common.js"></script>
+<script src="./v26-consolidated.js"></script>
+<script src="./geo.js"></script>
+<script src="./service-taxonomy.js"></script>
+<script src="./shopdrop-services-connector.js?v=193a"></script>
+<script src="./shopdrop-service-bag-193c.js?v=193c"></script>
+<script src="./shopdrop-service-booking-ui.js?v=193c"></script>
+
+<script>
+const {api}=ShopDrop;
+const serviceResults=document.getElementById('results');
+const serviceMessage=document.getElementById('msg');
+const serviceQuery=document.getElementById('q');
+let serviceSearchSequence=0;
+const serviceCategory193a=document.getElementById('serviceCategory193a');
+const serviceSubcategory193a=document.getElementById('serviceSubcategory193a');
+const serviceTaxonomy193a=window.ShopDropServiceTaxonomy||{};
+function fillService193a(select,values,placeholder){
+ select.replaceChildren(new Option(placeholder,''));
+ for(const value of [...new Set(values)].sort((a,b)=>a.localeCompare(b)))select.add(new Option(value,value));
+}
+function selectService193a(category='',subcategory=''){
+ serviceCategory193a.value=Object.hasOwn(serviceTaxonomy193a,category)?category:'';
+ const values=serviceTaxonomy193a[serviceCategory193a.value]||[];
+ fillService193a(serviceSubcategory193a,values,serviceCategory193a.value?'All service types':'Choose a category first');
+ serviceSubcategory193a.disabled=!serviceCategory193a.value;
+ serviceSubcategory193a.value=values.includes(subcategory)?subcategory:'';
+}
+fillService193a(serviceCategory193a,Object.keys(serviceTaxonomy193a),'All categories');
+selectService193a();
+serviceCategory193a.addEventListener('change',()=>{
+ selectService193a(serviceCategory193a.value);
+ serviceQuery.value='';
+ document.querySelectorAll('.subcat.selected').forEach(x=>x.classList.remove('selected'));
+ search('');
+});
+serviceSubcategory193a.addEventListener('change',()=>{
+ serviceQuery.value='';
+ document.querySelectorAll('.subcat.selected').forEach(x=>x.classList.remove('selected'));
+ search('');
+});
+
+const previewListings=[
+ {title:'Example Pest Control Service',category:'Pest Control',description:'Approved Shop&Drop provider listing preview.',pricing_unit:'treatment',unit_price_cents:108000,currency_code:'ZAR',minimum_units:1,service_area:'Example service area'},
+ {title:'Example Cleaning Service',category:'Cleaning Services',description:'Approved Shop&Drop provider listing preview.',pricing_unit:'job',unit_price_cents:54000,currency_code:'ZAR',minimum_units:1,service_area:'Example service area'}
+];
+
+function render(list,term=''){
+ serviceResults.replaceChildren();
+
+ if(!list.length){
+  const empty=document.createElement('div');
+  empty.className='empty muted';
+  empty.textContent='No service advertisements match your selection yet.';
+  serviceResults.append(empty);
+  return;
+ }
+
+ list.forEach(x=>{
+  const el=document.createElement('article');
+  el.className='result';
+  if(x.id)el.dataset.serviceId=x.id;
+
+  const heading=document.createElement('h3');
+  heading.textContent=x.title||'Service';
+  const photo=document.createElement('img');
+  let imageValid=false;
+  try{const u=new URL(x.photo_url);imageValid=u.origin==='https://dtkdvvxpwonywtsgqmdx.supabase.co'&&u.pathname.startsWith('/storage/v1/object/public/');}catch(_){ }
+  if(imageValid){photo.src=x.photo_url;photo.alt='Service advertisement photograph';photo.loading='lazy';photo.className='shopdrop-service-photo';}
+
+  const area=document.createElement('p');
+  area.className='muted';
+  area.textContent=[
+   x.category||'Other Service',
+   x.service_area||'Service area set by provider'
+  ].join(' · ');
+
+  const description=document.createElement('p');
+  description.className='result-description';
+  description.textContent=x.description||'';
+
+  const price=document.createElement('p');
+  price.className='price';
+  price.textContent=
+   ShopDrop.money(x.unit_price_cents,x.currency_code)+
+   ' per '+(x.pricing_unit||'service')+
+   ' · minimum '+(x.minimum_units||1)+' unit(s)';
+
+  const notice=document.createElement('p');
+  notice.className='muted';
+  notice.textContent='Published customer price includes the disclosed Shop&Drop marketplace service fee.';
+
+  el.append(heading);
+  if(imageValid)el.append(photo);
+  el.append(area,description,price,notice);
+
+  // Read-only customer preview. No booking or payment.
+  const cents=Number(x.unit_price_cents);
+  const minimum=Number(x.minimum_units)||1;
+
+  if(
+    x.id &&
+    Number.isSafeInteger(cents) &&
+    cents>0 &&
+    Number.isFinite(minimum) &&
+    minimum>0
+  ){
+    const preview=document.createElement('div');
+    preview.className='shopdrop-service-price-preview';
+
+    const label=document.createElement('label');
+    label.textContent='Number of units: ';
+
+    const quantity=document.createElement('input');
+    quantity.type='number';
+    quantity.min=String(minimum);
+    quantity.step='1';
+    quantity.value=String(Math.ceil(minimum));
+    quantity.style.maxWidth='120px';
+    quantity.setAttribute(
+      'aria-label','Number of service units'
+    );
+
+    const total=document.createElement('p');
+    total.setAttribute('aria-live','polite');
+
+    function updateTotal(){
+      const units=Number(quantity.value);
+
+      if(
+        !Number.isSafeInteger(units) ||
+        units<minimum ||
+        units>100000
+      ){
+        total.textContent='Enter a valid number of units.';
+        return;
+      }
+
+      const amount=cents*units;
+
+      if(!Number.isSafeInteger(amount)){
+        total.textContent='Amount exceeds preview limit.';
+        return;
+      }
+
+      total.textContent=
+        'Estimated customer total: '+
+        ShopDrop.money(
+          amount,x.currency_code
+        );
+    }
+
+    quantity.addEventListener(
+      'input',updateTotal
+    );
+
+    label.append(quantity);
+    preview.append(label,total);
+
+    const note=document.createElement('p');
+    note.className='muted';
+    note.textContent=
+      'Price preview only. Availability and '+
+      'booking must be confirmed separately.';
+
+    preview.append(note);
+    el.append(preview);
+    updateTotal();
+  }
+
+  // Fix 199B: report this specific service advertisement.
+  if(typeof x.id==='string'&&/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(x.id)){
+   const report199b=document.createElement('a');report199b.href='./report-listing.html?kind=service&reference='+encodeURIComponent(x.id);report199b.textContent='Report this Listing';el.append(report199b);
+  }
+  serviceResults.append(el);
+ });
+}
+
+async function search(term,category=serviceCategory193a.value,subcategory=serviceSubcategory193a.value){
+ const sequence=++serviceSearchSequence;
+ term=String(term||'').trim();
+ serviceMessage.textContent='Loading approved Shop&Drop services…';
+
+ try{
+  const list=await window.ShopDropServicesConnector.search(term,{}, {category,subcategory});
+  if(sequence!==serviceSearchSequence)return;
+
+  const filtered=list.filter(x=>(!category||x.category===category)&&(!subcategory||x.subcategory===subcategory));
+
+  serviceMessage.textContent=
+   filtered.length+(filtered.length===1 ? ' service found.' : ' services found.');
+  render(filtered,term);
+ }catch(e){
+  if(sequence!==serviceSearchSequence)return;
+  serviceResults.replaceChildren();
+  serviceMessage.textContent=
+   'Service listings are temporarily unavailable: '+e.message;
+ }
+}
+
+document.getElementById('go').onclick=()=>search(serviceQuery.value);
+
+serviceQuery.addEventListener('keydown',e=>{
+ if(e.key==='Enter'){
+  e.preventDefault();
+  search(serviceQuery.value);
+ }
+});
+
+document.getElementById('browseAllServices').onclick=()=>{
+ selectService193a();
+ serviceQuery.value='';
+ document.querySelectorAll('.subcat.selected')
+  .forEach(x=>x.classList.remove('selected'));
+ search('');
+};
+
+document.querySelectorAll('.service-card').forEach(card=>{
+ const wrap=document.createElement('div');
+ wrap.className='service-wrap';
+ card.parentNode.insertBefore(wrap,card);
+ wrap.append(card);
+
+ const subs=document.createElement('div');
+ subs.className='subcats';
+
+ (ShopDropServiceTaxonomy[card.dataset.category]||[]).forEach(name=>{
+  const b=document.createElement('button');
+  b.className='subcat';
+  b.type='button';
+  b.textContent=name;
+
+  b.onclick=e=>{
+   e.stopPropagation();
+   document.querySelectorAll('.subcat.selected')
+    .forEach(x=>x.classList.remove('selected'));
+   b.classList.add('selected');
+   selectService193a(card.dataset.category,name);
+   serviceQuery.value='';
+
+   let oldChoice=wrap.querySelector('.provider-choice');
+   if(oldChoice)oldChoice.remove();
+
+   const choice=document.createElement('div');
+   choice.className='provider-choice';
+   choice.innerHTML=
+    `<p><b>${ShopDrop.esc(name)}</b></p>`+
+    `<div class="provider-actions">`+
+    `<button class="btn find-service" type="button">FIND THIS SERVICE</button>`+
+    `<a class="btn" href="./seller.html?serviceCategory=${encodeURIComponent(card.dataset.category)}&serviceSubcategory=${encodeURIComponent(name)}#list-service">LIST THIS SERVICE — FREE</a>`+
+    `</div>`;
+
+   subs.before(choice);
+
+   choice.querySelector('.find-service').onclick=()=>{
+    selectService193a(card.dataset.category,name);
+    serviceQuery.value='';
+    search('');
+    serviceResults.scrollIntoView({behavior:'smooth',block:'start'});
+   };
+
+   search('');
+   choice.scrollIntoView({behavior:'smooth',block:'nearest'});
+  };
+
+  subs.append(b);
+ });
+
+ wrap.append(subs);
+
+ card.onclick=()=>{
+  document.querySelectorAll('.subcats.open').forEach(x=>{
+   if(x!==subs)x.classList.remove('open');
+  });
+
+  subs.classList.toggle('open');
+
+  if(subs.classList.contains('open')){
+   selectService193a(card.dataset.category);
+   serviceQuery.value='';
+   search('');
+  }
+ };
+});
+
+document.getElementById('request').onclick=async()=>{
+ const categoryInput=document.getElementById('cat');
+ const descriptionInput=document.getElementById('desc');
+ const requestMessage=document.getElementById('reqmsg');
+
+ if(!categoryInput.value.trim()){
+  requestMessage.textContent=
+   'Enter the category or service you want Shop&Drop to add.';
+  return;
+ }
+
+ if(ShopDrop.isStatic){
+  requestMessage.textContent=
+   'Category suggestions will be submitted when the secure suggestion service is activated.';
+  return;
+ }
+
+ try{
+  await api('/api/category-requests',{
+   method:'POST',
+   body:JSON.stringify({
+    requestedName:categoryInput.value,
+    description:descriptionInput.value
+   })
+  });
+
+  requestMessage.textContent=
+   'Thank you. Shop&Drop administration will review your suggestion.';
+ }catch(e){
+  requestMessage.textContent=e.message;
+ }
+};
+
+if(typeof serviceCountryFilter!=='undefined'){
+ serviceCountryFilter.innerHTML=ShopDropGeo.countryOptions('ZA');
+}
+
+// Automatically display available approved services to visitors.
+search('');
+</script>
+
+<script src="v26-bridge.js"></script>
+
+<section id="v26ServiceExtension">
+<!-- V26_SERVICE_EXTENSION -->
+<h2>Service Attendance</h2>
+<p>Booking Confirmed → Provider En Route → Arrival Pending Verification → Provider Arrived.</p>
+<p>Verified service completion using the customer-held Completion PIN is required before held proceeds can be released, subject to payment-provider activation and safeguards.</p>
+</section>
+
+<section class="v26DraftControls">
+<!-- V26_LIVE_DRAFT_UI -->
+<button type="button" onclick="ShopDropDrafts.save('service',{note:'draft state captured by page adapter'})">Save Draft</button>
+<button type="button" onclick="shopdropV26Status(ShopDropDrafts.load('service')?'Draft available to continue.':'No saved draft found.')">Continue Draft</button>
+</section>
+
+<section class="v26AvailabilityLink">
+<!-- V26_LIVE_AVAILABILITY_LINK -->
+<p><a href="availability.html">Availability Calendar</a></p>
+</section>
+
+<section class="v26ReportListing">
+<!-- V26_LIVE_REPORT_LISTING -->
+<p><a href="report-listing.html?kind=service">Report Listing</a></p>
+</section>
+
+<script defer src="shopdrop-info-language.js"></script>
+
+<!-- SHOPDROP FIX 7: Additive category suggestion integration -->
+<script src="./supabase-adapter.js"></script>
+<script>
+(function(){
+ 'use strict';
+
+ const button=document.getElementById('request');
+ const category=document.getElementById('cat');
+ const description=document.getElementById('desc');
+ const status=document.getElementById('reqmsg');
+
+ if(!button||!category||!description||!status)return;
+
+ button.onclick=async function(){
+  if(button.disabled)return;
+
+  const requestedName=category.value.trim();
+  const details=description.value.trim();
+
+  if(!requestedName){
+   status.textContent=
+    'Enter the category or service you want Shop&Drop to add.';
+   category.focus();
+   return;
+  }
+
+  button.disabled=true;
+  status.textContent='Submitting suggestion...';
+
+  try{
+   const submit=
+    window.ShopDropSupabaseAdapter
+     ?.authenticatedFunctions
+     ?.feedback;
+
+   if(typeof submit!=='function'){
+    throw new Error('Secure suggestion service unavailable.');
+   }
+
+   const result=await submit({
+    feedback_type:'suggestion',
+    category:'Category Request',
+    subject:('New category request: '+requestedName).slice(0,200),
+    message:
+     'Requested category: '+requestedName+
+     '\nDescription: '+(details||'Not provided')
+   });
+
+   if(!result?.ok||!result.reference){
+    throw new Error('Suggestion confirmation was not received.');
+   }
+
+   status.textContent=
+    'Suggestion submitted successfully. Reference: '+
+    result.reference;
+
+   category.value='';
+   description.value='';
+
+  }catch(error){
+   status.textContent=
+    error?.message||'Unable to submit suggestion.';
+  }finally{
+   button.disabled=false;
+  }
+ };
+})();
+</script>
+
+<script defer src="./shopdrop-public-advertiser-ui.js?v=59"></script>
+<script defer src="./shopdrop-customer-service-rates.js"></script>
+<script defer src="./shopdrop-payment-preview.js?v=59"></script>
+</body>
+</html>

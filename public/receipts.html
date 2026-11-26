@@ -38,6 +38,7 @@ a{color:#0f766e}
 <script src="common.js"></script>
 <script src="v26-consolidated.js"></script>
 <script src="v26-bridge.js"></script>
+<script src="./shopdrop-reference-display-199dc.js?v=199dc"></script>
 <script type="module">
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -101,7 +102,7 @@ async function loadHistory(userId){
     ['Order status',status(r.order_status)],['Payment status',status(r.payment_status)],
     ['Fulfilment',status(r.fulfilment_status)],['Item total',amount(r.product_total,r.currency||'ZAR')],['Created',date(r.created_at)]])},
   {label:'Product payments',run:supabase.from('payments')
-   .select('id,buyer_id,seller_id,payment_reference,provider_payment_reference,payment_status,total_paid,product_amount,courier_amount,shopdrop_commission,currency,paid_at,created_at')
+   .select('id,order_id,buyer_id,seller_id,payment_reference,provider_payment_reference,payment_status,total_paid,product_amount,courier_amount,shopdrop_commission,currency,paid_at,created_at')
    .or('buyer_id.eq.'+userId+',seller_id.eq.'+userId).order('created_at',{ascending:false}).limit(40),
    show:(p,r)=>card(p,'Payment · '+text(r.payment_reference,r.id),[
     ['Status',status(r.payment_status)],['Recorded total',amount(r.total_paid,r.currency||'ZAR')],
@@ -118,7 +119,7 @@ async function loadHistory(userId){
     ['Recorded total',amount(r.gross_amount)],['Provider payout',status(r.provider_payout_status)],
     ['Paid at',r.paid_at?date(r.paid_at):null],['Created',date(r.created_at)]])},
   {label:'Shipments',run:supabase.from('shipments')
-   .select('id,buyer_id,seller_id,shipment_reference,tracking_number,courier_name,shipment_status,delivery_status,delivery_verified_at,created_at')
+   .select('id,order_id,buyer_id,seller_id,shipment_reference,tracking_number,courier_name,shipment_status,delivery_status,delivery_verified_at,created_at')
    .or('buyer_id.eq.'+userId+',seller_id.eq.'+userId).order('created_at',{ascending:false}).limit(40),
    show:(p,r)=>card(p,'Shipment · '+text(r.shipment_reference,r.id),[
     ['Courier',r.courier_name],['Tracking number',r.tracking_number],
@@ -148,6 +149,17 @@ async function loadHistory(userId){
  ];
  try{
   const results=await Promise.all(sources.map(s=>s.run));
+  const R=window.ShopDropReferences199dc;
+  const productKeys=results.flatMap((res,i)=>(res.data||[]).map(r=>i===0?r.id:r.order_id));
+  const serviceKeys=results.flatMap(res=>(res.data||[]).map(r=>r.booking_id||r.service_booking_id));
+  const [productRefs,serviceRefs,extra]=await Promise.all([
+   R.orderRefs(supabase,productKeys),R.collect(R.dbRPC(supabase),'service_booking',serviceKeys),R.financial(supabase,'receipt')
+  ]);
+  const {data:currentUser,error:currentUserError}=await supabase.auth.getUser();
+  if(currentUserError||currentUser?.user?.id!==userId){history.textContent='Sign-in changed. Reload to view your own records.';return;}
+  for(let i=0;i<results.length;i++)for(const row of results[i].data||[]){
+   row.original_reference_199dc=productRefs.get(i===0?row.id:row.order_id)||serviceRefs.get(row.booking_id||row.service_booking_id)?.advertisement_reference||null;
+  }
   history.replaceChildren();
   const refresh=document.createElement('button');
   refresh.type='button';
@@ -160,8 +172,19 @@ async function loadHistory(userId){
    if(result.error){failures++;continue;}
    const rows=result.data||[];
    found+=rows.length;
-   section(history,sources[i].label,rows,sources[i].show);
+   section(history,sources[i].label,rows,(parent,row)=>{
+    sources[i].show(parent,row);
+    if(row.original_reference_199dc)line(parent.lastElementChild,'Original item / advertisement reference',row.original_reference_199dc);
+   });
   }
+  if(extra.error)failures++;
+  found+=extra.data.length;
+  section(history,'Transport payments and provider release requests',extra.data,(parent,row)=>card(parent,R.kindLabel(row.record_kind),[
+    ['Advertisement reference',row.advertisement_reference],['Transport offer reference',row.offer_reference],['Booking',row.booking_id],
+    ['Payment reference',row.payment_reference],['Provider release reference',row.release_reference],
+    ['Recorded amount',amount(row.recorded_amount,row.currency)],['Recorded status',status(row.recorded_status)],
+    ['Record type',row.record_kind.endsWith('release_request')?'Release request — not independent bank settlement confirmation':'Payment record'],['Created',date(row.recorded_at)]
+  ]));
   if(failures){
    const note=document.createElement('p');
    note.className='muted';

@@ -8,7 +8,7 @@
  }
  function relatedQueries(db,uid,role,ids){
   if(!uuid(uid)||!['buyer','seller'].includes(role)||!ids.length||ids.length>PAGE||ids.some(id=>!uuid(id)))throw Error('Invalid order selection');
-  const items=db.from('order_items').select('order_id,product_name,quantity,line_total').in('order_id',ids).limit(1000);
+  const items=db.from('order_items').select('order_id,product_name,quantity,line_total,listing_reference_snapshot,seller_alias_snapshot').in('order_id',ids).limit(1000);
   const shipments=db.from('shipments').select('order_id,shipment_reference,shipment_status').eq(role==='buyer'?'buyer_id':'seller_id',uid).in('order_id',ids).limit(200);
   const payouts=role==='seller'?db.from('seller_payouts').select('order_id,payout_status,payout_amount,paid_at').eq('seller_id',uid).in('order_id',ids).limit(200):Promise.resolve({data:[],error:null});
   return [items,shipments,payouts];
@@ -34,7 +34,7 @@
   const a=el('article');a.append(el('h2',o.order_reference||'Product order'),el('p','Order: '+label(o.order_status)),el('p','Payment: '+label(o.payment_status)),el('p','Fulfilment: '+label(o.fulfilment_status)),el('p','Item total: '+money(o.product_total,o.currency)));
   if(o.created_at){const date=new Date(o.created_at);if(!Number.isNaN(date.getTime()))a.append(el('p',date.toLocaleDateString('en-ZA')));}
   if(items.error)a.append(el('p','Item details unavailable. Open order details to retry.'));
-  else {const rows=items.data.filter(r=>r.order_id===o.id);if(rows.length){const ul=el('ul');for(const r of rows)ul.append(el('li',String(r.product_name||'Product')+' × '+String(r.quantity??'?')));a.append(ul);}else a.append(el('p','No item details returned.'));}
+  else {const rows=items.data.filter(r=>r.order_id===o.id);if(rows.length){const ul=el('ul');for(const r of rows){const li=el('li',String(r.product_name||'Product')+' × '+String(r.quantity??'?'));li.append(el('p','Item reference: '+(r.listing_reference_snapshot||'Not available')));if(r.seller_alias_snapshot)li.append(el('p','Seller: '+r.seller_alias_snapshot));ul.append(li);}a.append(ul);}else a.append(el('p','No item details returned.'));}
   a.append(link('View Order Details','./order.html?id='+encodeURIComponent(o.id)));
   if(!['cancelled','canceled','refunded','completed','delivered','disputed','expired','failed'].includes(String(o.order_status||'').toLowerCase())&&!['delivered','dispatched','shipped','in_transit','collected','picked_up'].includes(String(o.fulfilment_status||'').toLowerCase()))a.append(link('Request Cancellation','./cancellations.html?kind=product&reference='+encodeURIComponent(o.order_reference||o.id)));
   if(kind==='buyer'&&o.order_reference)a.append(link('Track My Order','./tracking.html?order='+encodeURIComponent(o.order_reference)));

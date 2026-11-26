@@ -1,0 +1,5 @@
+# Fix 199D-C: permanent item and advertisement references
+
+The four included SQL migration files are exact copies of the already installed Supabase migrations. Do not rerun them on the live project. They record original physical item references, protect service and transport references, expose authorized read-only lookups, and connect transport payments and provider release requests. The installer modifies only the integration branch and does not execute SQL or deploy Edge Functions.
+
+Database fixture verification: product, service and transport reference persistence, immutable item identity, and private reference ownership passed with rollback. No actual payment or release occurred. The new financial lookup has verified anonymous access denial; positive financial-record tests and real provider settlement remain outstanding. The website preserves existing payment, PIN, courier, language and photograph flows. Legacy offers without an actual advertisement reference display the preserved offer reference, not a fabricated advert number.

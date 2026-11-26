@@ -28,6 +28,7 @@
     const rows=await rpc(db,'shopdrop_service_appointments_193d',{p_as_provider:false});
     if(!Array.isArray(rows))throw Error('Invalid appointments');
     const row=rows.find(r=>r.booking_id===booking);
+    if(row)await window.ShopDropReferences199dc?.attach([row],window.ShopDropReferences199dc.dbRPC(db),'service_booking','booking_id');
     if(!row)throw safe('This booking is not available in your account. Return to My Service Appointments.');
     if(row.status!=='confirmed'||row.booking_status!=='pending'||row.payment_status!=='pending'||!future(row.confirmed_date,row.confirmed_time))throw safe('A confirmed future appointment awaiting payment is required. Return to My Service Appointments.');
     const locationState=await rpc(db,'shopdrop_service_location_state_193f',{p_booking_id:booking});
@@ -42,6 +43,7 @@
   function draw(s){
     const dl=el('dl');[['Provider amount',money(s.provider)],['Shop&Drop service fee ('+(s.provider<100000?'10%':'7%')+')',money(s.fee)],['Total payable',money(s.total)]].forEach(([label,value],i)=>{const d=el('div');if(i===2)d.className='total';d.append(el('dt',label),el('dd',value));dl.append(d);});
     summary.replaceChildren(el('h2',s.row.title||'Service booking'),el('p','Confirmed appointment: '+s.row.confirmed_date+' at '+String(s.row.confirmed_time).slice(0,5)+' SAST'),el('p','Service area: '+[s.row.town,s.row.province].filter(Boolean).join(', ')),dl,el('p','No courier charges. Card and EFT payments will become available after the financial service provider is activated.'));
+    window.ShopDropReferences199dc?.lines(summary,s.row);
     summary.hidden=false;
   }
   function controls(){reload.disabled=busy;prepare.disabled=busy||!current||prepared;prepare.hidden=!current;}

@@ -45,9 +45,11 @@
       try{
         const rows=await rpc('shopdrop_service_bag_list_193c');
         if(!Array.isArray(rows))throw Error('Invalid bag response');
+      await window.ShopDropReferences199dc?.attach(rows,rpc,'service_bag','id');
         message(status,(notice?notice+' ':'')+(rows.length?`${rows.length} service selection(s).`:'Your Service Bag is empty.'));
         for(const row of rows){
           const card=el('article');card.append(el('h2',row.title||'Service selection'));
+    window.ShopDropReferences199dc?.lines(card,row);
           card.append(el('p','Requested date: '+row.booking_date),el('p','Requested time: '+String(row.booking_time).slice(0,5)+' SAST'),el('p','Service area: '+row.town+', '+row.province),el('p','Quantity: '+row.quantity+' × '+String(row.pricing_unit).replaceAll('_',' ')));
           card.append(el('p','Provider amount: '+money(row.provider_amount)),el('p','Shop&Drop service fee: '+money(row.commission)));
           const total=el('p');total.append(el('strong','Estimated total: '+money(row.total)));card.append(total);
