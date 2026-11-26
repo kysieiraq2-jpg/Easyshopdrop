@@ -1,0 +1,12 @@
+/* Fix 198G: local buyer filter controls, matching the seller's two-field layout. */
+.shopdrop-buyer-picker198g{display:none;margin:10px 0 8px;min-width:0}
+.shopdrop-buyer-enhanced198g .shopdrop-buyer-picker198g{display:block}
+.shopdrop-buyer-picker198g .picker-row198g{display:flex;gap:6px;align-items:stretch;min-width:0}
+.shopdrop-buyer-picker198g input[type=search]{flex:1;min-width:0;width:100%;font-size:16px;min-height:44px;background:white;color:#17202a}
+.shopdrop-buyer-picker198g input:disabled{background:#f1f5f9;color:#64748b}
+.shopdrop-buyer-picker198g .picker-row198g button{flex:0 0 auto;width:auto;color:#0f766e;background:#fff;border:1px solid #94a3b8}
+.shopdrop-buyer-picker198g .picker-results198g{max-height:260px;overflow:auto;border:1px solid #cbd5e1;border-radius:7px;margin:5px 0;background:white}
+.shopdrop-buyer-picker198g .picker-results198g button{display:block;width:100%;margin:0;padding:11px 10px;min-height:44px;text-align:left;background:white;color:#17202a;border-radius:0;border-bottom:1px solid #e2e8f0;font-weight:500;overflow-wrap:anywhere}
+.shopdrop-buyer-picker198g .picker-results198g button:hover,.shopdrop-buyer-picker198g .picker-results198g button:focus-visible{background:#ecfdf5}
+.shopdrop-buyer-picker198g p{font-size:14px;color:#526273;margin:5px 0}
+.shopdrop-buyer-picker198g p:empty,.shopdrop-buyer-picker198g [hidden],.shopdrop-buyer-enhanced198g select[hidden],.shopdrop-buyer-enhanced198g label[hidden]{display:none!important}
