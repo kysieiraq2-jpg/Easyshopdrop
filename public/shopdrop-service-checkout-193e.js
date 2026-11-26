@@ -45,7 +45,7 @@
     summary.hidden=false;
   }
   function controls(){reload.disabled=busy;prepare.disabled=busy||!current||prepared;prepare.hidden=!current;}
-  async function load(){if(busy)return;busy=true;current=null;prepared=false;summary.hidden=true;summary.replaceChildren();controls();message('Checking your confirmed appointment…');try{if(!uuid(booking))throw safe('Choose a booking in My Service Appointments.');current=await verify(await session());draw(current);message('Review the total. You may prepare payment, but no money will be collected.');}catch(e){current=null;fail(e);}finally{busy=false;controls();}}
+  async function load(){if(busy)return;busy=true;current=null;prepared=false;summary.hidden=true;summary.replaceChildren();controls();message('Checking your confirmed appointment…');try{if(!uuid(booking))throw safe('Choose a booking in My Service Appointments.');const db=await session();if(!window.ShopDropPaidConfirmation199db?.check)throw safe('Secure payment confirmation is unavailable. Refresh checkout.');if(await window.ShopDropPaidConfirmation199db.check(db,'service',booking,status,reload))return;current=await verify(db);draw(current);message('Review the total. You may prepare payment, but no money will be collected.');}catch(e){current=null;fail(e);}finally{busy=false;controls();}}
   async function submit(){
     if(busy||!current||prepared)return;busy=true;controls();message('Verifying your appointment and preparing checkout…');
     try{const db=await session(),fresh=await verify(db);

@@ -60,7 +60,7 @@
   async function load(){
     if(busy)return;
     busy=true;current=null;prepared=false;summary.hidden=true;summary.replaceChildren();controls();message('Checking your confirmed appointment…');
-    try{if(!uuid(booking))throw safe('No valid booking selected. Return to My Transport Appointments.');const {db}=await session();current=await verifiedSelection(db);draw(current);message('Review the total. You can prepare the checkout, but no money will be collected until the financial service provider is activated.');}
+    try{if(!uuid(booking))throw safe('No valid booking selected. Return to My Transport Appointments.');const {db}=await session();if(!window.ShopDropPaidConfirmation199db?.check)throw safe('Secure payment confirmation is unavailable. Refresh checkout.');if(await window.ShopDropPaidConfirmation199db.check(db,'dispatch',booking,status,reload))return;current=await verifiedSelection(db);draw(current);message('Review the total. You can prepare the checkout, but no money will be collected until the financial service provider is activated.');}
     catch(e){current=null;fail(e);}finally{busy=false;controls();}
   }
   async function submit(){
