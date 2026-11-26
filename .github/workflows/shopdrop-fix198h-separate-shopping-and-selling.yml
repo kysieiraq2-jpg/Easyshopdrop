@@ -1,0 +1,158 @@
+name: ShopDrop Fix 198H Separate Buying and Selling
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix198h-separate-shopping-and-selling.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Separate product shopping and selling
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import os, hashlib, re, subprocess
+        from html.parser import HTMLParser
+        from collections import Counter
+        EXPECTED={
+         'public/index.html':'41d1c7c06e2ebc70ba9fa5b48f53ea7e59dcf9a9',
+         'public/v26-homepage-layout.js':'1522feb76e3ea0a25281254d40030bdbdbba86a0',
+         'public/product-shopping-194a.html':'27b6cd9d6fe6e57aea9f9b414e0faad9a7696000',
+         'public/sell-item.html':'57b0dd19b02166576d7f3681fa12100f5cc8b4df',
+         'public/my-product-advertisements-194d.html':'1331cd85f506f32704dcf7df1918d6b8de216f63',
+         'public/product-search-194b.html':'2c6d540c63cebe8f5e045d7b6ab76d05d2629843',
+        }
+        PROTECTED={
+         'public/taxonomy.json':'43d0163d8238ebaabdba04b919c75e3c8b696191',
+         'public/shopdrop-seller-category-198e.js':'f50c50a314027666dac6700da66b55e90e49803c',
+         'public/shopdrop-seller-category-198e.css':'e5ded5f771bfdecb1d954c5ec4a17fb1fb2441b8',
+         'public/shopdrop-product-orders-194f.js':'00b6251c41c3a24aa6e3cbe602ba06d18fa42567',
+         'public/account.html':'4a45318305017581eded43393bcfa18924957673',
+        }
+        HUB='public/product-shopping-194a.html'
+        NEW='public/product-selling-198h.html'
+        SELL='./product-selling-198h.html?v=198h'
+        BUY='./product-shopping-194a.html?v=198h'
+        PATCHES={
+         'public/index.html':[
+         ('href="./product-shopping-194a.html">Product Shopping &amp; Selling','href="'+BUY+'">Shop Products'),
+         ('href="./product-shopping-194a.html"><h2>Shop Products','href="'+BUY+'"><h2>Shop Products'),
+         ('\n          <a href="./sell-item.html?v=198g">Sell an Item — FREE</a>','\n          <a href="'+SELL+'">Sell an Item — FREE</a>'),
+         ('\n      <a href="./sell-item.html?v=198g">Sell an Item — FREE</a>','\n      <a href="'+SELL+'">Sell an Item — FREE</a>'),
+         ('src="v26-homepage-layout.js?v=198g"','src="v26-homepage-layout.js?v=198h"'),
+         ],
+         'public/sell-item.html': [('<a href="./product-shopping-194a.html">Back to Product Shopping &amp; Selling</a>','<a href="'+SELL+'">Back to Sell an Item — FREE</a>')],
+         'public/my-product-advertisements-194d.html': [('<a href="./product-shopping-194a.html">Product Shopping &amp; Selling</a>','<a href="'+SELL+'">Sell an Item — FREE</a>'),('<a class="btn" href="./product-shopping-194a.html">Back to Product Shopping &amp; Selling</a>','<a class="btn" href="'+SELL+'">Back to Sell an Item — FREE</a>'),('href="./sell-item.html">Sell a Product — FREE / Continue Unfinished Advertisement','href="./sell-item.html?v=198g">Sell an Item — FREE / Continue Unfinished Advertisement')],
+         'public/product-search-194b.html': [('<a href="./product-shopping-194a.html">Product Shopping &amp; Selling</a>','<a href="'+BUY+'">Shop Products</a>')],
+        }
+        # Exact selector change, retaining the earlier selectors as fallbacks.
+        PATCHES['public/v26-homepage-layout.js']=[("actions.querySelector('a[href=\"./sell-item.html?v=198g\"],a[href=\"./sell-item.html\"]');", "actions.querySelector('a[href=\"./product-selling-198h.html?v=198h\"],a[href=\"./sell-item.html?v=198g\"],a[href=\"./sell-item.html\"]');")]
+
+        def blob(raw):return hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
+        def require(ok,msg):
+         if not ok:raise SystemExit(msg)
+        def once(s,a,b):
+         require(s.count(a)==1,'Unexpected or duplicate anchor: '+a[:120]);return s.replace(a,b,1)
+        def inline(raw):return re.findall(rb'<script(?:\s[^>]*)?>([\s\S]*?)</script>',raw)
+        def revise(raw,path):
+         s=raw.decode();out=s
+         for a,b in PATCHES[path]:out=once(out,a,b)
+         restored=out
+         for a,b in reversed(PATCHES[path]):restored=once(restored,b,a)
+         require(restored==s,'Unexpected changes: '+path)
+         result=out.encode()
+         if path.endswith('.html'):require(inline(raw)==inline(result),'Operational inline scripts changed: '+path)
+         return result
+        class Links(HTMLParser):
+         def __init__(self,src):super().__init__();self.links=[];self.feed(src)
+         def handle_starttag(self,tag,attrs):
+          if tag=='a':self.links.append(dict(attrs).get('href'))
+
+        def split_hub(raw):
+         s=raw.decode();before,tail=s.split('<main>\n',1);body,after=tail.split('\n</main>',1)
+         sections=re.findall(r'<section class="panel(?: notice)?">[\s\S]*?</section>',body)
+         require(len(sections)==4,'Unexpected shopping hub sections')
+         intro,selling,shopping,manage=sections
+         require('<h1>Product Shopping &amp; Selling</h1>' in intro and '<h2>Sell Your Products — FREE</h2>' in selling and '<h2>Shop Products</h2>' in shopping and '<h2>Manage Purchases &amp; Sales</h2>' in manage,'Unexpected section structure')
+         require(body=='\n'.join(sections)+'\n<a class="product-menu-194a" href="./index.html">Back to Home</a>','Unexpected content outside sections')
+         buyer_intro=once(intro,'Product Shopping &amp; Selling','Shop Products')
+         buyer_intro=once(buyer_intro,'It is free to browse, register and advertise.','It is free to browse and register.')
+         buyer_intro=once(buyer_intro,'Sign in when you want to buy, sell or check your own orders.','Sign in when you want to buy or check your own orders.')
+         seller_intro=once(intro,'Product Shopping &amp; Selling','Sell an Item — FREE')
+         seller_intro=once(seller_intro,'Look for new, handmade and second-hand products anywhere in South Africa. It is free to browse, register and advertise.','Advertise new, handmade and second-hand products anywhere in South Africa. It is free to register and advertise.')
+         seller_intro=once(seller_intro,'You can look at products without an account. Sign in when you want to buy, sell or check your own orders.','Sign in when you want to advertise an item or check your sales.')
+         links=re.findall(r'<a class="product-menu-194a" href="([^\"]+)">[^<]+</a>',manage)
+         require(len(links)==8 and len(set(links))==8,'Unexpected order management links')
+         buyer_hrefs={'./product-orders-194f.html','./account.html#orders','./tracking.html','./account.html#notifications','./returns.html'}
+         seller_hrefs={'./product-orders-194f.html?role=seller','./payout-statement.html','./account.html#seller-courier-pickup-panel'}
+         require(set(links)==buyer_hrefs|seller_hrefs and not buyer_hrefs&seller_hrefs,'Unknown management link')
+         def select(hrefs):return ''.join(re.findall(r'<a class="product-menu-194a" href="[^\"]+">[^<]+</a>',manage)[links.index(h)] for h in links if h in hrefs)
+         note=re.search(r'<p class="muted">[\s\S]*?</p>',manage)
+         require(note is not None,'Missing seller pickup note')
+         buyer_manage='<section class="panel"><h2>Manage Purchases</h2>'+select(buyer_hrefs)+'</section>'
+         buyer_manage=once(buyer_manage,'>My Purchases &amp; Sales</a>','>All My Orders</a>')
+         seller_manage='<section class="panel"><h2>Manage Sales</h2>'+select(seller_hrefs)+note.group(0)+'</section>'
+         back='<a class="product-menu-194a" href="./index.html">Back to Home</a>'
+         def page(title,parts):return once(before,'<title>Product Shopping &amp; Selling | Shop&amp;Drop</title>','<title>'+title+' | Shop&amp;Drop</title>')+'<main>\n'+'\n'.join(parts+[back])+'\n</main>'+after
+         buyer=page('Shop Products',[buyer_intro,shopping,buyer_manage])
+         seller=page('Sell an Item — FREE',[seller_intro,selling,seller_manage])
+         # Exact selling and buying sections moved without rewriting their links or instructions.
+         require(selling in seller and selling not in buyer and shopping in buyer and shopping not in seller,'Section split failed')
+         old_links=Counter(Links(body).links);new_links=Counter(Links(buyer.split('<main>\n',1)[1]).links+Links(seller.split('<main>\n',1)[1]).links)
+         require(new_links==old_links+Counter({'./index.html':1}),'A link was lost, duplicated or changed')
+         return buyer.encode(),seller.encode()
+
+        def main():
+         require(os.environ.get('GITHUB_REF_NAME')=='shopdrop-phase6-integration','Wrong branch')
+         for name,sha in PROTECTED.items():require(blob(Path(name).read_bytes())==sha,'Protected file differs: '+name)
+         original={};installed={}
+         for name,sha in EXPECTED.items():
+          p=Path(name);b=Path('backups/fix198h')/p.name;raw=p.read_bytes()
+          if b.exists():require(blob(b.read_bytes())==sha,'Unexpected backup: '+name)
+          if blob(raw)==sha:original[name]=raw;installed[name]=False
+          elif b.is_file():original[name]=b.read_bytes();installed[name]=True
+          else:raise SystemExit('Unexpected source version; nothing changed: '+name)
+         buyer,seller=split_hub(original[HUB]);updated={name:revise(raw,name) for name,raw in original.items() if name!=HUB};updated[HUB]=buyer
+         for name,flag in installed.items():
+          if flag:require(Path(name).read_bytes()==updated[name],'Installed file differs: '+name)
+         require(not Path(NEW).exists() or Path(NEW).read_bytes()==seller,'New seller page collision')
+         subprocess.run(['node','--check','-'],input=updated['public/v26-homepage-layout.js'],check=True)
+         if all(installed.values()) and Path(NEW).is_file():print('Fix 198H already installed; verified.');return
+         for name,raw in original.items():
+          b=Path('backups/fix198h')/Path(name).name;b.parent.mkdir(parents=True,exist_ok=True)
+          if not b.exists():b.write_bytes(raw)
+          Path(name).write_bytes(updated[name])
+         Path(NEW).write_bytes(seller)
+         for name,sha in PROTECTED.items():require(blob(Path(name).read_bytes())==sha,'Protected file changed: '+name)
+         print('Fix 198H: buyer/seller sections separated; both seller entrances use one hub; original listing form and order logic preserved.')
+        if __name__=='__main__':main()
+        PYCODE
+        git diff --check
+        git config user.name "ShopDrop Integration"
+        git config user.email "actions@users.noreply.github.com"
+        git add -- public/index.html public/v26-homepage-layout.js public/product-shopping-194a.html public/sell-item.html public/my-product-advertisements-194d.html public/product-search-194b.html public/product-selling-198h.html backups/fix198h/index.html backups/fix198h/v26-homepage-layout.js backups/fix198h/product-shopping-194a.html backups/fix198h/sell-item.html backups/fix198h/my-product-advertisements-194d.html backups/fix198h/product-search-194b.html
+        if ! git diff --cached --quiet; then
+          git commit -m "Fix 198H separate product shopping and selling"
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
