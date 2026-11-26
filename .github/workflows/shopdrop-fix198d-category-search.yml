@@ -1,0 +1,89 @@
+name: ShopDrop Fix 198D Instant Category Search
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix198d-category-search.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Add instant category search to both lists
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import hashlib, os, subprocess
+        SHAS={'public/index.html': '6d5aeb48bc0b02130462b288dcdb648c61634e15', 'public/categories.html': '24038da4a48f137f3b7833a811155490be002250'}
+        TAX_SHA='43d0163d8238ebaabdba04b919c75e3c8b696191'
+        PATCHES={'public/index.html': [('<link rel="stylesheet" href="./shopdrop-unified-cards.css?v=59">\n</head>', '<link rel="stylesheet" href="./shopdrop-unified-cards.css?v=59">\n<link rel="stylesheet" href="./shopdrop-category-search-198d.css?v=198d">\n<script defer src="./shopdrop-category-search-198d.js?v=198d"></script>\n</head>'), ('            <div id="mainMenuCategories"></div>', '            <div class="shopdrop-category-search198d">\n              <label for="shopdropMenuCategory198dInput">Find a category</label>\n              <div class="shopdrop-category-search-row198d">\n                <input type="search" id="shopdropMenuCategory198dInput" placeholder="Type a category name…" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="100" enterkeyhint="done" aria-controls="mainMenuCategories" aria-describedby="shopdropMenuCategory198dStatus">\n                <button type="button" id="shopdropMenuCategory198dClear" hidden>Clear</button>\n              </div>\n              <p id="shopdropMenuCategory198dStatus" role="status" aria-live="polite"></p>\n            </div>\n            <div id="mainMenuCategories"></div>'), ('id="shopdropHomeCategoryLink197a" href="./categories.html?entry=categories&amp;v=198c"', 'id="shopdropHomeCategoryLink197a" href="./categories.html?entry=categories&amp;v=198d"')], 'public/categories.html': [('<link rel="stylesheet" href="./shopdrop-unified-cards.css?v=59">\n</head>', '<link rel="stylesheet" href="./shopdrop-unified-cards.css?v=59">\n<link rel="stylesheet" href="./shopdrop-category-search-198d.css?v=198d">\n<script defer src="./shopdrop-category-search-198d.js?v=198d"></script>\n</head>'), ('<h2 id="shopdropCategoryHeading198b">Browse categories A–Z</h2>\n<div id="cats" class="cats"></div>', '<h2 id="shopdropCategoryHeading198b">Browse categories A–Z</h2>\n<div class="shopdrop-category-search198d">\n  <label for="shopdropPageCategory198dInput">Find a category</label>\n  <div class="shopdrop-category-search-row198d">\n    <input type="search" id="shopdropPageCategory198dInput" placeholder="Type a category name…" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="100" enterkeyhint="done" aria-controls="cats" aria-describedby="shopdropPageCategory198dStatus">\n    <button type="button" id="shopdropPageCategory198dClear" hidden>Clear</button>\n  </div>\n  <p id="shopdropPageCategory198dStatus" role="status" aria-live="polite"></p>\n</div>\n<div id="cats" class="cats"></div>')]}
+        NEWFILES={'public/shopdrop-category-search-198d.js': "/* Fix 198D: filter only visible main-category rows; never change category data or history. */\n(function(){\n 'use strict';\n const normal=value=>String(value||'').normalize('NFKC').trim().toLocaleLowerCase('en-ZA').replace(/\\s+/g,' ');\n function bind(prefix,hostId,rowSelector,getName){\n  const input=document.getElementById(prefix+'Input'),clear=document.getElementById(prefix+'Clear'),status=document.getElementById(prefix+'Status'),host=document.getElementById(hostId);\n  if(!input||!clear||!status||!host)return;\n  function filter(){\n   const query=normal(input.value);\n   const rows=Array.from(host.children).filter(row=>row.matches(rowSelector));\n   let count=0;\n   for(const row of rows){\n    const match=normal(getName(row)).startsWith(query);\n    row.toggleAttribute('data-shopdrop-category-filtered198d',!match);\n    if(match)count++;\n   }\n   clear.hidden=!input.value;\n   const message=!query||!rows.length?'':count?`${count} matching ${count===1?'category':'categories'}`:'No matching categories. Try another letter or clear your search.';\n   if(status.textContent!==message)status.textContent=message;\n  }\n  input.addEventListener('input',filter);\n  input.addEventListener('search',filter);\n  clear.addEventListener('click',()=>{input.value='';filter();input.focus();});\n  // Reapply if either existing menu renderer or the category page replaces its rows.\n  new MutationObserver(filter).observe(host,{childList:true,subtree:true,characterData:true});\n  window.addEventListener('pageshow',filter);\n  filter();\n }\n bind('shopdropMenuCategory198d','mainMenuCategories','details',row=>row.querySelector('summary')?.textContent);\n bind('shopdropPageCategory198d','cats','.cat',row=>row.dataset.name);\n})();\n", 'public/shopdrop-category-search-198d.css': '/* Fix 198D: isolated category search controls and filtered row visibility. */\n.shopdrop-category-search198d{margin:8px 0 12px;padding:0;min-width:0;text-align:left}\n.shopdrop-category-search198d label{display:block;font-size:14px;font-weight:600;margin:0 0 6px;color:inherit}\n.shopdrop-category-search198d .shopdrop-category-search-row198d{display:flex;gap:6px;align-items:stretch;width:100%;min-width:0}\n.shopdrop-category-search198d input[type="search"]{box-sizing:border-box;flex:1 1 0;min-width:0;width:100%;max-width:100%;min-height:44px;padding:10px;border:1px solid #94a3b8;border-radius:8px;background:#fff;color:#17202a;font:inherit;font-size:16px}\n.shopdrop-category-search198d button{box-sizing:border-box;flex:0 0 auto;min-height:44px;padding:8px 10px;border:1px solid #94a3b8;border-radius:8px;background:#fff;color:#0f766e;font:inherit;font-size:14px;cursor:pointer}\n.shopdrop-category-search198d button[hidden],#mainMenuCategories>details[data-shopdrop-category-filtered198d],#cats>.cat[data-shopdrop-category-filtered198d]{display:none!important}\n.shopdrop-category-search198d input:focus-visible,.shopdrop-category-search198d button:focus-visible{outline:2px solid #0f766e;outline-offset:2px}\n.shopdrop-category-search198d p{font-size:13px;color:#475569;margin:6px 0 0;overflow-wrap:anywhere}\n.shopdrop-category-search198d p:empty{display:none}\n'}
+        def blob(raw):
+            return hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
+        def revise(raw,name):
+            revised=raw
+            for old,new in PATCHES[name]:
+                old,new=old.encode(),new.encode()
+                if revised.count(old)!=1 or new in revised:raise SystemExit('Unexpected source anchor: '+name)
+                revised=revised.replace(old,new,1)
+            restored=revised
+            for old,new in reversed(PATCHES[name]):
+                if restored.count(new.encode())!=1:raise SystemExit('Unexpected replacement: '+name)
+                restored=restored.replace(new.encode(),old.encode(),1)
+            if restored!=raw:raise SystemExit('Unapproved source change: '+name)
+            return revised
+        def main():
+            if os.environ.get('GITHUB_REF_NAME')!='shopdrop-phase6-integration':raise SystemExit('Wrong branch')
+            if blob(Path('public/taxonomy.json').read_bytes())!=TAX_SHA:raise SystemExit('Taxonomy changed; nothing installed')
+            plans=[]; installed=0
+            for name,expected in SHAS.items():
+                p=Path(name);b=Path('backups/fix198d')/p.name;raw=p.read_bytes()
+                if blob(raw)==expected:
+                    if b.exists() and b.read_bytes()!=raw:raise SystemExit('Backup collision: '+name)
+                    plans.append((p,b,raw,revise(raw,name)))
+                elif b.is_file() and blob(b.read_bytes())==expected and raw==revise(b.read_bytes(),name):installed+=1
+                else:raise SystemExit('Unexpected source version; nothing installed: '+name)
+            if installed not in (0,len(SHAS)):raise SystemExit('Partial installation; nothing changed')
+            for name,source in NEWFILES.items():
+                p=Path(name)
+                if installed:
+                    if not p.is_file() or p.read_bytes()!=source.encode():raise SystemExit('Installed helper differs: '+name)
+                elif p.exists():raise SystemExit('New file collision: '+name)
+                if name.endswith('.js'):subprocess.run(['node','--check','-'],input=source.encode(),check=True)
+            if installed:
+                print('Fix 198D already installed; verified.');return
+            for p,b,raw,revised in plans:
+                b.parent.mkdir(parents=True,exist_ok=True)
+                if not b.exists():b.write_bytes(raw)
+                p.write_bytes(revised)
+            for name,source in NEWFILES.items():Path(name).write_bytes(source.encode())
+            print('Fix 198D: two category search controls; existing scripts, taxonomy, and navigation preserved.')
+        if __name__=='__main__':main()
+        PYCODE
+        git diff --check
+        git config user.name "ShopDrop Integration"
+        git config user.email "actions@users.noreply.github.com"
+        git add -- public/index.html public/categories.html public/shopdrop-category-search-198d.js public/shopdrop-category-search-198d.css backups/fix198d/index.html backups/fix198d/categories.html
+        if ! git diff --cached --quiet; then
+          git commit -m "Fix 198D instant category search"
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
