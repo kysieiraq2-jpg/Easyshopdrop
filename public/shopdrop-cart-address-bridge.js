@@ -130,7 +130,8 @@
         :'';
       $('newAddressFields').hidden=Boolean(chosen);
       $('cancelAddAddress').hidden=true;
-      $('previewOrderButton').disabled=!chosen;
+      $('previewOrderButton').disabled=!chosen||Boolean(pendingOrderId);
+      if(pendingOrderId&&!isCurrentCheckout())window.ShopDropSingleCourier199da?.clear('Checkout changed. Prepare a new order before obtaining a quotation.');
       $('addressStatus').textContent=chosen?'Your delivery address is selected.':'Complete the address fields above, then tap Save delivery address.';
       say('One seller per checkout. You may purchase multiple items from this seller. Payment is not yet enabled.');
     } catch(e) {say('Cannot load cart/addresses: '+e.message);}
@@ -181,6 +182,7 @@
       quantity: Number(item.quantity)
     })).sort((a,b) => a.product_id.localeCompare(b.product_id)));
   }
+  function isCurrentCheckout(){return Boolean(pendingOrderId&&pendingOrderAddressId&&$('addresses').value===pendingOrderAddressId&&pendingOrderCartSignature===cartSignature()&&$('newAddressFields').hidden);}
   async function place(){
     if (creatingOrder) return;
     const button=$('previewOrderButton');
@@ -196,6 +198,7 @@
           throw Error('Shopping bag changed after order creation. Start a new checkout before payment.');
         if (!pendingOrderAddressId || $('addresses').value !== pendingOrderAddressId)
           throw Error('Delivery address changed after order creation. Re-select the original address or start a new checkout.');
+        if($('country').value==='ZA'&&!window.ShopDropSingleCourier199da?.canPay())throw Error('A valid courier quotation and activated payment provider are required.');
         const method=window.ShopDropPaymentSelection?.read();
         if (!method) throw Error('Choose a payment method first.');
         const courier=window.ShopDropCourierSelection;
@@ -243,15 +246,16 @@
         pendingOrderAddressId=requestedAddressId;
         pendingOrderCartSignature=requestedCartSignature;
         window.ShopDropReservationCountdown?.remember?.(pendingOrderId);
-        if(button) button.textContent='Continue to secure payment';
+        if(button){button.textContent='Proceed to secure payment';button.disabled=true;}
+        await window.ShopDropSingleCourier199da?.refresh();
       }
-      say(reference ? 'Secure order created: '+reference+'. Select a verified courier quote, then continue to payment.' : 'Secure order request accepted. No payment taken. Check your order status before trying again.');
+      say(reference ? 'Secure order created: '+reference+'. Select the appointed courier to obtain a quotation. No payment has been made.' : 'Secure order request accepted. No payment taken. Check your order status before trying again.');
       // Keep the stable request ID until checkout/payment is safely completed.
     } catch(e) {const msg=String(e?.message||'');say(msg.includes('one_seller_per_checkout')?'Only one seller is permitted per checkout. Please purchase from each seller separately.':'Order creation failed: '+(msg||'Please try again.'));}
-    finally {creatingOrder=false;if(button)button.disabled=false;}
+    finally {creatingOrder=false;if(button)button.disabled=pendingOrderId?!window.ShopDropSingleCourier199da?.canPay():!$('addresses').value;}
   }
   const button=$('previewOrderButton');
-  if(button) button.textContent='Create secure order';
+  if(button) button.textContent='Prepare order';
   $('addAnotherAddressButton').addEventListener('click',()=>{
     $('newAddressFields').hidden=false;
     $('cancelAddAddress').hidden=false;
@@ -261,7 +265,7 @@
   $('cancelAddAddress').addEventListener('click',()=>{
     $('newAddressFields').hidden=true;
     $('cancelAddAddress').hidden=true;
-    if(button)button.disabled=!$('addresses').value;
+    if(button)button.disabled=Boolean(pendingOrderId)||!$('addresses').value;
     $('addressStatus').textContent='Your saved delivery address is selected.';
   });
   $('addresses').addEventListener('change',()=>{
@@ -270,7 +274,7 @@
   });
   window.saveAddress=saveAddress;
   window.place=place;
-  window.ShopDropPhase6CartAddress=Object.freeze({load,getPendingOrderId:()=>pendingOrderId});
+  window.ShopDropPhase6CartAddress=Object.freeze({load,getPendingOrderId:()=>pendingOrderId,isCurrentCheckout});
   if(window.ShopDropGeo?.countryOptions) $('country').innerHTML=window.ShopDropGeo.countryOptions('ZA');
   load();
 })();

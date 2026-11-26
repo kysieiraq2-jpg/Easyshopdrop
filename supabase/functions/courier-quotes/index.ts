@@ -1,7 +1,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const VERSION = "SHOPDROP-R7-COURIER-V3-ADDRESS";
+const VERSION = "SHOPDROP-R7-COURIER-V5-199DA-CHECKOUT";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY =
@@ -218,6 +218,98 @@ Deno.serve(async (req) => {
     );
   }
 
+  // Only the buyer can request the new private checkout context.
+  // No addresses, contact details, credentials or seller IDs are returned.
+  if (input.action === "checkout_context") {
+    if (user.id !== order.buyer_id || user.is_anonymous === true) {
+      return reply({ok:false,error:"buyer_access_required"},403);
+    }
+    if (order.currency !== "ZAR" || order.payment_status !== "pending" ||
+        !order.delivery_address_id) {
+      return reply({ok:false,error:"valid_pending_checkout_required"},409);
+    }
+    const [{data:address,error:addressError},
+           {data:groups,error:groupError},
+           {data:totals,error:totalError},
+           {data:approval,error:approvalError}] = await Promise.all([
+      admin.from("addresses").select("id,country_code").eq("id",order.delivery_address_id).eq("user_id",user.id).maybeSingle(),
+      admin.from("fulfilment_groups").select("id,order_id,seller_id,selected_quote_id,currency,delivery_address_id").eq("order_id",orderId).limit(2),
+      admin.rpc("get_order_financial_totals",{p_order_id:orderId}),
+      admin.from("platform_settings").select("is_active,setting_value").eq("setting_key","shopdrop_two_payment_checkout").maybeSingle(),
+    ]);
+    if (addressError || groupError || totalError || approvalError || !address ||
+        address.country_code !== "ZA" || groups?.length !== 1 ||
+        groups[0].currency !== "ZAR" || groups[0].seller_id !== order.seller_id ||
+        (groups[0].delivery_address_id && groups[0].delivery_address_id !== address.id) ||
+        totals?.order_id !== orderId || totals?.currency !== "ZAR" ||
+        Number(totals.seller_count) !== 1) {
+      return reply({ok:false,error:"checkout_details_unavailable"},409);
+    }
+    const group = groups[0];
+    const cents = (value: unknown) => {
+      if (value == null || String(value).trim() === "") return NaN;
+      const n = Number(value);
+      const c = Math.round(n*100);
+      return Number.isSafeInteger(c) && c >= 0 && Math.abs(n*100-c)<0.0001 ? c : NaN;
+    };
+    const productCents = cents(totals.product_total);
+    const feeCents = cents(totals.commission_total);
+    if (!Number.isSafeInteger(productCents) || productCents <= 0 ||
+        !Number.isSafeInteger(feeCents) ||
+        cents(totals.product_plus_commission_total) !== productCents+feeCents) {
+      return reply({ok:false,error:"checkout_amounts_invalid"},409);
+    }
+    const code = String(Deno.env.get("SHOPDROP_APPOINTED_COURIER_CODE") ?? "").trim().toLowerCase();
+    let appointed: Record<string, unknown> | null = null;
+    if (approval?.is_active === true &&
+        approval.setting_value?.courier_provider_confirmed === true &&
+        Deno.env.get("SHOPDROP_COURIER_QUOTATIONS_ENABLED") === "true" &&
+        /^[a-z0-9_-]+$/.test(code)) {
+      const {data:provider,error:providerError} = await admin.from("courier_providers")
+        .select("provider_code,provider_name").eq("provider_code",code)
+        .eq("is_active",true).eq("supports_domestic",true).maybeSingle();
+      const suffix=code.toUpperCase().replace(/[^A-Z0-9]/g,"_");
+      let secureAdapter=false;
+      try {
+        const url=new URL(Deno.env.get("COURIER_ADAPTER_URL_"+suffix) ?? "");
+        secureAdapter=url.protocol==="https:"&&!url.username&&!url.password &&
+          Boolean(Deno.env.get("COURIER_ADAPTER_SECRET_"+suffix));
+      } catch (_) { /* Unconfigured provider remains inactive. */ }
+      if (!providerError && provider && secureAdapter) {
+        appointed={code:provider.provider_code,name:provider.provider_name};
+      }
+    }
+    let quoteResult: Record<string, unknown> | null = null;
+    let courierCents: number | null = null;
+    if (appointed && group.selected_quote_id) {
+      const {data:quote,error:quoteError}=await admin.from("courier_quotes")
+        .select("id,order_id,buyer_id,fulfilment_group_id,courier_name,quote_reference,service_name,amount,currency,status,expires_at")
+        .eq("id",group.selected_quote_id).eq("order_id",orderId)
+        .eq("buyer_id",user.id).eq("fulfilment_group_id",group.id).maybeSingle();
+      if (quoteError) return reply({ok:false,error:"selected_quote_unavailable"},503);
+      const amount=cents(quote?.amount);
+      if (quote && quote.courier_name===code && quote.currency==="ZAR" &&
+          ["active","valid","quoted","available","selected"].includes(String(quote.status).toLowerCase()) &&
+          String(quote.quote_reference ?? "").trim() &&
+          Date.parse(String(quote.expires_at))>Date.now() &&
+          Number.isSafeInteger(amount) && amount>0 &&
+          Number.isSafeInteger(productCents+feeCents+amount)) {
+        courierCents=amount;
+        quoteResult={quote_id:quote.id,quote_reference:quote.quote_reference,
+          provider:code,service_name:quote.service_name,amount:amount/100,
+          currency:"ZAR",expires_at:quote.expires_at};
+      }
+    }
+    return reply({ok:true,order_id:orderId,fulfilment_group_id:group.id,
+      currency:"ZAR",appointed_courier:appointed,quotation_enabled:Boolean(appointed),
+      selected_quote:quoteResult,selection_locked:Boolean(group.selected_quote_id),
+      amounts:{product:productCents/100,shopdrop_commission:feeCents/100,
+        courier:courierCents===null?null:courierCents/100,
+        total:courierCents===null?null:(productCents+feeCents+courierCents)/100},
+      intended_payment_model:"single_provider_payment",
+      live_payment_activated:false});
+  }
+
   // Fix 23E: fail closed before either quotation or selection when the
   // order has no saved delivery address belonging to its buyer.
   if (!order.delivery_address_id || !order.buyer_id) {
@@ -250,20 +342,36 @@ Deno.serve(async (req) => {
       admin.from("fulfilment_groups").select("id,order_id,selected_quote_id,status")
         .eq("id", groupId).eq("order_id", orderId).maybeSingle(),
       admin.from("courier_quotes")
-        .select("id,order_id,buyer_id,fulfilment_group_id,status,expires_at,amount,currency")
+        .select("id,order_id,buyer_id,fulfilment_group_id,status,expires_at,amount,currency,courier_name,quote_reference")
         .eq("id", quoteId).eq("order_id", orderId)
         .eq("buyer_id", user.id).eq("fulfilment_group_id", groupId).maybeSingle(),
     ]);
     if (groupError || quoteError) return reply({ ok: false, error: "quote_selection_lookup_failed" }, 500);
     if (!group || !quote) return reply({ ok: false, error: "quote_selection_not_found" }, 404);
-    if (group.selected_quote_id === quoteId)
-      return reply({ ok: true, order_id: orderId, fulfilment_group_id: groupId, quote_id: quoteId });
-    if (group.selected_quote_id) return reply({ ok: false, error: "courier_selection_already_locked" }, 409);
+    // Do not accept an expired quote even for an idempotent repeat.
     const expiry = Date.parse(String(quote.expires_at ?? ""));
     if (String(quote.status).toLowerCase() !== "quoted" ||
         !Number.isFinite(expiry) || expiry <= Date.now() ||
         !Number.isFinite(Number(quote.amount)) || Number(quote.amount) <= 0)
       return reply({ ok: false, error: "courier_quote_expired_or_invalid" }, 409);
+    if (order.currency === "ZAR") {
+      const approvedCode=String(Deno.env.get("SHOPDROP_APPOINTED_COURIER_CODE") ?? "").trim().toLowerCase();
+      const {data:approval,error:approvalError}=await admin.from("platform_settings")
+        .select("is_active,setting_value").eq("setting_key","shopdrop_two_payment_checkout").maybeSingle();
+      const {data:provider,error:providerError}=await admin.from("courier_providers")
+        .select("provider_code").eq("provider_code",approvedCode)
+        .eq("is_active",true).eq("supports_domestic",true).maybeSingle();
+      if (approvalError || providerError || !provider || approval?.is_active!==true ||
+          approval.setting_value?.courier_provider_confirmed!==true ||
+          Deno.env.get("SHOPDROP_COURIER_QUOTATIONS_ENABLED")!=="true" ||
+          quote.courier_name!==approvedCode || quote.currency!=="ZAR" ||
+          !String(quote.quote_reference ?? "").trim() || order.payment_status!=="pending") {
+        return reply({ok:false,error:"appointed_courier_quote_required"},409);
+      }
+    }
+    if (group.selected_quote_id === quoteId)
+      return reply({ ok: true, order_id: orderId, fulfilment_group_id: groupId, quote_id: quoteId });
+    if (group.selected_quote_id) return reply({ ok: false, error: "courier_selection_already_locked" }, 409);
     // A169 database protections remain authoritative for selection.
     const { data: updated, error: updateError } = await admin.from("fulfilment_groups")
       .update({ selected_quote_id: quoteId })
@@ -430,6 +538,71 @@ Deno.serve(async (req) => {
       product.shipping_height_cm,
     );
 
+  // Fix 199D-A: South African physical-product quotation handoff.
+  // Legacy international fields and routing remain unchanged.
+  const domesticZA = originCountry === "ZA" && destinationCountry === "ZA";
+  let appointedCode: string | null = null;
+  let privateOrigin: Record<string, unknown> = {};
+  let privateDestination: Record<string, unknown> = {};
+  if (domesticZA) {
+    if (user.id !== buyerId || user.is_anonymous === true || buyerId === sellerId) {
+      return reply({ ok: false, error: "buyer_access_required" }, 403);
+    }
+    if (!groupId || order.payment_status !== "pending" ||
+        deliveryAddressId !== order.delivery_address_id || quoteCurrency !== "ZAR") {
+      return reply({ ok: false, error: "valid_pending_checkout_required" }, 409);
+    }
+    if (!lengthCm || !widthCm || !heightCm) {
+      return reply({ ok: false, error: "complete_parcel_dimensions_required" }, 409);
+    }
+    // No real contact data can leave Shop&Drop before an explicitly appointed
+    // courier, its adapter and the quotation activation gate are confirmed.
+    const configuredCode = String(Deno.env.get("SHOPDROP_APPOINTED_COURIER_CODE") ?? "").trim().toLowerCase();
+    const { data: approval, error: approvalError } = await admin
+      .from("platform_settings").select("is_active,setting_value")
+      .eq("setting_key", "shopdrop_two_payment_checkout").maybeSingle();
+    if (approvalError || approval?.is_active !== true ||
+        approval.setting_value?.courier_provider_confirmed !== true ||
+        Deno.env.get("SHOPDROP_COURIER_QUOTATIONS_ENABLED") !== "true" ||
+        !/^[a-z0-9_-]+$/.test(configuredCode)) {
+      return reply({ ok: false, error: "appointed_courier_not_activated" }, 503);
+    }
+    appointedCode = configuredCode;
+    // Use the already ownership-checked, exact selected addresses.
+    // Contact numbers fall back to each party's private profile only.
+    const [{ data: sellerProfile, error: sellerProfileError },
+           { data: buyerProfile, error: buyerProfileError }] = await Promise.all([
+      admin.from("profiles").select("full_name,mobile_number").eq("id", sellerId).maybeSingle(),
+      admin.from("profiles").select("full_name,mobile_number").eq("id", buyerId).maybeSingle(),
+    ]);
+    if (sellerProfileError || buyerProfileError || !sellerProfile || !buyerProfile) {
+      return reply({ ok: false, error: "private_courier_contact_unavailable" }, 409);
+    }
+    const field = (value: unknown) => String(value ?? "").trim();
+    const contact = (address: Record<string, unknown>, profile: Record<string, unknown>) => {
+      const phone = field(address.mobile_number) || field(profile.mobile_number);
+      const digits = phone.replace(/\D/g, "");
+      if (!/^[+0-9 ()-]+$/.test(phone) || digits.length < 9 || digits.length > 15 ||
+          !field(address.address_line_1) || !field(address.city) || !field(address.state_province)) {
+        return null;
+      }
+      return {
+        name: field(address.recipient_name) || field(profile.full_name),
+        mobile_number: phone,
+        address_line_1: field(address.address_line_1),
+        address_line_2: field(address.address_line_2) || null,
+        state_province: field(address.state_province),
+      };
+    };
+    const origin = contact(pickup, sellerProfile);
+    const destination = contact(delivery, buyerProfile);
+    if (!origin || !destination) {
+      return reply({ ok: false, error: "courier_address_or_contact_incomplete" }, 409);
+    }
+    privateOrigin = origin;
+    privateDestination = destination;
+  }
+
   /*
    * GLOBAL COURIER REGISTRY
    *
@@ -514,8 +687,15 @@ Deno.serve(async (req) => {
    * The BUYER chooses.
    */
 
+  const quoteProviders = domesticZA
+    ? availableProviders.filter(({code,row}) =>
+        code === appointedCode && row.is_active === true && row.supports_domestic === true)
+    : availableProviders;
+  if (domesticZA && quoteProviders.length !== 1) {
+    return reply({ ok: false, error: "appointed_courier_not_available" }, 503);
+  }
   const results = await Promise.all(
-    availableProviders.map(
+    quoteProviders.map(
       async ({ code }) => {
         const envCode =
           code
@@ -537,10 +717,18 @@ Deno.serve(async (req) => {
           return [];
         }
 
+        // Refuse non-HTTPS destinations and redirects for protected ZA data.
+        if (domesticZA) {
+          try {
+            const destination = new URL(adapterUrl);
+            if (destination.protocol !== "https:" || destination.username || destination.password) return [];
+          } catch (_) { return []; }
+        }
         try {
           const providerResponse =
             await fetch(adapterUrl, {
               method: "POST",
+              ...(domesticZA ? { redirect: "error" as const } : {}),
 
               headers: {
                 "content-type":
@@ -557,6 +745,7 @@ Deno.serve(async (req) => {
                 ...(groupId ? { fulfilment_group_id: groupId } : {}),
 
                 origin: {
+                  ...privateOrigin,
                   country_code:
                     originCountry,
 
@@ -568,6 +757,7 @@ Deno.serve(async (req) => {
                 },
 
                 destination: {
+                  ...privateDestination,
                   country_code:
                     destinationCountry,
 
@@ -579,6 +769,10 @@ Deno.serve(async (req) => {
                 },
 
                 parcel: {
+                  ...(domesticZA ? {
+                    item_reference: product.listing_reference ?? null,
+                    item_description: product.title ?? null,
+                  } : {}),
                   weight_kg: weightKg,
                   length_cm: lengthCm,
                   width_cm: widthCm,
@@ -662,7 +856,7 @@ Deno.serve(async (req) => {
           console.error(
             VERSION,
             code,
-            error,
+            "courier_adapter_request_failed",
           );
 
           return [];

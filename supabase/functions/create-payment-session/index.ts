@@ -421,6 +421,35 @@ Deno.serve(
     }
 
 
+    // Fix 199D-A: physical-product checkout during the South African launch.
+    // Preserve the dormant international route and all existing financial checks.
+    // Do not prepare or initiate payment before single-provider settlement is tested.
+    const {data:launchSetting,error:launchError}=await admin.from("platform_settings")
+      .select("is_active,setting_value").eq("setting_key","shopdrop_launch_region").maybeSingle();
+    if (launchError || !launchSetting) {
+      return reply({ok:false,error:"launch_configuration_unavailable"},503);
+    }
+    if (launchSetting.is_active===true && launchSetting.setting_value?.launch_country==="ZA") {
+      if (user.is_anonymous===true || order.buyer_id!==user.id ||
+          order.currency!=="ZAR" || deliveryMethod!=="integrated_courier") {
+        return reply({ok:false,error:"south_african_courier_quotation_required"},409);
+      }
+      const {data:checkoutSetting,error:checkoutError}=await admin.from("platform_settings")
+        .select("is_active,setting_value").eq("setting_key","shopdrop_two_payment_checkout").maybeSingle();
+      const cfg=checkoutSetting?.setting_value;
+      if (checkoutError || checkoutSetting?.is_active!==true ||
+          launchSetting.setting_value?.live_payments_enabled!==true ||
+          cfg?.live_checkout_enabled!==true ||
+          cfg?.checkout_model!=="single_provider_payment" ||
+          cfg?.single_provider_settlement_verified!==true ||
+          cfg?.marketplace_provider_confirmed!==true ||
+          cfg?.courier_provider_confirmed!==true ||
+          cfg?.seller_funds_held_by_provider!==true ||
+          cfg?.shopdrop_receives_gross_payment!==false) {
+        return reply({ok:false,error:"single_provider_payment_activation_required"},503);
+      }
+    }
+
     // Fix35: exact seller for single-seller checkout.
     const checkoutSellerId = String(order.seller_id ?? "").trim();
     if (!/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(checkoutSellerId)) {
