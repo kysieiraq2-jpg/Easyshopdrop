@@ -1,0 +1,82 @@
+name: ShopDrop Fix 198F Simple Seller Category Fields
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix198f-simple-seller-category-fields.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Combine category search and selection
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import hashlib, os, subprocess, re
+        SHAS={'public/sell-item.html': '1796f518f8e8c6af263944000fd3d608a5ea8082', 'public/shopdrop-seller-category-198e.js': '4523287fd2f1cab66df4c802418381e387557d3a', 'public/shopdrop-seller-category-198e.css': '7bc0ec3c8469503efda19e2d1b52e4f4d8d4ce58'}
+        PATCHES=[('href="./shopdrop-seller-category-198e.css?v=198e"', 'href="./shopdrop-seller-category-198e.css?v=198f"'), ('src="./shopdrop-seller-category-198e.js?v=198e"', 'src="./shopdrop-seller-category-198e.js?v=198f"'), ('>Find your main category</label>', '>Main category</label>'), ('<label for="shopdropSellerSubcategory198eInput">Find your subcategory</label>', '<label for="shopdropSellerSubcategory198eInput">Subcategory</label>'), ('placeholder="Type the first letters, e.g. Baby"', 'placeholder="Tap or type to choose, e.g. Baby"'), ('placeholder="Type the first letters, e.g. Pram"', 'placeholder="Tap or type to choose, e.g. Pram"')]
+        REPLACEMENTS={'public/shopdrop-seller-category-198e.js': b'/* Fix 198F: one searchable field per choice, backed by the original required selects. */\n(function(root){\n \'use strict\';\n const normal=v=>String(v||\'\').normalize(\'NFKC\').trim().toLocaleLowerCase(\'en-ZA\').replace(/\\s+/g,\' \');\n const words=v=>normal(v).match(/[\\p{L}\\p{N}]+/gu)||[];\n const ignored=new Set([\'a\',\'an\',\'the\',\'new\',\'used\',\'second\',\'hand\',\'secondhand\',\'homemade\',\'handmade\',\'in\',\'good\',\'great\',\'excellent\',\'condition\',\'for\',\'sale\',\'with\',\'and\',\'very\',\'like\',\'of\']);\n const prefix=(names,q)=>names.filter(n=>normal(n).startsWith(normal(q)));\n function titleMatches(catalog,value){\n  const q=normal(value);if(!q)return [];\n  const direct=prefix([...catalog.keys()],q);\n  if(direct.length||q.length<=2)return direct;\n  const tokens=words(q).filter(w=>!ignored.has(w)&&w.length>=2);if(!tokens.length)return [];\n  const ranked=[];\n  for(const [category,subs] of catalog){\n   const base=words(category);let best=0;\n   for(const sub of [\'\',...subs]){const terms=base.concat(words(sub));best=Math.max(best,tokens.filter(t=>terms.some(w=>w.startsWith(t))).length);}\n   if(best)ranked.push([category,best]);\n  }\n  const max=Math.max(0,...ranked.map(r=>r[1]));return ranked.filter(r=>r[1]===max).map(r=>r[0]);\n }\n function bind(catalog){\n  const el=id=>document.getElementById(id),form=el(\'itemForm\'),title=el(\'n\'),category=el(\'c\'),sub=el(\'subcat\');\n  const make=(prefix,select)=>({select,input:el(prefix+\'Input\'),results:el(prefix+\'Results\'),status:el(prefix+\'Status\'),clear:el(prefix+\'Clear\'),label:document.querySelector(\'label[for="\'+select.id+\'"]\')});\n  if(!form||!title||!category||!sub||!catalog.size)return {reset(){}};\n  const cat=make(\'shopdropSellerCategory198e\',category),child=make(\'shopdropSellerSubcategory198e\',sub);\n  if(![cat,child].every(p=>p.input&&p.results&&p.status&&p.clear&&p.label))return {reset(){}};\n  let internal=false,skipFocus=false;\n  const names=()=>[...catalog.keys()];const children=()=>catalog.get(category.value)||[];\n  function close(p){p.results.hidden=true;p.results.replaceChildren();p.status.textContent=\'\';p.input.setAttribute(\'aria-expanded\',\'false\');}\n  function valid(){\n   const catOK=names().includes(category.value)&&cat.input.value===category.value;\n   const subOK=catOK&&children().includes(sub.value)&&child.input.value===sub.value;\n   cat.input.setCustomValidity(catOK?\'\':\'Choose a main category from the list.\');\n   child.input.disabled=!catOK;child.input.required=catOK;\n   child.input.setCustomValidity(!catOK||subOK?\'\':\'Choose a subcategory from the list.\');\n   cat.clear.hidden=!cat.input.value;child.clear.hidden=child.input.disabled||!child.input.value;\n  }\n  function reset(){cat.input.value=category.value;child.input.value=sub.value;close(cat);close(child);valid();}\n  function setSelect(p,value){\n   internal=true;\n   try{p.select.value=value;if(!value)p.select.selectedIndex=-1;p.select.dispatchEvent(new Event(\'change\',{bubbles:true}));}\n   finally{internal=false;}\n  }\n  function choose(p,name){\n   if(!(p===cat?names():children()).includes(name))return;\n   if(p.select.value!==name){setSelect(p,name);if(p===cat){child.input.value=sub.value;close(child);}}\n   p.input.value=name;close(p);valid();\n   // Return focus to the confirmed field without reopening its choices.\n   skipFocus=true;try{p.input.focus({preventScroll:true});}finally{skipFocus=false;}\n  }\n  function draw(p,values){\n   if(p.input.disabled)return;\n   const other=p===cat?child:cat;close(other);p.results.replaceChildren();\n   p.results.hidden=!values.length;p.input.setAttribute(\'aria-expanded\',String(Boolean(values.length)));\n   p.status.textContent=values.length?`${values.length} matching ${p===cat?\'categories\':\'subcategories\'}. Tap one to select.`:\'No matches. Try another letter or clear the field.\';\n   for(const name of values){const b=document.createElement(\'button\');b.type=\'button\';b.textContent=name;b.addEventListener(\'pointerdown\',e=>e.preventDefault());b.addEventListener(\'click\',()=>choose(p,name));p.results.append(b);}\n  }\n  function options(p,all=false){const list=p===cat?names():children();draw(p,all?list:prefix(list,p.input.value));}\n  function edit(p){\n   if(p.select.value&&p.input.value!==p.select.value){setSelect(p,\'\');if(p===cat){child.input.value=\'\';close(child);}}\n   valid();options(p);\n  }\n  function clear(p){p.input.value=\'\';edit(p);p.input.focus();options(p,true);}\n  for(const p of [cat,child]){\n   p.input.required=p===cat;\n   p.input.addEventListener(\'focus\',()=>{if(!skipFocus)options(p,!!p.select.value);});\n   p.input.addEventListener(\'click\',()=>{if(p.results.hidden)options(p,!!p.select.value);});\n   p.input.addEventListener(\'input\',()=>edit(p));\n   p.input.addEventListener(\'search\',()=>edit(p));\n   p.clear.addEventListener(\'click\',()=>clear(p));\n   p.input.addEventListener(\'keydown\',e=>{\n    if(e.key===\'Enter\'){e.preventDefault();if(p.results.hidden)options(p,!!p.select.value);}\n    if(e.key===\'Escape\'){e.preventDefault();close(p);}\n    if(e.key===\'ArrowDown\'){e.preventDefault();if(p.results.hidden)options(p,!!p.select.value);p.results.querySelector(\'button\')?.focus();}\n   });\n   p.results.addEventListener(\'keydown\',e=>{if(e.key===\'Escape\'){e.preventDefault();close(p);skipFocus=true;try{p.input.focus();}finally{skipFocus=false;}}});\n   // Original required selects remain authoritative; the visible fields report validity.\n   p.select.addEventListener(\'invalid\',e=>e.preventDefault());\n  }\n  title.addEventListener(\'input\',()=>{if(!category.value&&!cat.input.value){const matches=titleMatches(catalog,title.value);if(matches.length)draw(cat,matches);else close(cat);}});\n  category.addEventListener(\'change\',()=>{if(!internal)reset();});\n  sub.addEventListener(\'change\',()=>{if(!internal){child.input.value=sub.value;close(child);valid();}});\n  function outside(e){for(const p of [cat,child]){const block=p.input.closest(\'.shopdrop-seller-search198e\');if(!block.contains(e.target)&&!(p===cat&&e.target===title))close(p);}}\n  document.addEventListener(\'pointerdown\',outside);document.addEventListener(\'focusin\',outside);\n  reset();\n  for(const p of [cat,child]){p.select.hidden=true;p.label.hidden=true;}\n  form.classList.add(\'shopdrop-seller-picker198f\');\n  return {reset};\n }\n root.ShopDropSellerCategory198e=Object.freeze({bind,titleMatches,prefix});\n})(globalThis);\n', 'public/shopdrop-seller-category-198e.css': b'/* Fix 198F: only two visible searchable category fields after successful enhancement. */\n.shopdrop-seller-search198e{display:none;margin:10px 0 8px;min-width:0}\n.shopdrop-seller-picker198f .shopdrop-seller-search198e{display:block}\n.shopdrop-seller-picker198f select[hidden],.shopdrop-seller-picker198f label[hidden],.shopdrop-seller-search198e [hidden]{display:none!important}\n.shopdrop-seller-search198e .search-row198e{display:flex;align-items:stretch;gap:6px;min-width:0}\n.shopdrop-seller-search198e input{flex:1;min-width:0;width:100%;font-size:16px;min-height:44px;background:#fff;color:#17202a}\n.shopdrop-seller-search198e input:disabled{background:#f1f5f9;color:#64748b}\n.shopdrop-seller-search198e .search-row198e button{flex:0 0 auto;width:auto;margin:0;color:#0f766e;background:#fff;border:1px solid #94a3b8;min-height:44px}\n.shopdrop-seller-search198e .search-results198e{max-height:260px;overflow:auto;border:1px solid #cbd5e1;border-radius:7px;margin:5px 0;background:#fff}\n.shopdrop-seller-search198e .search-results198e button{display:block;width:100%;margin:0;padding:11px 10px;min-height:44px;text-align:left;background:#fff;color:#17202a;border-radius:0;border-bottom:1px solid #e2e8f0;font-weight:500;overflow-wrap:anywhere}\n.shopdrop-seller-search198e .search-results198e button:hover,.shopdrop-seller-search198e .search-results198e button:focus-visible{background:#ecfdf5}\n.shopdrop-seller-search198e p{font-size:14px;color:#526273;margin:5px 0}\n.shopdrop-seller-search198e p:empty{display:none}\n'}
+        TAX_SHA='43d0163d8238ebaabdba04b919c75e3c8b696191'
+        def blob(raw):return hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
+        def revise(path,raw):
+            if path in REPLACEMENTS:return REPLACEMENTS[path]
+            changed=raw
+            for old,new in PATCHES:
+                a,b=old.encode(),new.encode()
+                if changed.count(a)!=1 or b in changed:raise SystemExit('Unexpected seller form anchor: '+old)
+                changed=changed.replace(a,b,1)
+            restored=changed
+            for old,new in reversed(PATCHES):restored=restored.replace(new.encode(),old.encode(),1)
+            if restored!=raw:raise SystemExit('Unapproved HTML change')
+            # All existing module logic and form values must remain byte-identical.
+            assert re.findall(rb'<script type="module">([\s\S]*?)</script>',raw)==re.findall(rb'<script type="module">([\s\S]*?)</script>',changed)
+            return changed
+        def main():
+            if os.environ.get('GITHUB_REF_NAME')!='shopdrop-phase6-integration':raise SystemExit('Wrong branch')
+            if blob(Path('public/taxonomy.json').read_bytes())!=TAX_SHA:raise SystemExit('Unexpected taxonomy; no changes installed')
+            plans=[];installed=[]
+            for name,sha in SHAS.items():
+                p=Path(name);b=Path('backups/fix198f')/p.name;raw=p.read_bytes()
+                if blob(raw)==sha:
+                    if b.exists() and b.read_bytes()!=raw:raise SystemExit('Backup collision: '+name)
+                    plans.append((p,b,raw,revise(name,raw)))
+                elif b.is_file() and blob(b.read_bytes())==sha and raw==revise(name,b.read_bytes()):installed.append(name)
+                else:raise SystemExit('Unexpected source: '+name+'; no changes installed')
+            if installed and plans:raise SystemExit('Partial installation detected; no changes installed')
+            if installed:print('Fix 198F already installed; verified.');return
+            subprocess.run(['node','--check','-'],input=REPLACEMENTS['public/shopdrop-seller-category-198e.js'],check=True)
+            for p,b,raw,changed in plans:
+                b.parent.mkdir(parents=True,exist_ok=True)
+                if not b.exists():b.write_bytes(raw)
+                p.write_bytes(changed)
+            print('Fix 198F: two searchable selectors; existing required selects and submission module preserved.')
+        if __name__=='__main__':main()
+        PYCODE
+        git diff --check
+        git config user.name "ShopDrop Integration"
+        git config user.email "actions@users.noreply.github.com"
+        git add -- public/sell-item.html public/shopdrop-seller-category-198e.js public/shopdrop-seller-category-198e.css backups/fix198f/sell-item.html backups/fix198f/shopdrop-seller-category-198e.js backups/fix198f/shopdrop-seller-category-198e.css
+        if ! git diff --cached --quiet; then
+          git commit -m "Fix 198F simplify seller category selection"
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
