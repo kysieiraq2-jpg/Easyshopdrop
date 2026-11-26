@@ -143,10 +143,6 @@
       anchor=anchor?moveAfter(how,anchor):(main.prepend(how),how);
     }
 
-    if(contact){
-      anchor=moveAfter(contact,anchor||how);
-    }
-
     if(how && intro && intro!==how){
       const introWrap=document.createElement("div");
       introWrap.className="v26-shopdrop-introduction";
@@ -155,7 +151,9 @@
         introWrap.appendChild(intro.firstChild);
       }
 
-      how.appendChild(introWrap);
+      const heading=how.querySelector("h2");
+      if(heading)heading.insertAdjacentElement("afterend",introWrap);
+      else how.prepend(introWrap);
       intro.hidden=true;
     }
 
@@ -340,6 +338,11 @@
     if(featured){
       anchor=moveAfter(featured,anchor||categories);
     }
+
+    // Fix 198L: keep contact and policy links after all marketplace content.
+    const support=document.getElementById("v26HomeExtension");
+    if(contact)main.appendChild(contact);
+    if(support)main.appendChild(support);
 
     // V26_11_CONTACT_PRESENTATION:
     // Preserve existing contact hrefs and configuration.
