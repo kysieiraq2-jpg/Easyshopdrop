@@ -1,0 +1,214 @@
+name: ShopDrop Fix 198K Unified Navigation
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix198k-unified-navigation.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Reconcile existing menu and homepage navigation
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        from html.parser import HTMLParser
+        from collections import Counter
+        from html import escape
+        import os,re,hashlib
+        
+        INDEX='public/index.html'
+        HUB='public/my-purchases-sales-198j.html'
+        EXPECTED={INDEX:'30380e636510c9b8601252bde912e61470f35cde',HUB:'596f5f0271437800509e098383f04e90dfa5deb4'}
+        PROTECTED={
+        'public/account.html':'4a45318305017581eded43393bcfa18924957673',
+        'public/sign-in.html':'26da37b2951e5dcf4ff669bf7c9d2f3113330f89',
+        'public/v26-homepage-layout.js':'d8f2ceaede3eb6b0256313331addf72474079c87',
+        'public/shopdrop-language.js':'e9e80e90b454b943bdd4bfefd3f5b66e18e6d53b',
+        'public/taxonomy.json':'43d0163d8238ebaabdba04b919c75e3c8b696191',
+        'public/categories.html':'9f8972364b4d9d9076941c16b495add26bba1f31',
+        'public/category-results.html':'90d3d26da4cf7514dbeffa9df1e69b634ea6a587',
+        'public/shopdrop-category-search-198d.js':'45c535605e1cd84ad5a41ca615e435ce1dc72fff',
+        'public/sell-item.html':'71ff081513a0666bf3f43bdc086a4926a645c26a',
+        'public/product-shopping-194a.html':'0bb295aba4ad70c7d82682e4791527d470334485',
+        'public/product-search-194b.html':'4ded57f2acd8a980146b0f8dd1022e5e042a9040',
+        'public/shopdrop-buyer-picker-198g.js':'e9139969ad71673246a30a0f6a8d96d2c057bf81',
+        'public/shopdrop-seller-category-198e.js':'f50c50a314027666dac6700da66b55e90e49803c',
+        'public/checkout.html':'252f15c4af34e25494aeb6bcfa5e119f14ea2c17',
+        'public/services.html':'35c60a32a7568eeaebb29b94a87ac836e4c740b1',
+        'public/dispatching.html':'6aa208477f8e068321a6debe310eaf2ecddf29cc',
+        'public/seller.html':'a0cd1043b3559c24ba7cdc6223c8fbb37f61ef58',
+        'public/product-orders-194f.html':'0ffa4c23e45c4e84156b2b803ce368e6eedcb50d',
+        'public/my-product-advertisements-194d.html':'e87d2ea671c835e4f95f3441eb178135d0c657e2',
+        'public/shopdrop-division-layout-195d.css':'ead47f8900c64fb7cea190da2ffa205e1fba1156',
+        }
+        DEST='./my-purchases-sales-198j.html?v=198k'
+        OLDDEST='./my-purchases-sales-198j.html?v=198j'
+        CAT='./categories.html?entry=categories&v=198d'
+        MENU_START='<nav id="menu" class="menu shopdrop-main-menu" hidden aria-label="Main menu">'
+        CAT_START='          <button class="shopdrop-menu-link shopdrop-products-toggle" id="productsCategoriesButton"'
+        CAT_END='            <div id="mainMenuCategories"></div>\n          </section>'
+        SUPPORT=[('Returns & Disputes','./returns.html'),('Complaints & Suggestions','./feedback.html'),('How Shop&Drop Works','./help.html'),('Terms & Conditions','./terms.html'),('Privacy Policy','./privacy.html'),('Administrator Sign In','./admin-login.html')]
+        PRIMARY=[('Shop Products','./product-shopping-194a.html?v=198j'),('Sell an Item — FREE','./sell-item.html?v=198j'),('Other Services','./services.html'),('Transport Services & Equipment Hire','./dispatching.html')]
+        SHORTCUTS=[('Browse All Items','./categories.html#browse-all-items'),('Sign In / Create Account','./sign-in.html'),('My Account',DEST),('My Shopping Bag','./checkout.html')]
+        MOVED=[('./categories.html?view=new','public/product-shopping-194a.html'),('./account.html','hub'),('./tracking.html','hub'),('./seller.html','hub'),('./seller.html#list-service','hub')]
+        CSS='''<style id="shopdrop-navigation-198k">
+        /* Fix 198K: homepage and main menu presentation only. */
+        #menu.shopdrop-main-menu{padding:9px 10px 12px;line-height:1.35}
+        #menu.shopdrop-main-menu .menu-heading198k{font-size:11px;font-weight:700;letter-spacing:.055em;color:#64748b;padding:9px 9px 4px;margin-top:6px;border-top:1px solid #e2e8f0;text-transform:uppercase}
+        #menu.shopdrop-main-menu>a,#menu.shopdrop-main-menu>#productsCategoriesButton{display:flex;align-items:center;min-height:44px;font-size:14px;font-weight:600;padding:9px 10px;white-space:normal;overflow-wrap:anywhere;text-align:left;line-height:1.35;border-radius:7px}
+        #menu.shopdrop-main-menu>a:focus-visible,#menu.shopdrop-main-menu>#productsCategoriesButton:focus-visible{outline:2px solid #0f766e;outline-offset:-2px}
+        #productsCategoriesPanel .category-direct198k{display:block;padding:10px 4px;color:#0f766e;font-weight:700;text-decoration:underline;line-height:1.4}
+        #shopdropHeader .shopdrop-header-account,#shopdropHeader .shopdrop-header-bag{background:#0f766e!important;color:#fff!important;border:1px solid #0f766e!important;font-size:13px!important;line-height:1.3!important;white-space:normal!important;text-align:center!important}
+        #shopdropHomeSupport198k{background:#fff;border:1px solid #dce2ea;border-radius:12px;padding:14px;margin:14px 0 0}
+        #shopdropHomeSupport198k h2{font-size:17px;line-height:1.3;margin:0 0 10px;color:#17202a}
+        #shopdropHomeSupport198k .support-grid198k{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+        #shopdropHomeSupport198k a{display:flex;align-items:center;justify-content:center;min-height:52px;padding:10px 7px;background:#0f766e;color:#fff;font-size:13px;line-height:1.35;font-weight:700;text-align:center;border-radius:9px;text-decoration:none;white-space:normal;overflow-wrap:anywhere}
+        #shopdropHomeSupport198k a:focus-visible{outline:3px solid #17202a;outline-offset:2px}
+        @media(min-width:760px){#shopdropHomeSupport198k .support-grid198k{grid-template-columns:repeat(3,minmax(0,1fr))}}
+        </style>'''
+        def require(ok,msg):
+         if not ok:raise SystemExit(msg)
+        def blob(raw):return hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
+        def change(s,a,b,n=1):
+         require(s.count(a)==n,'Unexpected anchor: '+a[:100]);return s.replace(a,b)
+        def scripts(s):return re.findall(r'<script\b[^>]*>[\s\S]*?</script>',s,re.I)
+        class Links(HTMLParser):
+         def __init__(self,s):super().__init__();self.hrefs=[];self.ids=[];self.feed(s)
+         def handle_starttag(self,tag,attrs):
+          a=dict(attrs)
+          if 'id' in a:self.ids.append(a['id'])
+          if tag=='a' and a.get('href'):self.hrefs.append(a['href'])
+        def links(s):return Counter(Links(s).hrefs)
+        def link(name,href,cls=''):
+         return '<a'+(' class="'+cls+'"' if cls else '')+' href="'+escape(href,quote=True)+'">'+escape(name)+'</a>'
+        def menu_link(pair):return '          '+link(*pair)
+        def heading(name):return '          <div class="menu-heading198k">'+escape(name)+'</div>'
+        def button(name,href):return link(name,href,'product-menu-194a')
+        def section(name,items):return '<section class="panel"><h2>'+escape(name)+'</h2>'+''.join(button(*x) for x in items)+'</section>'
+        
+        def transform(original):
+         index=original[INDEX].decode();hub=original[HUB].decode()
+         require(index.count(MENU_START)==1,'Unexpected menu')
+         before,rest=index.split(MENU_START,1);oldnav,after=rest.split('</nav>',1)
+         require(oldnav.count(CAT_START)==1 and oldnav.count(CAT_END)==1,'Missing category controls')
+         cat=oldnav[oldnav.index(CAT_START):oldnav.index(CAT_END)+len(CAT_END)]
+         # Preserve all category control bytes, adding only a direct page shortcut.
+         cat2=change(cat,'            <div class="shopdrop-category-search198d">','            '+link('Browse Product Categories',CAT,'category-direct198k')+'\n            <div class="shopdrop-category-search198d">')
+         nav='\n'+'\n'.join([menu_link(('Home','./index.html')),heading('Shopping & selling'),menu_link(PRIMARY[0]),menu_link(SHORTCUTS[0]),cat2,*map(menu_link,PRIMARY[1:]),heading('Your account'),menu_link(SHORTCUTS[1]),menu_link(SHORTCUTS[2]),menu_link(SHORTCUTS[3]),heading('Help & information'),*map(menu_link,SUPPORT[:-1]),heading('Administration'),menu_link(SUPPORT[-1])])+'\n        '
+         idx=before+MENU_START+nav+'</nav>'+after
+         # Existing header quick links: align names and appearance, preserve targets and classes.
+         idx=change(idx,'href="./sign-in.html">Sign In / Account</a>','href="./sign-in.html">Sign In / Create Account</a>')
+         idx=change(idx,'href="./checkout.html">Bag</a>','href="./checkout.html">My Shopping Bag</a>')
+         idx=change(idx,'<strong>BROWSE ALL ADVERTISEMENTS</strong>','<strong>Browse All Items</strong>')
+         idx=change(idx,'>BROWSE ALL ITEMS</a><p>Explore available','>Browse All Items</a><p>Explore available')
+         # Keep the four existing green tile sources and their layout script unchanged.
+         idx=change(idx,'href="./services.html"><h2>Find Other Services</h2>','href="./services.html"><h2>Other Services</h2>')
+         # Existing account block is relabelled, not a new page or new account system.
+         idx=change(idx,'id="shopdropHomeManage198j" href="'+OLDDEST+'"','id="shopdropHomeManage198j" href="'+DEST+'"')
+         idx=change(idx,'<strong>My Purchases &amp; Sales</strong><small style="font-size:13px;font-weight:400;color:#fff;">Manage your purchases, sales and payments</small>','<strong>My Account</strong><small style="font-size:13px;font-weight:400;color:#fff;">Purchases, sales, orders and payments</small>')
+         marker='\n</section>\n<section class="section" id="products">'
+         support='<section id="shopdropHomeSupport198k" aria-label="Help and information"><h2>Help &amp; Information</h2><div class="support-grid198k">'+''.join(link(*p) for p in SUPPORT)+'</div></section>'
+         idx=change(idx,marker,'\n'+support+marker)
+         idx=change(idx,'<link rel="stylesheet" href="./shopdrop-unified-cards.css?v=59">','<link rel="stylesheet" href="./shopdrop-unified-cards.css?v=59">\n'+CSS)
+         require(scripts(idx)==scripts(index),'Homepage operational scripts changed')
+         # Restore exact category panel to verify its existing controls have not been altered.
+         require(change(cat2,'            '+link('Browse Product Categories',CAT,'category-direct198k')+'\n','')==cat,'Category controls changed')
+         # Consolidate existing management gateway, preserving every original link.
+         h=change(hub,'<title>My Purchases &amp; Sales | Shop&amp;Drop</title>','<title>My Account | Shop&amp;Drop</title>')
+         h=change(h,'<h1>My Purchases &amp; Sales</h1>','<h1>My Account</h1>')
+         h=change(h,'Manage the products you bought and sold, track your orders and view your payments.','Manage your personal details, purchases, sales, service bookings, transport bookings and payments in one place.')
+         h=change(h,'href="./checkout.html">My Bag</a>','href="./checkout.html">My Shopping Bag</a>')
+         h=change(h,'href="./account.html">My Account</a>','href="./account.html">My Profile &amp; Account Details</a>')
+         h=change(h,'<h2>Manage My Purchases</h2>','<h2>My Purchases</h2>')
+         h=change(h,'<h2>Manage My Sales</h2>','<h2>My Sales</h2>'+button('My Product Advertisements','./my-product-advertisements-194d.html'))
+         h=change(h,'href="./checkout.html">My Shopping Bag / Checkout</a>','href="./checkout.html">My Shopping Bag</a>')
+         # Place existing shared notifications, dispute and payment links under appropriate groups.
+         notifications=button('My Notifications','./account.html#notifications')
+         disputes=button('Returns & Disputes','./returns.html')
+         receive=button('Receive My Payment','./account.html#shopdropPaymentPurpose195a')
+         payout=button('My Payout Statement','./payout-statement.html')
+         for element in (notifications,disputes,receive,payout):h=change(h,element,'')
+         profile=section('My Personal Details',[('My Profile & Account Details','./account.html')])
+         services=section('My Services & Transport',[('Seller / Service Provider Centre','./seller.html'),('List a Service — FREE','./seller.html#list-service'),('My Service Bag','./service-bag-193c.html'),('My Service Appointments','./service-appointments-193d.html'),('Requests for My Service Advertisements','./service-appointments-193d.html?role=provider'),('My Transport Bag','./dispatch-bag-192dc.html'),('My Transport Appointments','./dispatch-appointments-192dd.html'),('Requests for My Transport Advertisements','./dispatch-appointments-192dd.html?role=provider'),('Availability Calendar','./availability.html')])
+         payments=section('My Payments',[('Receive My Payment','./account.html#shopdropPaymentPurpose195a'),('My Payout Statement','./payout-statement.html'),('Financial Statement','./financial-statement.html'),('Receipts & Transaction History','./receipts.html')])
+         support2=section('My Notifications & Support',[('My Notifications','./account.html#notifications'),('Returns & Disputes','./returns.html'),('Cancellations','./cancellations.html'),('Payment Disputes','./payment-disputes.html')])
+         h=change(h,'<section class="panel"><h2>My Purchases</h2>',profile+'\n<section class="panel"><h2>My Purchases</h2>')
+         h=change(h,button('Back to Home','./index.html'),services+'\n'+payments+'\n'+support2+'\n'+button('Back to Home','./index.html'))
+         require(scripts(h)==scripts(hub)==[],'Account gateway must remain static')
+         require(not (links(hub)-links(h)),'Existing gateway destination lost')
+         # Validate top-level menu targets match existing homepage links, and no legacy action lost.
+         nav_links=links(nav)
+         for label,href in PRIMARY+SHORTCUTS+SUPPORT:
+          require(nav_links[href]==1,'Menu action missing or duplicated: '+label)
+          require(links(idx)[href]>=2,'Homepage action missing: '+label)
+         require(nav_links[CAT]==1 and links(idx)[CAT]>=2,'Shared category destination missing')
+         require(nav_links['./index.html']==1,'Home missing')
+         for href,where in MOVED:
+          if where=='hub':require(links(h)[href]>=1,'Relocated account action missing: '+href)
+          else:require(links(Path(where).read_text())[href]>=1,'Relocated shopping action missing: '+href)
+         old_menu=links(oldnav)
+         removed=old_menu-nav_links
+         allowed={OLDDEST,'./categories.html?view=new','./account.html','./tracking.html','./seller.html','./seller.html#list-service'}
+         require(set(removed)<=allowed,'Unaccounted old menu link: '+str(removed))
+         for ident in ('productsCategoriesButton','productsCategoriesPanel','mainMenuCategories','shopdropMenuCategory198dInput','shopdropHomeCategoryLink197a','shopdropHomeManage198j','shopdropHomeSupport198k'):
+          require(Links(idx).ids.count(ident)==1,'Missing or duplicate DOM id: '+ident)
+         return {INDEX:idx.encode(),HUB:h.encode()}
+        
+        def main():
+         require(os.environ.get('GITHUB_REF_NAME')=='shopdrop-phase6-integration','Wrong branch')
+         for name,sha in PROTECTED.items():require(blob(Path(name).read_bytes())==sha,'Protected file changed: '+name)
+         original={};installed={}
+         for name,sha in EXPECTED.items():
+          p=Path(name);b=Path('backups/fix198k')/p.name;raw=p.read_bytes()
+          if b.exists():require(blob(b.read_bytes())==sha,'Backup collision: '+name)
+          if blob(raw)==sha:original[name]=raw;installed[name]=False
+          elif b.is_file():original[name]=b.read_bytes();installed[name]=True
+          else:raise SystemExit('Unexpected source version: '+name)
+         updated=transform(original)
+         for name,flag in installed.items():
+          if flag:require(Path(name).read_bytes()==updated[name],'Unexpected installed version: '+name)
+         # Check actual local files and account fragments for every static gateway and menu target.
+         for href in links(updated[HUB].decode())+Counter(dict((url,1) for _,url in PRIMARY+SHORTCUTS+SUPPORT))+Counter({CAT:1}):
+          if not href.startswith('./'):continue
+          relative=href[2:].split('?',1)[0].split('#',1)[0];path=Path('public',relative)
+          require(path.is_file(),'Missing destination: '+href)
+          if '#' in href:
+           fragment=href.split('#',1)[1];require(fragment in Links(path.read_text()).ids,'Missing fragment: '+href)
+         if all(installed.values()):print('Fix 198K already installed; verified.');return
+         for name,raw in original.items():
+          p=Path(name);b=Path('backups/fix198k')/p.name;b.parent.mkdir(parents=True,exist_ok=True)
+          if not b.exists():b.write_bytes(raw)
+          p.write_bytes(updated[name])
+         for name,sha in PROTECTED.items():require(blob(Path(name).read_bytes())==sha,'Protected file changed: '+name)
+         print('Fix 198K: menu and homepage labels reconciled; existing account gateway consolidated; protected sources and inline scripts unchanged.')
+        if __name__=='__main__':main()
+        PYCODE
+        git diff --check
+        git config user.name "ShopDrop Integration"
+        git config user.email "actions@users.noreply.github.com"
+        git add -- public/index.html public/my-purchases-sales-198j.html backups/fix198k/index.html backups/fix198k/my-purchases-sales-198j.html
+        if ! git diff --cached --quiet; then
+          git commit -m "Fix 198K unify homepage menu and account navigation"
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
