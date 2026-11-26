@@ -1,0 +1,73 @@
+name: ShopDrop Fix 198C Open Categories at Top
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix198c-category-page-top.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Remove automatic jump down the categories page
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import os, hashlib
+        EXPECTED='8214b1617a2da9a4556d65a9d40a0443008b8842'
+        CATEGORY_SHA='24038da4a48f137f3b7833a811155490be002250'
+        OLD='id="shopdropHomeCategoryLink197a" href="./categories.html?entry=categories&amp;v=198b#shopdropCategoryList198b"'
+        NEW='id="shopdropHomeCategoryLink197a" href="./categories.html?entry=categories&amp;v=198c"'
+        P=Path('public/index.html')
+        B=Path('backups/fix198c/index.html')
+        def blob(raw):
+            return hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
+        def revise(raw):
+            old,new=OLD.encode(),NEW.encode()
+            if raw.count(old)!=1 or new in raw:raise SystemExit('Unexpected homepage anchor')
+            changed=raw.replace(old,new,1)
+            if changed.replace(new,old,1)!=raw:raise SystemExit('Unapproved source change')
+            return changed
+        def main():
+            if os.environ.get('GITHUB_REF_NAME')!='shopdrop-phase6-integration':raise SystemExit('Wrong branch')
+            if blob(Path('public/categories.html').read_bytes())!=CATEGORY_SHA:raise SystemExit('Category page changed; nothing installed')
+            raw=P.read_bytes()
+            if blob(raw)==EXPECTED:
+                if B.exists() and B.read_bytes()!=raw:raise SystemExit('Backup collision')
+                changed=revise(raw)
+            elif B.is_file() and blob(B.read_bytes())==EXPECTED and raw==revise(B.read_bytes()):
+                print('Fix 198C already installed; verified.');return
+            else:raise SystemExit('Unexpected homepage source; nothing installed')
+            B.parent.mkdir(parents=True,exist_ok=True)
+            if not B.exists():B.write_bytes(raw)
+            P.write_bytes(changed)
+            print('Fix 198C: one homepage link changed; category page unchanged.')
+        if __name__=='__main__':main()
+        PYCODE
+        git diff --check
+        git config user.name "ShopDrop Integration"
+        git config user.email "actions@users.noreply.github.com"
+        git add -- public/index.html backups/fix198c/index.html
+        if ! git diff --cached --quiet; then
+          git commit -m "Fix 198C open category page at top"
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
