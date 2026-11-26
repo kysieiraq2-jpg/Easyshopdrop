@@ -1,0 +1,94 @@
+name: ShopDrop Fix 198G Buyer Search and Seller Links
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix198g-buyer-category-search-and-sell-links.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Install buyer filters and unify seller links
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import hashlib, os, subprocess, re
+        SHAS={'public/index.html': 'c7417f4636fc69eff78a7f312cf5ffb2b93632d0', 'public/v26-homepage-layout.js': '29246eba59632f8810bca722147f63efa24eca08', 'public/product-shopping-194a.html': 'eaff84573aa1a52c9bdd63302a7be4f164d1c800', 'public/product-search-194b.html': '8d10c897097a08e953acd67de358ce26c9d493ce', 'public/shopdrop-product-search-194b.js': '24dddc2d9e68221269b7ab9abb51623b90619ea1'}
+        PROTECTED={'public/taxonomy.json': '43d0163d8238ebaabdba04b919c75e3c8b696191', 'public/sell-item.html': '57b0dd19b02166576d7f3681fa12100f5cc8b4df', 'public/shopdrop-seller-category-198e.js': 'f50c50a314027666dac6700da66b55e90e49803c', 'public/shopdrop-seller-category-198e.css': 'e5ded5f771bfdecb1d954c5ec4a17fb1fb2441b8'}
+        PATCHES={'public/index.html': [('\n          <a href="./sell-item.html">Sell a Product — FREE</a>', '\n          <a href="./sell-item.html?v=198g">Sell an Item — FREE</a>'), ('\n      <a href="./sell-item.html">Sell an Item</a>', '\n      <a href="./sell-item.html?v=198g">Sell an Item — FREE</a>'), ('src="v26-homepage-layout.js?v=197a"', 'src="v26-homepage-layout.js?v=198g"')], 'public/v26-homepage-layout.js': [('actions.querySelector(\'a[href="./sell-item.html"]\');', 'actions.querySelector(\'a[href="./sell-item.html?v=198g"],a[href="./sell-item.html"]\');')], 'public/product-shopping-194a.html': [('href="./sell-item.html">Sell a Product — FREE', 'href="./sell-item.html?v=198g">Sell an Item — FREE'), ('Tap Sell a Product — FREE.', 'Tap Sell an Item — FREE.'), ('href="./product-search-194b.html?view=handmade"', 'href="./product-search-194b.html?view=handmade&amp;v=198g"'), ('href="./product-search-194b.html">Search Products — Filters', 'href="./product-search-194b.html?v=198g">Search Products — Filters'), ('href="./categories.html">Products &amp; Categories / Search', 'href="./categories.html?entry=categories&amp;v=198d">Products &amp; Categories / Search')], 'public/product-search-194b.html': [('<link rel="stylesheet" href="./shopdrop-unified-cards.css?v=59">', '<link rel="stylesheet" href="./shopdrop-unified-cards.css?v=59">\n<link rel="stylesheet" href="./shopdrop-buyer-picker-198g.css?v=198g">'), ('<label for="category194b">Category</label><select id="category194b"><option value="">All categories</option></select>', '<div class="shopdrop-buyer-picker198g"><label for="shopdropBuyerCategory198gInput">Main category</label>\n<div class="picker-row198g"><input type="search" id="shopdropBuyerCategory198gInput" placeholder="All categories — tap or type" maxlength="100" autocomplete="off" enterkeyhint="done" aria-controls="shopdropBuyerCategory198gResults" aria-describedby="shopdropBuyerCategory198gStatus" aria-expanded="false"><button type="button" id="shopdropBuyerCategory198gClear" hidden>Clear</button></div>\n<p id="shopdropBuyerCategory198gStatus" role="status" aria-live="polite"></p><div class="picker-results198g" id="shopdropBuyerCategory198gResults" hidden></div></div>\n<label for="category194b">Category</label><select id="category194b"><option value="">All categories</option></select>'), ('<label for="subcategory194b">Subcategory</label><select id="subcategory194b" disabled><option value="">All subcategories</option></select>', '<div class="shopdrop-buyer-picker198g"><label for="shopdropBuyerSubcategory198gInput">Subcategory</label>\n<div class="picker-row198g"><input type="search" id="shopdropBuyerSubcategory198gInput" placeholder="All subcategories — tap or type" maxlength="100" autocomplete="off" enterkeyhint="done" aria-controls="shopdropBuyerSubcategory198gResults" aria-describedby="shopdropBuyerSubcategory198gStatus" aria-expanded="false" disabled><button type="button" id="shopdropBuyerSubcategory198gClear" hidden>Clear</button></div>\n<p id="shopdropBuyerSubcategory198gStatus" role="status" aria-live="polite"></p><div class="picker-results198g" id="shopdropBuyerSubcategory198gResults" hidden></div></div>\n<label for="subcategory194b">Subcategory</label><select id="subcategory194b" disabled><option value="">All subcategories</option></select>'), ('<script src="./shopdrop-product-search-194b.js?v=198a" defer></script>', '<script src="./shopdrop-buyer-picker-198g.js?v=198g" defer></script><script src="./shopdrop-product-search-194b.js?v=198g" defer></script>'), ('href="./categories.html">Browse Original Product Categories', 'href="./categories.html?entry=categories&amp;v=198d">Browse Product Categories')], 'public/shopdrop-product-search-194b.js': [(' const catalog=new Map();let places={},current=null,offset=0,busy=false;', ' const catalog=new Map();let places={},current=null,offset=0,busy=false,buyerPicker198g=null;'), ('form.reset();updateSubs();updateTowns();load();', 'form.reset();updateSubs();updateTowns();buyerPicker198g?.reset();load();'), ('updateSubs();updateTowns();controls(false);await load();', 'updateSubs();updateTowns();buyerPicker198g=window.ShopDropBuyerPicker198g?.bind();controls(false);await load();')]}
+        NEW={'public/shopdrop-buyer-picker-198g.js': b'/* Fix 198G: optional searchable buyer filters; original selects remain authoritative. */\n(function(root){\n \'use strict\';\n const norm=v=>String(v||\'\').normalize(\'NFKC\').trim().toLocaleLowerCase(\'en-ZA\').replace(/\\s+/g,\' \');\n function bind(){\n  const by=id=>document.getElementById(id),form=by(\'productSearch194b\');\n  if(!form)return {reset(){}};\n  const make=(id,selectId)=>({input:by(id+\'Input\'),results:by(id+\'Results\'),status:by(id+\'Status\'),clear:by(id+\'Clear\'),select:by(selectId),label:document.querySelector(\'label[for="\'+selectId+\'"]\')});\n  const cat=make(\'shopdropBuyerCategory198g\',\'category194b\'),sub=make(\'shopdropBuyerSubcategory198g\',\'subcategory194b\');\n  if(![cat,sub].every(p=>p.input&&p.results&&p.status&&p.clear&&p.select&&p.label)||cat.select.options.length<2)return {reset(){}};\n  let internal=false,skipFocus=false;\n  const entries=p=>Array.from(p.select.options).filter(o=>!o.disabled).map(o=>({name:o.textContent,value:o.value}));\n  const chosen=p=>Array.from(p.select.options).find(o=>o.value===p.select.value&&o.value!==\'\');\n  function close(p){p.results.hidden=true;p.results.replaceChildren();p.status.textContent=\'\';p.input.setAttribute(\'aria-expanded\',\'false\');}\n  function sync(p){p.input.value=chosen(p)?.textContent||\'\';p.input.disabled=p.select.disabled;close(p);}\n  function valid(p){\n   const q=p.input.value.trim(),o=chosen(p);\n   p.input.setCustomValidity(p.input.disabled||(!q&&!o)||(o&&p.input.value===o.textContent)?\'\':\'Choose an option from the list, or clear this filter.\');\n   p.clear.hidden=p.input.disabled||!p.input.value;\n  }\n  function reset(){sync(cat);sync(sub);valid(cat);valid(sub);}\n  function setValue(p,value){\n   internal=true;try{p.select.value=value;p.select.dispatchEvent(new Event(\'change\',{bubbles:true}));}finally{internal=false;}\n  }\n  function choose(p,entry){\n   if(!entries(p).some(o=>o.name===entry.name&&o.value===entry.value))return;\n   if(p.select.value!==entry.value)setValue(p,entry.value);\n   sync(p);if(p===cat)sync(sub);valid(cat);valid(sub);\n   skipFocus=true;try{p.input.focus({preventScroll:true});}finally{skipFocus=false;}\n  }\n  function show(p,all=false){\n   if(p.input.disabled)return;\n   close(p===cat?sub:cat);\n   const q=norm(p.input.value),items=entries(p).filter(o=>all||!q||norm(o.name).startsWith(q));\n   p.results.replaceChildren();p.results.hidden=!items.length;p.input.setAttribute(\'aria-expanded\',String(!!items.length));\n   p.status.textContent=items.length?\'Tap an option to choose.\':\'No matches. Try another letter or clear the field.\';\n   for(const o of items){const b=document.createElement(\'button\');b.type=\'button\';b.textContent=o.name;b.addEventListener(\'pointerdown\',e=>e.preventDefault());b.addEventListener(\'click\',()=>choose(p,o));p.results.append(b);}\n  }\n  function edit(p){\n   if(p.select.value&&p.input.value!==chosen(p)?.textContent){setValue(p,\'\');if(p===cat)sync(sub);}\n   valid(cat);valid(sub);show(p);\n  }\n  for(const p of [cat,sub]){\n   p.input.addEventListener(\'focus\',()=>{if(!skipFocus)show(p,!!p.select.value);});\n   p.input.addEventListener(\'click\',()=>{if(p.results.hidden)show(p,!!p.select.value);});\n   p.input.addEventListener(\'input\',()=>edit(p));p.input.addEventListener(\'search\',()=>edit(p));\n   p.clear.addEventListener(\'click\',()=>{p.input.value=\'\';edit(p);p.input.focus();show(p,true);});\n   p.input.addEventListener(\'keydown\',e=>{if(e.key===\'Enter\'){e.preventDefault();if(p.results.hidden)show(p,!!p.select.value);}if(e.key===\'Escape\'){e.preventDefault();close(p);}if(e.key===\'ArrowDown\'){e.preventDefault();if(p.results.hidden)show(p,!!p.select.value);p.results.querySelector(\'button\')?.focus();}});\n   p.results.addEventListener(\'keydown\',e=>{if(e.key===\'Escape\'){e.preventDefault();close(p);skipFocus=true;try{p.input.focus();}finally{skipFocus=false;}}});\n   p.select.addEventListener(\'change\',()=>{if(!internal)reset();});\n  }\n  function outside(e){for(const p of [cat,sub])if(!p.input.closest(\'.shopdrop-buyer-picker198g\').contains(e.target))close(p);}\n  document.addEventListener(\'pointerdown\',outside);document.addEventListener(\'focusin\',outside);\n  // Restore form values when navigating back. Native selects are the fallback if initialization fails.\n  window.addEventListener(\'pageshow\',e=>{if(e.persisted)reset();});\n  reset();for(const p of [cat,sub]){p.select.hidden=true;p.label.hidden=true;}\n  form.classList.add(\'shopdrop-buyer-enhanced198g\');return {reset};\n }\n root.ShopDropBuyerPicker198g=Object.freeze({bind});\n})(globalThis);\n', 'public/shopdrop-buyer-picker-198g.css': b"/* Fix 198G: local buyer filter controls, matching the seller's two-field layout. */\n.shopdrop-buyer-picker198g{display:none;margin:10px 0 8px;min-width:0}\n.shopdrop-buyer-enhanced198g .shopdrop-buyer-picker198g{display:block}\n.shopdrop-buyer-picker198g .picker-row198g{display:flex;gap:6px;align-items:stretch;min-width:0}\n.shopdrop-buyer-picker198g input[type=search]{flex:1;min-width:0;width:100%;font-size:16px;min-height:44px;background:white;color:#17202a}\n.shopdrop-buyer-picker198g input:disabled{background:#f1f5f9;color:#64748b}\n.shopdrop-buyer-picker198g .picker-row198g button{flex:0 0 auto;width:auto;color:#0f766e;background:#fff;border:1px solid #94a3b8}\n.shopdrop-buyer-picker198g .picker-results198g{max-height:260px;overflow:auto;border:1px solid #cbd5e1;border-radius:7px;margin:5px 0;background:white}\n.shopdrop-buyer-picker198g .picker-results198g button{display:block;width:100%;margin:0;padding:11px 10px;min-height:44px;text-align:left;background:white;color:#17202a;border-radius:0;border-bottom:1px solid #e2e8f0;font-weight:500;overflow-wrap:anywhere}\n.shopdrop-buyer-picker198g .picker-results198g button:hover,.shopdrop-buyer-picker198g .picker-results198g button:focus-visible{background:#ecfdf5}\n.shopdrop-buyer-picker198g p{font-size:14px;color:#526273;margin:5px 0}\n.shopdrop-buyer-picker198g p:empty,.shopdrop-buyer-picker198g [hidden],.shopdrop-buyer-enhanced198g select[hidden],.shopdrop-buyer-enhanced198g label[hidden]{display:none!important}\n"}
+        def blob(raw):return hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
+        def revise(name,raw):
+            changed=raw
+            for old,new in PATCHES[name]:
+                a,b=old.encode(),new.encode()
+                if changed.count(a)!=1:raise SystemExit('Unexpected source anchor: '+name+' '+old)
+                changed=changed.replace(a,b,1)
+            restored=changed
+            for old,new in reversed(PATCHES[name]):
+                if restored.count(new.encode())!=1:raise SystemExit('Ambiguous replacement: '+name)
+                restored=restored.replace(new.encode(),old.encode(),1)
+            if restored!=raw:raise SystemExit('Unapproved source change: '+name)
+            return changed
+        def main():
+            if os.environ.get('GITHUB_REF_NAME')!='shopdrop-phase6-integration':raise SystemExit('Wrong branch')
+            for name,sha in PROTECTED.items():
+                if blob(Path(name).read_bytes())!=sha:raise SystemExit('Protected source changed: '+name)
+            planned=[];installed=[]
+            for name,sha in SHAS.items():
+                p=Path(name);b=Path('backups/fix198g')/p.name;raw=p.read_bytes()
+                if blob(raw)==sha:
+                    if b.exists() and b.read_bytes()!=raw:raise SystemExit('Backup collision: '+name)
+                    planned.append((p,b,raw,revise(name,raw)))
+                elif b.is_file() and blob(b.read_bytes())==sha and raw==revise(name,b.read_bytes()):installed.append(name)
+                else:raise SystemExit('Unexpected source: '+name+'; nothing installed')
+            if installed and planned:raise SystemExit('Partial installation; nothing installed')
+            for name,raw in NEW.items():
+                p=Path(name)
+                if installed:
+                    if not p.is_file() or p.read_bytes()!=raw:raise SystemExit('Installed helper mismatch: '+name)
+                elif p.exists():raise SystemExit('New file collision: '+name)
+            if installed:print('Fix 198G already installed; verified.');return
+            for p,b,raw,changed in planned:
+                if p.suffix=='.js':subprocess.run(['node','--check','-'],input=changed,check=True)
+                if p.name=='index.html':
+                    assert re.findall(rb'<script(?:\s[^>]*)?>([\s\S]*?)</script>',raw)==re.findall(rb'<script(?:\s[^>]*)?>([\s\S]*?)</script>',changed)
+            for name,raw in NEW.items():
+                if name.endswith('.js'):subprocess.run(['node','--check','-'],input=raw,check=True)
+            for p,b,raw,changed in planned:
+                b.parent.mkdir(parents=True,exist_ok=True)
+                if not b.exists():b.write_bytes(raw)
+                p.write_bytes(changed)
+            for name,raw in NEW.items():Path(name).write_bytes(raw)
+            for name,sha in PROTECTED.items():assert blob(Path(name).read_bytes())==sha
+            print('Fix 198G installed: searchable optional buyer filters; unified seller routes; seller form and catalogue unchanged.')
+        if __name__=='__main__':main()
+        PYCODE
+        git diff --check
+        git config user.name "ShopDrop Integration"
+        git config user.email "actions@users.noreply.github.com"
+        git add -- public/index.html public/v26-homepage-layout.js public/product-shopping-194a.html public/product-search-194b.html public/shopdrop-product-search-194b.js public/shopdrop-buyer-picker-198g.js public/shopdrop-buyer-picker-198g.css backups/fix198g/index.html backups/fix198g/v26-homepage-layout.js backups/fix198g/product-shopping-194a.html backups/fix198g/product-search-194b.html backups/fix198g/shopdrop-product-search-194b.js
+        if ! git diff --cached --quiet; then
+          git commit -m "Fix 198G buyer category filters and consistent sell links"
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
