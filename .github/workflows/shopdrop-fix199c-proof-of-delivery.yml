@@ -1,0 +1,113 @@
+name: ShopDrop Fix 199C Proof of Delivery
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix199c-proof-of-delivery.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Connect existing authorised delivery records
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        from html.parser import HTMLParser
+        import os,hashlib,subprocess,tempfile
+        EXPECTED={'public/proof-of-delivery.html': '3cdf95bfb94dbe16813964d0f29475433335f8b3', 'public/tracking.html': 'b3a5e17425b30146801f89d1af414868a2e08260', 'public/order.html': '683c270653128b9cd68db02cccb8f05296383c0f', 'public/returns.html': '53099e55d29a7b569c935dd42c4be08b79459b7a'}
+        PROTECTED={'public/common.js': 'ba2a61b164322de85609517420682aa867f84671', 'public/v26-consolidated.js': '131dec7fc0f70869db9ba14454de2cd9e113c6b2', 'public/v26-bridge.js': '05db93447d6be8b25ad1355e28f349dcccff9512', 'public/shopdrop-buyer-language.js': 'f9251641c014c9c97dbdd33e5602f0453001dd35', 'public/shopdrop-transport-search-192b.css': 'ecb7d2458b90c65a11d68b794641d307dc077222', 'public/checkout.html': 'f4f6a9439171d8d8396b055fd431c10646b00761', 'public/account.html': 'cfc1775329c75d5f6ebe4f4d367eba82d19e8cf5', 'public/supabase-adapter.js': 'dace209ddf39873e20f8911236b80685f9770c10', 'public/my-purchases-sales-198j.html': 'c5933120fe66bef5d56627be6c26920217480b4d', 'public/shopdrop-completion-status-193g.js': 'dbd2b42a3b44e3c5240cc28271c9e6c32b062d1e', 'public/shopdrop-checkout-connector.js': '3ee71b42d479f9f88d4128c9f6bb1e3755353e11', 'public/dispute-evidence.html': '60b46349a1469926b81e6ea62856517ced98ec9d', '.github/workflows/shopdrop-integration-pages.yml': '5ca27368c51150bdf8f19a8cba91438c66436a1f', 'public/sign-in.html': '26da37b2951e5dcf4ff669bf7c9d2f3113330f89'}
+        PATCHES={'public/tracking.html': [('<a href="./proof-of-delivery.html">', '<a href="./proof-of-delivery.html" data-shopdrop-pod-link>', 2), ('<a href="./report-listing.html">\nReport a problem\n</a>', '<a href="./returns.html" id="shopdropDeliveryProblem199c">\nReport a problem\n</a>', 1), ("function renderDelivery(data){\n const target=$('deliverySummary');\n target.replaceChildren();", "function renderDelivery(data){\n const target=$('deliverySummary');\n target.replaceChildren();\n // Fix 199C: carry only the authorised order reference into existing links.\n const podOrder199c=String(data.order_reference||data.order_id||'');\n if(podOrder199c){\n  document.querySelectorAll('[data-shopdrop-pod-link]').forEach(a=>{a.href='./proof-of-delivery.html?order='+encodeURIComponent(podOrder199c);});\n  $('shopdropDeliveryProblem199c').href='./returns.html?order='+encodeURIComponent(podOrder199c);\n }", 1), ('  target.append(div);\n }\n}\n\nfunction resetView(){', "  if(podOrder199c){\n   const podLink199c=node('a','View Proof of Delivery');\n   const shipmentRef199c=String(shipment.shipment_reference||shipment.id||'');\n   podLink199c.href='./proof-of-delivery.html?order='+encodeURIComponent(podOrder199c)+(shipmentRef199c?'&shipment='+encodeURIComponent(shipmentRef199c):'');\n   div.append(podLink199c);\n  }\n  target.append(div);\n }\n}\n\nfunction resetView(){", 1), (" $('deliverySummary').textContent=\n  'Delivery information will appear after loading your order.';", " $('deliverySummary').textContent=\n  'Delivery information will appear after loading your order.';\n document.querySelectorAll('[data-shopdrop-pod-link]').forEach(a=>{a.href='./proof-of-delivery.html';});\n $('shopdropDeliveryProblem199c').href='./returns.html';", 1)], 'public/order.html': [('    shipments.append(div);', "    // Fix 199C: existing buyer tracking permission is not extended to sellers.\n    if(order.buyer_id===user.id){\n     const podLink199c=document.createElement('a');\n     podLink199c.textContent='View Proof of Delivery';\n     podLink199c.href='./proof-of-delivery.html?order='+encodeURIComponent(order.order_reference||order.id)+(shipment.shipment_reference?'&shipment='+encodeURIComponent(shipment.shipment_reference):'');\n     div.append(podLink199c);\n    }\n    shipments.append(div);", 1)], 'public/returns.html': [('<a href="proof-of-delivery.html">\n  Proof of Delivery\n </a>', '<a href="proof-of-delivery.html" id="shopdropReturnsPod199c">\n  Proof of Delivery\n </a>', 1), ("document.getElementById('open').onclick=async()=>{", "// Fix 199C: prefill the existing form and maintain the POD link; no dispute or upload changes.\n(function(){\n const field=document.getElementById('orderId');\n const link=document.getElementById('shopdropReturnsPod199c');\n const value=new URLSearchParams(location.search).get('order');\n if(value&&value.length<=80)field.value=value;\n const sync=()=>{const ref=field.value.trim();link.href='./proof-of-delivery.html'+(ref&&ref.length<=80?'?order='+encodeURIComponent(ref):'');};\n field.addEventListener('input',sync);\n link.addEventListener('click',sync);\n sync();\n})();\ndocument.getElementById('open').onclick=async()=>{", 1)]}
+        PAGE='<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Proof of Delivery | Shop&amp;Drop</title>\n<link rel="stylesheet" href="./shopdrop-transport-search-192b.css"><style>input{display:block;width:100%;font:inherit;padding:12px;margin-top:8px;border:1px solid #cbd5e1;border-radius:8px}dl{margin:12px 0}dt{font-weight:bold;margin-top:10px}dd{margin:3px 0;overflow-wrap:anywhere}#podStatus199c{overflow-wrap:anywhere}a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid #17202a;outline-offset:2px}</style></head>\n<body><header><a href="./index.html">Home</a><a href="./my-purchases-sales-198j.html?v=199a">My Account</a></header><main>\n<section class="panel"><h1>Proof of Delivery</h1><p>View the delivery information recorded for your own Shop&amp;Drop order and courier shipment.</p>\n<p class="muted">Courier delivery reports and confirmed delivery are shown separately. Seller payment for physical products follows the existing verified courier collection process, not this delivery information page.</p>\n<form id="podForm199c"><label for="podOrderInput199c">Shop&amp;Drop order reference</label><input id="podOrderInput199c" required maxlength="80" autocomplete="off" placeholder="Enter your Shop&amp;Drop order reference"><button id="podLoad199c" type="submit" disabled>View Delivery Information</button></form>\n<p id="podStatus199c" role="status" aria-live="polite">Connecting to Shop&amp;Drop…</p><p>Sign in to view your own order. <a href="./sign-in.html">Sign in</a></p></section>\n<section class="panel" id="podResults199c" hidden></section>\n<section class="panel"><h2>Tracking and help</h2><a class="btn" id="podBackTracking199c" href="./tracking.html">Back to Tracking</a><a class="btn" id="podBackOrder199c" href="./product-orders-194f.html">My Purchases</a><a class="btn" id="podProblem199c" href="./returns.html">Returns &amp; Disputes</a><p class="muted">This page only displays available delivery records. It does not confirm delivery, release money, upload evidence or change any transaction.</p></section>\n</main><script src="common.js"></script><script src="v26-consolidated.js"></script><script src="v26-bridge.js"></script><script src="./shopdrop-pod-199c.js?v=199c" defer></script></body></html>\n'
+        JS="(() => {\n 'use strict';\n const BASE='https://dtkdvvxpwonywtsgqmdx.supabase.co';\n const KEY='sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';\n const $=id=>document.getElementById(id);\n const form=$('podForm199c'),input=$('podOrderInput199c'),button=$('podLoad199c'),status=$('podStatus199c'),results=$('podResults199c');\n const tracking=$('podBackTracking199c'),orderLink=$('podBackOrder199c'),problem=$('podProblem199c');\n if(!form||!input||!button||!status||!results||!tracking||!orderLink||!problem)return;\n const params=new URLSearchParams(location.search);\n const supplied=params.get('order')||'';\n let selected=params.get('shipment')||'';\n let clientPromise,generation=0,owner=null,watching=false;\n const uuid=v=>typeof v==='string'&&/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v);\n const el=(tag,text)=>{const x=document.createElement(tag);if(text!=null)x.textContent=String(text);return x;};\n const array=v=>Array.isArray(v)?v:[];\n const value=v=>v==null||v===''?'Not recorded':String(v);\n const date=v=>{if(!v)return 'Not recorded';const d=new Date(v);return Number.isNaN(d.getTime())?'Not available':d.toLocaleString('en-ZA',{dateStyle:'medium',timeStyle:'short',timeZone:'Africa/Johannesburg'})+' SAST';};\n function line(dl,k,v){dl.append(el('dt',k),el('dd',value(v)));}\n function show(s,error=false){status.textContent=s;status.className=error?'error':'muted';}\n function clear(){results.hidden=true;results.replaceChildren();tracking.href='./tracking.html';orderLink.href='./product-orders-194f.html';problem.href='./returns.html';orderLink.textContent='My Purchases';}\n function invalidate(){generation++;owner=null;clear();button.disabled=false;}\n async function client(){\n  if(!clientPromise)clientPromise=import('https://esm.sh/@supabase/supabase-js@2.49.4').then(({createClient})=>createClient(BASE,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}})).catch(e=>{clientPromise=undefined;throw e;});\n  const db=await clientPromise;\n  if(!watching){watching=true;db.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_OUT'||(owner&&session?.user?.id!==owner)){invalidate();show('Sign-in changed. Load your order again.',true);}});}\n  return db;\n }\n async function verifiedUser(db){const {data,error}=await db.auth.getUser();if(error||!uuid(data?.user?.id)||data.user.is_anonymous===true)throw new Error('Sign in to view your own order.');return data.user.id;}\n function recentLocation(data,shipment){return [...array(data.tracking_events),...array(data.courier_updates)].filter(e=>e?.shipment_id===shipment.id&&e.location&&Number.isFinite(Date.parse(e.event_time))).sort((a,b)=>Date.parse(b.event_time)-Date.parse(a.event_time))[0];}\n function render(data,shipments,providerRefs,available){\n  results.append(el('h2','Order '+value(data.order_reference||data.order_id)));\n  if(!shipments.length)results.append(el('p','No courier shipment has been recorded for this order yet.'));\n  for(const shipment of shipments){\n   const card=el('article');card.append(el('h3','Shipment '+value(shipment.shipment_reference||shipment.id)));\n   const dl=el('dl');line(dl,'Shop&Drop shipment reference',shipment.shipment_reference||shipment.id);line(dl,'Courier',shipment.courier_name);line(dl,'Courier tracking reference',shipment.tracking_number);line(dl,'Shipment status',shipment.shipment_status);line(dl,'Recorded delivery status',shipment.delivery_status);line(dl,'Courier-reported delivery time',date(shipment.delivered_at));line(dl,'Shop&Drop delivery verified at',date(shipment.delivery_verified_at));\n   const loc=recentLocation(data,shipment);line(dl,'Last recorded tracking location',loc?.location);if(loc)line(dl,'Tracking location recorded at',date(loc.event_time));\n   const podRef=providerRefs.get(shipment.id);line(dl,'Recorded provider POD reference',available?podRef:'Temporarily unavailable');card.append(dl);\n   const confirmed=array(data.delivery_confirmations).filter(c=>c?.shipment_id===shipment.id);\n   card.append(el('p',shipment.delivery_verified_at?'Shop&Drop delivery verification is recorded.':shipment.delivered_at?'Courier delivery reported; Shop&Drop delivery verification not yet recorded.':'Delivery verification not yet recorded.'));\n   if(confirmed.length){const cdl=el('dl');for(const c of confirmed){line(cdl,'Recorded confirmation method',c.confirmation_method);line(cdl,'Confirmation status',c.delivery_status);line(cdl,'Confirmation time',date(c.confirmed_at));}card.append(cdl);}\n   card.append(el('p','Private evidence files are not displayed here. For a delivery problem, use Returns & Disputes.'));\n   results.append(card);\n  }\n  results.hidden=false;\n  const ref=String(data.order_reference||data.order_id);\n  tracking.href='./tracking.html?order='+encodeURIComponent(ref);orderLink.href='./order.html?id='+encodeURIComponent(data.order_id);orderLink.textContent='Back to Order Details';problem.href='./returns.html?order='+encodeURIComponent(ref);\n }\n async function load(){\n  const request=++generation;clear();button.disabled=true;const ref=input.value.trim(),ship=selected;\n  if(!ref||ref.length>80||ship.length>100){show('Enter a valid order reference.',true);button.disabled=false;return;}\n  show('Loading your delivery information…');\n  try{\n   const db=await client();const uid=await verifiedUser(db);if(request!==generation)return;owner=uid;\n   const {data,error}=await db.rpc('shopdrop_buyer_tracking_snapshot',{p_order_reference:ref});\n   if(request!==generation)return;\n   if(error||!data||!uuid(data.order_id))throw new Error('No matching order is available to your account, or tracking is temporarily unavailable.');\n   const all=array(data.shipments).filter(s=>uuid(s?.id));\n   const shipments=ship?all.filter(s=>s.id===ship||s.shipment_reference===ship):all;\n   if(ship&&shipments.length!==1)throw new Error('That shipment is not available for this order. Open tracking and select the correct shipment.');\n   let refs=new Map(),available=true;\n   if(shipments.length){\n    try{const {data:rows,error:err}=await db.from('shipments').select('id,pod_reference').eq('order_id',data.order_id).eq('buyer_id',uid).limit(1000);if(err||!Array.isArray(rows))throw Error('Unavailable');refs=new Map(rows.filter(r=>uuid(r.id)).map(r=>[r.id,r.pod_reference]));}catch(_){available=false;}\n   }\n   if(request!==generation)return;\n   if(await verifiedUser(db)!==uid||request!==generation){if(request===generation)invalidate();return;}\n   render(data,shipments,refs,available);show('Delivery information loaded.');\n  }catch(e){if(request===generation){clear();show(e?.message==='Sign in to view your own order.'||String(e?.message||'').startsWith('No matching order')||String(e?.message||'').startsWith('That shipment')?e.message:'Unable to load delivery information. Please try again.',true);}}\n  finally{if(request===generation)button.disabled=false;}\n }\n form.addEventListener('submit',e=>{e.preventDefault();if(form.reportValidity())load();});\n input.addEventListener('input',()=>{selected='';invalidate();show('Enter your order reference and load delivery information.');});\n window.addEventListener('pagehide',invalidate);window.addEventListener('pageshow',e=>{if(e.persisted&&input.value.trim())load();});\n button.disabled=false;\n if(supplied&&supplied.length<=80){input.value=supplied;load();}else{selected='';show('Enter your Shop&Drop order reference.');}\n})();\n"
+        NEW='public/shopdrop-pod-199c.js'
+        BACKUP=Path('backups/fix199c')
+        REPLACE='public/proof-of-delivery.html'
+        def require(ok,msg):
+            if not ok: raise SystemExit(msg)
+        def blob(raw):return hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
+        class Scripts(HTMLParser):
+            def __init__(self,s):super().__init__(convert_charrefs=False);self.blocks=[];self.cur=None;self.feed(s)
+            def handle_starttag(self,tag,attrs):
+                if tag=='script': self.cur=[dict(attrs),'']
+            def handle_data(self,data):
+                if self.cur is not None:self.cur[1]+=data
+            def handle_endtag(self,tag):
+                if tag=='script' and self.cur is not None:self.blocks.append(self.cur);self.cur=None
+        def transform(path,raw):
+            if path==REPLACE:return PAGE.encode()
+            s=raw.decode()
+            for old,new,count in PATCHES[path]:
+                require(s.count(old)==count,'Unexpected source anchor: '+path+' '+old[:60]);s=s.replace(old,new,count)
+            # Exactly reversing all approved replacements must reconstruct the original.
+            reverse=s
+            for old,new,count in reversed(PATCHES[path]):
+                require(reverse.count(new)==count,'Unexpected replacement count: '+path);reverse=reverse.replace(new,old,count)
+            require(reverse.encode()==raw,'Unapproved source change: '+path)
+            return s.encode()
+        def main():
+            require(os.environ.get('GITHUB_REF_NAME')=='shopdrop-phase6-integration','Wrong branch')
+            require(not(set(EXPECTED)&set(PROTECTED)) and set(PATCHES)|{REPLACE}==set(EXPECTED),'Allowlist mismatch')
+            for path,sha in PROTECTED.items():require(blob(Path(path).read_bytes())==sha,'Protected file changed: '+path)
+            originals={};outputs={}
+            for path,sha in EXPECTED.items():
+                p=Path(path); raw=p.read_bytes(); b=BACKUP/p.name
+                original=b.read_bytes() if b.exists() else raw
+                require(blob(original)==sha,'Unexpected source or backup: '+path)
+                out=transform(path,original);require(raw in (original,out),'Unexpected current file: '+path)
+                originals[path]=original;outputs[path]=out
+            new=Path(NEW);require(not new.exists() or new.read_bytes()==JS.encode(),'New script already exists with different contents')
+            # Check all newly referenced local destinations and JavaScript before writes.
+            for path in ['index.html','my-purchases-sales-198j.html','tracking.html','product-orders-194f.html','order.html','returns.html','sign-in.html','shopdrop-transport-search-192b.css','common.js','v26-consolidated.js','v26-bridge.js']:
+                require(Path('public',path).is_file(),'Missing link target: '+path)
+            old=Scripts(originals[REPLACE].decode()).blocks;updated=Scripts(PAGE).blocks
+            require(updated[:len(old)]==old,'Existing POD script references changed')
+            with tempfile.TemporaryDirectory() as temp:
+                script=Path(temp,'pod.js');script.write_text(JS);subprocess.run(['node','--check',str(script)],check=True)
+                for path,raw in outputs.items():
+                    for i,(attrs,source) in enumerate(Scripts(raw.decode()).blocks):
+                        if 'src' in attrs or not source.strip():continue
+                        if attrs.get('type','') not in ('','module','text/javascript','application/javascript'):continue
+                        script=Path(temp,Path(path).stem+str(i)+('.mjs' if attrs.get('type')=='module' else '.js'));script.write_text(source);subprocess.run(['node','--check',str(script)],check=True)
+            for path,raw in originals.items():
+                backup=BACKUP/Path(path).name
+                if not backup.exists():backup.parent.mkdir(parents=True,exist_ok=True);backup.write_bytes(raw)
+                Path(path).write_bytes(outputs[path])
+            new.write_bytes(JS.encode())
+            for path,sha in PROTECTED.items():require(blob(Path(path).read_bytes())==sha,'Protected file changed: '+path)
+            print('Fix 199C: existing authorised tracking read only; approved links and text only; no payment, photo, upload, or database changes.')
+        if __name__=='__main__':main()
+        PYCODE
+        git diff --check
+        git config user.name "ShopDrop Integration"
+        git config user.email "actions@users.noreply.github.com"
+        git add -- public/proof-of-delivery.html public/tracking.html public/order.html public/returns.html public/shopdrop-pod-199c.js backups/fix199c/proof-of-delivery.html backups/fix199c/tracking.html backups/fix199c/order.html backups/fix199c/returns.html
+        python3 - <<'CHECK'
+        import subprocess
+        allowed=set(['public/proof-of-delivery.html', 'public/tracking.html', 'public/order.html', 'public/returns.html', 'public/shopdrop-pod-199c.js', 'backups/fix199c/proof-of-delivery.html', 'backups/fix199c/tracking.html', 'backups/fix199c/order.html', 'backups/fix199c/returns.html'])
+        changed=set(subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines())
+        if not changed<=allowed: raise SystemExit('Unapproved staged paths: '+str(changed-allowed))
+        CHECK
+        if ! git diff --cached --quiet; then
+         git commit -m "Fix 199C connect existing buyer delivery information and tracking links"
+         git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
