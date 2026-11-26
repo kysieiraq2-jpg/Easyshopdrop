@@ -1,0 +1,603 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Post an Item | Shop&Drop</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f3f5f8;color:#17202a;font:16px Arial,sans-serif}
+main{max-width:720px;margin:auto;padding:18px}
+section{background:white;border:1px solid #e2e8f0;border-radius:12px;padding:19px;margin:14px 0}
+h1{font-size:27px}
+label{display:block;margin:13px 0 5px;font-weight:600}
+input,select,textarea,button{font:inherit;border-radius:7px;padding:12px;border:1px solid #cbd5e1}
+input,select,textarea{width:100%}
+textarea{min-height:100px}
+button{background:#0f766e;color:white;border:0;font-weight:700;cursor:pointer;width:100%;margin-top:12px}
+button:disabled{opacity:.6}
+a{color:#0f766e}
+.muted{color:#526273}
+.message{background:#eaf7f4;border-radius:8px;padding:12px;white-space:pre-wrap}
+.error{background:#fff0e8}
+#shopdropPhotoPreview{display:flex;flex-wrap:wrap}
+#shopdropPhotoPreview button{width:auto}
+</style>
+<link rel="stylesheet" href="./shopdrop-payment-purpose-195a.css?v=195a">
+<link rel="stylesheet" href="./shopdrop-seller-category-198e.css?v=198f">
+</head>
+<body>
+<main>
+<a href="./index.html">← Shop&Drop</a>
+<p><a href="./product-shopping-194a.html">Back to Product Shopping &amp; Selling</a></p>
+<h1>Sell an item — FREE</h1>
+<p>Sell in four steps: register once, sign in, take or select 1–6 pictures, then describe and post your item. Ordinary advertisements do not wait for Shop&amp;Drop approval.</p>
+
+<section>
+<p id="accountStatus" class="muted">Checking your sign-in…</p>
+<p><strong>Step 1:</strong> New? <a href="./register.html?next=sell-item.html">Register a free account</a> once.</p><p><strong>Step 2:</strong> Already registered? <a href="./sign-in.html?next=sell-item.html">Sign in to continue selling</a>.</p><p class="muted">Step 3: photos and item details below. Step 4: tap Post My Item. No bank card or application approval is needed to advertise.</p>
+</section>
+
+<section id="unfinishedSection" hidden>
+<h2>Finish an item you already started</h2>
+<p class="muted">Your unfinished advertisements are saved privately. Select one to continue without creating a duplicate.</p>
+<div id="unfinishedRows"></div>
+</section>
+
+<form id="itemForm">
+<section>
+<label for="n">What are you selling?</label>
+<input id="n" maxlength="150" minlength="2" required placeholder="e.g. Wooden coffee table">
+
+<div class="shopdrop-seller-search198e">
+<label for="shopdropSellerCategory198eInput">Main category</label>
+<div class="search-row198e">
+<input type="search" id="shopdropSellerCategory198eInput" placeholder="Tap or type to choose, e.g. Baby" maxlength="100" autocomplete="off" enterkeyhint="done" aria-controls="shopdropSellerCategory198eResults" aria-describedby="shopdropSellerCategory198eStatus">
+<button type="button" id="shopdropSellerCategory198eClear" hidden>Clear</button>
+</div>
+<p id="shopdropSellerCategory198eStatus" role="status" aria-live="polite"></p>
+<div class="search-results198e" id="shopdropSellerCategory198eResults" hidden></div>
+</div>
+<label for="c">Category</label>
+<select id="c" required>
+
+</select>
+<div class="shopdrop-seller-search198e">
+<label for="shopdropSellerSubcategory198eInput">Subcategory</label>
+<div class="search-row198e">
+<input type="search" id="shopdropSellerSubcategory198eInput" placeholder="Tap or type to choose, e.g. Pram" maxlength="100" autocomplete="off" enterkeyhint="done" aria-controls="shopdropSellerSubcategory198eResults" aria-describedby="shopdropSellerSubcategory198eStatus" disabled>
+<button type="button" id="shopdropSellerSubcategory198eClear" hidden>Clear</button>
+</div>
+<p id="shopdropSellerSubcategory198eStatus" role="status" aria-live="polite"></p>
+<div class="search-results198e" id="shopdropSellerSubcategory198eResults" hidden></div>
+</div>
+<label for="subcat">Subcategory</label>
+<select id="subcat" required disabled>
+
+</select>
+
+<label for="d">Describe your item</label>
+<textarea id="d" maxlength="3000" minlength="10" required placeholder="Condition, size, age, defects and any details a buyer should know"></textarea>
+
+<label for="p">Your selling price in rand (R)</label>
+<input id="p" type="number" min="1" step="0.01" inputmode="decimal" required placeholder="e.g. 450">
+
+<label for="condition">Condition</label>
+<select id="condition">
+<option value="used">Second-hand / Used</option>
+<option value="new">New</option>
+<option value="like_new">Like new</option>
+<option value="refurbished">Refurbished</option>
+</select>
+
+<label for="town">Town or area (optional)</label>
+<input id="town" maxlength="120" placeholder="e.g. Pretoria">
+</section>
+
+<section>
+<h2>Packed parcel measurements</h2>
+<p class="muted">
+Measure the item after packing it securely.
+These measurements help calculate courier
+delivery charges. Enter the complete packed
+parcel size, not only the item's size.
+</p>
+
+<label for="shippingWeightKg">
+Packed weight (kg)</label>
+<input id="shippingWeightKg"
+       type="number"
+       min="0.01" max="10000"
+       step="any" inputmode="decimal"
+       required placeholder="e.g. 2.5">
+
+<label for="shippingLengthCm">
+Packed length (cm)</label>
+<input id="shippingLengthCm"
+       type="number"
+       min="0.1" max="10000"
+       step="any" inputmode="decimal"
+       required placeholder="e.g. 45">
+
+<label for="shippingWidthCm">
+Packed width (cm)</label>
+<input id="shippingWidthCm"
+       type="number"
+       min="0.1" max="10000"
+       step="any" inputmode="decimal"
+       required placeholder="e.g. 30">
+
+<label for="shippingHeightCm">
+Packed height (cm)</label>
+<input id="shippingHeightCm"
+       type="number"
+       min="0.1" max="10000"
+       step="any" inputmode="decimal"
+       required placeholder="e.g. 20">
+
+<p class="muted">
+The final courier quotation will be confirmed
+when approved courier services are activated.
+</p>
+</section>
+
+<section>
+<h2>Photos (1–6)</h2>
+<label for="photo">Choose pictures from your phone or computer</label>
+<input id="photo" type="file" accept="image/jpeg,image/png,image/webp" multiple>
+
+<label for="shopdropPhotoCamera">Or take a picture with your phone</label>
+<input id="shopdropPhotoCamera" type="file" accept="image/*" capture="environment">
+
+<p class="muted">The first picture is the main picture. You can add photos in more than one selection.</p>
+<div id="savedPhotographs" aria-label="Already uploaded photographs"></div>
+<div id="shopdropPhotoPreview" aria-label="Selected photographs"></div>
+<p id="uploadStatus" class="muted" role="status"></p>
+</section>
+
+<section>
+<label><input id="ownership" type="checkbox" required style="width:auto"> I own this item or am allowed to sell it. The description and photos are accurate.</label>
+
+<aside class="shopdrop-purpose-195a"><div class="purpose-note-195a"><strong>FOR PAYMENT PURPOSES</strong><p><strong>New, Second-Hand &amp; Handmade Products:</strong> Obtain the courier company’s own booking, waybill or tracking reference when the courier physically collects your sold item. It is your responsibility to obtain this reference number for payment purposes.</p><p>No reference number or PIN is needed to register or advertise. After pickup or completion, sign in and use Receive My Payment in My Account.</p></div></aside>
+<button id="postButton" type="submit">Post My Item</button>
+<p id="result" class="message" role="status" aria-live="polite" hidden></p>
+</section>
+</form>
+
+<p class="muted">Shop&Drop handles listing automatically. Payment, courier booking and payout take place separately when an item is purchased. Shop&Drop never asks for your card PIN or OTP.</p>
+</main>
+
+<script src="./shopdrop-photo-scan-status.js" defer></script>
+<script src="./shopdrop-product-photos.js" defer></script>
+<script src="./shopdrop-category-198a.js?v=198a"></script>
+<script src="./shopdrop-seller-category-198e.js?v=198f"></script>
+<script type="module">
+import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
+
+const sb=createClient(
+  'https://dtkdvvxpwonywtsgqmdx.supabase.co',
+  'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q',
+  {auth:{
+    persistSession:true,
+    autoRefreshToken:true,
+    detectSessionInUrl:true
+  }}
+);
+
+const $=id=>document.getElementById(id);
+let pendingId=null,photosAttached=false,processing=false,recoveredListing=false;
+const departmentSubs=new Map();
+let tax198a=null,originalPair198a=null;
+let categoryAssist198e=null;
+function fillSubcategories(selected=''){
+  const select=$('subcat');
+  const options=departmentSubs.get($('c').value)||[];
+  select.replaceChildren();
+  for(const name of options)select.add(new Option(name,name));
+  select.disabled=options.length===0;
+  if(options.includes(selected)){
+    select.value=selected;
+  }else{
+    select.selectedIndex=-1;
+  }
+}
+$('c').addEventListener('change',()=>fillSubcategories());
+
+function show(message,error=false){
+  const el=$('result');
+  el.hidden=false;
+  el.className='message'+(error?' error':'');
+  el.textContent=message;
+}
+
+
+// Recovery is account-bound and uses existing Supabase RLS.
+async function loadUnfinished(user){
+  const {data, error}=await sb.from('products')
+    .select('id,title,description,category,subcategory,condition,price,location,listing_reference,created_at,shipping_weight_kg,shipping_length_cm,shipping_width_cm,shipping_height_cm')
+    .eq('seller_id',user.id)
+    .eq('listing_status','pending')
+    .order('created_at',{ascending:false})
+    .limit(8);
+  if(error || !Array.isArray(data) || data.length===0)return;
+  const section=$('unfinishedSection');
+  section.hidden=false;
+  const rows=$('unfinishedRows');
+  rows.replaceChildren();
+  for(const product of data){
+    const button=document.createElement('button');
+    button.type='button';
+    button.textContent='Continue: '+String(product.title||'Unfinished item');
+    button.addEventListener('click',()=>resumeItem(product));
+    rows.append(button);
+  }
+}
+async function resumeItem(product){
+  if(processing)return;
+  try{
+    const {data:images,error}=await sb.from('listing_images')
+      .select('image_position,storage_bucket,storage_path')
+      .eq('product_id',product.id)
+      .order('image_position',{ascending:true});
+    if(error||!Array.isArray(images)||images.length>6)
+      throw Error('Saved photographs could not be loaded.');
+    if(!images.every((image,i)=>Number(image.image_position)===i+1))
+      throw Error('Saved photo order could not be verified.');
+    pendingId=product.id;
+    photosAttached=false;
+    recoveredListing=true;
+    $('n').value=product.title||'';
+    $('d').value=product.description||'';
+    $('p').value=product.price||'';
+    originalPair198a=[product.category||'',product.subcategory||''];
+    const choice=ShopDropCategory198a.recover(tax198a,...originalPair198a);
+    $('c').value=choice[0];
+    fillSubcategories(choice[1]);
+    categoryAssist198e?.reset();
+    $('condition').value=product.condition||'used';
+    $('town').value=product.location||'';
+    $('shippingWeightKg').value=
+      product.shipping_weight_kg??'';
+    $('shippingLengthCm').value=
+      product.shipping_length_cm??'';
+    $('shippingWidthCm').value=
+      product.shipping_width_cm??'';
+    $('shippingHeightCm').value=
+      product.shipping_height_cm??'';
+    window.ShopDropProductPhotos.recover(product,images.length);
+    const saved=$('savedPhotographs');
+    saved.replaceChildren();
+    for(const image of images){
+      const {data:urlData}=sb.storage.from('listing-images').getPublicUrl(image.storage_path);
+      if(!urlData?.publicUrl)continue;
+      const img=document.createElement('img');
+      img.src=urlData.publicUrl;
+      img.alt='Already saved photograph '+image.image_position;
+      img.style.cssText='width:85px;height:85px;object-fit:cover;margin:5px;border-radius:8px';
+      saved.append(img);
+    }
+    show('Existing advertisement recovered. '+images.length+
+      ' photograph(s) already saved. Add more if you wish, then press Post My Item.');
+    $('itemForm').scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(error){show(error?.message||'Unable to reopen saved advertisement.',true);}
+}
+
+async function setup(){
+  try{
+    const {data:{user}}=await sb.auth.getUser();
+
+    $('accountStatus').textContent=user
+      ?'Signed in. You can post your item now.'
+      :'Sign in to post. You can fill in the form and select photos first.';
+    const response=await fetch(
+      './taxonomy.json',
+      {cache:'no-store'}
+    );
+
+    if(!response.ok){
+      throw Error('Could not load categories');
+    }
+
+    const taxonomy=await response.json();
+    tax198a=taxonomy;
+    departmentSubs.clear();
+
+    for(const department of ShopDropCategory198a.publicDepartments(taxonomy)){
+      if(
+        typeof department.name==='string' &&
+        department.name.trim()
+      ){
+        $('c').add(
+          new Option(
+            department.name,
+            department.name
+          )
+        );
+        departmentSubs.set(department.name,
+          Array.isArray(department.subcategories)
+            ?department.subcategories.filter(x=>typeof x==='string'&&x.trim())
+            :[]);
+      }
+    }
+    $('c').selectedIndex=-1;
+    fillSubcategories();
+    categoryAssist198e=window.ShopDropSellerCategory198e?.bind(departmentSubs);
+    if(user)await loadUnfinished(user);
+  }catch(e){
+    $('accountStatus').textContent=
+      'Unable to load account or categories. Refresh and try again.';
+  }
+}
+
+setup();
+
+$('itemForm').addEventListener('submit',async event=>{
+  event.preventDefault();
+  if(processing)return;
+  if(!$('itemForm').reportValidity())return;
+
+  processing=true;
+  $('postButton').disabled=true;
+
+  try{
+    const {
+      data:{user},
+      error:authError
+    }=await sb.auth.getUser();
+
+    if(authError||!user){
+      throw Error(
+        'Please sign in to your free Shop&Drop account, then return to post your item.'
+      );
+    }
+
+    const photos=window.ShopDropProductPhotos;
+
+    if(!photos){
+      throw Error(
+        'Photo uploader has not loaded. Refresh the page.'
+      );
+    }
+
+    await photos.ready();
+
+    if(
+      !photosAttached && !pendingId &&
+      (photos.count()<1||photos.count()>6)
+    ){
+      throw Error(
+        'Select one to six photographs first.'
+      );
+    }
+
+    // Scan original selected photo bytes
+    // before saving or publishing.
+    if (
+      !photosAttached &&
+      typeof photos.screenSelected==='function'
+    ){
+      show('Checking photographs…');
+
+      const results=await photos.screenSelected(
+        progress=>{
+          if(progress?.state==='scanning'){
+            show(
+              'Checking photograph '+
+              progress.current+' of '+
+              progress.total+'…'
+            );
+          }
+        }
+      );
+
+      const flagged=results.find(
+        result=>result.status==='reject'
+      );
+
+      if(flagged){
+        throw Error(
+          'Photograph blocked: '+
+          flagged.reason+
+          '. Remove or replace the photograph.'
+        );
+      }
+
+      const uncertain=results.find(
+        result=>result.status!=='preliminary_pass'
+      );
+
+      if(uncertain){
+        throw Error(
+          'Photograph check incomplete: '+
+          uncertain.reason+
+          '. Please try again or replace the photograph.'
+        );
+      }
+    }
+
+    const description=$('d').value.trim();
+
+    if(description.length<10){
+      throw Error(
+        'Please describe the item in at least 10 characters.'
+      );
+    }
+
+    const chosenCategory198a=$('c').value;
+    const chosenSub198a=$('subcat').value;
+    if(!departmentSubs.has(chosenCategory198a) ||
+       !(departmentSubs.get(chosenCategory198a)||[]).includes(chosenSub198a)){
+      throw Error('Please choose a main category and a matching subcategory.');
+    }
+    const [category,subcategory]=ShopDropCategory198a.storedFor(tax198a,chosenCategory198a,chosenSub198a,originalPair198a);
+
+    const amount=Number($('p').value);
+
+    if(!Number.isFinite(amount)||amount<=0){
+      throw Error('Enter a valid price.');
+    }
+
+    const parcelFields=[
+      ['shippingWeightKg','Packed weight'],
+      ['shippingLengthCm','Packed length'],
+      ['shippingWidthCm','Packed width'],
+      ['shippingHeightCm','Packed height']
+    ];
+
+    const parcelValues={};
+    const parcelColumns=[
+      'shipping_weight_kg',
+      'shipping_length_cm',
+      'shipping_width_cm',
+      'shipping_height_cm'
+    ];
+
+    parcelFields.forEach(([id,label],index)=>{
+      const input=$(id);
+      const value=Number(input.value);
+      if(!input.value.trim() ||
+         !Number.isFinite(value) ||
+         value<=0 ||
+         value>Number(input.max)){
+        throw Error(
+          label+' must be a valid positive number.'
+        );
+      }
+      parcelValues[parcelColumns[index]]=value;
+    });
+
+    if(!pendingId){
+      show('Saving your advertisement…');
+
+      const {
+        data:created,
+        error:saveError
+      }=await sb.from('products')
+        .insert({
+          seller_id:user.id,
+          title:$('n').value.trim(),
+          description,
+          category,
+          subcategory,
+          condition:$('condition').value,
+          price:amount,
+          currency:'ZAR',
+          country_code:'ZA',
+          quantity:1,
+          location:$('town').value.trim()||null,
+          listing_status:'pending',
+    ...parcelValues
+        })
+        .select(
+          'id,listing_reference,listing_status'
+        )
+        .single();
+
+      if(saveError||!created){
+        throw Error(
+          'Could not save the item: '+
+          (saveError?.message||'Please try again.')
+        );
+      }
+
+      pendingId=created.id;
+      photos.setPending(created);
+    }
+
+    if(recoveredListing){
+      const {error:updateError}=await sb.from('products').update({
+        title:$('n').value.trim(),
+        description,
+        price:amount,
+        category,
+        subcategory,
+        condition:$('condition').value,
+        location:$('town').value.trim()||null,
+    ...parcelValues
+      }).eq('id',pendingId).eq('seller_id',user.id).eq('listing_status','pending');
+      if(updateError)throw Error('Unable to update your saved item: '+updateError.message);
+    }
+
+    if(!photosAttached){
+      const {
+        data:product,
+        error:loadError
+      }=await sb.from('products')
+        .select(
+          'id,listing_reference,listing_status'
+        )
+        .eq('id',pendingId)
+        .eq('seller_id',user.id)
+        .single();
+
+      if(loadError||!product){
+        throw Error(
+          'Could not resume the saved item. Contact support.'
+        );
+      }
+
+      const count=await photos.attach(
+        sb,
+        user.id,
+        product,
+        message=>show(message)
+      );
+
+      if(count<1){
+        throw Error(
+          'Please attach at least one photograph.'
+        );
+      }
+
+      photosAttached=true;
+    }
+
+    show('Publishing your item…');
+
+    const {
+      data:result,
+      error:publishError
+    }=await sb.functions.invoke(
+      'shopdrop-quick-publish',
+      {body:{product_id:pendingId}}
+    );
+
+    if(publishError||result?.published!==true){
+      throw Error(
+        'Your item and photos are saved. Publication could not finish: '+
+        (result?.error||'Please try again')+
+        '. Press Post My Item again to retry without creating another item.'
+      );
+    }
+
+    show(
+      'Your item is posted! Reference: '+
+      (result.listing_reference||pendingId)+
+      '. No Shop&Drop approval is required.'
+    );
+
+    const link=document.createElement('a');
+    link.href='./product.html?id'+
+      '='+encodeURIComponent(pendingId);
+    link.textContent=' View your item';
+    $('result').append(link);
+
+    $('postButton').textContent='Item Posted';
+    $('postButton').disabled=true;
+    return;
+
+  }catch(e){
+    show(
+      e?.message||'Unable to post this item.',
+      true
+    );
+  }finally{
+    processing=false;
+    if($('postButton').textContent!=='Item Posted'){
+      $('postButton').disabled=false;
+    }
+  }
+});
+</script>
+<script src="./shopdrop-location-182a.js" defer></script></body>
+</html>
