@@ -232,7 +232,7 @@ footer{padding:30px;text-align:center;color:#64748b}
 </main>
 <footer>Shop&Drop · Marketplace transactions stay inside Shop&Drop · Seller contact details remain private<br><a href="./admin-login.html" style="display:inline-block;margin-top:12px;color:#64748b">Administrator sign in</a></footer>
 <script src="./common.js"></script>
-<script src="./v26-consolidated.js?v=26.49"></script>
+<script src="./v26-consolidated.js?v=198a"></script>
 <script>
 const {api,esc,money}=ShopDrop;
 function card(p){
@@ -347,7 +347,7 @@ async function shopdropPopulateCategoryMenu(){
     throw Error('Categories unavailable');
    }
 
-   const departments=[...data.departments].sort(
+   const departments=[...(data.publicDepartments||data.departments)].sort(
     (a,b)=>String(a.name||'').localeCompare(
      String(b.name||''),
      'en',
@@ -395,6 +395,12 @@ async function shopdropPopulateCategoryMenu(){
      links.append(link);
     }
 
+    for(const related of (data.related?.[department.name]||[])){
+     const link=document.createElement('a');
+     link.textContent='See also: '+related;
+     link.href='./categories.html?'+new URLSearchParams({category:related}).toString();
+     links.append(link);
+    }
     item.append(links);
     list.append(item);
     count++;

@@ -150,6 +150,7 @@ when approved courier services are activated.
 
 <script src="./shopdrop-photo-scan-status.js" defer></script>
 <script src="./shopdrop-product-photos.js" defer></script>
+<script src="./shopdrop-category-198a.js?v=198a"></script>
 <script type="module">
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -166,6 +167,7 @@ const sb=createClient(
 const $=id=>document.getElementById(id);
 let pendingId=null,photosAttached=false,processing=false,recoveredListing=false;
 const departmentSubs=new Map();
+let tax198a=null,originalPair198a=null;
 function fillSubcategories(selected=''){
   const select=$('subcat');
   const options=departmentSubs.get($('c').value)||[];
@@ -226,8 +228,10 @@ async function resumeItem(product){
     $('n').value=product.title||'';
     $('d').value=product.description||'';
     $('p').value=product.price||'';
-    $('c').value=product.category||'';
-    fillSubcategories(product.subcategory||'');
+    originalPair198a=[product.category||'',product.subcategory||''];
+    const choice=ShopDropCategory198a.recover(tax198a,...originalPair198a);
+    $('c').value=choice[0];
+    fillSubcategories(choice[1]);
     $('condition').value=product.condition||'used';
     $('town').value=product.location||'';
     $('shippingWeightKg').value=
@@ -273,9 +277,10 @@ async function setup(){
     }
 
     const taxonomy=await response.json();
+    tax198a=taxonomy;
     departmentSubs.clear();
 
-    for(const department of taxonomy.departments||[]){
+    for(const department of ShopDropCategory198a.publicDepartments(taxonomy)){
       if(
         typeof department.name==='string' &&
         department.name.trim()
@@ -395,12 +400,13 @@ $('itemForm').addEventListener('submit',async event=>{
       );
     }
 
-    const category=$('c').value;
-    const subcategory=$('subcat').value;
-    if(!departmentSubs.has(category) ||
-       !(departmentSubs.get(category)||[]).includes(subcategory)){
+    const chosenCategory198a=$('c').value;
+    const chosenSub198a=$('subcat').value;
+    if(!departmentSubs.has(chosenCategory198a) ||
+       !(departmentSubs.get(chosenCategory198a)||[]).includes(chosenSub198a)){
       throw Error('Please choose a main category and a matching subcategory.');
     }
+    const [category,subcategory]=ShopDropCategory198a.storedFor(tax198a,chosenCategory198a,chosenSub198a,originalPair198a);
 
     const amount=Number($('p').value);
 

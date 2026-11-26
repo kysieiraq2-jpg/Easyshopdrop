@@ -41,6 +41,7 @@ a:focus-visible,button:focus-visible{outline:3px solid #0f766e;outline-offset:2p
 <button id="more" type="button" hidden>Show More Products</button>
 </section>
 </main>
+<script src="./shopdrop-category-198a.js?v=198a"></script>
 <script>
 (()=>{
  'use strict';
@@ -52,7 +53,7 @@ a:focus-visible,button:focus-visible{outline:3px solid #0f766e;outline-offset:2p
  const category=query.get('category')||'';
  const subcategory=query.get('subcategory')||'';
  const view=query.get('view')||'';
- let offset=0,loading=false;
+ let offset=0,loading=false,tax198a=null,shownSub198a=subcategory;
  const pageSize=20;
 
  function imageUrl(image){
@@ -121,17 +122,18 @@ a:focus-visible,button:focus-visible{outline:3px solid #0f766e;outline-offset:2p
   return card;
  }
  async function load(){
-  if(loading)return;
+  if(loading||!tax198a)return;
   loading=true;
   $('more').disabled=true;
-  $('status').textContent='Loading '+subcategory+' advertisements…';
+  $('status').textContent='Loading '+shownSub198a+' advertisements…';
   try{
    const p=new URLSearchParams({
     select:'id,title,condition,price,currency',
     listing_status:'eq.active',quantity:'gt.0',country_code:'eq.ZA',
-    category:'eq.'+category,subcategory:'eq.'+subcategory,
+    // Fix 198A: category filter applied below using compatible pairs.
     order:'created_at.desc',limit:String(pageSize),offset:String(offset)
    });
+   ShopDropCategory198a.applyCategory(p,tax198a,category,subcategory);
    if(view==='new')p.set('condition','ilike.new');
    if(view==='preowned')p.set('condition','not.ilike.new');
    const response=await fetch(endpoint+'/rest/v1/products?'+p,{headers});
@@ -142,8 +144,8 @@ a:focus-visible,button:focus-visible{outline:3px solid #0f766e;outline-offset:2p
    for(const item of rows)$('items').append(createCard(item,images));
    offset+=rows.length;
    $('status').textContent=offset
-    ?offset+' product(s) in '+subcategory+'. Tap a product to view it.'
-    :'No products currently advertised in '+subcategory+'.';
+    ?offset+' product(s) in '+shownSub198a+'. Tap a product to view it.'
+    :'No products currently advertised in '+shownSub198a+'.';
    $('more').hidden=rows.length<pageSize;
   }catch(error){$('status').textContent=error.message||'Unable to load products.';}
   finally{loading=false;$('more').disabled=false;}
@@ -158,9 +160,12 @@ a:focus-visible,button:focus-visible{outline:3px solid #0f766e;outline-offset:2p
       !department.subcategories.includes(subcategory)){
     throw Error('Choose a valid category and subcategory from Shop&Drop.');
    }
-   $('crumb').textContent=category+' → '+subcategory;
-   $('heading').textContent=subcategory;
-   document.title=subcategory+' | Shop&Drop';
+   tax198a=data;
+   const display=ShopDropCategory198a.label(data,category,subcategory);
+   shownSub198a=display[1];
+   $('crumb').textContent=display.join(' → ');
+   $('heading').textContent=shownSub198a;
+   document.title=shownSub198a+' | Shop&Drop';
    await load();
   }catch(error){$('status').textContent=error.message||'Unable to open category.';}
  }

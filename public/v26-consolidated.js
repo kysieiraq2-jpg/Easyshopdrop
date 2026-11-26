@@ -348,7 +348,7 @@ async function shopdropLoadTaxonomy(){
 }
 async function renderMainMenuCategories(target){
  const host=typeof target==="string"?document.querySelector(target):target;if(!host)return;
- const data=await shopdropLoadTaxonomy();const cats=Array.isArray(data)?data:(data.departments||data.categories||[]);
+ const data=await shopdropLoadTaxonomy();const cats=Array.isArray(data)?data:(data.publicDepartments||data.departments||data.categories||[]);
  const sortedCats=[...cats].sort((a,b)=>String(a.name||a.label||"").localeCompare(String(b.name||b.label||""),"en",{sensitivity:"base"}));
  host.replaceChildren();
  for(const c of sortedCats){
@@ -357,6 +357,7 @@ async function renderMainMenuCategories(target){
   const categoryName=c.slug||c.id||c.name||"";
   all.href=`./categories.html?category=${encodeURIComponent(categoryName)}`;all.textContent=`Browse All ${c.name||c.label||""}`.trim();w.appendChild(all);
   for(const sub of [...(c.subcategories||[])].sort((a,b)=>String(typeof a==="string"?a:(a.name||a.label||"")).localeCompare(String(typeof b==="string"?b:(b.name||b.label||"")),"en",{sensitivity:"base"}))){const subName=typeof sub==="string"?sub:(sub.slug||sub.id||sub.name||"");const a=document.createElement("a");a.href=`./category-results.html?category=${encodeURIComponent(categoryName)}&subcategory=${encodeURIComponent(subName)}`;a.textContent=typeof sub==="string"?sub:(sub.name||sub.label||"Subcategory");w.appendChild(a);}
+  for(const related of (data.related?.[c.name]||[])){const a=document.createElement('a');a.href='./categories.html?'+new URLSearchParams({category:related}).toString();a.textContent='See also: '+related;w.appendChild(a);}
   d.appendChild(w);host.appendChild(d);
  }
 }

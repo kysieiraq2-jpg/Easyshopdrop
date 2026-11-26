@@ -1,6 +1,3183 @@
 {
-  "version": "25.16",
+  "version": "25.17",
   "departments": [
+    {
+      "name": "4x4",
+      "subcategories": [
+        "Air compressors",
+        "Awnings",
+        "Bakkie canopies",
+        "Bull bars and nudge bars",
+        "Bumpers",
+        "Dual battery systems",
+        "Lift kits and suspension",
+        "Load bin covers",
+        "Off-road tyres and wheels",
+        "Recovery boards and straps",
+        "Rock sliders and side steps",
+        "Roll bars",
+        "Roof racks",
+        "Rooftop tents",
+        "Seat covers",
+        "Snorkels",
+        "Spotlights",
+        "Underbody protection",
+        "Vehicle drawers",
+        "Vehicle fridges",
+        "Water containers",
+        "Winches"
+      ]
+    },
+    {
+      "name": "Air Conditioners, Fans & Heaters",
+      "subcategories": [
+        "Air conditioners",
+        "Fans",
+        "Heaters",
+        "Heating and cooling (general)",
+        "Humidifiers",
+        "Spare parts"
+      ]
+    },
+    {
+      "name": "Appliances",
+      "subcategories": [
+        "Heating & Cooling",
+        "Irons & Garment Care",
+        "Large Appliances",
+        "Laundry Appliances",
+        "Small Kitchen Appliances",
+        "Vacuum Cleaners & Floor Care",
+        "Water Purification"
+      ]
+    },
+    {
+      "name": "Arts & Crafts",
+      "subcategories": [
+        "Beads",
+        "Candles and soap making",
+        "Candles and soaps",
+        "Canvases",
+        "Craft materials",
+        "Drawing supplies",
+        "Handmade crafts",
+        "Handmade decorations",
+        "Hobby tools and supplies",
+        "Painting and drawing (general)",
+        "Painting supplies",
+        "Pottery and ceramics",
+        "Print-on-demand",
+        "Printing supplies",
+        "Resin craft materials",
+        "Woodwork crafts"
+      ]
+    },
+    {
+      "name": "Arts, Crafts & Handmade",
+      "subcategories": [
+        "Candles & Soaps",
+        "Craft Materials",
+        "Handmade Furniture Components",
+        "Handmade Furniture — Beds & Bedroom Furniture",
+        "Handmade Furniture — Cabinets & Cupboards",
+        "Handmade Furniture — Chairs & Benches",
+        "Handmade Furniture — Children’s Furniture",
+        "Handmade Furniture — Custom & Bespoke Furniture",
+        "Handmade Furniture — Other",
+        "Handmade Furniture — Outdoor & Garden Furniture",
+        "Handmade Furniture — Shelving & Storage",
+        "Handmade Furniture — Tables & Desks",
+        "Handmade Furniture — Woodwork & Decorative Pieces",
+        "Handmade Home Décor",
+        "Handmade Jewellery",
+        "Painting & Drawing",
+        "Personalised Gifts",
+        "Pottery & Ceramics",
+        "Print-on-Demand",
+        "Reclaimed Wood Products",
+        "Restored Furniture",
+        "Sewing & Needlecraft",
+        "Upcycled Furniture",
+        "Woodwork"
+      ]
+    },
+    {
+      "name": "Automotive",
+      "subcategories": [
+        "Car Accessories",
+        "Car Care & Cleaning",
+        "Car Electronics",
+        "Motorcycle Accessories",
+        "Replacement Parts",
+        "Tools & Garage Equipment",
+        "Towing & Recovery",
+        "Tyres & Wheels"
+      ]
+    },
+    {
+      "name": "Baby & Toddler",
+      "subcategories": [
+        "Baby bath and skincare",
+        "Baby baths",
+        "Baby Clothing",
+        "Baby clothing",
+        "Baby food accessories",
+        "Baby monitors",
+        "Baby safety",
+        "Baby Safety",
+        "Baby Toys",
+        "Baby toys",
+        "Bath & Skincare",
+        "Car seats",
+        "Car Seats",
+        "Cots and nursery furniture",
+        "Feeding",
+        "Maternity",
+        "Nappies & Changing",
+        "Nappies and changing",
+        "Nursery",
+        "Nursery items (general)",
+        "Prams & Travel Systems",
+        "Prams and travel systems"
+      ]
+    },
+    {
+      "name": "Baking & Homemade Cakes",
+      "subcategories": [
+        "Baked goods",
+        "Baking ingredients",
+        "Biscuits",
+        "Bread",
+        "Cakes",
+        "Cupcakes",
+        "Homemade bread",
+        "Homemade cakes",
+        "Other homemade baked goods",
+        "Rusks"
+      ]
+    },
+    {
+      "name": "Bathroom",
+      "subcategories": [
+        "Bath mats",
+        "Bathroom accessories",
+        "Bathroom fixtures",
+        "Bathroom storage",
+        "Mirrors",
+        "Shower curtains",
+        "Towels"
+      ]
+    },
+    {
+      "name": "Beach & Holiday",
+      "subcategories": [
+        "Beach bags",
+        "Beach chairs",
+        "Beach games",
+        "Beach mats",
+        "Beach shelters",
+        "Beach towels",
+        "Beach umbrellas",
+        "Cooler bags",
+        "Holiday accessories",
+        "Inflatable leisure products",
+        "Picnic sets"
+      ]
+    },
+    {
+      "name": "Beauty & Makeup",
+      "subcategories": [
+        "Bath and body",
+        "Beauty tools",
+        "Fragrances",
+        "Hair care",
+        "Makeup",
+        "Nail care",
+        "Shaving",
+        "Skincare"
+      ]
+    },
+    {
+      "name": "Beauty & Personal Care",
+      "subcategories": [
+        "Bath & Body",
+        "Beauty Tools & Accessories",
+        "Fragrances",
+        "Hair Care",
+        "Hair Styling Tools",
+        "Makeup",
+        "Nail Care",
+        "Shaving & Grooming",
+        "Skincare"
+      ]
+    },
+    {
+      "name": "Bedding & Linen",
+      "subcategories": [
+        "Bedding (general)",
+        "Blankets",
+        "Duvets",
+        "Mattress protectors",
+        "Pillows",
+        "Sheets",
+        "Table linen"
+      ]
+    },
+    {
+      "name": "Bicycle Parts & Accessories",
+      "subcategories": [
+        "Bicycle carriers",
+        "Bicycle computers",
+        "Bicycle frames",
+        "Brakes",
+        "Chains and gears",
+        "Cycling clothing and shoes",
+        "Handlebars and grips",
+        "Helmets",
+        "Indoor trainers",
+        "Lights",
+        "Locks",
+        "Pedals",
+        "Pumps",
+        "Repair tools",
+        "Saddles",
+        "Suspension",
+        "Tyres and tubes",
+        "Wheels and rims"
+      ]
+    },
+    {
+      "name": "Bicycles",
+      "subcategories": [
+        "Bicycles and cycling (general)",
+        "BMX",
+        "Children's bicycles",
+        "Folding bicycles",
+        "Gravel bikes",
+        "Mountain bikes",
+        "Road bikes",
+        "Touring bikes"
+      ]
+    },
+    {
+      "name": "Bird Supplies",
+      "subcategories": [
+        "Aviaries",
+        "Bird cages",
+        "Bird food",
+        "Bird supplies (general)",
+        "Feeders",
+        "Nesting boxes",
+        "Perches",
+        "Toys"
+      ]
+    },
+    {
+      "name": "Books",
+      "subcategories": [
+        "Children's books",
+        "Educational books",
+        "Languages",
+        "Magazines",
+        "Maps",
+        "Novels and general books",
+        "Study guides and textbooks"
+      ]
+    },
+    {
+      "name": "Books & Learning",
+      "subcategories": [
+        "Books",
+        "Children’s Books",
+        "Educational Materials",
+        "Languages",
+        "Magazines & Periodicals",
+        "Maps & Atlases",
+        "Textbooks & Study Guides"
+      ]
+    },
+    {
+      "name": "Braai & Barbecue",
+      "subcategories": [
+        "Braai covers",
+        "Braai grids",
+        "Braai stands",
+        "Braai tools",
+        "Braais and outdoor cooking (general)",
+        "Built-in braais",
+        "Charcoal braais",
+        "Electric braais",
+        "Fire pits and bomas",
+        "Gas braais",
+        "Handmade braais",
+        "Outdoor cooking stations",
+        "Pizza ovens",
+        "Portable braais",
+        "Potjiekos pots",
+        "Smokers",
+        "Spare parts",
+        "Spit braais",
+        "Thermometers",
+        "Wood braais"
+      ]
+    },
+    {
+      "name": "Braai Wood & Charcoal",
+      "subcategories": [
+        "Briquettes",
+        "Charcoal",
+        "Firelighters (where permitted)",
+        "Hardwood",
+        "Wood bundles"
+      ]
+    },
+    {
+      "name": "Building Supplies",
+      "subcategories": [
+        "Building materials",
+        "Cement and concrete supplies",
+        "Doors and windows",
+        "Flooring",
+        "Insulation",
+        "Roofing",
+        "Tiles"
+      ]
+    },
+    {
+      "name": "Cameras & Photography",
+      "subcategories": [
+        "Action Cameras",
+        "Action cameras",
+        "Binoculars & Optics",
+        "Binoculars and optics",
+        "Camera bags",
+        "Camera Bags & Cases",
+        "Digital cameras",
+        "Digital Cameras",
+        "Lenses",
+        "Lighting",
+        "Lighting & Studio",
+        "Lighting and studio equipment",
+        "Memory cards",
+        "Memory Cards & Storage",
+        "Tripods",
+        "Tripods & Supports"
+      ]
+    },
+    {
+      "name": "Camping",
+      "subcategories": [
+        "Camp beds",
+        "Camping chairs",
+        "Camping tables",
+        "Camping tents",
+        "Climbing equipment",
+        "Coolers",
+        "Hammocks",
+        "Hiking equipment",
+        "Hunting accessories (existing restrictions apply)",
+        "Outdoor clothing",
+        "Outdoor cooking",
+        "Sleeping bags",
+        "Sleeping bags and gear",
+        "Travel outdoor gear"
+      ]
+    },
+    {
+      "name": "Camping & Outdoors",
+      "subcategories": [
+        "Camping Tents & Shelters",
+        "Climbing",
+        "Coolers & Hydration",
+        "Fishing",
+        "Hiking",
+        "Hunting Accessories",
+        "Outdoor Clothing",
+        "Outdoor Cooking",
+        "Sleeping Gear",
+        "Travel Outdoor Gear"
+      ]
+    },
+    {
+      "name": "Car Accessories",
+      "subcategories": [
+        "Boot liners",
+        "Car mats and carpets",
+        "Car organisers",
+        "Car seat covers",
+        "Car sunshades",
+        "General car accessories",
+        "Steering wheel covers",
+        "Tow bars",
+        "Vehicle covers"
+      ]
+    },
+    {
+      "name": "Car Audio & Electronics",
+      "subcategories": [
+        "Car electronics (general)",
+        "Car phone accessories (general)",
+        "Car radios",
+        "Dash cameras",
+        "GPS",
+        "Phone holders",
+        "Reversing cameras",
+        "Speakers and amplifiers"
+      ]
+    },
+    {
+      "name": "Car Cleaning",
+      "subcategories": [
+        "Car cleaning accessories",
+        "Car polish",
+        "Detailing equipment",
+        "Pressure washers"
+      ]
+    },
+    {
+      "name": "Car Parts",
+      "subcategories": [
+        "Batteries",
+        "Belts and filters",
+        "Braking parts",
+        "Cooling parts",
+        "Engine parts",
+        "Headlights and tail lights",
+        "Replacement parts",
+        "Starter motors and alternators"
+      ]
+    },
+    {
+      "name": "Caravans & Trailers",
+      "subcategories": [
+        "Caravan accessories",
+        "Caravan fittings",
+        "Caravan storage",
+        "Towing and recovery equipment",
+        "Towing equipment",
+        "Trailer accessories",
+        "Trailer lights"
+      ]
+    },
+    {
+      "name": "Cat Supplies",
+      "subcategories": [
+        "Beds",
+        "Carriers",
+        "Cat food and treats",
+        "Cat supplies (general)",
+        "Collars",
+        "Grooming",
+        "Litter and trays",
+        "Scratching posts and cat trees",
+        "Toys"
+      ]
+    },
+    {
+      "name": "Cellphones",
+      "subcategories": [
+        "Chargers and cables",
+        "Feature phones",
+        "Phone cases",
+        "Phone parts",
+        "Power banks",
+        "Screen protectors",
+        "Smartphones"
+      ]
+    },
+    {
+      "name": "Cellphones & Wearables",
+      "subcategories": [
+        "Car Phone Accessories",
+        "Chargers & Cables",
+        "Feature Phones",
+        "Fitness Trackers",
+        "Phone Cases & Covers",
+        "Phone Parts & Repair",
+        "Power Banks",
+        "Screen Protectors",
+        "Smartphones",
+        "Smartwatches"
+      ]
+    },
+    {
+      "name": "Cleaning Supplies",
+      "subcategories": [
+        "Brooms and mops",
+        "Cleaning accessories",
+        "Household cleaners",
+        "Paper products",
+        "Washing and laundry supplies"
+      ]
+    },
+    {
+      "name": "Clothing",
+      "subcategories": [
+        "Children's clothing",
+        "Clothing accessories",
+        "Men's clothing",
+        "Traditional clothing",
+        "Women's clothing",
+        "Workwear"
+      ]
+    },
+    {
+      "name": "Collectibles & Antiques",
+      "subcategories": [
+        "Antique furniture",
+        "Antiques and vintage items (general)",
+        "Coins",
+        "Memorabilia",
+        "Model cars",
+        "Porcelain",
+        "Stamps",
+        "Trading cards",
+        "Vintage clocks",
+        "Vintage ornaments"
+      ]
+    },
+    {
+      "name": "Collectibles & Hobbies",
+      "subcategories": [
+        "Antiques & Vintage",
+        "Coins & Currency",
+        "Hobby Tools & Supplies",
+        "Memorabilia",
+        "Model Kits",
+        "Model Trains",
+        "Stamps",
+        "Trading Cards"
+      ]
+    },
+    {
+      "name": "Computers & Tablets",
+      "subcategories": [
+        "Components",
+        "Computer Components",
+        "Desktop Computers",
+        "Desktop computers",
+        "Drives and storage",
+        "Keyboards & Mice",
+        "Keyboards and mice",
+        "Laptop Accessories",
+        "Laptop accessories",
+        "Laptops",
+        "Monitors",
+        "Networking",
+        "Printers & Scanners",
+        "Printers and scanners",
+        "Software",
+        "Storage & Drives",
+        "Tablets"
+      ]
+    },
+    {
+      "name": "DIY, Tools & Machinery",
+      "subcategories": [
+        "Electrical",
+        "Generators & Power Equipment",
+        "Hand Tools",
+        "Hardware & Fasteners",
+        "Machinery",
+        "Paint & Supplies",
+        "Plumbing",
+        "Power Tools",
+        "Safety Equipment",
+        "Tool Accessories",
+        "Welding"
+      ]
+    },
+    {
+      "name": "Dog Supplies",
+      "subcategories": [
+        "Beds and kennels",
+        "Bowls",
+        "Collars",
+        "Dog food and treats",
+        "Dog supplies (general)",
+        "Grooming",
+        "Harnesses (including heavy-duty)",
+        "Leads and leashes",
+        "Toys",
+        "Training accessories",
+        "Travel equipment"
+      ]
+    },
+    {
+      "name": "E-Bike Parts",
+      "subcategories": [
+        "Batteries",
+        "Chargers",
+        "Controllers",
+        "Conversion kits",
+        "Displays",
+        "Motors",
+        "Sensors",
+        "Spare parts",
+        "Tyres and wheels",
+        "Wiring and connectors"
+      ]
+    },
+    {
+      "name": "E-Bikes",
+      "subcategories": [
+        "Cargo e-bikes",
+        "Commuter e-bikes",
+        "Folding e-bikes",
+        "Mountain e-bikes",
+        "Road e-bikes"
+      ]
+    },
+    {
+      "name": "Electrical Supplies",
+      "subcategories": [
+        "Electrical fittings",
+        "Extension leads",
+        "Installation tools",
+        "Plugs and sockets",
+        "Switches",
+        "Wiring accessories"
+      ]
+    },
+    {
+      "name": "Electronics",
+      "subcategories": [
+        "Batteries & Chargers",
+        "Batteries and chargers",
+        "Calculators",
+        "Calculators & Translators",
+        "Calculators and translators",
+        "Drones",
+        "Electronic Accessories",
+        "Electronic accessories",
+        "GPS",
+        "GPS & Navigation",
+        "Security Cameras & Systems",
+        "Smart Home",
+        "Smart home devices",
+        "Translators"
+      ]
+    },
+    {
+      "name": "Farming",
+      "subcategories": [
+        "Agricultural supplies",
+        "Farm equipment",
+        "Farm fencing",
+        "Farm hand tools",
+        "Feeders",
+        "Greenhouse equipment",
+        "Incubators",
+        "Irrigation equipment",
+        "Irrigation pumps",
+        "Machinery",
+        "Small implements"
+      ]
+    },
+    {
+      "name": "Farming & Agriculture",
+      "subcategories": [
+        "Agricultural Irrigation Equipment",
+        "Agricultural Machinery",
+        "Farming Equipment",
+        "Farming Hand Tools",
+        "Greenhouse Equipment",
+        "Irrigation Pumps",
+        "Small Farming Implements"
+      ]
+    },
+    {
+      "name": "Fashion",
+      "subcategories": [
+        "Accessories",
+        "Bags & Handbags",
+        "Jewellery",
+        "Kids’ Clothing",
+        "Men’s Clothing",
+        "Shoes",
+        "Sportswear",
+        "Traditional & Cultural Clothing",
+        "Watches",
+        "Women’s Clothing",
+        "Workwear"
+      ]
+    },
+    {
+      "name": "Fish Tanks & Aquarium",
+      "subcategories": [
+        "Aquarium filters",
+        "Aquarium food",
+        "Aquarium heaters",
+        "Aquarium lighting",
+        "Aquarium pumps",
+        "Aquarium supplies (general)",
+        "Fish tanks",
+        "Tank accessories"
+      ]
+    },
+    {
+      "name": "Fishing & Angling",
+      "subcategories": [
+        "Bass fishing",
+        "Boat and deep-sea fishing",
+        "Carp fishing",
+        "Fishing equipment (general)",
+        "Fly fishing",
+        "Freshwater fishing",
+        "Rock and surf fishing",
+        "Saltwater fishing"
+      ]
+    },
+    {
+      "name": "Fishing Bait & Dips",
+      "subcategories": [
+        "Artificial baits",
+        "Boilies",
+        "Dips and flavourings",
+        "Groundbait",
+        "Pellets",
+        "Prepared baits"
+      ]
+    },
+    {
+      "name": "Fishing Tackle & Equipment",
+      "subcategories": [
+        "Bite alarms",
+        "Fish finders",
+        "Fishing chairs and beds",
+        "Fishing clothing and waders",
+        "Fishing kayaks",
+        "Fishing line and braid",
+        "Fishing reels",
+        "Fishing rods",
+        "Floats and indicators",
+        "Hooks and sinkers",
+        "Landing nets",
+        "Leaders and swivels",
+        "Lures and spinners",
+        "Rod and reel sets",
+        "Rod pods and stands",
+        "Shelters",
+        "Tackle bags and boxes"
+      ]
+    },
+    {
+      "name": "Food & Groceries",
+      "subcategories": [
+        "Baking ingredients",
+        "Coffee and tea",
+        "Cooking ingredients",
+        "Non-alcoholic drinks",
+        "Pantry food",
+        "Snacks"
+      ]
+    },
+    {
+      "name": "Fridges & Freezers",
+      "subcategories": [
+        "Chest freezers",
+        "Freezers",
+        "Fridge-freezer combinations",
+        "Refrigerators",
+        "Water dispensers"
+      ]
+    },
+    {
+      "name": "Furniture",
+      "subcategories": [
+        "Bedroom furniture",
+        "Cabinets and cupboards",
+        "Chairs and benches",
+        "Children's furniture",
+        "Desks and tables",
+        "Furniture (general)",
+        "Furniture parts",
+        "Refurbished furniture",
+        "Shelves and storage",
+        "Sofas",
+        "Used furniture"
+      ]
+    },
+    {
+      "name": "Gaming",
+      "subcategories": [
+        "Collectible Gaming",
+        "Collectible gaming",
+        "Consoles",
+        "Controllers",
+        "Games",
+        "Gaming Accessories",
+        "Gaming accessories",
+        "Gaming chairs",
+        "Gaming Chairs",
+        "Gaming computers",
+        "Gaming headsets",
+        "Gaming Headsets",
+        "Gaming PCs & Laptops",
+        "Video Games"
+      ]
+    },
+    {
+      "name": "Garden Furniture",
+      "subcategories": [
+        "Garden benches",
+        "Garden chairs",
+        "Garden tables",
+        "Homemade garden furniture",
+        "Outdoor furniture (general)",
+        "Outdoor umbrellas",
+        "Patio sets"
+      ]
+    },
+    {
+      "name": "Garden Machines",
+      "subcategories": [
+        "Brush cutters",
+        "Chainsaws",
+        "Garden machine parts",
+        "Grass trimmers (weed eaters)",
+        "Hedge trimmers",
+        "Lawnmowers",
+        "Leaf blowers",
+        "Ride-on mowers"
+      ]
+    },
+    {
+      "name": "Garden, Pool & Patio",
+      "subcategories": [
+        "Braais & Outdoor Cooking",
+        "Garden Tools",
+        "Irrigation & Watering",
+        "Lawn Care",
+        "Outdoor Furniture",
+        "Outdoor Lighting",
+        "Pest & Weed Control Products",
+        "Plants & Seeds",
+        "Pool & Spa"
+      ]
+    },
+    {
+      "name": "Gardening",
+      "subcategories": [
+        "Compost and potting soil",
+        "Fertiliser and plant food",
+        "Garden hand tools",
+        "Garden ornaments",
+        "Garden sheds",
+        "Garden tools (general)",
+        "Hoses and sprinklers",
+        "Irrigation",
+        "Lawn care",
+        "Permitted pest and weed control products",
+        "Plants and seeds (general)",
+        "Plants and trees",
+        "Pots and planters",
+        "Seeds and bulbs",
+        "Water pumps",
+        "Water tanks",
+        "Wheelbarrows"
+      ]
+    },
+    {
+      "name": "Gifts & Parties",
+      "subcategories": [
+        "Decorations",
+        "Event accessories",
+        "Gift wrap",
+        "Greeting cards",
+        "Novelty gifts",
+        "Party supplies",
+        "Personalised gifts",
+        "Wedding supplies"
+      ]
+    },
+    {
+      "name": "Golf",
+      "subcategories": [
+        "Balls and tees",
+        "Complete golf sets",
+        "Drivers",
+        "Fairway woods and hybrids",
+        "Golf bags",
+        "Golf caps and clothing",
+        "Golf equipment (general)",
+        "Golf gloves",
+        "Golf shoes",
+        "Golf trolleys",
+        "Golf umbrellas",
+        "Irons and wedges",
+        "Practice equipment",
+        "Putters",
+        "Rangefinders",
+        "Shafts and grips",
+        "Simulators"
+      ]
+    },
+    {
+      "name": "Groceries & Household",
+      "subcategories": [
+        "Baking",
+        "Coffee & Tea",
+        "Cooking Ingredients",
+        "Food Storage",
+        "Household Cleaning",
+        "Non-Alcoholic Beverages",
+        "Pantry Food",
+        "Paper & Disposable Products",
+        "Snacks & Sweets"
+      ]
+    },
+    {
+      "name": "Gym & Fitness",
+      "subcategories": [
+        "Dumbbells and barbells",
+        "Exercise bikes",
+        "Exercise mats",
+        "Gym benches",
+        "Gym equipment",
+        "Kettlebells",
+        "Pilates and yoga",
+        "Power racks",
+        "Resistance bands",
+        "Rowing machines",
+        "Treadmills",
+        "Weight plates",
+        "Weightlifting accessories"
+      ]
+    },
+    {
+      "name": "Hair & Salon Equipment",
+      "subcategories": [
+        "Barber and salon furniture",
+        "Clippers",
+        "Hair dryers and styling tools",
+        "Hair washing basins",
+        "Mirrors",
+        "Salon accessories"
+      ]
+    },
+    {
+      "name": "Hand Tools",
+      "subcategories": [
+        "Hammers",
+        "Hand saws",
+        "Hand tools (general)",
+        "Measuring tapes",
+        "Pliers",
+        "Ratchets and sockets",
+        "Screwdrivers",
+        "Spanners",
+        "Tool sets",
+        "Vices and clamps"
+      ]
+    },
+    {
+      "name": "Handmade Furniture",
+      "subcategories": [
+        "Beds",
+        "Cabinets and cupboards",
+        "Chairs and benches",
+        "Children's furniture",
+        "Custom furniture",
+        "Decorative woodwork",
+        "Furniture components",
+        "Garden furniture",
+        "Other handmade furniture",
+        "Shelving and storage",
+        "Tables and desks",
+        "Upcycled and restored furniture"
+      ]
+    },
+    {
+      "name": "Hardware",
+      "subcategories": [
+        "Brackets",
+        "Fasteners",
+        "Hardware and fasteners (general)",
+        "Hinges",
+        "Locks",
+        "Nuts and bolts",
+        "Screws"
+      ]
+    },
+    {
+      "name": "Health & Personal Care",
+      "subcategories": [
+        "Dental care",
+        "Eye care",
+        "First aid",
+        "Hygiene",
+        "Permitted medical devices",
+        "Relaxation products"
+      ]
+    },
+    {
+      "name": "Health & Wellness",
+      "subcategories": [
+        "CBD Oils & Wellness Products",
+        "Eye Care",
+        "First Aid",
+        "Fitness Recovery",
+        "Medical Devices",
+        "Mobility & Daily Living",
+        "Oral Care",
+        "Personal Hygiene",
+        "Vitamins & Supplements",
+        "Wellness & Relaxation"
+      ]
+    },
+    {
+      "name": "Home & Kitchen",
+      "subcategories": [
+        "Bathroom",
+        "Bedding",
+        "Cleaning Supplies",
+        "Cookware & Bakeware",
+        "Furniture",
+        "Furniture Parts & Components",
+        "Home Décor",
+        "Kitchen & Dining",
+        "Laundry & Home Care",
+        "Lighting",
+        "Refurbished Home Furniture",
+        "Second-hand Furniture",
+        "Storage & Organisation"
+      ]
+    },
+    {
+      "name": "Home Appliances",
+      "subcategories": [
+        "Floor care",
+        "Irons and garment care",
+        "Large appliances (general)",
+        "Other household appliances",
+        "Vacuum cleaners",
+        "Vacuum cleaners and floor care",
+        "Water purification"
+      ]
+    },
+    {
+      "name": "Home Decorations",
+      "subcategories": [
+        "Clocks",
+        "Handmade home decorations",
+        "Home decorations (general)",
+        "Lamps",
+        "Mirrors",
+        "Ornaments",
+        "Pictures and frames",
+        "Reclaimed wood decorations"
+      ]
+    },
+    {
+      "name": "Home Improvement & Building Supplies",
+      "subcategories": [
+        "Bathroom Fixtures",
+        "Building Materials",
+        "Doors & Windows",
+        "Flooring",
+        "Insulation",
+        "Kitchen Fixtures",
+        "Locks & Security Hardware",
+        "Roofing",
+        "Tiles & Surfaces"
+      ]
+    },
+    {
+      "name": "Homemade Food",
+      "subcategories": [
+        "Homemade pantry foods",
+        "Homemade savoury foods suitable for lawful delivery",
+        "Homemade snacks",
+        "Homemade treats",
+        "Other permitted homemade food"
+      ]
+    },
+    {
+      "name": "Homemade Food & Pantry",
+      "subcategories": [
+        "Baked Goods",
+        "Jams, Preserves & Spreads",
+        "Other Homemade Pantry Foods",
+        "Sauces, Chutneys & Condiments",
+        "Snacks & Treats",
+        "Spices, Herbs & Seasonings",
+        "Sweets & Confectionery"
+      ]
+    },
+    {
+      "name": "Industrial & Business Supplies",
+      "subcategories": [
+        "Agricultural Supplies",
+        "Bakery Equipment",
+        "Commercial Cleaning Supplies",
+        "Commercial Refrigeration",
+        "Industrial Tools",
+        "Material Handling",
+        "Office & Business Equipment",
+        "Packaging & Shipping Supplies",
+        "Restaurant & Catering Equipment",
+        "Retail & POS Equipment",
+        "Safety & PPE",
+        "Salon & Barber Equipment",
+        "Shop Shelving & Displays",
+        "Used Business Furniture",
+        "Used Shop Equipment",
+        "Workshop Equipment"
+      ]
+    },
+    {
+      "name": "Jams, Honey & Preserves",
+      "subcategories": [
+        "Fruit preserves",
+        "Homemade jams and preserves",
+        "Honey",
+        "Jams",
+        "Jams and preserves (general)",
+        "Marmalade",
+        "Pickles",
+        "Spreads"
+      ]
+    },
+    {
+      "name": "Jewellery & Watches",
+      "subcategories": [
+        "Bracelets",
+        "Earrings",
+        "Handmade jewellery",
+        "Jewellery (general)",
+        "Jewellery boxes",
+        "Necklaces",
+        "Rings",
+        "Watch accessories",
+        "Watches"
+      ]
+    },
+    {
+      "name": "Kitchen Appliances",
+      "subcategories": [
+        "Air fryers",
+        "Blenders",
+        "Coffee machines",
+        "Electric grills",
+        "Electric pressure cookers",
+        "Food processors",
+        "Ice makers",
+        "Juicers",
+        "Kettles",
+        "Microwave ovens",
+        "Mixers",
+        "Sandwich makers",
+        "Small kitchen appliances (general)",
+        "Toasters"
+      ]
+    },
+    {
+      "name": "Kitchenware",
+      "subcategories": [
+        "Baking equipment",
+        "Chopping boards",
+        "Coffee accessories",
+        "Cookware and baking (general)",
+        "Cookware sets",
+        "Cutlery",
+        "Dinnerware",
+        "Food containers",
+        "Glassware",
+        "Kitchen and dining (general)",
+        "Kitchen fixtures",
+        "Kitchen knives",
+        "Kitchen linen",
+        "Kitchen utensils",
+        "Pots and pans",
+        "Pressure cookers",
+        "Serving equipment"
+      ]
+    },
+    {
+      "name": "Ladders & Scaffolding",
+      "subcategories": [
+        "Access platforms",
+        "Extension ladders",
+        "Scaffolding equipment",
+        "Step ladders"
+      ]
+    },
+    {
+      "name": "Lighting",
+      "subcategories": [
+        "Indoor lights",
+        "LED lights",
+        "Lighting (general)",
+        "Outdoor lights",
+        "Solar lights",
+        "Spare fittings"
+      ]
+    },
+    {
+      "name": "Luggage & Bags",
+      "subcategories": [
+        "Backpacks",
+        "Handbags",
+        "Suitcases",
+        "Travel bags",
+        "Travel locks",
+        "Travel organisers"
+      ]
+    },
+    {
+      "name": "Luggage & Travel",
+      "subcategories": [
+        "Backpacks",
+        "Cooler Bags",
+        "Locks & Security",
+        "Suitcases",
+        "Travel Accessories",
+        "Travel Bags",
+        "Travel Organisers"
+      ]
+    },
+    {
+      "name": "Marine & Water Sports",
+      "subcategories": [
+        "Boat accessories",
+        "Bodyboards",
+        "Kayaks",
+        "Life jackets",
+        "Marine electronics",
+        "Paddleboards",
+        "Snorkelling",
+        "Surfboards",
+        "Trolling motors"
+      ]
+    },
+    {
+      "name": "Medical & Mobility Equipment",
+      "subcategories": [
+        "Examination furniture",
+        "Mobility aids",
+        "Permitted non-restricted equipment",
+        "Walking aids",
+        "Wheelchairs"
+      ]
+    },
+    {
+      "name": "Motorbike Accessories",
+      "subcategories": [
+        "Motorbike clothing",
+        "Motorbike helmets",
+        "Motorbike parts and accessories"
+      ]
+    },
+    {
+      "name": "Music & Instruments",
+      "subcategories": [
+        "Amplifiers",
+        "DJ equipment",
+        "Drums",
+        "Guitars",
+        "Instrument accessories",
+        "Keyboards and pianos",
+        "Microphones",
+        "Orchestral instruments",
+        "Recording equipment",
+        "Sheet music"
+      ]
+    },
+    {
+      "name": "Music & Musical Instruments",
+      "subcategories": [
+        "DJ Equipment",
+        "Drums & Percussion",
+        "DVDs & Blu-rays",
+        "Guitars",
+        "Instrument Accessories",
+        "Keyboards & Pianos",
+        "Microphones",
+        "Music CDs",
+        "Orchestral Instruments",
+        "Sheet Music",
+        "Studio & Recording",
+        "Vintage Physical Media",
+        "Vinyl Records"
+      ]
+    },
+    {
+      "name": "Music, CDs & Records",
+      "subcategories": [
+        "DVDs and Blu-rays",
+        "Music CDs",
+        "Vintage physical media",
+        "Vinyl records"
+      ]
+    },
+    {
+      "name": "Office & Stationery",
+      "subcategories": [
+        "Art & Craft Supplies",
+        "Business Machines",
+        "Desk Accessories",
+        "Filing & Storage",
+        "Labels",
+        "Office Furniture",
+        "Paper & Notebooks",
+        "Presentation Supplies",
+        "School Stationery",
+        "Writing & Correction"
+      ]
+    },
+    {
+      "name": "Office Equipment",
+      "subcategories": [
+        "Business machines",
+        "Desk accessories",
+        "Desks and office furniture",
+        "Filing cabinets",
+        "Office and business equipment (general)",
+        "Presentation equipment",
+        "Shredders"
+      ]
+    },
+    {
+      "name": "Paint & Decorating",
+      "subcategories": [
+        "Brushes and rollers",
+        "Decorating tools",
+        "Paint and supplies",
+        "Sanding supplies"
+      ]
+    },
+    {
+      "name": "Party, Events & Gifts",
+      "subcategories": [
+        "Decorations",
+        "Event Accessories",
+        "Gift Wrap",
+        "Greeting Cards",
+        "Novelty Gifts",
+        "Party Supplies",
+        "Wedding Supplies"
+      ]
+    },
+    {
+      "name": "Pet Accessories",
+      "subcategories": [
+        "Beds and housing",
+        "Bowls",
+        "Grooming tools",
+        "Handmade pet products",
+        "Pet carriers",
+        "Pet food (general)",
+        "Pet toys",
+        "Pet travel accessories"
+      ]
+    },
+    {
+      "name": "Pet Health & Care",
+      "subcategories": [
+        "Dental care",
+        "Grooming and hygiene",
+        "Legally permitted non-prescription nutritional supplements"
+      ]
+    },
+    {
+      "name": "Pet Supplies",
+      "subcategories": [
+        "Birds",
+        "Cats",
+        "Dogs",
+        "Fish & Aquarium",
+        "Pet Beds & Housing",
+        "Pet Food",
+        "Pet Grooming",
+        "Pet Toys",
+        "Pet Travel & Accessories",
+        "Reptiles",
+        "Small Animals"
+      ]
+    },
+    {
+      "name": "Plumbing",
+      "subcategories": [
+        "Fittings",
+        "Pipe tools",
+        "Plumbing supplies",
+        "Pumps",
+        "Taps"
+      ]
+    },
+    {
+      "name": "Power Tools",
+      "subcategories": [
+        "Angle grinders",
+        "Bench grinders",
+        "Corded drills",
+        "Cordless drills",
+        "Hammer drills",
+        "Impact drivers",
+        "Jigsaws",
+        "Mitre saws",
+        "Polishers",
+        "Power tool accessories",
+        "Power tools (general)",
+        "Routers",
+        "Sanders",
+        "Saws",
+        "Tool batteries and chargers"
+      ]
+    },
+    {
+      "name": "Reptile & Small Pet Supplies",
+      "subcategories": [
+        "Bedding",
+        "Cages and enclosures",
+        "Feeding accessories",
+        "Habitat equipment",
+        "Heating and lighting",
+        "Rabbit and hamster supplies",
+        "Reptile supplies (general)",
+        "Small pet supplies (general)",
+        "Terrariums and vivariums"
+      ]
+    },
+    {
+      "name": "Restaurant & Catering Equipment",
+      "subcategories": [
+        "Bakery equipment",
+        "Catering equipment",
+        "Commercial cleaning supplies",
+        "Commercial refrigeration",
+        "Display cabinets",
+        "Kitchen equipment"
+      ]
+    },
+    {
+      "name": "Sauces & Marinades",
+      "subcategories": [
+        "Braai sauces",
+        "Chutneys",
+        "Dips",
+        "Homemade sauces and condiments",
+        "Hot sauces",
+        "Marinades",
+        "Salad dressings",
+        "Table sauces"
+      ]
+    },
+    {
+      "name": "School & Stationery",
+      "subcategories": [
+        "Art supplies",
+        "Calculators",
+        "Educational materials",
+        "Exercise books",
+        "Labels",
+        "Paper",
+        "School bags",
+        "School stationery",
+        "Writing supplies"
+      ]
+    },
+    {
+      "name": "Security Equipment",
+      "subcategories": [
+        "Alarms",
+        "Gates and locks",
+        "Safes",
+        "Security cameras",
+        "Security lighting"
+      ]
+    },
+    {
+      "name": "Sewing & Knitting",
+      "subcategories": [
+        "Embroidery equipment",
+        "Fabrics",
+        "Knitting supplies",
+        "Overlockers",
+        "Patterns",
+        "Sewing and needlecraft (general)",
+        "Sewing machines",
+        "Thread",
+        "Wool"
+      ]
+    },
+    {
+      "name": "Shoes",
+      "subcategories": [
+        "Children's shoes",
+        "Men's shoes",
+        "Shoes (general)",
+        "Women's shoes",
+        "Work shoes"
+      ]
+    },
+    {
+      "name": "Solar & Backup Power",
+      "subcategories": [
+        "Portable power stations",
+        "Portable Power Stations",
+        "Solar Batteries",
+        "Solar batteries",
+        "Solar Cables & Accessories",
+        "Solar cables and accessories",
+        "Solar charge controllers",
+        "Solar Charge Controllers",
+        "Solar Inverters",
+        "Solar inverters",
+        "Solar panels",
+        "Solar Panels",
+        "Used solar equipment",
+        "Used Solar Equipment"
+      ]
+    },
+    {
+      "name": "Spices, Herbs & Seasonings",
+      "subcategories": [
+        "Braai rubs",
+        "Dried herbs",
+        "Homemade spice blends",
+        "Meat seasonings",
+        "Spice mixes",
+        "Spices"
+      ]
+    },
+    {
+      "name": "Sport & Fitness",
+      "subcategories": [
+        "Combat Sports",
+        "Cycling",
+        "Fan & Supporter Gear",
+        "Fitness Equipment",
+        "Golf",
+        "Racquet Sports",
+        "Running",
+        "Sports Nutrition Accessories",
+        "Swimming",
+        "Team Sports"
+      ]
+    },
+    {
+      "name": "Sports",
+      "subcategories": [
+        "Athletics",
+        "Badminton",
+        "Basketball",
+        "Bowls",
+        "Boxing",
+        "Combat sports (general)",
+        "Cricket",
+        "Darts",
+        "Gymnastics",
+        "Hockey",
+        "Martial arts",
+        "Netball",
+        "Padel",
+        "Pickleball",
+        "Racquet sports (general)",
+        "Rugby",
+        "Running",
+        "Skateboarding",
+        "Soccer",
+        "Squash",
+        "Swimming",
+        "Table tennis",
+        "Team sports (general)",
+        "Tennis",
+        "Triathlon",
+        "Volleyball",
+        "Water polo"
+      ]
+    },
+    {
+      "name": "Sports Clothing & Shoes",
+      "subcategories": [
+        "Fitness clothing",
+        "Running shoes",
+        "Sports clothing",
+        "Sports shoes",
+        "Sports sunglasses",
+        "Supporter gear",
+        "Training shoes"
+      ]
+    },
+    {
+      "name": "Sports Nutrition",
+      "subcategories": [
+        "Creatine",
+        "Permitted sports nutrition",
+        "Protein powders",
+        "Shakers and bottles",
+        "Sports nutrition accessories",
+        "Vitamins and minerals"
+      ]
+    },
+    {
+      "name": "Sports Watches & Trackers",
+      "subcategories": [
+        "Fitness trackers",
+        "Golf GPS and watches",
+        "Smartwatches",
+        "Sports watches"
+      ]
+    },
+    {
+      "name": "Storage & Organisation",
+      "subcategories": [
+        "Garage organisers",
+        "Shelving",
+        "Storage (general)",
+        "Storage boxes",
+        "Storage cupboards",
+        "Tool storage"
+      ]
+    },
+    {
+      "name": "Stoves & Ovens",
+      "subcategories": [
+        "Electric stoves",
+        "Extractor fans",
+        "Gas stoves",
+        "Hobs",
+        "Ovens"
+      ]
+    },
+    {
+      "name": "Sweets & Snacks",
+      "subcategories": [
+        "Confectionery",
+        "Homemade snacks",
+        "Homemade sweets",
+        "Packaged snacks",
+        "Snacks and sweets (general)"
+      ]
+    },
+    {
+      "name": "Swimming Pools",
+      "subcategories": [
+        "Pool accessories",
+        "Pool and spa equipment (general)",
+        "Pool cleaning equipment",
+        "Pool filters and pumps",
+        "Pools",
+        "Spa equipment"
+      ]
+    },
+    {
+      "name": "Toys & Games",
+      "subcategories": [
+        "Action Figures",
+        "Action figures",
+        "Arts & Crafts Toys",
+        "Arts and crafts toys",
+        "Baby & Toddler Toys",
+        "Baby and toddler toys",
+        "Board Games",
+        "Board games",
+        "Building Sets",
+        "Building sets",
+        "Collectible toys",
+        "Collectibles",
+        "Dolls",
+        "Dolls & Accessories",
+        "Educational toys",
+        "Educational Toys",
+        "Model kits and trains",
+        "Outdoor toys",
+        "Outdoor Toys",
+        "Puzzles",
+        "Remote Control",
+        "Remote control toys"
+      ]
+    },
+    {
+      "name": "TV, Audio & Video",
+      "subcategories": [
+        "Cables & AV Accessories",
+        "Headphones & Earphones",
+        "Hi-Fi Components",
+        "Home Theatre",
+        "Portable Audio",
+        "Projectors",
+        "Speakers",
+        "Streaming Devices",
+        "Televisions"
+      ]
+    },
+    {
+      "name": "TV, Sound & Video",
+      "subcategories": [
+        "Audio accessories",
+        "Headphones",
+        "Hi-fi components",
+        "Home theatre",
+        "Portable audio",
+        "Projectors",
+        "Speakers",
+        "Streaming devices",
+        "TVs"
+      ]
+    },
+    {
+      "name": "Tyres & Rims",
+      "subcategories": [
+        "Car rims",
+        "Car tyres",
+        "Tyres and wheels (general)",
+        "Wheel accessories",
+        "Wheel covers"
+      ]
+    },
+    {
+      "name": "Used Business Equipment",
+      "subcategories": [
+        "Business furniture",
+        "Material handling",
+        "Packaging supplies",
+        "Retail equipment",
+        "Shop displays",
+        "Used shop equipment"
+      ]
+    },
+    {
+      "name": "Vitamins & Supplements",
+      "subcategories": [
+        "CBD Oils & Wellness Products",
+        "Legally permitted vitamins and nutritional supplements",
+        "Recovery accessories",
+        "Wellness products"
+      ]
+    },
+    {
+      "name": "Washing Machines & Dryers",
+      "subcategories": [
+        "Laundry appliances",
+        "Tumble dryers",
+        "Washing machines"
+      ]
+    },
+    {
+      "name": "Welding",
+      "subcategories": [
+        "Welding accessories",
+        "Welding equipment (general)",
+        "Welding helmets",
+        "Welding machines",
+        "Welding safety equipment"
+      ]
+    },
+    {
+      "name": "Wine",
+      "subcategories": [
+        "Dessert & Fortified Wine",
+        "Dessert and fortified wine",
+        "Other Wine",
+        "Other wine",
+        "Red Wine",
+        "Red wine",
+        "Rosé Wine",
+        "Rosé wine",
+        "Sparkling Wine",
+        "Sparkling wine",
+        "White Wine",
+        "White wine"
+      ]
+    },
+    {
+      "name": "Workshop Equipment",
+      "subcategories": [
+        "Air compressors",
+        "Air tools",
+        "Buffing machines",
+        "Concrete mixers",
+        "Garage tools and equipment",
+        "Generators",
+        "Industrial tools",
+        "Jacks and axle stands",
+        "Machinery",
+        "Measuring equipment",
+        "PPE",
+        "Tool cabinets",
+        "Woodworking machinery",
+        "Workbenches",
+        "Workshop equipment (general)",
+        "Workshop vacuums"
+      ]
+    }
+  ],
+  "publicDepartments": [
+    {
+      "name": "4x4",
+      "subcategories": [
+        "Air compressors",
+        "Awnings",
+        "Bakkie canopies",
+        "Bull bars and nudge bars",
+        "Bumpers",
+        "Dual battery systems",
+        "Lift kits and suspension",
+        "Load bin covers",
+        "Off-road tyres and wheels",
+        "Recovery boards and straps",
+        "Rock sliders and side steps",
+        "Roll bars",
+        "Roof racks",
+        "Rooftop tents",
+        "Seat covers",
+        "Snorkels",
+        "Spotlights",
+        "Underbody protection",
+        "Vehicle drawers",
+        "Vehicle fridges",
+        "Water containers",
+        "Winches"
+      ]
+    },
+    {
+      "name": "Air Conditioners, Fans & Heaters",
+      "subcategories": [
+        "Air conditioners",
+        "Fans",
+        "Heaters",
+        "Heating and cooling (general)",
+        "Humidifiers",
+        "Spare parts"
+      ]
+    },
+    {
+      "name": "Arts & Crafts",
+      "subcategories": [
+        "Beads",
+        "Candles and soap making",
+        "Candles and soaps",
+        "Canvases",
+        "Craft materials",
+        "Drawing supplies",
+        "Handmade crafts",
+        "Handmade decorations",
+        "Hobby tools and supplies",
+        "Painting and drawing (general)",
+        "Painting supplies",
+        "Pottery and ceramics",
+        "Print-on-demand",
+        "Printing supplies",
+        "Resin craft materials",
+        "Woodwork crafts"
+      ]
+    },
+    {
+      "name": "Baby & Toddler",
+      "subcategories": [
+        "Baby bath and skincare",
+        "Baby baths",
+        "Baby clothing",
+        "Baby food accessories",
+        "Baby monitors",
+        "Baby safety",
+        "Baby toys",
+        "Car seats",
+        "Cots and nursery furniture",
+        "Feeding",
+        "Maternity",
+        "Nappies and changing",
+        "Nursery items (general)",
+        "Prams and travel systems"
+      ]
+    },
+    {
+      "name": "Baking & Homemade Cakes",
+      "subcategories": [
+        "Baked goods",
+        "Baking ingredients",
+        "Biscuits",
+        "Bread",
+        "Cakes",
+        "Cupcakes",
+        "Homemade bread",
+        "Homemade cakes",
+        "Other homemade baked goods",
+        "Rusks"
+      ]
+    },
+    {
+      "name": "Bathroom",
+      "subcategories": [
+        "Bath mats",
+        "Bathroom accessories",
+        "Bathroom fixtures",
+        "Bathroom storage",
+        "Mirrors",
+        "Shower curtains",
+        "Towels"
+      ]
+    },
+    {
+      "name": "Beach & Holiday",
+      "subcategories": [
+        "Beach bags",
+        "Beach chairs",
+        "Beach games",
+        "Beach mats",
+        "Beach shelters",
+        "Beach towels",
+        "Beach umbrellas",
+        "Cooler bags",
+        "Holiday accessories",
+        "Inflatable leisure products",
+        "Picnic sets"
+      ]
+    },
+    {
+      "name": "Beauty & Makeup",
+      "subcategories": [
+        "Bath and body",
+        "Beauty tools",
+        "Fragrances",
+        "Hair care",
+        "Makeup",
+        "Nail care",
+        "Shaving",
+        "Skincare"
+      ]
+    },
+    {
+      "name": "Bedding & Linen",
+      "subcategories": [
+        "Bedding (general)",
+        "Blankets",
+        "Duvets",
+        "Mattress protectors",
+        "Pillows",
+        "Sheets",
+        "Table linen"
+      ]
+    },
+    {
+      "name": "Bicycle Parts & Accessories",
+      "subcategories": [
+        "Bicycle carriers",
+        "Bicycle computers",
+        "Bicycle frames",
+        "Brakes",
+        "Chains and gears",
+        "Cycling clothing and shoes",
+        "Handlebars and grips",
+        "Helmets",
+        "Indoor trainers",
+        "Lights",
+        "Locks",
+        "Pedals",
+        "Pumps",
+        "Repair tools",
+        "Saddles",
+        "Suspension",
+        "Tyres and tubes",
+        "Wheels and rims"
+      ]
+    },
+    {
+      "name": "Bicycles",
+      "subcategories": [
+        "Bicycles and cycling (general)",
+        "BMX",
+        "Children's bicycles",
+        "Folding bicycles",
+        "Gravel bikes",
+        "Mountain bikes",
+        "Road bikes",
+        "Touring bikes"
+      ]
+    },
+    {
+      "name": "Bird Supplies",
+      "subcategories": [
+        "Aviaries",
+        "Bird cages",
+        "Bird food",
+        "Bird supplies (general)",
+        "Feeders",
+        "Nesting boxes",
+        "Perches",
+        "Toys"
+      ]
+    },
+    {
+      "name": "Books",
+      "subcategories": [
+        "Children's books",
+        "Educational books",
+        "Languages",
+        "Magazines",
+        "Maps",
+        "Novels and general books",
+        "Study guides and textbooks"
+      ]
+    },
+    {
+      "name": "Braai & Barbecue",
+      "subcategories": [
+        "Braai covers",
+        "Braai grids",
+        "Braai stands",
+        "Braai tools",
+        "Braais and outdoor cooking (general)",
+        "Built-in braais",
+        "Charcoal braais",
+        "Electric braais",
+        "Fire pits and bomas",
+        "Gas braais",
+        "Handmade braais",
+        "Outdoor cooking stations",
+        "Pizza ovens",
+        "Portable braais",
+        "Potjiekos pots",
+        "Smokers",
+        "Spare parts",
+        "Spit braais",
+        "Thermometers",
+        "Wood braais"
+      ]
+    },
+    {
+      "name": "Braai Wood & Charcoal",
+      "subcategories": [
+        "Briquettes",
+        "Charcoal",
+        "Firelighters (where permitted)",
+        "Hardwood",
+        "Wood bundles"
+      ]
+    },
+    {
+      "name": "Building Supplies",
+      "subcategories": [
+        "Building materials",
+        "Cement and concrete supplies",
+        "Doors and windows",
+        "Flooring",
+        "Insulation",
+        "Roofing",
+        "Tiles"
+      ]
+    },
+    {
+      "name": "Cameras & Photography",
+      "subcategories": [
+        "Action cameras",
+        "Binoculars and optics",
+        "Camera bags",
+        "Digital cameras",
+        "Lenses",
+        "Lighting",
+        "Lighting and studio equipment",
+        "Memory cards",
+        "Tripods"
+      ]
+    },
+    {
+      "name": "Camping",
+      "subcategories": [
+        "Camp beds",
+        "Camping chairs",
+        "Camping tables",
+        "Camping tents",
+        "Climbing equipment",
+        "Coolers",
+        "Hammocks",
+        "Hiking equipment",
+        "Hunting accessories (existing restrictions apply)",
+        "Outdoor clothing",
+        "Outdoor cooking",
+        "Sleeping bags",
+        "Sleeping bags and gear",
+        "Travel outdoor gear"
+      ]
+    },
+    {
+      "name": "Car Accessories",
+      "subcategories": [
+        "Boot liners",
+        "Car mats and carpets",
+        "Car organisers",
+        "Car seat covers",
+        "Car sunshades",
+        "General car accessories",
+        "Steering wheel covers",
+        "Tow bars",
+        "Vehicle covers"
+      ]
+    },
+    {
+      "name": "Car Audio & Electronics",
+      "subcategories": [
+        "Car electronics (general)",
+        "Car phone accessories (general)",
+        "Car radios",
+        "Dash cameras",
+        "GPS",
+        "Phone holders",
+        "Reversing cameras",
+        "Speakers and amplifiers"
+      ]
+    },
+    {
+      "name": "Car Cleaning",
+      "subcategories": [
+        "Car cleaning accessories",
+        "Car polish",
+        "Detailing equipment",
+        "Pressure washers"
+      ]
+    },
+    {
+      "name": "Car Parts",
+      "subcategories": [
+        "Batteries",
+        "Belts and filters",
+        "Braking parts",
+        "Cooling parts",
+        "Engine parts",
+        "Headlights and tail lights",
+        "Replacement parts",
+        "Starter motors and alternators"
+      ]
+    },
+    {
+      "name": "Caravans & Trailers",
+      "subcategories": [
+        "Caravan accessories",
+        "Caravan fittings",
+        "Caravan storage",
+        "Towing and recovery equipment",
+        "Towing equipment",
+        "Trailer accessories",
+        "Trailer lights"
+      ]
+    },
+    {
+      "name": "Cat Supplies",
+      "subcategories": [
+        "Beds",
+        "Carriers",
+        "Cat food and treats",
+        "Cat supplies (general)",
+        "Collars",
+        "Grooming",
+        "Litter and trays",
+        "Scratching posts and cat trees",
+        "Toys"
+      ]
+    },
+    {
+      "name": "Cellphones",
+      "subcategories": [
+        "Chargers and cables",
+        "Feature phones",
+        "Phone cases",
+        "Phone parts",
+        "Power banks",
+        "Screen protectors",
+        "Smartphones"
+      ]
+    },
+    {
+      "name": "Cleaning Supplies",
+      "subcategories": [
+        "Brooms and mops",
+        "Cleaning accessories",
+        "Household cleaners",
+        "Paper products",
+        "Washing and laundry supplies"
+      ]
+    },
+    {
+      "name": "Clothing",
+      "subcategories": [
+        "Children's clothing",
+        "Clothing accessories",
+        "Men's clothing",
+        "Traditional clothing",
+        "Women's clothing",
+        "Workwear"
+      ]
+    },
+    {
+      "name": "Collectibles & Antiques",
+      "subcategories": [
+        "Antique furniture",
+        "Antiques and vintage items (general)",
+        "Coins",
+        "Memorabilia",
+        "Model cars",
+        "Porcelain",
+        "Stamps",
+        "Trading cards",
+        "Vintage clocks",
+        "Vintage ornaments"
+      ]
+    },
+    {
+      "name": "Computers & Tablets",
+      "subcategories": [
+        "Components",
+        "Desktop computers",
+        "Drives and storage",
+        "Keyboards and mice",
+        "Laptop accessories",
+        "Laptops",
+        "Monitors",
+        "Networking",
+        "Printers and scanners",
+        "Software",
+        "Tablets"
+      ]
+    },
+    {
+      "name": "Dog Supplies",
+      "subcategories": [
+        "Beds and kennels",
+        "Bowls",
+        "Collars",
+        "Dog food and treats",
+        "Dog supplies (general)",
+        "Grooming",
+        "Harnesses (including heavy-duty)",
+        "Leads and leashes",
+        "Toys",
+        "Training accessories",
+        "Travel equipment"
+      ]
+    },
+    {
+      "name": "E-Bike Parts",
+      "subcategories": [
+        "Batteries",
+        "Chargers",
+        "Controllers",
+        "Conversion kits",
+        "Displays",
+        "Motors",
+        "Sensors",
+        "Spare parts",
+        "Tyres and wheels",
+        "Wiring and connectors"
+      ]
+    },
+    {
+      "name": "E-Bikes",
+      "subcategories": [
+        "Cargo e-bikes",
+        "Commuter e-bikes",
+        "Folding e-bikes",
+        "Mountain e-bikes",
+        "Road e-bikes"
+      ]
+    },
+    {
+      "name": "Electrical Supplies",
+      "subcategories": [
+        "Electrical fittings",
+        "Extension leads",
+        "Installation tools",
+        "Plugs and sockets",
+        "Switches",
+        "Wiring accessories"
+      ]
+    },
+    {
+      "name": "Electronics",
+      "subcategories": [
+        "Batteries and chargers",
+        "Calculators",
+        "Calculators and translators",
+        "Drones",
+        "Electronic accessories",
+        "GPS",
+        "Smart home devices",
+        "Translators"
+      ]
+    },
+    {
+      "name": "Farming",
+      "subcategories": [
+        "Agricultural supplies",
+        "Farm equipment",
+        "Farm fencing",
+        "Farm hand tools",
+        "Feeders",
+        "Greenhouse equipment",
+        "Incubators",
+        "Irrigation equipment",
+        "Irrigation pumps",
+        "Machinery",
+        "Small implements"
+      ]
+    },
+    {
+      "name": "Fish Tanks & Aquarium",
+      "subcategories": [
+        "Aquarium filters",
+        "Aquarium food",
+        "Aquarium heaters",
+        "Aquarium lighting",
+        "Aquarium pumps",
+        "Aquarium supplies (general)",
+        "Fish tanks",
+        "Tank accessories"
+      ]
+    },
+    {
+      "name": "Fishing & Angling",
+      "subcategories": [
+        "Bass fishing",
+        "Boat and deep-sea fishing",
+        "Carp fishing",
+        "Fishing equipment (general)",
+        "Fly fishing",
+        "Freshwater fishing",
+        "Rock and surf fishing",
+        "Saltwater fishing"
+      ]
+    },
+    {
+      "name": "Fishing Bait & Dips",
+      "subcategories": [
+        "Artificial baits",
+        "Boilies",
+        "Dips and flavourings",
+        "Groundbait",
+        "Pellets",
+        "Prepared baits"
+      ]
+    },
+    {
+      "name": "Fishing Tackle & Equipment",
+      "subcategories": [
+        "Bite alarms",
+        "Fish finders",
+        "Fishing chairs and beds",
+        "Fishing clothing and waders",
+        "Fishing kayaks",
+        "Fishing line and braid",
+        "Fishing reels",
+        "Fishing rods",
+        "Floats and indicators",
+        "Hooks and sinkers",
+        "Landing nets",
+        "Leaders and swivels",
+        "Lures and spinners",
+        "Rod and reel sets",
+        "Rod pods and stands",
+        "Shelters",
+        "Tackle bags and boxes"
+      ]
+    },
+    {
+      "name": "Food & Groceries",
+      "subcategories": [
+        "Baking ingredients",
+        "Coffee and tea",
+        "Cooking ingredients",
+        "Non-alcoholic drinks",
+        "Pantry food",
+        "Snacks"
+      ]
+    },
+    {
+      "name": "Fridges & Freezers",
+      "subcategories": [
+        "Chest freezers",
+        "Freezers",
+        "Fridge-freezer combinations",
+        "Refrigerators",
+        "Water dispensers"
+      ]
+    },
+    {
+      "name": "Furniture",
+      "subcategories": [
+        "Bedroom furniture",
+        "Cabinets and cupboards",
+        "Chairs and benches",
+        "Children's furniture",
+        "Desks and tables",
+        "Furniture (general)",
+        "Furniture parts",
+        "Refurbished furniture",
+        "Shelves and storage",
+        "Sofas",
+        "Used furniture"
+      ]
+    },
+    {
+      "name": "Gaming",
+      "subcategories": [
+        "Collectible gaming",
+        "Consoles",
+        "Controllers",
+        "Games",
+        "Gaming accessories",
+        "Gaming chairs",
+        "Gaming computers",
+        "Gaming headsets"
+      ]
+    },
+    {
+      "name": "Garden Furniture",
+      "subcategories": [
+        "Garden benches",
+        "Garden chairs",
+        "Garden tables",
+        "Homemade garden furniture",
+        "Outdoor furniture (general)",
+        "Outdoor umbrellas",
+        "Patio sets"
+      ]
+    },
+    {
+      "name": "Garden Machines",
+      "subcategories": [
+        "Brush cutters",
+        "Chainsaws",
+        "Garden machine parts",
+        "Grass trimmers (weed eaters)",
+        "Hedge trimmers",
+        "Lawnmowers",
+        "Leaf blowers",
+        "Ride-on mowers"
+      ]
+    },
+    {
+      "name": "Gardening",
+      "subcategories": [
+        "Compost and potting soil",
+        "Fertiliser and plant food",
+        "Garden hand tools",
+        "Garden ornaments",
+        "Garden sheds",
+        "Garden tools (general)",
+        "Hoses and sprinklers",
+        "Irrigation",
+        "Lawn care",
+        "Permitted pest and weed control products",
+        "Plants and seeds (general)",
+        "Plants and trees",
+        "Pots and planters",
+        "Seeds and bulbs",
+        "Water pumps",
+        "Water tanks",
+        "Wheelbarrows"
+      ]
+    },
+    {
+      "name": "Gifts & Parties",
+      "subcategories": [
+        "Decorations",
+        "Event accessories",
+        "Gift wrap",
+        "Greeting cards",
+        "Novelty gifts",
+        "Party supplies",
+        "Personalised gifts",
+        "Wedding supplies"
+      ]
+    },
+    {
+      "name": "Golf",
+      "subcategories": [
+        "Balls and tees",
+        "Complete golf sets",
+        "Drivers",
+        "Fairway woods and hybrids",
+        "Golf bags",
+        "Golf caps and clothing",
+        "Golf equipment (general)",
+        "Golf gloves",
+        "Golf shoes",
+        "Golf trolleys",
+        "Golf umbrellas",
+        "Irons and wedges",
+        "Practice equipment",
+        "Putters",
+        "Rangefinders",
+        "Shafts and grips",
+        "Simulators"
+      ]
+    },
+    {
+      "name": "Gym & Fitness",
+      "subcategories": [
+        "Dumbbells and barbells",
+        "Exercise bikes",
+        "Exercise mats",
+        "Gym benches",
+        "Gym equipment",
+        "Kettlebells",
+        "Pilates and yoga",
+        "Power racks",
+        "Resistance bands",
+        "Rowing machines",
+        "Treadmills",
+        "Weight plates",
+        "Weightlifting accessories"
+      ]
+    },
+    {
+      "name": "Hair & Salon Equipment",
+      "subcategories": [
+        "Barber and salon furniture",
+        "Clippers",
+        "Hair dryers and styling tools",
+        "Hair washing basins",
+        "Mirrors",
+        "Salon accessories"
+      ]
+    },
+    {
+      "name": "Hand Tools",
+      "subcategories": [
+        "Hammers",
+        "Hand saws",
+        "Hand tools (general)",
+        "Measuring tapes",
+        "Pliers",
+        "Ratchets and sockets",
+        "Screwdrivers",
+        "Spanners",
+        "Tool sets",
+        "Vices and clamps"
+      ]
+    },
+    {
+      "name": "Handmade Furniture",
+      "subcategories": [
+        "Beds",
+        "Cabinets and cupboards",
+        "Chairs and benches",
+        "Children's furniture",
+        "Custom furniture",
+        "Decorative woodwork",
+        "Furniture components",
+        "Garden furniture",
+        "Other handmade furniture",
+        "Shelving and storage",
+        "Tables and desks",
+        "Upcycled and restored furniture"
+      ]
+    },
+    {
+      "name": "Hardware",
+      "subcategories": [
+        "Brackets",
+        "Fasteners",
+        "Hardware and fasteners (general)",
+        "Hinges",
+        "Locks",
+        "Nuts and bolts",
+        "Screws"
+      ]
+    },
+    {
+      "name": "Health & Personal Care",
+      "subcategories": [
+        "Dental care",
+        "Eye care",
+        "First aid",
+        "Hygiene",
+        "Permitted medical devices",
+        "Relaxation products"
+      ]
+    },
+    {
+      "name": "Home Appliances",
+      "subcategories": [
+        "Floor care",
+        "Irons and garment care",
+        "Large appliances (general)",
+        "Other household appliances",
+        "Vacuum cleaners",
+        "Vacuum cleaners and floor care",
+        "Water purification"
+      ]
+    },
+    {
+      "name": "Home Decorations",
+      "subcategories": [
+        "Clocks",
+        "Handmade home decorations",
+        "Home decorations (general)",
+        "Lamps",
+        "Mirrors",
+        "Ornaments",
+        "Pictures and frames",
+        "Reclaimed wood decorations"
+      ]
+    },
+    {
+      "name": "Homemade Food",
+      "subcategories": [
+        "Homemade pantry foods",
+        "Homemade savoury foods suitable for lawful delivery",
+        "Homemade snacks",
+        "Homemade treats",
+        "Other permitted homemade food"
+      ]
+    },
+    {
+      "name": "Jams, Honey & Preserves",
+      "subcategories": [
+        "Fruit preserves",
+        "Homemade jams and preserves",
+        "Honey",
+        "Jams",
+        "Jams and preserves (general)",
+        "Marmalade",
+        "Pickles",
+        "Spreads"
+      ]
+    },
+    {
+      "name": "Jewellery & Watches",
+      "subcategories": [
+        "Bracelets",
+        "Earrings",
+        "Handmade jewellery",
+        "Jewellery (general)",
+        "Jewellery boxes",
+        "Necklaces",
+        "Rings",
+        "Watch accessories",
+        "Watches"
+      ]
+    },
+    {
+      "name": "Kitchen Appliances",
+      "subcategories": [
+        "Air fryers",
+        "Blenders",
+        "Coffee machines",
+        "Electric grills",
+        "Electric pressure cookers",
+        "Food processors",
+        "Ice makers",
+        "Juicers",
+        "Kettles",
+        "Microwave ovens",
+        "Mixers",
+        "Sandwich makers",
+        "Small kitchen appliances (general)",
+        "Toasters"
+      ]
+    },
+    {
+      "name": "Kitchenware",
+      "subcategories": [
+        "Baking equipment",
+        "Chopping boards",
+        "Coffee accessories",
+        "Cookware and baking (general)",
+        "Cookware sets",
+        "Cutlery",
+        "Dinnerware",
+        "Food containers",
+        "Glassware",
+        "Kitchen and dining (general)",
+        "Kitchen fixtures",
+        "Kitchen knives",
+        "Kitchen linen",
+        "Kitchen utensils",
+        "Pots and pans",
+        "Pressure cookers",
+        "Serving equipment"
+      ]
+    },
+    {
+      "name": "Ladders & Scaffolding",
+      "subcategories": [
+        "Access platforms",
+        "Extension ladders",
+        "Scaffolding equipment",
+        "Step ladders"
+      ]
+    },
+    {
+      "name": "Lighting",
+      "subcategories": [
+        "Indoor lights",
+        "LED lights",
+        "Lighting (general)",
+        "Outdoor lights",
+        "Solar lights",
+        "Spare fittings"
+      ]
+    },
+    {
+      "name": "Luggage & Bags",
+      "subcategories": [
+        "Backpacks",
+        "Handbags",
+        "Suitcases",
+        "Travel bags",
+        "Travel locks",
+        "Travel organisers"
+      ]
+    },
+    {
+      "name": "Marine & Water Sports",
+      "subcategories": [
+        "Boat accessories",
+        "Bodyboards",
+        "Kayaks",
+        "Life jackets",
+        "Marine electronics",
+        "Paddleboards",
+        "Snorkelling",
+        "Surfboards",
+        "Trolling motors"
+      ]
+    },
+    {
+      "name": "Medical & Mobility Equipment",
+      "subcategories": [
+        "Examination furniture",
+        "Mobility aids",
+        "Permitted non-restricted equipment",
+        "Walking aids",
+        "Wheelchairs"
+      ]
+    },
+    {
+      "name": "Motorbike Accessories",
+      "subcategories": [
+        "Motorbike clothing",
+        "Motorbike helmets",
+        "Motorbike parts and accessories"
+      ]
+    },
+    {
+      "name": "Music & Instruments",
+      "subcategories": [
+        "Amplifiers",
+        "DJ equipment",
+        "Drums",
+        "Guitars",
+        "Instrument accessories",
+        "Keyboards and pianos",
+        "Microphones",
+        "Orchestral instruments",
+        "Recording equipment",
+        "Sheet music"
+      ]
+    },
+    {
+      "name": "Music, CDs & Records",
+      "subcategories": [
+        "DVDs and Blu-rays",
+        "Music CDs",
+        "Vintage physical media",
+        "Vinyl records"
+      ]
+    },
+    {
+      "name": "Office Equipment",
+      "subcategories": [
+        "Business machines",
+        "Desk accessories",
+        "Desks and office furniture",
+        "Filing cabinets",
+        "Office and business equipment (general)",
+        "Presentation equipment",
+        "Shredders"
+      ]
+    },
+    {
+      "name": "Paint & Decorating",
+      "subcategories": [
+        "Brushes and rollers",
+        "Decorating tools",
+        "Paint and supplies",
+        "Sanding supplies"
+      ]
+    },
+    {
+      "name": "Pet Accessories",
+      "subcategories": [
+        "Beds and housing",
+        "Bowls",
+        "Grooming tools",
+        "Handmade pet products",
+        "Pet carriers",
+        "Pet food (general)",
+        "Pet toys",
+        "Pet travel accessories"
+      ]
+    },
+    {
+      "name": "Pet Health & Care",
+      "subcategories": [
+        "Dental care",
+        "Grooming and hygiene",
+        "Legally permitted non-prescription nutritional supplements"
+      ]
+    },
+    {
+      "name": "Plumbing",
+      "subcategories": [
+        "Fittings",
+        "Pipe tools",
+        "Plumbing supplies",
+        "Pumps",
+        "Taps"
+      ]
+    },
+    {
+      "name": "Power Tools",
+      "subcategories": [
+        "Angle grinders",
+        "Bench grinders",
+        "Corded drills",
+        "Cordless drills",
+        "Hammer drills",
+        "Impact drivers",
+        "Jigsaws",
+        "Mitre saws",
+        "Polishers",
+        "Power tool accessories",
+        "Power tools (general)",
+        "Routers",
+        "Sanders",
+        "Saws",
+        "Tool batteries and chargers"
+      ]
+    },
+    {
+      "name": "Reptile & Small Pet Supplies",
+      "subcategories": [
+        "Bedding",
+        "Cages and enclosures",
+        "Feeding accessories",
+        "Habitat equipment",
+        "Heating and lighting",
+        "Rabbit and hamster supplies",
+        "Reptile supplies (general)",
+        "Small pet supplies (general)",
+        "Terrariums and vivariums"
+      ]
+    },
+    {
+      "name": "Restaurant & Catering Equipment",
+      "subcategories": [
+        "Bakery equipment",
+        "Catering equipment",
+        "Commercial cleaning supplies",
+        "Commercial refrigeration",
+        "Display cabinets",
+        "Kitchen equipment"
+      ]
+    },
+    {
+      "name": "Sauces & Marinades",
+      "subcategories": [
+        "Braai sauces",
+        "Chutneys",
+        "Dips",
+        "Homemade sauces and condiments",
+        "Hot sauces",
+        "Marinades",
+        "Salad dressings",
+        "Table sauces"
+      ]
+    },
+    {
+      "name": "School & Stationery",
+      "subcategories": [
+        "Art supplies",
+        "Calculators",
+        "Educational materials",
+        "Exercise books",
+        "Labels",
+        "Paper",
+        "School bags",
+        "School stationery",
+        "Writing supplies"
+      ]
+    },
+    {
+      "name": "Security Equipment",
+      "subcategories": [
+        "Alarms",
+        "Gates and locks",
+        "Safes",
+        "Security cameras",
+        "Security lighting"
+      ]
+    },
+    {
+      "name": "Sewing & Knitting",
+      "subcategories": [
+        "Embroidery equipment",
+        "Fabrics",
+        "Knitting supplies",
+        "Overlockers",
+        "Patterns",
+        "Sewing and needlecraft (general)",
+        "Sewing machines",
+        "Thread",
+        "Wool"
+      ]
+    },
+    {
+      "name": "Shoes",
+      "subcategories": [
+        "Children's shoes",
+        "Men's shoes",
+        "Shoes (general)",
+        "Women's shoes",
+        "Work shoes"
+      ]
+    },
+    {
+      "name": "Solar & Backup Power",
+      "subcategories": [
+        "Portable power stations",
+        "Solar batteries",
+        "Solar cables and accessories",
+        "Solar charge controllers",
+        "Solar inverters",
+        "Solar panels",
+        "Used solar equipment"
+      ]
+    },
+    {
+      "name": "Spices, Herbs & Seasonings",
+      "subcategories": [
+        "Braai rubs",
+        "Dried herbs",
+        "Homemade spice blends",
+        "Meat seasonings",
+        "Spice mixes",
+        "Spices"
+      ]
+    },
+    {
+      "name": "Sports",
+      "subcategories": [
+        "Athletics",
+        "Badminton",
+        "Basketball",
+        "Bowls",
+        "Boxing",
+        "Combat sports (general)",
+        "Cricket",
+        "Darts",
+        "Gymnastics",
+        "Hockey",
+        "Martial arts",
+        "Netball",
+        "Padel",
+        "Pickleball",
+        "Racquet sports (general)",
+        "Rugby",
+        "Running",
+        "Skateboarding",
+        "Soccer",
+        "Squash",
+        "Swimming",
+        "Table tennis",
+        "Team sports (general)",
+        "Tennis",
+        "Triathlon",
+        "Volleyball",
+        "Water polo"
+      ]
+    },
+    {
+      "name": "Sports Clothing & Shoes",
+      "subcategories": [
+        "Fitness clothing",
+        "Running shoes",
+        "Sports clothing",
+        "Sports shoes",
+        "Sports sunglasses",
+        "Supporter gear",
+        "Training shoes"
+      ]
+    },
+    {
+      "name": "Sports Nutrition",
+      "subcategories": [
+        "Creatine",
+        "Permitted sports nutrition",
+        "Protein powders",
+        "Shakers and bottles",
+        "Sports nutrition accessories",
+        "Vitamins and minerals"
+      ]
+    },
+    {
+      "name": "Sports Watches & Trackers",
+      "subcategories": [
+        "Fitness trackers",
+        "Golf GPS and watches",
+        "Smartwatches",
+        "Sports watches"
+      ]
+    },
+    {
+      "name": "Storage & Organisation",
+      "subcategories": [
+        "Garage organisers",
+        "Shelving",
+        "Storage (general)",
+        "Storage boxes",
+        "Storage cupboards",
+        "Tool storage"
+      ]
+    },
+    {
+      "name": "Stoves & Ovens",
+      "subcategories": [
+        "Electric stoves",
+        "Extractor fans",
+        "Gas stoves",
+        "Hobs",
+        "Ovens"
+      ]
+    },
+    {
+      "name": "Sweets & Snacks",
+      "subcategories": [
+        "Confectionery",
+        "Homemade snacks",
+        "Homemade sweets",
+        "Packaged snacks",
+        "Snacks and sweets (general)"
+      ]
+    },
+    {
+      "name": "Swimming Pools",
+      "subcategories": [
+        "Pool accessories",
+        "Pool and spa equipment (general)",
+        "Pool cleaning equipment",
+        "Pool filters and pumps",
+        "Pools",
+        "Spa equipment"
+      ]
+    },
+    {
+      "name": "Toys & Games",
+      "subcategories": [
+        "Action figures",
+        "Arts and crafts toys",
+        "Baby and toddler toys",
+        "Board games",
+        "Building sets",
+        "Collectible toys",
+        "Dolls",
+        "Educational toys",
+        "Model kits and trains",
+        "Outdoor toys",
+        "Puzzles",
+        "Remote control toys"
+      ]
+    },
+    {
+      "name": "TV, Sound & Video",
+      "subcategories": [
+        "Audio accessories",
+        "Headphones",
+        "Hi-fi components",
+        "Home theatre",
+        "Portable audio",
+        "Projectors",
+        "Speakers",
+        "Streaming devices",
+        "TVs"
+      ]
+    },
+    {
+      "name": "Tyres & Rims",
+      "subcategories": [
+        "Car rims",
+        "Car tyres",
+        "Tyres and wheels (general)",
+        "Wheel accessories",
+        "Wheel covers"
+      ]
+    },
+    {
+      "name": "Used Business Equipment",
+      "subcategories": [
+        "Business furniture",
+        "Material handling",
+        "Packaging supplies",
+        "Retail equipment",
+        "Shop displays",
+        "Used shop equipment"
+      ]
+    },
+    {
+      "name": "Vitamins & Supplements",
+      "subcategories": [
+        "CBD Oils & Wellness Products",
+        "Legally permitted vitamins and nutritional supplements",
+        "Recovery accessories",
+        "Wellness products"
+      ]
+    },
+    {
+      "name": "Washing Machines & Dryers",
+      "subcategories": [
+        "Laundry appliances",
+        "Tumble dryers",
+        "Washing machines"
+      ]
+    },
+    {
+      "name": "Welding",
+      "subcategories": [
+        "Welding accessories",
+        "Welding equipment (general)",
+        "Welding helmets",
+        "Welding machines",
+        "Welding safety equipment"
+      ]
+    },
+    {
+      "name": "Wine",
+      "subcategories": [
+        "Dessert and fortified wine",
+        "Other wine",
+        "Red wine",
+        "Rosé wine",
+        "Sparkling wine",
+        "White wine"
+      ]
+    },
+    {
+      "name": "Workshop Equipment",
+      "subcategories": [
+        "Air compressors",
+        "Air tools",
+        "Buffing machines",
+        "Concrete mixers",
+        "Garage tools and equipment",
+        "Generators",
+        "Industrial tools",
+        "Jacks and axle stands",
+        "Machinery",
+        "Measuring equipment",
+        "PPE",
+        "Tool cabinets",
+        "Woodworking machinery",
+        "Workbenches",
+        "Workshop equipment (general)",
+        "Workshop vacuums"
+      ]
+    }
+  ],
+  "legacyDepartments": [
     {
       "name": "Appliances",
       "subcategories": [
@@ -486,5 +3663,1996 @@
         "Used Solar Equipment"
       ]
     }
-  ]
+  ],
+  "legacyMap": [
+    [
+      "Appliances",
+      "Large Appliances",
+      "Home Appliances",
+      "Large appliances (general)"
+    ],
+    [
+      "Appliances",
+      "Small Kitchen Appliances",
+      "Kitchen Appliances",
+      "Small kitchen appliances (general)"
+    ],
+    [
+      "Appliances",
+      "Laundry Appliances",
+      "Washing Machines & Dryers",
+      "Laundry appliances"
+    ],
+    [
+      "Appliances",
+      "Heating & Cooling",
+      "Air Conditioners, Fans & Heaters",
+      "Heating and cooling (general)"
+    ],
+    [
+      "Appliances",
+      "Vacuum Cleaners & Floor Care",
+      "Home Appliances",
+      "Vacuum cleaners and floor care"
+    ],
+    [
+      "Appliances",
+      "Irons & Garment Care",
+      "Home Appliances",
+      "Irons and garment care"
+    ],
+    [
+      "Appliances",
+      "Water Purification",
+      "Home Appliances",
+      "Water purification"
+    ],
+    [
+      "Automotive",
+      "Car Accessories",
+      "Car Accessories",
+      "General car accessories"
+    ],
+    [
+      "Automotive",
+      "Car Care & Cleaning",
+      "Car Cleaning",
+      "Car cleaning accessories"
+    ],
+    [
+      "Automotive",
+      "Car Electronics",
+      "Car Audio & Electronics",
+      "Car electronics (general)"
+    ],
+    [
+      "Automotive",
+      "Replacement Parts",
+      "Car Parts",
+      "Replacement parts"
+    ],
+    [
+      "Automotive",
+      "Tyres & Wheels",
+      "Tyres & Rims",
+      "Tyres and wheels (general)"
+    ],
+    [
+      "Automotive",
+      "Motorcycle Accessories",
+      "Motorbike Accessories",
+      "Motorbike parts and accessories"
+    ],
+    [
+      "Automotive",
+      "Tools & Garage Equipment",
+      "Workshop Equipment",
+      "Garage tools and equipment"
+    ],
+    [
+      "Automotive",
+      "Towing & Recovery",
+      "Caravans & Trailers",
+      "Towing and recovery equipment"
+    ],
+    [
+      "Baby & Toddler",
+      "Baby Clothing",
+      "Baby & Toddler",
+      "Baby clothing"
+    ],
+    [
+      "Baby & Toddler",
+      "Feeding",
+      "Baby & Toddler",
+      "Feeding"
+    ],
+    [
+      "Baby & Toddler",
+      "Nappies & Changing",
+      "Baby & Toddler",
+      "Nappies and changing"
+    ],
+    [
+      "Baby & Toddler",
+      "Nursery",
+      "Baby & Toddler",
+      "Nursery items (general)"
+    ],
+    [
+      "Baby & Toddler",
+      "Prams & Travel Systems",
+      "Baby & Toddler",
+      "Prams and travel systems"
+    ],
+    [
+      "Baby & Toddler",
+      "Car Seats",
+      "Baby & Toddler",
+      "Car seats"
+    ],
+    [
+      "Baby & Toddler",
+      "Baby Safety",
+      "Baby & Toddler",
+      "Baby safety"
+    ],
+    [
+      "Baby & Toddler",
+      "Baby Toys",
+      "Baby & Toddler",
+      "Baby toys"
+    ],
+    [
+      "Baby & Toddler",
+      "Bath & Skincare",
+      "Baby & Toddler",
+      "Baby bath and skincare"
+    ],
+    [
+      "Baby & Toddler",
+      "Maternity",
+      "Baby & Toddler",
+      "Maternity"
+    ],
+    [
+      "Beauty & Personal Care",
+      "Skincare",
+      "Beauty & Makeup",
+      "Skincare"
+    ],
+    [
+      "Beauty & Personal Care",
+      "Makeup",
+      "Beauty & Makeup",
+      "Makeup"
+    ],
+    [
+      "Beauty & Personal Care",
+      "Hair Care",
+      "Beauty & Makeup",
+      "Hair care"
+    ],
+    [
+      "Beauty & Personal Care",
+      "Hair Styling Tools",
+      "Hair & Salon Equipment",
+      "Hair dryers and styling tools"
+    ],
+    [
+      "Beauty & Personal Care",
+      "Fragrances",
+      "Beauty & Makeup",
+      "Fragrances"
+    ],
+    [
+      "Beauty & Personal Care",
+      "Nail Care",
+      "Beauty & Makeup",
+      "Nail care"
+    ],
+    [
+      "Beauty & Personal Care",
+      "Bath & Body",
+      "Beauty & Makeup",
+      "Bath and body"
+    ],
+    [
+      "Beauty & Personal Care",
+      "Shaving & Grooming",
+      "Beauty & Makeup",
+      "Shaving"
+    ],
+    [
+      "Beauty & Personal Care",
+      "Beauty Tools & Accessories",
+      "Beauty & Makeup",
+      "Beauty tools"
+    ],
+    [
+      "Books & Learning",
+      "Books",
+      "Books",
+      "Novels and general books"
+    ],
+    [
+      "Books & Learning",
+      "Children’s Books",
+      "Books",
+      "Children's books"
+    ],
+    [
+      "Books & Learning",
+      "Textbooks & Study Guides",
+      "Books",
+      "Study guides and textbooks"
+    ],
+    [
+      "Books & Learning",
+      "Educational Materials",
+      "School & Stationery",
+      "Educational materials"
+    ],
+    [
+      "Books & Learning",
+      "Languages",
+      "Books",
+      "Languages"
+    ],
+    [
+      "Books & Learning",
+      "Maps & Atlases",
+      "Books",
+      "Maps"
+    ],
+    [
+      "Books & Learning",
+      "Magazines & Periodicals",
+      "Books",
+      "Magazines"
+    ],
+    [
+      "Cameras & Photography",
+      "Digital Cameras",
+      "Cameras & Photography",
+      "Digital cameras"
+    ],
+    [
+      "Cameras & Photography",
+      "Action Cameras",
+      "Cameras & Photography",
+      "Action cameras"
+    ],
+    [
+      "Cameras & Photography",
+      "Lenses",
+      "Cameras & Photography",
+      "Lenses"
+    ],
+    [
+      "Cameras & Photography",
+      "Tripods & Supports",
+      "Cameras & Photography",
+      "Tripods"
+    ],
+    [
+      "Cameras & Photography",
+      "Lighting & Studio",
+      "Cameras & Photography",
+      "Lighting and studio equipment"
+    ],
+    [
+      "Cameras & Photography",
+      "Camera Bags & Cases",
+      "Cameras & Photography",
+      "Camera bags"
+    ],
+    [
+      "Cameras & Photography",
+      "Memory Cards & Storage",
+      "Cameras & Photography",
+      "Memory cards"
+    ],
+    [
+      "Cameras & Photography",
+      "Binoculars & Optics",
+      "Cameras & Photography",
+      "Binoculars and optics"
+    ],
+    [
+      "Cellphones & Wearables",
+      "Smartphones",
+      "Cellphones",
+      "Smartphones"
+    ],
+    [
+      "Cellphones & Wearables",
+      "Feature Phones",
+      "Cellphones",
+      "Feature phones"
+    ],
+    [
+      "Cellphones & Wearables",
+      "Phone Cases & Covers",
+      "Cellphones",
+      "Phone cases"
+    ],
+    [
+      "Cellphones & Wearables",
+      "Screen Protectors",
+      "Cellphones",
+      "Screen protectors"
+    ],
+    [
+      "Cellphones & Wearables",
+      "Chargers & Cables",
+      "Cellphones",
+      "Chargers and cables"
+    ],
+    [
+      "Cellphones & Wearables",
+      "Power Banks",
+      "Cellphones",
+      "Power banks"
+    ],
+    [
+      "Cellphones & Wearables",
+      "Smartwatches",
+      "Sports Watches & Trackers",
+      "Smartwatches"
+    ],
+    [
+      "Cellphones & Wearables",
+      "Fitness Trackers",
+      "Sports Watches & Trackers",
+      "Fitness trackers"
+    ],
+    [
+      "Cellphones & Wearables",
+      "Phone Parts & Repair",
+      "Cellphones",
+      "Phone parts"
+    ],
+    [
+      "Cellphones & Wearables",
+      "Car Phone Accessories",
+      "Car Audio & Electronics",
+      "Car phone accessories (general)"
+    ],
+    [
+      "Computers & Tablets",
+      "Laptops",
+      "Computers & Tablets",
+      "Laptops"
+    ],
+    [
+      "Computers & Tablets",
+      "Desktop Computers",
+      "Computers & Tablets",
+      "Desktop computers"
+    ],
+    [
+      "Computers & Tablets",
+      "Tablets",
+      "Computers & Tablets",
+      "Tablets"
+    ],
+    [
+      "Computers & Tablets",
+      "Monitors",
+      "Computers & Tablets",
+      "Monitors"
+    ],
+    [
+      "Computers & Tablets",
+      "Printers & Scanners",
+      "Computers & Tablets",
+      "Printers and scanners"
+    ],
+    [
+      "Computers & Tablets",
+      "Computer Components",
+      "Computers & Tablets",
+      "Components"
+    ],
+    [
+      "Computers & Tablets",
+      "Storage & Drives",
+      "Computers & Tablets",
+      "Drives and storage"
+    ],
+    [
+      "Computers & Tablets",
+      "Networking",
+      "Computers & Tablets",
+      "Networking"
+    ],
+    [
+      "Computers & Tablets",
+      "Keyboards & Mice",
+      "Computers & Tablets",
+      "Keyboards and mice"
+    ],
+    [
+      "Computers & Tablets",
+      "Laptop Accessories",
+      "Computers & Tablets",
+      "Laptop accessories"
+    ],
+    [
+      "Computers & Tablets",
+      "Software",
+      "Computers & Tablets",
+      "Software"
+    ],
+    [
+      "Electronics",
+      "Smart Home",
+      "Electronics",
+      "Smart home devices"
+    ],
+    [
+      "Electronics",
+      "GPS & Navigation",
+      "Electronics",
+      "GPS"
+    ],
+    [
+      "Electronics",
+      "Batteries & Chargers",
+      "Electronics",
+      "Batteries and chargers"
+    ],
+    [
+      "Electronics",
+      "Electronic Accessories",
+      "Electronics",
+      "Electronic accessories"
+    ],
+    [
+      "Electronics",
+      "Security Cameras & Systems",
+      "Security Equipment",
+      "Security cameras"
+    ],
+    [
+      "Electronics",
+      "Drones",
+      "Electronics",
+      "Drones"
+    ],
+    [
+      "Electronics",
+      "Calculators & Translators",
+      "Electronics",
+      "Calculators and translators"
+    ],
+    [
+      "TV, Audio & Video",
+      "Televisions",
+      "TV, Sound & Video",
+      "TVs"
+    ],
+    [
+      "TV, Audio & Video",
+      "Streaming Devices",
+      "TV, Sound & Video",
+      "Streaming devices"
+    ],
+    [
+      "TV, Audio & Video",
+      "Home Theatre",
+      "TV, Sound & Video",
+      "Home theatre"
+    ],
+    [
+      "TV, Audio & Video",
+      "Speakers",
+      "TV, Sound & Video",
+      "Speakers"
+    ],
+    [
+      "TV, Audio & Video",
+      "Headphones & Earphones",
+      "TV, Sound & Video",
+      "Headphones"
+    ],
+    [
+      "TV, Audio & Video",
+      "Portable Audio",
+      "TV, Sound & Video",
+      "Portable audio"
+    ],
+    [
+      "TV, Audio & Video",
+      "Hi-Fi Components",
+      "TV, Sound & Video",
+      "Hi-fi components"
+    ],
+    [
+      "TV, Audio & Video",
+      "Projectors",
+      "TV, Sound & Video",
+      "Projectors"
+    ],
+    [
+      "TV, Audio & Video",
+      "Cables & AV Accessories",
+      "TV, Sound & Video",
+      "Audio accessories"
+    ],
+    [
+      "Gaming",
+      "Consoles",
+      "Gaming",
+      "Consoles"
+    ],
+    [
+      "Gaming",
+      "Video Games",
+      "Gaming",
+      "Games"
+    ],
+    [
+      "Gaming",
+      "Gaming PCs & Laptops",
+      "Gaming",
+      "Gaming computers"
+    ],
+    [
+      "Gaming",
+      "Controllers",
+      "Gaming",
+      "Controllers"
+    ],
+    [
+      "Gaming",
+      "Gaming Headsets",
+      "Gaming",
+      "Gaming headsets"
+    ],
+    [
+      "Gaming",
+      "Gaming Chairs",
+      "Gaming",
+      "Gaming chairs"
+    ],
+    [
+      "Gaming",
+      "Gaming Accessories",
+      "Gaming",
+      "Gaming accessories"
+    ],
+    [
+      "Gaming",
+      "Collectible Gaming",
+      "Gaming",
+      "Collectible gaming"
+    ],
+    [
+      "Fashion",
+      "Women’s Clothing",
+      "Clothing",
+      "Women's clothing"
+    ],
+    [
+      "Fashion",
+      "Men’s Clothing",
+      "Clothing",
+      "Men's clothing"
+    ],
+    [
+      "Fashion",
+      "Kids’ Clothing",
+      "Clothing",
+      "Children's clothing"
+    ],
+    [
+      "Fashion",
+      "Shoes",
+      "Shoes",
+      "Shoes (general)"
+    ],
+    [
+      "Fashion",
+      "Bags & Handbags",
+      "Luggage & Bags",
+      "Handbags"
+    ],
+    [
+      "Fashion",
+      "Jewellery",
+      "Jewellery & Watches",
+      "Jewellery (general)"
+    ],
+    [
+      "Fashion",
+      "Watches",
+      "Jewellery & Watches",
+      "Watches"
+    ],
+    [
+      "Fashion",
+      "Accessories",
+      "Clothing",
+      "Clothing accessories"
+    ],
+    [
+      "Fashion",
+      "Sportswear",
+      "Sports Clothing & Shoes",
+      "Sports clothing"
+    ],
+    [
+      "Fashion",
+      "Workwear",
+      "Clothing",
+      "Workwear"
+    ],
+    [
+      "Fashion",
+      "Traditional & Cultural Clothing",
+      "Clothing",
+      "Traditional clothing"
+    ],
+    [
+      "Home & Kitchen",
+      "Furniture",
+      "Furniture",
+      "Furniture (general)"
+    ],
+    [
+      "Home & Kitchen",
+      "Kitchen & Dining",
+      "Kitchenware",
+      "Kitchen and dining (general)"
+    ],
+    [
+      "Home & Kitchen",
+      "Cookware & Bakeware",
+      "Kitchenware",
+      "Cookware and baking (general)"
+    ],
+    [
+      "Home & Kitchen",
+      "Bedding",
+      "Bedding & Linen",
+      "Bedding (general)"
+    ],
+    [
+      "Home & Kitchen",
+      "Bathroom",
+      "Bathroom",
+      "Bathroom accessories"
+    ],
+    [
+      "Home & Kitchen",
+      "Home Décor",
+      "Home Decorations",
+      "Home decorations (general)"
+    ],
+    [
+      "Home & Kitchen",
+      "Lighting",
+      "Lighting",
+      "Lighting (general)"
+    ],
+    [
+      "Home & Kitchen",
+      "Storage & Organisation",
+      "Storage & Organisation",
+      "Storage (general)"
+    ],
+    [
+      "Home & Kitchen",
+      "Cleaning Supplies",
+      "Cleaning Supplies",
+      "Household cleaners"
+    ],
+    [
+      "Home & Kitchen",
+      "Laundry & Home Care",
+      "Cleaning Supplies",
+      "Washing and laundry supplies"
+    ],
+    [
+      "Home & Kitchen",
+      "Second-hand Furniture",
+      "Furniture",
+      "Used furniture"
+    ],
+    [
+      "Home & Kitchen",
+      "Furniture Parts & Components",
+      "Furniture",
+      "Furniture parts"
+    ],
+    [
+      "Home & Kitchen",
+      "Refurbished Home Furniture",
+      "Furniture",
+      "Refurbished furniture"
+    ],
+    [
+      "DIY, Tools & Machinery",
+      "Hand Tools",
+      "Hand Tools",
+      "Hand tools (general)"
+    ],
+    [
+      "DIY, Tools & Machinery",
+      "Power Tools",
+      "Power Tools",
+      "Power tools (general)"
+    ],
+    [
+      "DIY, Tools & Machinery",
+      "Tool Accessories",
+      "Power Tools",
+      "Power tool accessories"
+    ],
+    [
+      "DIY, Tools & Machinery",
+      "Hardware & Fasteners",
+      "Hardware",
+      "Hardware and fasteners (general)"
+    ],
+    [
+      "DIY, Tools & Machinery",
+      "Electrical",
+      "Electrical Supplies",
+      "Electrical fittings"
+    ],
+    [
+      "DIY, Tools & Machinery",
+      "Plumbing",
+      "Plumbing",
+      "Plumbing supplies"
+    ],
+    [
+      "DIY, Tools & Machinery",
+      "Paint & Supplies",
+      "Paint & Decorating",
+      "Paint and supplies"
+    ],
+    [
+      "DIY, Tools & Machinery",
+      "Safety Equipment",
+      "Workshop Equipment",
+      "PPE"
+    ],
+    [
+      "DIY, Tools & Machinery",
+      "Generators & Power Equipment",
+      "Workshop Equipment",
+      "Generators"
+    ],
+    [
+      "DIY, Tools & Machinery",
+      "Welding",
+      "Welding",
+      "Welding equipment (general)"
+    ],
+    [
+      "DIY, Tools & Machinery",
+      "Machinery",
+      "Workshop Equipment",
+      "Machinery"
+    ],
+    [
+      "Garden, Pool & Patio",
+      "Garden Tools",
+      "Gardening",
+      "Garden tools (general)"
+    ],
+    [
+      "Garden, Pool & Patio",
+      "Plants & Seeds",
+      "Gardening",
+      "Plants and seeds (general)"
+    ],
+    [
+      "Garden, Pool & Patio",
+      "Outdoor Furniture",
+      "Garden Furniture",
+      "Outdoor furniture (general)"
+    ],
+    [
+      "Garden, Pool & Patio",
+      "Braais & Outdoor Cooking",
+      "Braai & Barbecue",
+      "Braais and outdoor cooking (general)"
+    ],
+    [
+      "Garden, Pool & Patio",
+      "Pool & Spa",
+      "Swimming Pools",
+      "Pool and spa equipment (general)"
+    ],
+    [
+      "Garden, Pool & Patio",
+      "Irrigation & Watering",
+      "Gardening",
+      "Irrigation"
+    ],
+    [
+      "Garden, Pool & Patio",
+      "Lawn Care",
+      "Gardening",
+      "Lawn care"
+    ],
+    [
+      "Garden, Pool & Patio",
+      "Outdoor Lighting",
+      "Lighting",
+      "Outdoor lights"
+    ],
+    [
+      "Garden, Pool & Patio",
+      "Pest & Weed Control Products",
+      "Gardening",
+      "Permitted pest and weed control products"
+    ],
+    [
+      "Groceries & Household",
+      "Pantry Food",
+      "Food & Groceries",
+      "Pantry food"
+    ],
+    [
+      "Groceries & Household",
+      "Snacks & Sweets",
+      "Sweets & Snacks",
+      "Snacks and sweets (general)"
+    ],
+    [
+      "Groceries & Household",
+      "Coffee & Tea",
+      "Food & Groceries",
+      "Coffee and tea"
+    ],
+    [
+      "Groceries & Household",
+      "Non-Alcoholic Beverages",
+      "Food & Groceries",
+      "Non-alcoholic drinks"
+    ],
+    [
+      "Groceries & Household",
+      "Baking",
+      "Food & Groceries",
+      "Baking ingredients"
+    ],
+    [
+      "Groceries & Household",
+      "Cooking Ingredients",
+      "Food & Groceries",
+      "Cooking ingredients"
+    ],
+    [
+      "Groceries & Household",
+      "Household Cleaning",
+      "Cleaning Supplies",
+      "Household cleaners"
+    ],
+    [
+      "Groceries & Household",
+      "Paper & Disposable Products",
+      "Cleaning Supplies",
+      "Paper products"
+    ],
+    [
+      "Groceries & Household",
+      "Food Storage",
+      "Kitchenware",
+      "Food containers"
+    ],
+    [
+      "Health & Wellness",
+      "Vitamins & Supplements",
+      "Vitamins & Supplements",
+      "Legally permitted vitamins and nutritional supplements"
+    ],
+    [
+      "Health & Wellness",
+      "First Aid",
+      "Health & Personal Care",
+      "First aid"
+    ],
+    [
+      "Health & Wellness",
+      "Mobility & Daily Living",
+      "Medical & Mobility Equipment",
+      "Mobility aids"
+    ],
+    [
+      "Health & Wellness",
+      "Medical Devices",
+      "Health & Personal Care",
+      "Permitted medical devices"
+    ],
+    [
+      "Health & Wellness",
+      "Oral Care",
+      "Health & Personal Care",
+      "Dental care"
+    ],
+    [
+      "Health & Wellness",
+      "Eye Care",
+      "Health & Personal Care",
+      "Eye care"
+    ],
+    [
+      "Health & Wellness",
+      "Wellness & Relaxation",
+      "Health & Personal Care",
+      "Relaxation products"
+    ],
+    [
+      "Health & Wellness",
+      "Fitness Recovery",
+      "Vitamins & Supplements",
+      "Recovery accessories"
+    ],
+    [
+      "Health & Wellness",
+      "Personal Hygiene",
+      "Health & Personal Care",
+      "Hygiene"
+    ],
+    [
+      "Health & Wellness",
+      "CBD Oils & Wellness Products",
+      "Vitamins & Supplements",
+      "CBD Oils & Wellness Products"
+    ],
+    [
+      "Office & Stationery",
+      "Writing & Correction",
+      "School & Stationery",
+      "Writing supplies"
+    ],
+    [
+      "Office & Stationery",
+      "Paper & Notebooks",
+      "School & Stationery",
+      "Paper"
+    ],
+    [
+      "Office & Stationery",
+      "Filing & Storage",
+      "Office Equipment",
+      "Filing cabinets"
+    ],
+    [
+      "Office & Stationery",
+      "Labels",
+      "School & Stationery",
+      "Labels"
+    ],
+    [
+      "Office & Stationery",
+      "Desk Accessories",
+      "Office Equipment",
+      "Desk accessories"
+    ],
+    [
+      "Office & Stationery",
+      "Office Furniture",
+      "Office Equipment",
+      "Desks and office furniture"
+    ],
+    [
+      "Office & Stationery",
+      "Presentation Supplies",
+      "Office Equipment",
+      "Presentation equipment"
+    ],
+    [
+      "Office & Stationery",
+      "School Stationery",
+      "School & Stationery",
+      "School stationery"
+    ],
+    [
+      "Office & Stationery",
+      "Art & Craft Supplies",
+      "Arts & Crafts",
+      "Craft materials"
+    ],
+    [
+      "Office & Stationery",
+      "Business Machines",
+      "Office Equipment",
+      "Business machines"
+    ],
+    [
+      "Pet Supplies",
+      "Dogs",
+      "Dog Supplies",
+      "Dog supplies (general)"
+    ],
+    [
+      "Pet Supplies",
+      "Cats",
+      "Cat Supplies",
+      "Cat supplies (general)"
+    ],
+    [
+      "Pet Supplies",
+      "Birds",
+      "Bird Supplies",
+      "Bird supplies (general)"
+    ],
+    [
+      "Pet Supplies",
+      "Fish & Aquarium",
+      "Fish Tanks & Aquarium",
+      "Aquarium supplies (general)"
+    ],
+    [
+      "Pet Supplies",
+      "Reptiles",
+      "Reptile & Small Pet Supplies",
+      "Reptile supplies (general)"
+    ],
+    [
+      "Pet Supplies",
+      "Small Animals",
+      "Reptile & Small Pet Supplies",
+      "Small pet supplies (general)"
+    ],
+    [
+      "Pet Supplies",
+      "Pet Food",
+      "Pet Accessories",
+      "Pet food (general)"
+    ],
+    [
+      "Pet Supplies",
+      "Pet Beds & Housing",
+      "Pet Accessories",
+      "Beds and housing"
+    ],
+    [
+      "Pet Supplies",
+      "Pet Toys",
+      "Pet Accessories",
+      "Pet toys"
+    ],
+    [
+      "Pet Supplies",
+      "Pet Grooming",
+      "Pet Accessories",
+      "Grooming tools"
+    ],
+    [
+      "Pet Supplies",
+      "Pet Travel & Accessories",
+      "Pet Accessories",
+      "Pet travel accessories"
+    ],
+    [
+      "Sport & Fitness",
+      "Fitness Equipment",
+      "Gym & Fitness",
+      "Gym equipment"
+    ],
+    [
+      "Sport & Fitness",
+      "Running",
+      "Sports",
+      "Running"
+    ],
+    [
+      "Sport & Fitness",
+      "Cycling",
+      "Bicycles",
+      "Bicycles and cycling (general)"
+    ],
+    [
+      "Sport & Fitness",
+      "Team Sports",
+      "Sports",
+      "Team sports (general)"
+    ],
+    [
+      "Sport & Fitness",
+      "Racquet Sports",
+      "Sports",
+      "Racquet sports (general)"
+    ],
+    [
+      "Sport & Fitness",
+      "Golf",
+      "Golf",
+      "Golf equipment (general)"
+    ],
+    [
+      "Sport & Fitness",
+      "Swimming",
+      "Sports",
+      "Swimming"
+    ],
+    [
+      "Sport & Fitness",
+      "Combat Sports",
+      "Sports",
+      "Combat sports (general)"
+    ],
+    [
+      "Sport & Fitness",
+      "Sports Nutrition Accessories",
+      "Sports Nutrition",
+      "Sports nutrition accessories"
+    ],
+    [
+      "Sport & Fitness",
+      "Fan & Supporter Gear",
+      "Sports Clothing & Shoes",
+      "Supporter gear"
+    ],
+    [
+      "Camping & Outdoors",
+      "Camping Tents & Shelters",
+      "Camping",
+      "Camping tents"
+    ],
+    [
+      "Camping & Outdoors",
+      "Sleeping Gear",
+      "Camping",
+      "Sleeping bags and gear"
+    ],
+    [
+      "Camping & Outdoors",
+      "Outdoor Cooking",
+      "Camping",
+      "Outdoor cooking"
+    ],
+    [
+      "Camping & Outdoors",
+      "Hiking",
+      "Camping",
+      "Hiking equipment"
+    ],
+    [
+      "Camping & Outdoors",
+      "Fishing",
+      "Fishing & Angling",
+      "Fishing equipment (general)"
+    ],
+    [
+      "Camping & Outdoors",
+      "Hunting Accessories",
+      "Camping",
+      "Hunting accessories (existing restrictions apply)"
+    ],
+    [
+      "Camping & Outdoors",
+      "Climbing",
+      "Camping",
+      "Climbing equipment"
+    ],
+    [
+      "Camping & Outdoors",
+      "Outdoor Clothing",
+      "Camping",
+      "Outdoor clothing"
+    ],
+    [
+      "Camping & Outdoors",
+      "Coolers & Hydration",
+      "Camping",
+      "Coolers"
+    ],
+    [
+      "Camping & Outdoors",
+      "Travel Outdoor Gear",
+      "Camping",
+      "Travel outdoor gear"
+    ],
+    [
+      "Toys & Games",
+      "Baby & Toddler Toys",
+      "Toys & Games",
+      "Baby and toddler toys"
+    ],
+    [
+      "Toys & Games",
+      "Dolls & Accessories",
+      "Toys & Games",
+      "Dolls"
+    ],
+    [
+      "Toys & Games",
+      "Action Figures",
+      "Toys & Games",
+      "Action figures"
+    ],
+    [
+      "Toys & Games",
+      "Building Sets",
+      "Toys & Games",
+      "Building sets"
+    ],
+    [
+      "Toys & Games",
+      "Board Games",
+      "Toys & Games",
+      "Board games"
+    ],
+    [
+      "Toys & Games",
+      "Puzzles",
+      "Toys & Games",
+      "Puzzles"
+    ],
+    [
+      "Toys & Games",
+      "Educational Toys",
+      "Toys & Games",
+      "Educational toys"
+    ],
+    [
+      "Toys & Games",
+      "Remote Control",
+      "Toys & Games",
+      "Remote control toys"
+    ],
+    [
+      "Toys & Games",
+      "Outdoor Toys",
+      "Toys & Games",
+      "Outdoor toys"
+    ],
+    [
+      "Toys & Games",
+      "Arts & Crafts Toys",
+      "Toys & Games",
+      "Arts and crafts toys"
+    ],
+    [
+      "Toys & Games",
+      "Collectibles",
+      "Toys & Games",
+      "Collectible toys"
+    ],
+    [
+      "Luggage & Travel",
+      "Suitcases",
+      "Luggage & Bags",
+      "Suitcases"
+    ],
+    [
+      "Luggage & Travel",
+      "Travel Bags",
+      "Luggage & Bags",
+      "Travel bags"
+    ],
+    [
+      "Luggage & Travel",
+      "Backpacks",
+      "Luggage & Bags",
+      "Backpacks"
+    ],
+    [
+      "Luggage & Travel",
+      "Travel Accessories",
+      "Beach & Holiday",
+      "Holiday accessories"
+    ],
+    [
+      "Luggage & Travel",
+      "Travel Organisers",
+      "Luggage & Bags",
+      "Travel organisers"
+    ],
+    [
+      "Luggage & Travel",
+      "Locks & Security",
+      "Luggage & Bags",
+      "Travel locks"
+    ],
+    [
+      "Luggage & Travel",
+      "Cooler Bags",
+      "Beach & Holiday",
+      "Cooler bags"
+    ],
+    [
+      "Music & Musical Instruments",
+      "Guitars",
+      "Music & Instruments",
+      "Guitars"
+    ],
+    [
+      "Music & Musical Instruments",
+      "Keyboards & Pianos",
+      "Music & Instruments",
+      "Keyboards and pianos"
+    ],
+    [
+      "Music & Musical Instruments",
+      "Drums & Percussion",
+      "Music & Instruments",
+      "Drums"
+    ],
+    [
+      "Music & Musical Instruments",
+      "Orchestral Instruments",
+      "Music & Instruments",
+      "Orchestral instruments"
+    ],
+    [
+      "Music & Musical Instruments",
+      "DJ Equipment",
+      "Music & Instruments",
+      "DJ equipment"
+    ],
+    [
+      "Music & Musical Instruments",
+      "Microphones",
+      "Music & Instruments",
+      "Microphones"
+    ],
+    [
+      "Music & Musical Instruments",
+      "Studio & Recording",
+      "Music & Instruments",
+      "Recording equipment"
+    ],
+    [
+      "Music & Musical Instruments",
+      "Instrument Accessories",
+      "Music & Instruments",
+      "Instrument accessories"
+    ],
+    [
+      "Music & Musical Instruments",
+      "Sheet Music",
+      "Music & Instruments",
+      "Sheet music"
+    ],
+    [
+      "Music & Musical Instruments",
+      "Vinyl Records",
+      "Music, CDs & Records",
+      "Vinyl records"
+    ],
+    [
+      "Music & Musical Instruments",
+      "Music CDs",
+      "Music, CDs & Records",
+      "Music CDs"
+    ],
+    [
+      "Music & Musical Instruments",
+      "DVDs & Blu-rays",
+      "Music, CDs & Records",
+      "DVDs and Blu-rays"
+    ],
+    [
+      "Music & Musical Instruments",
+      "Vintage Physical Media",
+      "Music, CDs & Records",
+      "Vintage physical media"
+    ],
+    [
+      "Arts, Crafts & Handmade",
+      "Handmade Home Décor",
+      "Home Decorations",
+      "Handmade home decorations"
+    ],
+    [
+      "Arts, Crafts & Handmade",
+      "Handmade Jewellery",
+      "Jewellery & Watches",
+      "Handmade jewellery"
+    ],
+    [
+      "Arts, Crafts & Handmade",
+      "Candles & Soaps",
+      "Arts & Crafts",
+      "Candles and soaps"
+    ],
+    [
+      "Arts, Crafts & Handmade",
+      "Woodwork",
+      "Arts & Crafts",
+      "Woodwork crafts"
+    ],
+    [
+      "Arts, Crafts & Handmade",
+      "Handmade Furniture — Tables & Desks",
+      "Handmade Furniture",
+      "Tables and desks"
+    ],
+    [
+      "Arts, Crafts & Handmade",
+      "Handmade Furniture — Chairs & Benches",
+      "Handmade Furniture",
+      "Chairs and benches"
+    ],
+    [
+      "Arts, Crafts & Handmade",
+      "Handmade Furniture — Shelving & Storage",
+      "Handmade Furniture",
+      "Shelving and storage"
+    ],
+    [
+      "Arts, Crafts & Handmade",
+      "Handmade Furniture — Cabinets & Cupboards",
+      "Handmade Furniture",
+      "Cabinets and cupboards"
+    ],
+    [
+      "Arts, Crafts & Handmade",
+      "Handmade Furniture — Beds & Bedroom Furniture",
+      "Handmade Furniture",
+      "Beds"
+    ],
+    [
+      "Arts, Crafts & Handmade",
+      "Handmade Furniture — Outdoor & Garden Furniture",
+      "Handmade Furniture",
+      "Garden furniture"
+    ],
+    [
+      "Arts, Crafts & Handmade",
+      "Handmade Furniture — Children’s Furniture",
+      "Handmade Furniture",
+      "Children's furniture"
+    ],
+    [
+      "Arts, Crafts & Handmade",
+      "Handmade Furniture — Custom & Bespoke Furniture",
+      "Handmade Furniture",
+      "Custom furniture"
+    ],
+    [
+      "Arts, Crafts & Handmade",
+      "Handmade Furniture — Woodwork & Decorative Pieces",
+      "Handmade Furniture",
+      "Decorative woodwork"
+    ],
+    [
+      "Arts, Crafts & Handmade",
+      "Handmade Furniture — Other",
+      "Handmade Furniture",
+      "Other handmade furniture"
+    ],
+    [
+      "Arts, Crafts & Handmade",
+      "Pottery & Ceramics",
+      "Arts & Crafts",
+      "Pottery and ceramics"
+    ],
+    [
+      "Arts, Crafts & Handmade",
+      "Sewing & Needlecraft",
+      "Sewing & Knitting",
+      "Sewing and needlecraft (general)"
+    ],
+    [
+      "Arts, Crafts & Handmade",
+      "Painting & Drawing",
+      "Arts & Crafts",
+      "Painting and drawing (general)"
+    ],
+    [
+      "Arts, Crafts & Handmade",
+      "Craft Materials",
+      "Arts & Crafts",
+      "Craft materials"
+    ],
+    [
+      "Arts, Crafts & Handmade",
+      "Personalised Gifts",
+      "Gifts & Parties",
+      "Personalised gifts"
+    ],
+    [
+      "Arts, Crafts & Handmade",
+      "Print-on-Demand",
+      "Arts & Crafts",
+      "Print-on-demand"
+    ],
+    [
+      "Arts, Crafts & Handmade",
+      "Restored Furniture",
+      "Handmade Furniture",
+      "Upcycled and restored furniture"
+    ],
+    [
+      "Arts, Crafts & Handmade",
+      "Upcycled Furniture",
+      "Handmade Furniture",
+      "Upcycled and restored furniture"
+    ],
+    [
+      "Arts, Crafts & Handmade",
+      "Reclaimed Wood Products",
+      "Home Decorations",
+      "Reclaimed wood decorations"
+    ],
+    [
+      "Arts, Crafts & Handmade",
+      "Handmade Furniture Components",
+      "Handmade Furniture",
+      "Furniture components"
+    ],
+    [
+      "Industrial & Business Supplies",
+      "Industrial Tools",
+      "Workshop Equipment",
+      "Industrial tools"
+    ],
+    [
+      "Industrial & Business Supplies",
+      "Material Handling",
+      "Used Business Equipment",
+      "Material handling"
+    ],
+    [
+      "Industrial & Business Supplies",
+      "Packaging & Shipping Supplies",
+      "Used Business Equipment",
+      "Packaging supplies"
+    ],
+    [
+      "Industrial & Business Supplies",
+      "Safety & PPE",
+      "Workshop Equipment",
+      "PPE"
+    ],
+    [
+      "Industrial & Business Supplies",
+      "Commercial Cleaning Supplies",
+      "Restaurant & Catering Equipment",
+      "Commercial cleaning supplies"
+    ],
+    [
+      "Industrial & Business Supplies",
+      "Restaurant & Catering Equipment",
+      "Restaurant & Catering Equipment",
+      "Catering equipment"
+    ],
+    [
+      "Industrial & Business Supplies",
+      "Retail & POS Equipment",
+      "Used Business Equipment",
+      "Retail equipment"
+    ],
+    [
+      "Industrial & Business Supplies",
+      "Office & Business Equipment",
+      "Office Equipment",
+      "Office and business equipment (general)"
+    ],
+    [
+      "Industrial & Business Supplies",
+      "Agricultural Supplies",
+      "Farming",
+      "Agricultural supplies"
+    ],
+    [
+      "Industrial & Business Supplies",
+      "Used Shop Equipment",
+      "Used Business Equipment",
+      "Used shop equipment"
+    ],
+    [
+      "Industrial & Business Supplies",
+      "Shop Shelving & Displays",
+      "Used Business Equipment",
+      "Shop displays"
+    ],
+    [
+      "Industrial & Business Supplies",
+      "Commercial Refrigeration",
+      "Restaurant & Catering Equipment",
+      "Commercial refrigeration"
+    ],
+    [
+      "Industrial & Business Supplies",
+      "Bakery Equipment",
+      "Restaurant & Catering Equipment",
+      "Bakery equipment"
+    ],
+    [
+      "Industrial & Business Supplies",
+      "Salon & Barber Equipment",
+      "Hair & Salon Equipment",
+      "Barber and salon furniture"
+    ],
+    [
+      "Industrial & Business Supplies",
+      "Workshop Equipment",
+      "Workshop Equipment",
+      "Workshop equipment (general)"
+    ],
+    [
+      "Industrial & Business Supplies",
+      "Used Business Furniture",
+      "Used Business Equipment",
+      "Business furniture"
+    ],
+    [
+      "Home Improvement & Building Supplies",
+      "Building Materials",
+      "Building Supplies",
+      "Building materials"
+    ],
+    [
+      "Home Improvement & Building Supplies",
+      "Doors & Windows",
+      "Building Supplies",
+      "Doors and windows"
+    ],
+    [
+      "Home Improvement & Building Supplies",
+      "Flooring",
+      "Building Supplies",
+      "Flooring"
+    ],
+    [
+      "Home Improvement & Building Supplies",
+      "Roofing",
+      "Building Supplies",
+      "Roofing"
+    ],
+    [
+      "Home Improvement & Building Supplies",
+      "Bathroom Fixtures",
+      "Bathroom",
+      "Bathroom fixtures"
+    ],
+    [
+      "Home Improvement & Building Supplies",
+      "Kitchen Fixtures",
+      "Kitchenware",
+      "Kitchen fixtures"
+    ],
+    [
+      "Home Improvement & Building Supplies",
+      "Locks & Security Hardware",
+      "Hardware",
+      "Locks"
+    ],
+    [
+      "Home Improvement & Building Supplies",
+      "Insulation",
+      "Building Supplies",
+      "Insulation"
+    ],
+    [
+      "Home Improvement & Building Supplies",
+      "Tiles & Surfaces",
+      "Building Supplies",
+      "Tiles"
+    ],
+    [
+      "Party, Events & Gifts",
+      "Party Supplies",
+      "Gifts & Parties",
+      "Party supplies"
+    ],
+    [
+      "Party, Events & Gifts",
+      "Decorations",
+      "Gifts & Parties",
+      "Decorations"
+    ],
+    [
+      "Party, Events & Gifts",
+      "Gift Wrap",
+      "Gifts & Parties",
+      "Gift wrap"
+    ],
+    [
+      "Party, Events & Gifts",
+      "Greeting Cards",
+      "Gifts & Parties",
+      "Greeting cards"
+    ],
+    [
+      "Party, Events & Gifts",
+      "Wedding Supplies",
+      "Gifts & Parties",
+      "Wedding supplies"
+    ],
+    [
+      "Party, Events & Gifts",
+      "Event Accessories",
+      "Gifts & Parties",
+      "Event accessories"
+    ],
+    [
+      "Party, Events & Gifts",
+      "Novelty Gifts",
+      "Gifts & Parties",
+      "Novelty gifts"
+    ],
+    [
+      "Collectibles & Hobbies",
+      "Trading Cards",
+      "Collectibles & Antiques",
+      "Trading cards"
+    ],
+    [
+      "Collectibles & Hobbies",
+      "Coins & Currency",
+      "Collectibles & Antiques",
+      "Coins"
+    ],
+    [
+      "Collectibles & Hobbies",
+      "Stamps",
+      "Collectibles & Antiques",
+      "Stamps"
+    ],
+    [
+      "Collectibles & Hobbies",
+      "Model Kits",
+      "Toys & Games",
+      "Model kits and trains"
+    ],
+    [
+      "Collectibles & Hobbies",
+      "Model Trains",
+      "Toys & Games",
+      "Model kits and trains"
+    ],
+    [
+      "Collectibles & Hobbies",
+      "Memorabilia",
+      "Collectibles & Antiques",
+      "Memorabilia"
+    ],
+    [
+      "Collectibles & Hobbies",
+      "Antiques & Vintage",
+      "Collectibles & Antiques",
+      "Antiques and vintage items (general)"
+    ],
+    [
+      "Collectibles & Hobbies",
+      "Hobby Tools & Supplies",
+      "Arts & Crafts",
+      "Hobby tools and supplies"
+    ],
+    [
+      "Homemade Food & Pantry",
+      "Baked Goods",
+      "Baking & Homemade Cakes",
+      "Baked goods"
+    ],
+    [
+      "Homemade Food & Pantry",
+      "Jams, Preserves & Spreads",
+      "Jams, Honey & Preserves",
+      "Jams and preserves (general)"
+    ],
+    [
+      "Homemade Food & Pantry",
+      "Sauces, Chutneys & Condiments",
+      "Sauces & Marinades",
+      "Homemade sauces and condiments"
+    ],
+    [
+      "Homemade Food & Pantry",
+      "Spices, Herbs & Seasonings",
+      "Spices, Herbs & Seasonings",
+      "Homemade spice blends"
+    ],
+    [
+      "Homemade Food & Pantry",
+      "Sweets & Confectionery",
+      "Sweets & Snacks",
+      "Homemade sweets"
+    ],
+    [
+      "Homemade Food & Pantry",
+      "Snacks & Treats",
+      "Homemade Food",
+      "Homemade snacks"
+    ],
+    [
+      "Homemade Food & Pantry",
+      "Other Homemade Pantry Foods",
+      "Homemade Food",
+      "Other permitted homemade food"
+    ],
+    [
+      "Wine",
+      "Red Wine",
+      "Wine",
+      "Red wine"
+    ],
+    [
+      "Wine",
+      "White Wine",
+      "Wine",
+      "White wine"
+    ],
+    [
+      "Wine",
+      "Rosé Wine",
+      "Wine",
+      "Rosé wine"
+    ],
+    [
+      "Wine",
+      "Sparkling Wine",
+      "Wine",
+      "Sparkling wine"
+    ],
+    [
+      "Wine",
+      "Dessert & Fortified Wine",
+      "Wine",
+      "Dessert and fortified wine"
+    ],
+    [
+      "Wine",
+      "Other Wine",
+      "Wine",
+      "Other wine"
+    ],
+    [
+      "Farming & Agriculture",
+      "Irrigation Pumps",
+      "Farming",
+      "Irrigation pumps"
+    ],
+    [
+      "Farming & Agriculture",
+      "Greenhouse Equipment",
+      "Farming",
+      "Greenhouse equipment"
+    ],
+    [
+      "Farming & Agriculture",
+      "Small Farming Implements",
+      "Farming",
+      "Small implements"
+    ],
+    [
+      "Farming & Agriculture",
+      "Farming Hand Tools",
+      "Farming",
+      "Farm hand tools"
+    ],
+    [
+      "Farming & Agriculture",
+      "Agricultural Irrigation Equipment",
+      "Farming",
+      "Irrigation equipment"
+    ],
+    [
+      "Farming & Agriculture",
+      "Farming Equipment",
+      "Farming",
+      "Farm equipment"
+    ],
+    [
+      "Farming & Agriculture",
+      "Agricultural Machinery",
+      "Farming",
+      "Machinery"
+    ],
+    [
+      "Solar & Backup Power",
+      "Solar Panels",
+      "Solar & Backup Power",
+      "Solar panels"
+    ],
+    [
+      "Solar & Backup Power",
+      "Solar Inverters",
+      "Solar & Backup Power",
+      "Solar inverters"
+    ],
+    [
+      "Solar & Backup Power",
+      "Solar Batteries",
+      "Solar & Backup Power",
+      "Solar batteries"
+    ],
+    [
+      "Solar & Backup Power",
+      "Portable Power Stations",
+      "Solar & Backup Power",
+      "Portable power stations"
+    ],
+    [
+      "Solar & Backup Power",
+      "Solar Charge Controllers",
+      "Solar & Backup Power",
+      "Solar charge controllers"
+    ],
+    [
+      "Solar & Backup Power",
+      "Solar Cables & Accessories",
+      "Solar & Backup Power",
+      "Solar cables and accessories"
+    ],
+    [
+      "Solar & Backup Power",
+      "Used Solar Equipment",
+      "Solar & Backup Power",
+      "Used solar equipment"
+    ]
+  ],
+  "related": {
+    "Braai & Barbecue": [
+      "Braai Wood & Charcoal",
+      "Sauces & Marinades",
+      "Spices, Herbs & Seasonings"
+    ],
+    "Fishing & Angling": [
+      "Fishing Tackle & Equipment",
+      "Fishing Bait & Dips"
+    ],
+    "Home Appliances": [
+      "Fridges & Freezers",
+      "Kitchen Appliances",
+      "Stoves & Ovens",
+      "Washing Machines & Dryers"
+    ],
+    "Homemade Food": [
+      "Baking & Homemade Cakes",
+      "Jams, Honey & Preserves",
+      "Sauces & Marinades",
+      "Spices, Herbs & Seasonings",
+      "Sweets & Snacks"
+    ],
+    "Bicycles": [
+      "Bicycle Parts & Accessories",
+      "E-Bikes"
+    ],
+    "Bicycle Parts & Accessories": [
+      "Bicycles"
+    ],
+    "E-Bikes": [
+      "E-Bike Parts"
+    ],
+    "E-Bike Parts": [
+      "E-Bikes"
+    ],
+    "Fishing Tackle & Equipment": [
+      "Fishing & Angling",
+      "Fishing Bait & Dips"
+    ],
+    "Fishing Bait & Dips": [
+      "Fishing & Angling",
+      "Fishing Tackle & Equipment"
+    ],
+    "Sauces & Marinades": [
+      "Braai & Barbecue",
+      "Spices, Herbs & Seasonings"
+    ],
+    "Spices, Herbs & Seasonings": [
+      "Sauces & Marinades",
+      "Braai & Barbecue"
+    ],
+    "Braai Wood & Charcoal": [
+      "Braai & Barbecue"
+    ],
+    "Dog Supplies": [
+      "Pet Accessories",
+      "Pet Health & Care"
+    ],
+    "Cat Supplies": [
+      "Pet Accessories",
+      "Pet Health & Care"
+    ],
+    "Gym & Fitness": [
+      "Sports Nutrition",
+      "Sports Clothing & Shoes"
+    ]
+  },
+  "fix": "198A"
 }

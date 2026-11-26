@@ -137,14 +137,15 @@ Loading vehicle advertisements...
 Browse Transport Services &amp; Equipment Hire
 </a></p>
 </div>
-<h2>Browse product departments A–Z</h2>
+<h2>Browse categories A–Z</h2>
 <div id="cats" class="cats"></div>
 <p id="result" class="muted"></p>
 </section>
 </main>
 <script src="./common.js"></script>
-<script src="./v26-consolidated.js"></script>
+<script src="./v26-consolidated.js?v=198a"></script>
 <script src="./geo.js"></script>
+<script src="./shopdrop-category-198a.js?v=198a"></script>
 <script>
 const SHOPDROP_PUBLIC_PRODUCTS_ENDPOINT =
  'https://dtkdvvxpwonywtsgqmdx.supabase.co/rest/v1/products';
@@ -164,6 +165,7 @@ const browseQuery=document.getElementById('q');
 const browseCategories=document.getElementById('cats');
 const browseView=new URLSearchParams(location.search).get('view')||'';
 let browseFilters={view:browseView};
+let browseTax198a=null;
 let browseOffset=0;
 let browseRequest=0;
 const browsePageSize=24;
@@ -269,7 +271,7 @@ function browseCard(p,imageInfo){
  const info=document.createElement('p');
  info.className='muted';
  info.textContent=[
-  p.category,p.subcategory,p.condition,p.location
+  ...ShopDropCategory198a.label(browseTax198a,p.category,p.subcategory),p.condition,p.location
  ].filter(Boolean).join(' · ');
 
  const price=document.createElement('strong');
@@ -307,24 +309,14 @@ async function browsePublicProducts(filters={},append=false){
   offset:String(browseOffset)
  });
 
- if(browseFilters.category){
-  params.set('category','eq.'+browseFilters.category);
- }
- if(browseFilters.subcategory){
-  params.set('subcategory','eq.'+browseFilters.subcategory);
- }
+ if(browseFilters.category)ShopDropCategory198a.applyCategory(params,browseTax198a,browseFilters.category,browseFilters.subcategory);
  if(browseFilters.view==='new'){
   params.set('condition','ilike.new');
  }
  if(browseFilters.view==='preowned'){
   params.set('condition','not.ilike.new');
  }
- if(browseFilters.term){
-  const safe=browseFilters.term.replace(/[(),.*%]/g,' ').trim();
-  if(safe){
-   params.set('or','(title.ilike.*'+safe+'*,description.ilike.*'+safe+'*)');
-  }
- }
+ if(browseFilters.term)ShopDropCategory198a.applySearch(params,browseFilters.term);
 
  try{
   const response=await fetch(
@@ -407,10 +399,11 @@ window.addEventListener('pageshow',()=>{
 
 async function loadCats(){
  try{
-  const response=await fetch('./taxonomy.json');
+  const response=await fetch('./taxonomy.json',{cache:'no-store'});
   if(!response.ok)throw Error('Categories unavailable.');
   const taxonomy=await response.json();
-  const departments=[...taxonomy.departments]
+  browseTax198a=taxonomy;
+  const departments=[...ShopDropCategory198a.publicDepartments(taxonomy)]
    .sort((a,b)=>a.name.localeCompare(b.name));
 
   browseCategories.innerHTML=departments.map(d=>`
@@ -426,6 +419,7 @@ async function loadCats(){
        data-parent="${ShopDrop.esc(d.name)}"
        data-sub="${ShopDrop.esc(sc)}">${ShopDrop.esc(sc)}</button>
      `).join('')}
+     ${ShopDropCategory198a.related(taxonomy,d.name).map(name=>`<p><a href="./categories.html?category=${encodeURIComponent(name)}">See also: ${ShopDrop.esc(name)}</a></p>`).join('')}
     </div>
    </div>
   `).join('');
@@ -461,6 +455,13 @@ async function loadCats(){
 });
 
   categoryRender197c(true);
+  if(requestedCategory197c&&!departments.some(d=>d.name===requestedCategory197c)){
+   const old=(taxonomy.legacyDepartments||[]).find(d=>d.name===requestedCategory197c);
+   if(old){
+    browseCategoryMessage.textContent='This older category has been split into clearer categories. Your existing advertisements remain available below.';
+    await browsePublicProducts({category:requestedCategory197c,view:browseView});
+   }
+  }
  }catch(e){
   browseCategoryMessage.textContent='Categories could not be loaded.';
  }
