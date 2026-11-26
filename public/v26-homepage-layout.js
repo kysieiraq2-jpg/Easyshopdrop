@@ -165,7 +165,7 @@
     const actions=sell && sell.querySelector(".v264Actions");
 
     const itemLink=actions &&
-      actions.querySelector('a[href="./sell-item.html?v=198i"],a[href="./product-selling-198h.html?v=198h"],a[href="./sell-item.html?v=198g"],a[href="./sell-item.html"]');
+      actions.querySelector('a[href="./sell-item.html?v=198j"],a[href="./sell-item.html?v=198i"],a[href="./product-selling-198h.html?v=198h"],a[href="./sell-item.html?v=198g"],a[href="./sell-item.html"]');
 
     const complete=
       dispatch &&
