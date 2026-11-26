@@ -74,6 +74,8 @@ select,input,button{max-width:100%;box-sizing:border-box}
 }
 </style>
 <link rel="stylesheet" href="./shopdrop-unified-cards.css?v=59">
+<link rel="stylesheet" href="./shopdrop-category-search-198d.css?v=198d">
+<script defer src="./shopdrop-category-search-198d.js?v=198d"></script>
 </head>
 <body>
 <header>
@@ -148,6 +150,14 @@ Browse Transport Services &amp; Equipment Hire
 </section>
 <section class="panel" id="shopdropCategoryList198b" aria-labelledby="shopdropCategoryHeading198b">
 <h2 id="shopdropCategoryHeading198b">Browse categories A–Z</h2>
+<div class="shopdrop-category-search198d">
+  <label for="shopdropPageCategory198dInput">Find a category</label>
+  <div class="shopdrop-category-search-row198d">
+    <input type="search" id="shopdropPageCategory198dInput" placeholder="Type a category name…" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="100" enterkeyhint="done" aria-controls="cats" aria-describedby="shopdropPageCategory198dStatus">
+    <button type="button" id="shopdropPageCategory198dClear" hidden>Clear</button>
+  </div>
+  <p id="shopdropPageCategory198dStatus" role="status" aria-live="polite"></p>
+</div>
 <div id="cats" class="cats"></div>
 <p id="result" class="muted"></p>
 </section>

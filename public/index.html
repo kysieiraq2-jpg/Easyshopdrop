@@ -125,6 +125,8 @@ footer{padding:30px;text-align:center;color:#64748b}
 }
 </style>
 <link rel="stylesheet" href="./shopdrop-unified-cards.css?v=59">
+<link rel="stylesheet" href="./shopdrop-category-search-198d.css?v=198d">
+<script defer src="./shopdrop-category-search-198d.js?v=198d"></script>
 </head>
 <body>
 <header class="shopdrop-header" id="shopdropHeader">
@@ -147,6 +149,14 @@ footer{padding:30px;text-align:center;color:#64748b}
           <a href="./categories.html?view=new">Shop New Products</a>
           <button class="shopdrop-menu-link shopdrop-products-toggle" id="productsCategoriesButton" type="button" aria-expanded="false" aria-controls="productsCategoriesPanel">Products &amp; Categories</button>
           <section class="shopdrop-menu-categories" id="productsCategoriesPanel" aria-label="Product categories" hidden>
+            <div class="shopdrop-category-search198d">
+              <label for="shopdropMenuCategory198dInput">Find a category</label>
+              <div class="shopdrop-category-search-row198d">
+                <input type="search" id="shopdropMenuCategory198dInput" placeholder="Type a category name…" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="100" enterkeyhint="done" aria-controls="mainMenuCategories" aria-describedby="shopdropMenuCategory198dStatus">
+                <button type="button" id="shopdropMenuCategory198dClear" hidden>Clear</button>
+              </div>
+              <p id="shopdropMenuCategory198dStatus" role="status" aria-live="polite"></p>
+            </div>
             <div id="mainMenuCategories"></div>
           </section>
           <a href="./services.html">Other Services</a>
@@ -205,7 +215,7 @@ footer{padding:30px;text-align:center;color:#64748b}
   </section>
 </section>
 <section class="section" id="shopdropHomeCategories197a" aria-label="Products and categories" style="margin:10px 0 18px;">
-<a id="shopdropHomeCategoryLink197a" href="./categories.html?entry=categories&amp;v=198c" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%;min-height:100px;padding:16px 12px;box-sizing:border-box;background:#0f766e;color:#fff;border:1px solid #0f766e;border-radius:12px;font-size:16px;font-weight:700;line-height:1.35;text-align:center;text-decoration:none;overflow-wrap:anywhere;"><strong>Products &amp; Categories</strong><small style="font-size:13px;font-weight:400;color:#fff;">Search for items by category</small></a>
+<a id="shopdropHomeCategoryLink197a" href="./categories.html?entry=categories&amp;v=198d" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%;min-height:100px;padding:16px 12px;box-sizing:border-box;background:#0f766e;color:#fff;border:1px solid #0f766e;border-radius:12px;font-size:16px;font-weight:700;line-height:1.35;text-align:center;text-decoration:none;overflow-wrap:anywhere;"><strong>Products &amp; Categories</strong><small style="font-size:13px;font-weight:400;color:#fff;">Search for items by category</small></a>
 </section>
 <section class="section" id="products">
 <h2>New & featured products</h2>

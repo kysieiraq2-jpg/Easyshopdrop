@@ -1,0 +1,10 @@
+/* Fix 198D: isolated category search controls and filtered row visibility. */
+.shopdrop-category-search198d{margin:8px 0 12px;padding:0;min-width:0;text-align:left}
+.shopdrop-category-search198d label{display:block;font-size:14px;font-weight:600;margin:0 0 6px;color:inherit}
+.shopdrop-category-search198d .shopdrop-category-search-row198d{display:flex;gap:6px;align-items:stretch;width:100%;min-width:0}
+.shopdrop-category-search198d input[type="search"]{box-sizing:border-box;flex:1 1 0;min-width:0;width:100%;max-width:100%;min-height:44px;padding:10px;border:1px solid #94a3b8;border-radius:8px;background:#fff;color:#17202a;font:inherit;font-size:16px}
+.shopdrop-category-search198d button{box-sizing:border-box;flex:0 0 auto;min-height:44px;padding:8px 10px;border:1px solid #94a3b8;border-radius:8px;background:#fff;color:#0f766e;font:inherit;font-size:14px;cursor:pointer}
+.shopdrop-category-search198d button[hidden],#mainMenuCategories>details[data-shopdrop-category-filtered198d],#cats>.cat[data-shopdrop-category-filtered198d]{display:none!important}
+.shopdrop-category-search198d input:focus-visible,.shopdrop-category-search198d button:focus-visible{outline:2px solid #0f766e;outline-offset:2px}
+.shopdrop-category-search198d p{font-size:13px;color:#475569;margin:6px 0 0;overflow-wrap:anywhere}
+.shopdrop-category-search198d p:empty{display:none}
