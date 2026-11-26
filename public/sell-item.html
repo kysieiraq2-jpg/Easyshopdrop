@@ -24,6 +24,7 @@ a{color:#0f766e}
 #shopdropPhotoPreview button{width:auto}
 </style>
 <link rel="stylesheet" href="./shopdrop-payment-purpose-195a.css?v=195a">
+<link rel="stylesheet" href="./shopdrop-seller-category-198e.css?v=198e">
 </head>
 <body>
 <main>
@@ -48,20 +49,38 @@ a{color:#0f766e}
 <label for="n">What are you selling?</label>
 <input id="n" maxlength="150" minlength="2" required placeholder="e.g. Wooden coffee table">
 
+<div class="shopdrop-seller-search198e">
+<label for="shopdropSellerCategory198eInput">Find your main category</label>
+<div class="search-row198e">
+<input type="search" id="shopdropSellerCategory198eInput" placeholder="Type the first letters, e.g. Baby" maxlength="100" autocomplete="off" enterkeyhint="done" aria-controls="shopdropSellerCategory198eResults" aria-describedby="shopdropSellerCategory198eStatus">
+<button type="button" id="shopdropSellerCategory198eClear" hidden>Clear</button>
+</div>
+<p id="shopdropSellerCategory198eStatus" role="status" aria-live="polite"></p>
+<div class="search-results198e" id="shopdropSellerCategory198eResults" hidden></div>
+</div>
+<label for="c">Category</label>
+<select id="c" required>
+
+</select>
+<div class="shopdrop-seller-search198e">
+<label for="shopdropSellerSubcategory198eInput">Find your subcategory</label>
+<div class="search-row198e">
+<input type="search" id="shopdropSellerSubcategory198eInput" placeholder="Type the first letters, e.g. Pram" maxlength="100" autocomplete="off" enterkeyhint="done" aria-controls="shopdropSellerSubcategory198eResults" aria-describedby="shopdropSellerSubcategory198eStatus" disabled>
+<button type="button" id="shopdropSellerSubcategory198eClear" hidden>Clear</button>
+</div>
+<p id="shopdropSellerSubcategory198eStatus" role="status" aria-live="polite"></p>
+<div class="search-results198e" id="shopdropSellerSubcategory198eResults" hidden></div>
+</div>
+<label for="subcat">Subcategory</label>
+<select id="subcat" required disabled>
+
+</select>
+
 <label for="d">Describe your item</label>
 <textarea id="d" maxlength="3000" minlength="10" required placeholder="Condition, size, age, defects and any details a buyer should know"></textarea>
 
 <label for="p">Your selling price in rand (R)</label>
 <input id="p" type="number" min="1" step="0.01" inputmode="decimal" required placeholder="e.g. 450">
-
-<label for="c">Category</label>
-<select id="c" required>
-
-</select>
-<label for="subcat">Subcategory</label>
-<select id="subcat" required disabled>
-
-</select>
 
 <label for="condition">Condition</label>
 <select id="condition">
@@ -151,6 +170,7 @@ when approved courier services are activated.
 <script src="./shopdrop-photo-scan-status.js" defer></script>
 <script src="./shopdrop-product-photos.js" defer></script>
 <script src="./shopdrop-category-198a.js?v=198a"></script>
+<script src="./shopdrop-seller-category-198e.js?v=198e"></script>
 <script type="module">
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -168,6 +188,7 @@ const $=id=>document.getElementById(id);
 let pendingId=null,photosAttached=false,processing=false,recoveredListing=false;
 const departmentSubs=new Map();
 let tax198a=null,originalPair198a=null;
+let categoryAssist198e=null;
 function fillSubcategories(selected=''){
   const select=$('subcat');
   const options=departmentSubs.get($('c').value)||[];
@@ -232,6 +253,7 @@ async function resumeItem(product){
     const choice=ShopDropCategory198a.recover(tax198a,...originalPair198a);
     $('c').value=choice[0];
     fillSubcategories(choice[1]);
+    categoryAssist198e?.reset();
     $('condition').value=product.condition||'used';
     $('town').value=product.location||'';
     $('shippingWeightKg').value=
@@ -299,6 +321,7 @@ async function setup(){
     }
     $('c').selectedIndex=-1;
     fillSubcategories();
+    categoryAssist198e=window.ShopDropSellerCategory198e?.bind(departmentSubs);
     if(user)await loadUnfinished(user);
   }catch(e){
     $('accountStatus').textContent=
