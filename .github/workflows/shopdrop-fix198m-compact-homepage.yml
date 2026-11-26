@@ -1,0 +1,117 @@
+name: ShopDrop Fix 198M Compact Homepage
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix198m-compact-homepage.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Shorten introduction and preserve full help
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        from html.parser import HTMLParser
+        from collections import Counter
+        import hashlib, os, re, subprocess
+        INDEX='public/index.html'
+        LAYOUT='public/v26-homepage-layout.js'
+        HELP='public/help.html'
+        EXPECTED={INDEX:'25b6fa91253e2a0cc076ecfd7aa08f0e817e43ab',LAYOUT:'523e095ca30939f8e6cff2ce53d8780a674820f1',HELP:'2e30947286a26d10ac5b2891670bac629aec8a66'}
+        PROTECTED={'public/my-purchases-sales-198j.html': 'b6a90a116501e5ec58dba71ac577260438604074', 'public/sell-item.html': '71ff081513a0666bf3f43bdc086a4926a645c26a', 'public/account.html': '4a45318305017581eded43393bcfa18924957673', 'public/sign-in.html': '26da37b2951e5dcf4ff669bf7c9d2f3113330f89', 'public/taxonomy.json': '43d0163d8238ebaabdba04b919c75e3c8b696191', 'public/categories.html': '9f8972364b4d9d9076941c16b495add26bba1f31', 'public/category-results.html': '90d3d26da4cf7514dbeffa9df1e69b634ea6a587', 'public/product-shopping-194a.html': '0bb295aba4ad70c7d82682e4791527d470334485', 'public/checkout.html': '252f15c4af34e25494aeb6bcfa5e119f14ea2c17', 'public/services.html': '35c60a32a7568eeaebb29b94a87ac836e4c740b1', 'public/dispatching.html': '6aa208477f8e068321a6debe310eaf2ecddf29cc', 'public/shopdrop-language.js': 'e9e80e90b454b943bdd4bfefd3f5b66e18e6d53b', 'public/v26-professional.css': '3f20443b25562f250968b5f9221f4b24a3d26c8c', 'public/shopdrop-info-language.js': '9aa8e524c3c9954ddb7480c3bbb9553c28ca6464', 'public/common.js': 'ba2a61b164322de85609517420682aa867f84671', 'public/v26-consolidated.js': '131dec7fc0f70869db9ba14454de2cd9e113c6b2', 'public/shopdrop-category-search-198d.js': '45c535605e1cd84ad5a41ca615e435ce1dc72fff', 'public/shopdrop-seller-category-198e.js': 'f50c50a314027666dac6700da66b55e90e49803c', 'public/shopdrop-buyer-picker-198g.js': 'e9139969ad71673246a30a0f6a8d96d2c057bf81'}
+        HERO='  <section class="v264Hero">\n    <h1>Shop&Drop</h1>\n    <p class="shopdrop-tagline198l"><strong>Buy. Sell. Shop simply.</strong></p>\n    <p><strong>Buy • Sell • Find Services • Get It Moved</strong></p>\n    <p>Shop&amp;Drop is an online marketplace designed for everyone, from private individuals and home-based entrepreneurs to professionals and established businesses.</p>\n    <p><strong>Registration and advertising are FREE.</strong></p>\n    <h3>Our Purpose</h3>\n    <p>Our purpose is to make buying, selling and booking services a <strong>simple, enjoyable, affordable and secure experience.</strong></p>\n    <p>Shop&amp;Drop acts as an intermediary between buyers, sellers and service providers, reducing the inconvenience of organising payments, courier services and transaction arrangements independently.</p>\n    <p><strong>Less effort. Less uncertainty. More convenience.</strong></p>\n    <p>Courier arrangements are incorporated into checkout when required, and payment verification safeguards help protect all parties against fraud.</p>\n    <p>Whether you are selling a second-hand item, making products from home, purchasing something new, offering a service or hiring transport and equipment, <strong>Shop&amp;Drop brings everything together in one convenient place.</strong></p>\n  </section>'
+        STEPS='<div class="shopdrop-steps198l">\n<h3>Three Simple Steps</h3>\n<p><strong>1. Advertise for FREE</strong> — List your products, services, transport or equipment at your chosen price.</p>\n<p><strong>2. Buy or Book with Ease</strong> — Find what you need and complete your purchase or booking through Shop&amp;Drop.</p>\n<p><strong>3. Complete the Transaction Securely</strong> — Seller and service provider payments are released after the applicable collection or completion requirements have been verified.</p>\n<p>Applicable marketplace fees are disclosed as part of the transaction.</p>\n<p><strong>Your private contact and financial details remain protected.</strong></p>\n<p>Shop&amp;Drop is designed to help you save time, reduce unnecessary expenses and enjoy a simpler way of doing business.</p>\n</div>'
+        HELP_LINK='<a href="./help.html">How Shop&amp;Drop Works</a>'
+        OLD_HOW='    const how=firstExisting(["How Shop&Drop Works"]);'
+        NEW_HOW='    const how=document.getElementById("help")||firstExisting(["How Shop&Drop Works"]);'
+        OLD_PIN='<p><strong>SELLERS: ASK THE COURIER FOR THE SIX-DIGIT SHOP&amp;DROP COLLECTION PIN AT PICKUP.</strong> Only after physically handing over the parcel, sign in to My Account, select your shipment and submit the code. Keep the collection receipt. Verified courier tracking or scanning may also confirm pickup.</p>'
+        NEW_PIN='<p><strong>For physical products:</strong> Obtain the courier company’s booking, waybill or tracking reference when the courier physically collects the sold item. Sign in to My Account and use Receive My Payment. Keep the collection receipt. The reference alone does not authorise payout; collection must also be independently verified with the courier.</p>'
+        COMPACT='<section class="hero" id="help">\n<h1>Shop&amp;Drop</h1>\n<div class="shopdrop-keypoints198m">\n<p><strong>Buy • Sell • Find Services • Get It Moved</strong></p>\n<p><strong>Free registration • Free advertising</strong></p>\n<p><strong>Transport Services &amp; Equipment Hire • Other Services</strong></p>\n<p><strong>Easy, convenient shopping • Payment verification &amp; fraud safeguards • Courier arrangements at checkout</strong></p>\n</div>\n<a class="shopdrop-help198m" href="./help.html">How Shop&amp;Drop Works</a>\n</section>'
+        CSS_M='<style id="shopdrop-compact198m">\n#help{padding:18px 16px;margin:0 0 14px;text-align:center}\n#help h1{font-size:clamp(24px,6vw,32px);line-height:1.15;margin:0 0 12px}\n#help .shopdrop-keypoints198m p{font-size:14px;line-height:1.45;margin:7px 0;overflow-wrap:anywhere}\n#help .shopdrop-help198m{display:flex;align-items:center;justify-content:center;min-height:48px;max-width:420px;margin:14px auto 0;padding:10px 12px;border-radius:9px;background:#0f766e;color:#fff;font-weight:700;font-size:14px;text-decoration:none;box-sizing:border-box}\n#help .shopdrop-help198m:focus-visible{outline:3px solid #17202a;outline-offset:3px}\n</style>'
+        def require(ok,msg):
+         if not ok:raise SystemExit(msg)
+        def blob(raw):return hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
+        def change(s,a,b):
+         require(s.count(a)==1,'Unexpected source anchor: '+a[:90]);return s.replace(a,b,1)
+        class Links(HTMLParser):
+         def __init__(self,s):super().__init__();self.hrefs=[];self.feed(s)
+         def handle_starttag(self,tag,attrs):
+          if tag=='a':
+           d=dict(attrs);h=d.get('href');
+           if h:self.hrefs.append(h.removeprefix('./'))
+        def scripts(s):return re.findall(r'<script(?:\s[^>]*)?>([\s\S]*?)</script>',s)
+        def transform(original):
+         s=original[INDEX].decode();js=original[LAYOUT].decode();h=original[HELP].decode();before=s;beforehelp=h
+         # Reuse approved introduction and steps on the existing help page.
+         intro=HERO.split('<h1>Shop&Drop</h1>',1)[1].rsplit('</section>',1)[0].strip()
+         details='<div class="box" id="shopdropPurpose198m">'+intro+'</div><div class="box" id="shopdropSteps198m">'+STEPS+'</div>'
+         h=change(h,'<h1>How Shop&Drop Works</h1>','<h1>How Shop&Drop Works</h1>'+details)
+         h=change(h,OLD_PIN,NEW_PIN)
+         # No new functional destinations: move the footer help link to the compact intro.
+         s=change(s,HERO,'')
+         oldhelp='<section class="hero" id="help">\n<h2>How Shop&Drop works</h2>\n'+STEPS+'\n\n</section>'
+         s=change(s,oldhelp,COMPACT)
+         footerhelp='<div class="support-grid198k"><a href="./returns.html">Returns &amp; Disputes</a><a href="./feedback.html">Complaints &amp; Suggestions</a>'+HELP_LINK+'</div>'
+         s=change(s,footerhelp,footerhelp.replace(HELP_LINK,''))
+         s=change(s,'<link rel="stylesheet" href="./shopdrop-category-search-198d.css?v=198d">',CSS_M+'\n<link rel="stylesheet" href="./shopdrop-category-search-198d.css?v=198d">')
+         s=change(s,'src="v26-homepage-layout.js?v=198l"','src="v26-homepage-layout.js?v=198m"')
+         js=change(js,OLD_HOW,NEW_HOW)
+         require(Counter(Links(before).hrefs)==Counter(Links(s).hrefs),'Homepage link destinations or counts changed')
+         require(Counter(Links(beforehelp).hrefs)==Counter(Links(h).hrefs),'Help page destinations changed')
+         require(scripts(before)==scripts(s) and scripts(beforehelp)==scripts(h),'Inline scripts changed')
+         require(re.search(r'<header[\s\S]*?</header>',before).group()==re.search(r'<header[\s\S]*?</header>',s).group(),'Header changed')
+         require(re.search(r'<section id="v26HomeExtension"[\s\S]*?</main>',before).group().replace(HELP_LINK,'')==re.search(r'<section id="v26HomeExtension"[\s\S]*?</main>',s).group(),'Footer changed unexpectedly')
+         require(s.count('id="help"')==1 and s.count(COMPACT)==1 and h.count(STEPS)==1,'Missing compact introduction or transferred help')
+         return {INDEX:s.encode(),LAYOUT:js.encode(),HELP:h.encode()}
+        def main():
+         require(os.environ.get('GITHUB_REF_NAME')=='shopdrop-phase6-integration','Wrong branch')
+         for path,sha in PROTECTED.items():require(blob(Path(path).read_bytes())==sha,'Protected source differs: '+path)
+         original={};already={}
+         for path,sha in EXPECTED.items():
+          p=Path(path);b=Path('backups/fix198m')/p.name;raw=p.read_bytes()
+          if b.exists():require(blob(b.read_bytes())==sha,'Backup collision: '+path)
+          if blob(raw)==sha:original[path]=raw;already[path]=False
+          elif b.exists():original[path]=b.read_bytes();already[path]=True
+          else:raise SystemExit('Unexpected source; nothing installed: '+path)
+         out=transform(original)
+         for path,done in already.items():
+          if done:require(Path(path).read_bytes()==out[path],'Unexpected installed source: '+path)
+         subprocess.run(['node','--check','-'],input=out[LAYOUT],check=True)
+         for path,raw in original.items():
+          b=Path('backups/fix198m')/Path(path).name;b.parent.mkdir(parents=True,exist_ok=True)
+          if not b.exists():b.write_bytes(raw)
+          Path(path).write_bytes(out[path])
+         for path,sha in PROTECTED.items():require(blob(Path(path).read_bytes())==sha,'Protected source changed: '+path)
+         print('Fix 198M: compact homepage and existing help page; all link destinations and inline scripts preserved.')
+        if __name__=='__main__':main()
+
+        PYCODE
+        git diff --check
+        git config user.name "ShopDrop Integration"
+        git config user.email "actions@users.noreply.github.com"
+        git add -- public/index.html public/v26-homepage-layout.js public/help.html backups/fix198m/index.html backups/fix198m/v26-homepage-layout.js backups/fix198m/help.html
+        if ! git diff --cached --quiet; then
+          git commit -m "Fix 198M compact homepage and detailed help"
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
