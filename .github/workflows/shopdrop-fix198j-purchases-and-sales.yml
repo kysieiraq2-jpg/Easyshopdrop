@@ -1,0 +1,156 @@
+name: ShopDrop Fix 198J My Purchases and Sales
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix198j-purchases-and-sales.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Relocate existing purchase and sales navigation
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        from html.parser import HTMLParser
+        from collections import Counter
+        import os,re,hashlib,subprocess
+
+        INDEX='public/index.html'
+        SHOP='public/product-shopping-194a.html'
+        SELL='public/sell-item.html'
+        LAYOUT='public/v26-homepage-layout.js'
+        NEW='public/my-purchases-sales-198j.html'
+        DEST='./my-purchases-sales-198j.html?v=198j'
+        EXPECTED={INDEX:'63d8034fd6fe5deca8009b4ec14f9fd4c3392c91',SHOP:'dde3b1df7ac4d791e78ccbcf524374a685ebde29',SELL:'38fffc1db887031e8f785c7a2ae75f28f05c8d6e',LAYOUT:'6b4e7727d90ef4302726df026c68fb03f05af6e0'}
+        PROTECTED={'public/account.html':'4a45318305017581eded43393bcfa18924957673','public/sign-in.html':'26da37b2951e5dcf4ff669bf7c9d2f3113330f89','public/taxonomy.json':'43d0163d8238ebaabdba04b919c75e3c8b696191','public/product-search-194b.html':'4ded57f2acd8a980146b0f8dd1022e5e042a9040','public/shopdrop-product-search-194b.js':'61e8fe80902cf621eabc92d7c338c01de14cb3ca','public/shopdrop-seller-category-198e.js':'f50c50a314027666dac6700da66b55e90e49803c','public/shopdrop-seller-category-198e.css':'e5ded5f771bfdecb1d954c5ec4a17fb1fb2441b8','public/product-orders-194f.html':'0ffa4c23e45c4e84156b2b803ce368e6eedcb50d','public/my-product-advertisements-194d.html':'5e9bec9cccf517c285d33cb033496c661ae6b94a','public/shopdrop-division-layout-195d.css':'ead47f8900c64fb7cea190da2ffa205e1fba1156'}
+        # All originals are preserved in backups/fix198j. Only link locations, labels and cache versions change.
+        BAG='<a class="product-menu-194a" href="./checkout.html">My Shopping Bag / Checkout</a>'
+        BUY='<section class="panel"><h2>Manage Purchases</h2><a class="product-menu-194a" href="./product-orders-194f.html">My Purchases</a><a class="product-menu-194a" href="./account.html#orders">All My Orders</a><a class="product-menu-194a" href="./tracking.html">Track My Order</a><a class="product-menu-194a" href="./account.html#notifications">My Notifications</a><a class="product-menu-194a" href="./returns.html">Returns &amp; Disputes</a></section>'
+        SALES='<section class="panel"><h2>Manage Sales</h2><a class="product-menu-194a" href="./product-orders-194f.html?role=seller">My Sales</a><a class="product-menu-194a" href="./payout-statement.html">My Payout Statement</a><a class="product-menu-194a" href="./account.html#seller-courier-pickup-panel">Seller — Confirm Courier Collection</a><p class="muted">For a sold item, get the courier company\'s own reference number when the courier collects it. Enter that number after pickup. Shop&amp;Drop must also verify collection with the courier before your payment can be released.</p></section>'
+        MENU_SELL='          <a href="./sell-item.html?v=198i">Sell an Item — FREE</a>'
+        CAT_LINK='<a id="shopdropHomeCategoryLink197a" href="./categories.html?entry=categories&amp;v=198d" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%;min-height:100px;padding:16px 12px;box-sizing:border-box;background:#0f766e;color:#fff;border:1px solid #0f766e;border-radius:12px;font-size:16px;font-weight:700;line-height:1.35;text-align:center;text-decoration:none;overflow-wrap:anywhere;"><strong>Products &amp; Categories</strong><small style="font-size:13px;font-weight:400;color:#fff;">Search for items by category</small></a>'
+        MANAGE_LINK='<a id="shopdropHomeManage198j" href="'+DEST+'" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%;min-height:100px;padding:16px 12px;box-sizing:border-box;background:#0f766e;color:#fff;border:1px solid #0f766e;border-radius:12px;font-size:16px;font-weight:700;line-height:1.35;text-align:center;text-decoration:none;overflow-wrap:anywhere;margin-top:14px;"><strong>My Purchases &amp; Sales</strong><small style="font-size:13px;font-weight:400;color:#fff;">Manage your purchases, sales and payments</small></a>'
+        SELECTOR='actions.querySelector(\'a[href="./sell-item.html?v=198i"],a[href="./product-selling-198h.html?v=198h"],a[href="./sell-item.html?v=198g"],a[href="./sell-item.html"]\');'
+        SELECTOR_NEW=SELECTOR.replace('a[href="./sell-item.html?v=198i"]','a[href="./sell-item.html?v=198j"],a[href="./sell-item.html?v=198i"]',1)
+        PAY='<a class="product-menu-194a" href="./account.html#shopdropPaymentPurpose195a">Receive My Payment</a>'
+
+        def require(ok,msg):
+         if not ok:raise SystemExit(msg)
+        def blob(b):return hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()
+        def change(s,a,b,n=1):
+         require(s.count(a)==n,'Unexpected anchor: '+a[:120]);return s.replace(a,b)
+        def scripts(s):return re.findall(r'<script(?:\s[^>]*)?>([\s\S]*?)</script>',s)
+        class Links(HTMLParser):
+         def __init__(self,s):super().__init__();self.hrefs=[];self.feed(s)
+         def handle_starttag(self,tag,attrs):
+          if tag=='a':self.hrefs.append(dict(attrs).get('href'))
+        def links(s):return Counter(Links(s).hrefs)
+        def transform(original):
+         index,shop,sell,layout=[original[p].decode('utf-8') for p in [INDEX,SHOP,SELL,LAYOUT]]
+         # Preserve all current header/menu convenience shortcuts. Cache versions only, not destination paths.
+         index2=change(index,MENU_SELL,MENU_SELL+'\n          <a href="'+DEST+'">My Purchases &amp; Sales</a>')
+         index2=change(index2,CAT_LINK,CAT_LINK+'\n'+MANAGE_LINK)
+         index2=change(index2,'aria-label="Products and categories" style="margin:10px 0 18px;"','aria-label="Products, categories and account management" style="margin:10px 0 18px;"')
+         index2=change(index2,'href="./sell-item.html?v=198i"','href="./sell-item.html?v=198j"',2)
+         index2=change(index2,'href="./product-shopping-194a.html?v=198h"','href="./product-shopping-194a.html?v=198j"',2)
+         index2=change(index2,'src="v26-homepage-layout.js?v=198i"','src="v26-homepage-layout.js?v=198j"')
+         require(scripts(index2)==scripts(index),'Homepage inline scripts changed')
+         # Reverse the precisely scoped homepage edits to prove nothing else changed.
+         rev=change(index2,'src="v26-homepage-layout.js?v=198j"','src="v26-homepage-layout.js?v=198i"')
+         rev=change(rev,'href="./product-shopping-194a.html?v=198j"','href="./product-shopping-194a.html?v=198h"',2)
+         rev=change(rev,'href="./sell-item.html?v=198j"','href="./sell-item.html?v=198i"',2)
+         rev=change(rev,'aria-label="Products, categories and account management" style="margin:10px 0 18px;"','aria-label="Products and categories" style="margin:10px 0 18px;"')
+         rev=change(rev,CAT_LINK+'\n'+MANAGE_LINK,CAT_LINK)
+         rev=change(rev,MENU_SELL+'\n          <a href="'+DEST+'">My Purchases &amp; Sales</a>',MENU_SELL)
+         require(rev==index,'Homepage changes not reversible')
+         layout2=change(layout,SELECTOR,SELECTOR_NEW)
+         require(change(layout2,SELECTOR_NEW,SELECTOR)==layout,'Homepage layout changes not reversible')
+         # Move exact existing management blocks; all shopping controls remain.
+         shop2=change(shop,BAG,'')
+         shop2=change(shop2,BUY+'\n','')
+         sell2=change(sell,SALES+'\n','')
+         require(scripts(shop2)==scripts(shop) and scripts(sell2)==scripts(sell),'Operational script changed')
+         require(sell2.split('<form id="itemForm">',1)[1]==sell.split('<form id="itemForm">',1)[1],'Advertising form or submission changed')
+         require(links(shop2)==links(shop)-links(BAG+BUY),'Shopping links changed beyond approved moves')
+         require(links(sell2)==links(sell)-links(SALES),'Selling links changed beyond approved moves')
+         require('href="#shopdropSellerStart198i">Sell an Item — FREE' in sell2 and 'href="./my-product-advertisements-194d.html">My Product Advertisements' in sell2,'Existing seller links missing')
+         # Derive the static management page from the existing shop page shell.
+         require(shop.count('<main>\n')==1 and shop.count('\n</main>')==1,'Unexpected shop shell')
+         head,rest=shop.split('<main>\n',1);oldbody,tail=rest.split('\n</main>',1)
+         head=change(head,'<title>Shop Products | Shop&amp;Drop</title>','<title>My Purchases &amp; Sales | Shop&amp;Drop</title>')
+         buy=change(BUY,'<h2>Manage Purchases</h2>','<h2>Manage My Purchases</h2>'+BAG)
+         sales=change(SALES,'<h2>Manage Sales</h2>','<h2>Manage My Sales</h2>')
+         sales=change(sales,'<p class="muted">',PAY+'<p class="muted">')
+         intro='<section class="panel notice"><h1>My Purchases &amp; Sales</h1><p>Manage the products you bought and sold, track your orders and view your payments.</p><p class="muted">Sign in to your free account to view your own purchases, sales and payment information.</p><a class="product-menu-194a" href="./sign-in.html">Sign In / Create Account</a></section>'
+         newbody='\n'.join([intro,buy,sales,'<a class="product-menu-194a" href="./index.html">Back to Home</a>'])
+         hub=head+'<main>\n'+newbody+'\n</main>'+tail
+         require(links(buy+sales)==links(BAG+BUY+SALES)+links(PAY),'Management destinations changed')
+         require(not scripts(hub),'Unexpected script on management page')
+         require(index2.count('href="'+DEST+'"')==2,'Expected two management entrances')
+         require(shop2.count('My Shopping Bag / Checkout')==0 and 'Manage Purchases</h2>' not in shop2 and 'Manage Sales</h2>' not in sell2,'Management section not moved')
+         return {INDEX:index2.encode(),SHOP:shop2.encode(),SELL:sell2.encode(),LAYOUT:layout2.encode(),NEW:hub.encode()}
+
+        def main():
+         require(os.environ.get('GITHUB_REF_NAME')=='shopdrop-phase6-integration','Wrong branch')
+         for name,sha in PROTECTED.items():require(blob(Path(name).read_bytes())==sha,'Protected source differs: '+name)
+         original={};flags={}
+         for name,sha in EXPECTED.items():
+          p=Path(name);b=Path('backups/fix198j')/p.name;raw=p.read_bytes()
+          if b.exists():require(blob(b.read_bytes())==sha,'Backup collision: '+name)
+          if blob(raw)==sha:original[name]=raw;flags[name]=False
+          elif b.is_file():original[name]=b.read_bytes();flags[name]=True
+          else:raise SystemExit('Unexpected source; nothing installed: '+name)
+         updated=transform(original)
+         for name,flag in flags.items():
+          if flag:require(Path(name).read_bytes()==updated[name],'Unexpected installed version: '+name)
+         new=Path(NEW)
+         if new.exists():require(all(flags.values()) and new.read_bytes()==updated[NEW],'New page collision; nothing installed')
+         if all(flags.values()):require(new.is_file(),'Installed management page missing')
+         # Verify moved links refer to existing files; account fragments must exist.
+         for href in Links(updated[NEW].decode()).hrefs:
+          if href and href.startswith('./'):
+           path=href[2:].split('?',1)[0].split('#',1)[0]
+           require(Path('public',path).is_file(),'Missing destination: '+href)
+           if '#' in href:
+            fragment=href.split('#',1)[1];source=Path('public',path).read_text()
+            require('id="'+fragment+'"' in source or "id='"+fragment+"'" in source,'Missing link fragment: '+href)
+         subprocess.run(['node','--check','-'],input=updated[LAYOUT],check=True)
+         if all(flags.values()):print('Fix 198J already installed; verified.');return
+         for name,raw in original.items():
+          b=Path('backups/fix198j')/Path(name).name;b.parent.mkdir(parents=True,exist_ok=True)
+          if not b.exists():b.write_bytes(raw)
+          Path(name).write_bytes(updated[name])
+         new.write_bytes(updated[NEW])
+         for name,sha in PROTECTED.items():require(blob(Path(name).read_bytes())==sha,'Protected file changed: '+name)
+         print('Fix 198J: existing transaction navigation moved, original destinations retained, advertising form and inline scripts unchanged.')
+        if __name__=='__main__':main()
+        PYCODE
+        git diff --check
+        git config user.name "ShopDrop Integration"
+        git config user.email "actions@users.noreply.github.com"
+        git add -- public/index.html public/product-shopping-194a.html public/sell-item.html public/v26-homepage-layout.js public/my-purchases-sales-198j.html backups/fix198j/index.html backups/fix198j/product-shopping-194a.html backups/fix198j/sell-item.html backups/fix198j/v26-homepage-layout.js
+        if ! git diff --cached --quiet; then
+          git commit -m "Fix 198J separate purchases and sales navigation"
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
