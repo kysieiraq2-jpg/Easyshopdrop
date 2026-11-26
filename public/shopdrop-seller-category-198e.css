@@ -1,11 +1,13 @@
-/* Fix 198E: isolated seller category search. */
-.shopdrop-seller-search198e{margin:10px 0 8px;min-width:0}
+/* Fix 198F: only two visible searchable category fields after successful enhancement. */
+.shopdrop-seller-search198e{display:none;margin:10px 0 8px;min-width:0}
+.shopdrop-seller-picker198f .shopdrop-seller-search198e{display:block}
+.shopdrop-seller-picker198f select[hidden],.shopdrop-seller-picker198f label[hidden],.shopdrop-seller-search198e [hidden]{display:none!important}
 .shopdrop-seller-search198e .search-row198e{display:flex;align-items:stretch;gap:6px;min-width:0}
-.shopdrop-seller-search198e input{flex:1;min-width:0;width:100%;font-size:16px;min-height:44px}
+.shopdrop-seller-search198e input{flex:1;min-width:0;width:100%;font-size:16px;min-height:44px;background:#fff;color:#17202a}
+.shopdrop-seller-search198e input:disabled{background:#f1f5f9;color:#64748b}
 .shopdrop-seller-search198e .search-row198e button{flex:0 0 auto;width:auto;margin:0;color:#0f766e;background:#fff;border:1px solid #94a3b8;min-height:44px}
 .shopdrop-seller-search198e .search-results198e{max-height:260px;overflow:auto;border:1px solid #cbd5e1;border-radius:7px;margin:5px 0;background:#fff}
 .shopdrop-seller-search198e .search-results198e button{display:block;width:100%;margin:0;padding:11px 10px;min-height:44px;text-align:left;background:#fff;color:#17202a;border-radius:0;border-bottom:1px solid #e2e8f0;font-weight:500;overflow-wrap:anywhere}
-.shopdrop-seller-search198e .search-results198e button:hover{background:#ecfdf5}
-.shopdrop-seller-search198e [hidden]{display:none!important}
+.shopdrop-seller-search198e .search-results198e button:hover,.shopdrop-seller-search198e .search-results198e button:focus-visible{background:#ecfdf5}
 .shopdrop-seller-search198e p{font-size:14px;color:#526273;margin:5px 0}
 .shopdrop-seller-search198e p:empty{display:none}
