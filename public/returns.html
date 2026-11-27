@@ -232,15 +232,7 @@
    ></textarea>
   </div>
 
-  <div class="shopdrop-returns-field">
-   <label for="evidence">Photos / evidence (optional)</label>
-   <input
-    id="evidence"
-    type="file"
-    accept="image/jpeg,image/png,image/webp"
-    multiple
-   >
-  </div>
+  <p class="shopdrop-returns-message">Open your dispute first. You can then securely attach photographs or PDF documents to your dispute using the evidence link.</p>
 
   <button
    id="open"
@@ -278,7 +270,7 @@
  class="shopdrop-returns-card shopdrop-returns-links"
 >
  <!-- V26_2_EVIDENCE_LINK -->
- <a href="dispute-evidence.html">
+ <a href="./customer-dispute-evidence-199gb.html" id="customerEvidence199gb">
   Upload / View Dispute &amp; Return Evidence
  </a>
 </section>
@@ -321,7 +313,6 @@ document.getElementById('open').onclick=async()=>{
  const orderId=document.getElementById('orderId');
  const reason=document.getElementById('reason');
  const description=document.getElementById('description');
- const evidence=document.getElementById('evidence');
  const msg=document.getElementById('msg');
  const button=document.getElementById('open');
 
@@ -339,19 +330,6 @@ document.getElementById('open').onclick=async()=>{
  if(!details){
   msg.textContent='Please describe the problem.';
   description.focus();
-  return;
- }
-
- /*
-  Evidence uploads remain handled by the existing
-  protected dispute-evidence page. Do not silently
-  discard files selected on this form.
- */
- if(evidence.files.length){
-  msg.textContent=
-   'Please use Upload / View Dispute & Return Evidence '+
-   'to submit your photographs. Then return here '+
-   'and open your dispute.';
   return;
  }
 
@@ -376,15 +354,21 @@ document.getElementById('open').onclick=async()=>{
    description:details
   });
 
-  if(!result?.ok||!result.dispute_reference){
+  if(!result?.ok||!result.dispute_reference||
+   typeof result.dispute_id!=='string'||
+   !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(result.dispute_id)){
    throw new Error(
     'Dispute confirmation was not received.'
    );
   }
 
-  msg.textContent=
-   'Dispute submitted for review. Reference: '+
-   result.dispute_reference;
+  const evidenceURL='./customer-dispute-evidence-199gb.html?dispute_id='+encodeURIComponent(result.dispute_id);
+  document.getElementById('customerEvidence199gb').href=evidenceURL;
+  msg.textContent=(result.duplicate===true?'Existing dispute: ':'Dispute submitted for review. Reference: ')+result.dispute_reference+' ';
+  const attach=document.createElement('a');
+  attach.href=evidenceURL;
+  attach.textContent='Attach or view your evidence';
+  msg.append(attach);
 
   orderId.value='';
   description.value='';

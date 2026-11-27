@@ -1,7 +1,6 @@
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const VERSION = "SHOPDROP-R7-DISPUTES-V2";
+const VERSION = "SHOPDROP-199GB2-DISPUTES-V4-CASE";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY =
@@ -129,77 +128,97 @@ Deno.serve(async (req) => {
   }
 
   /*
-   * Shop&Drop dispute references are generated only
-   * by the protected backend.
+   * FIX 4B: Verify that every supplied reference belongs to the
+   * authenticated buyer before creating a dispute event.
+   * Preserve existing event format and all other behavior.
    */
+  const uuidPattern =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  const { data: disputeReference, error: referenceError } =
-    await db.rpc(
-      "generate_shopdrop_reference",
-      { prefix: "SD-DSP" },
-    );
+  let verifiedOrderId: string | null = null;
 
-  if (
-    referenceError ||
-    typeof disputeReference !== "string" ||
-    !disputeReference.startsWith("SD-DSP-")
-  ) {
-    console.error(
-      VERSION,
-      "reference generation failed",
-      referenceError,
-    );
+  if (orderId || transactionReference) {
+    const supplied = orderId || transactionReference;
+    const field = uuidPattern.test(supplied) ? "id" : "order_reference";
+    const { data: ownedOrder, error: orderError } = await db
+      .from("orders")
+      .select("id")
+      .eq(field, supplied)
+      .eq("buyer_id", user.id)
+      .maybeSingle();
 
-    return json(
-      { ok: false, error: "reference_generation_failed" },
-      500,
-    );
+    if (orderError) {
+      console.error(VERSION, "order ownership check failed", orderError);
+      return json({ ok: false, error: "order_verification_failed" }, 500);
+    }
+    if (!ownedOrder) {
+      return json({ ok: false, error: "order_not_found_or_not_owned" }, 403);
+    }
+    verifiedOrderId = ownedOrder.id;
+
+    if (orderId && transactionReference) {
+      const secondaryField = uuidPattern.test(transactionReference)
+        ? "id" : "order_reference";
+      const { data: secondary, error: secondaryError } = await db
+        .from("orders")
+        .select("id")
+        .eq(secondaryField, transactionReference)
+        .eq("buyer_id", user.id)
+        .maybeSingle();
+      if (secondaryError) {
+        return json({ ok: false, error: "order_verification_failed" }, 500);
+      }
+      if (!secondary || secondary.id !== verifiedOrderId) {
+        return json({ ok: false, error: "reference_mismatch" }, 403);
+      }
+    }
   }
 
-  /*
-   * Store only normalized fields.
-   * The authenticated user ID is server-derived.
-   */
-
-  const payload = {
-    user_id: user.id,
-    dispute_reference: disputeReference,
-    order_id: orderId || null,
-    payment_id: paymentId || null,
-    transaction_reference:
-      transactionReference || null,
-    reason,
-    description,
-    created_at: new Date().toISOString(),
-  };
-
-  const { error: insertError } =
-    await db
-      .from("integration_events")
-      .insert({
-        event_type: "payment_dispute_opened",
-        external_reference: disputeReference,
-        payload,
-        status: "received",
-      });
-
-  if (insertError) {
-    console.error(
-      VERSION,
-      "dispute storage failed",
-      insertError,
-    );
-
-    return json(
-      { ok: false, error: "dispute_storage_failed" },
-      500,
-    );
+  if (paymentId) {
+    if (!uuidPattern.test(paymentId)) {
+      return json({ ok: false, error: "invalid_payment_reference" }, 400);
+    }
+    const { data: ownedPayment, error: paymentError } = await db
+      .from("payments")
+      .select("order_id")
+      .eq("id", paymentId)
+      .eq("buyer_id", user.id)
+      .maybeSingle();
+    if (paymentError) {
+      console.error(VERSION, "payment ownership check failed", paymentError);
+      return json({ ok: false, error: "payment_verification_failed" }, 500);
+    }
+    if (!ownedPayment || !ownedPayment.order_id ||
+        (verifiedOrderId && ownedPayment.order_id !== verifiedOrderId)) {
+      return json({ ok: false, error: "payment_not_found_or_not_owned" }, 403);
+    }
+    verifiedOrderId = ownedPayment.order_id;
   }
 
-  return json({
-    ok: true,
-    dispute_reference: disputeReference,
-    status: "submitted",
-  });
+  if (!verifiedOrderId) {
+    return json({ ok: false, error: "verified_order_required" }, 403);
+  }
+
+  // Fix 199G-B2: one atomic, ownership-checked case and linked support event.
+  const { data: result, error: caseError } = await db.rpc(
+    "shopdrop_open_product_dispute_199gb",
+    { p_user_id: user.id, p_order_id: verifiedOrderId,
+      p_reason: reason, p_description: description },
+  );
+  if (caseError) {
+    const code = caseError.code;
+    if (code === "23514") return json({ ok: false, error: "paid_order_required_for_dispute" }, 409);
+    if (code === "42501") return json({ ok: false, error: "order_not_found_or_not_owned" }, 403);
+    if (code === "22023") return json({ ok: false, error: "invalid_dispute_details" }, 400);
+    console.error(VERSION, "dispute case creation failed", code);
+    return json({ ok: false, error: "dispute_storage_failed" }, 500);
+  }
+  if (!result?.ok || !uuidPattern.test(result.dispute_id ?? "") ||
+      typeof result.dispute_reference !== "string" ||
+      !result.dispute_reference.startsWith("SD-DSP-")) {
+    return json({ ok: false, error: "dispute_confirmation_unavailable" }, 500);
+  }
+  return json({ ok: true, dispute_id: result.dispute_id,
+    dispute_reference: result.dispute_reference, status: result.status,
+    duplicate: result.duplicate === true });
 });
-
