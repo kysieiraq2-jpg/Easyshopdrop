@@ -2009,6 +2009,25 @@ Deno.serve(
     }
 
 
+    // Fix 199I-C2: only the trusted backend may start this legacy worker.
+    // A valid customer JWT is not payout-worker authorization.
+    const supplied = (req.headers.get("Authorization") ?? "")
+      .match(/^Bearer ([^\s]+)$/i)?.[1] ?? "";
+    const encoder = new TextEncoder();
+    const [providedHash, expectedHash] = await Promise.all([
+      crypto.subtle.digest("SHA-256", encoder.encode(supplied)),
+      crypto.subtle.digest("SHA-256", encoder.encode(SERVICE_KEY)),
+    ]);
+    const providedBytes = new Uint8Array(providedHash);
+    const expectedBytes = new Uint8Array(expectedHash);
+    let difference = 0;
+    for (let i = 0; i < expectedBytes.length; i++) {
+      difference |= providedBytes[i] ^ expectedBytes[i];
+    }
+    if (!supplied || difference !== 0) {
+      return reply({ ok: false, error: "worker_authorization_required" }, 403);
+    }
+
     /*
      * ========================================================
      * STEP 1
