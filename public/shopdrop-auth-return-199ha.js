@@ -4,6 +4,7 @@
 const rules=Object.freeze({
  'sell-item.html':{},
  'account.html':{},
+ 'checkout.html':{},
  'order.html':{'id':'ref'},
  'product-orders-194f.html':{'role':'role'},
  'tracking.html':{'order':'ref','orderRef':'ref','ref':'ref'},

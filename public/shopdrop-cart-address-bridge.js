@@ -5,7 +5,17 @@
   const URL = 'https://dtkdvvxpwonywtsgqmdx.supabase.co';
   const KEY = 'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q';
   const $ = id => document.getElementById(id);
-  const say = message => { $('orderStatus').textContent = message; };
+  const say = (message, error) => {
+    const status = $('orderStatus');
+    status.textContent = message;
+    if (!error?.needsSignIn) return;
+    for (const [page, label] of [['sign-in.html','Sign in'],['register.html','Create account']]) {
+      const link = document.createElement('a');
+      link.href = window.ShopDropReturn199h?.authLink(page) || './'+page+'?next=checkout.html';
+      link.textContent = label;
+      status.append(document.createTextNode(' '),link);
+    }
+  };
   let clientPromise;
   let cart = [];
   function client() {
@@ -15,7 +25,7 @@
   async function current() {
     const db = await client();
     const {data,error} = await db.auth.getUser();
-    if (error || !data?.user?.id) throw new Error('Sign in to view your shopping bag and addresses.');
+    if (error || !data?.user?.id) throw Object.assign(new Error('Sign in to view your shopping bag and addresses.'),{needsSignIn:true});
     return {db, uid:data.user.id};
   }
   async function load(preferredAddressId = '') {
@@ -134,7 +144,7 @@
       if(pendingOrderId&&!isCurrentCheckout())window.ShopDropSingleCourier199da?.clear('Checkout changed. Prepare a new order before obtaining a quotation.');
       $('addressStatus').textContent=chosen?'Your delivery address is selected.':'Complete the address fields above, then tap Save delivery address.';
       say('One seller per checkout. You may purchase multiple items from this seller. Payment is not yet enabled.');
-    } catch(e) {say('Cannot load cart/addresses: '+e.message);}
+    } catch(e) {say('Cannot load cart/addresses: '+e.message,e);}
   }
   async function change(item,quantity){
     try{
@@ -145,7 +155,7 @@
       if(result.error)throw result.error;
       window.ShopDropReservationCountdown?.clear?.();
       await load();
-    }catch(e){say('Cart update failed: '+e.message);}
+    }catch(e){say('Cart update failed: '+e.message,e);}
   }
   async function saveAddress(){
     const saveButton=$('saveDeliveryAddressButton');
@@ -167,7 +177,7 @@
       say('Delivery address saved. Payment remains disabled.');
     }catch(e){
       $('addressStatus').textContent='Address not saved: '+e.message;
-      say('Address save failed: '+e.message);
+      say('Address save failed: '+e.message,e);
     }finally{saveButton.disabled=false;}
   }
   let creatingOrder = false;
@@ -251,7 +261,7 @@
       }
       say(reference ? 'Secure order created: '+reference+'. Select the appointed courier to obtain a quotation. No payment has been made.' : 'Secure order request accepted. No payment taken. Check your order status before trying again.');
       // Keep the stable request ID until checkout/payment is safely completed.
-    } catch(e) {const msg=String(e?.message||'');say(msg.includes('one_seller_per_checkout')?'Only one seller is permitted per checkout. Please purchase from each seller separately.':'Order creation failed: '+(msg||'Please try again.'));}
+    } catch(e) {const msg=String(e?.message||'');say(msg.includes('one_seller_per_checkout')?'Only one seller is permitted per checkout. Please purchase from each seller separately.':'Order creation failed: '+(msg||'Please try again.'),e);}
     finally {creatingOrder=false;if(button)button.disabled=pendingOrderId?!window.ShopDropSingleCourier199da?.canPay():!$('addresses').value;}
   }
   const button=$('previewOrderButton');
