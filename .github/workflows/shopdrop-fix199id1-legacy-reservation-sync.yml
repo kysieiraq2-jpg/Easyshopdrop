@@ -1,0 +1,21 @@
+name: ShopDrop Fix 199I-D1 Legacy Reservation Sync
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix199id1-legacy-reservation-sync.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Record verified database correction only
+      shell: bash
+      run: "set -euo pipefail\ntest \"$GITHUB_REF_NAME\" = shopdrop-phase6-integration\npython3 <<'PYCODE'\nfrom pathlib import Path\nimport hashlib\nFILES = {'supabase/migrations/20261127135408_shopdrop_fix199id1_legacy_reservation_access.sql': '-- Fix 199I-D1: retire direct customer access to obsolete reservation mutators.\\n-- Retain the existing functions and backend grants; current checkout, payment and expiry functions are unchanged.\\nREVOKE EXECUTE ON FUNCTION public.reserve_product_inventory(uuid,integer,uuid) FROM PUBLIC, anon, authenticated;\\nREVOKE EXECUTE ON FUNCTION public.release_inventory_reservation(uuid) FROM PUBLIC, anon, authenticated;\\nGRANT EXECUTE ON FUNCTION public.reserve_product_inventory(uuid,integer,uuid) TO service_role;\\nGRANT EXECUTE ON FUNCTION public.release_inventory_reservation(uuid) TO service_role;\\n', 'docs/SHOPDROP_FIX199ID1_LEGACY_RESERVATION_ACCESS.md': '# Fix 199I-D1 \u2014 Legacy reservation access\\n\\nSupabase migration 20261127135408; applied 27 November 2026.\\nMigration MD5: `8f46f977368e1a37ad45b5b042149b9c`.\\n\\n- Removed anonymous and authenticated execution of obsolete single-product reserve/release functions; retained definitions and service-role grants.\\n- Verified that current order reservation, release, paid inventory commitment, checkout creation and expiry cleanup remain backend-accessible and customer-inaccessible.\\n- Verified authenticated access to the checkout countdown RPC.\\n- No frontend, transaction procedure, or provider configuration change.\\n\\nThis workflow records the already-applied migration. It does not run SQL. Permission tests passed; full browser and live-provider tests are not implied.\\n'}\nassert hashlib.md5(FILES['supabase/migrations/20261127135408_shopdrop_fix199id1_legacy_reservation_access.sql'].encode()).hexdigest() == '8f46f977368e1a37ad45b5b042149b9c'\nfor name,content in FILES.items():\n p=Path(name); data=content.encode()\n if p.exists():\n  assert p.read_bytes()==data, 'Unexpected existing file: '+name\n else:\n  p.parent.mkdir(parents=True,exist_ok=True)\n  p.write_bytes(data)\nprint('Verified exact deployed migration; no frontend or function changes.')\nPYCODE\ngit config user.name \"github-actions[bot]\"\ngit config user.email \"41898282+github-actions[bot]@users.noreply.github.com\"\ngit add -- supabase/migrations/20261127135408_shopdrop_fix199id1_legacy_reservation_access.sql docs/SHOPDROP_FIX199ID1_LEGACY_RESERVATION_ACCESS.md\ngit diff --cached --check\npython3 <<'CHECK'\nimport subprocess\nallowed={'docs/SHOPDROP_FIX199ID1_LEGACY_RESERVATION_ACCESS.md', 'supabase/migrations/20261127135408_shopdrop_fix199id1_legacy_reservation_access.sql'}\nchanged=set(subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines())\nassert changed <= allowed, 'Unexpected changed paths'\nCHECK\nif ! git diff --cached --quiet; then\n git commit -m \"Fix 199I-D1 synchronize legacy reservation access migration\"\n git push origin HEAD:shopdrop-phase6-integration\nfi\n"
