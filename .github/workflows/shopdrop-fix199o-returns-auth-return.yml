@@ -1,0 +1,133 @@
+name: ShopDrop Fix 199O Returns Auth Return
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix199o-returns-auth-return.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: shopdrop-fix199o
+  cancel-in-progress: false
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+        persist-credentials: true
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - name: Correct and verify returns sign-in and order reference
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import hashlib, os, subprocess, tempfile
+        from html.parser import HTMLParser
+        PATCHES = {'public/shopdrop-auth-return-199ha.js': ('e889506c3d12f9f29cda78351e92599d1628ed15', [(" 'checkout.html':{},", " 'checkout.html':{},\n 'returns.html':{order:'ref'},")]), 'public/sign-in.html': ('0e6a4032e20093c0aa5b79aa620494a17fa23872', [('./shopdrop-auth-return-199ha.js?v=199m', './shopdrop-auth-return-199ha.js?v=199o')]), 'public/register.html': ('9e95ce4351f4f2488397564b093365ea753249d9', [('./shopdrop-auth-return-199ha.js?v=199m', './shopdrop-auth-return-199ha.js?v=199o')]), 'public/returns.html': ('73238b1f5197bdcd7a7296827025ab1cdeb926bf', [('<script src="./supabase-adapter.js"></script>', '<script src="./supabase-adapter.js"></script>\n<script src="./shopdrop-auth-return-199ha.js?v=199o"></script>'), ("document.getElementById('open').onclick=async()=>{", "function appendAuthReturn199o(message,error,orderReference){\n const reason=String(error?.message||'');\n if(!['Please sign in to Shop&Drop first.','Session expired. Please sign in again.','Authenticated Shop&Drop session required.'].includes(reason))return;\n const ref=String(orderReference||'');\n const candidate='returns.html'+(/^[A-Za-z0-9_-]{1,80}$/.test(ref)?'?order='+encodeURIComponent(ref):'');\n const next=window.ShopDropReturn199h?.safe(candidate)||'./returns.html';\n for(const [page,label] of [['sign-in.html','Sign in'],['register.html','Create account']]){\n  const a=document.createElement('a');\n  a.href='./'+page+'?next='+encodeURIComponent(next.slice(2));\n  a.textContent=label;\n  message.append(document.createTextNode(' '),a);\n }\n}\ndocument.getElementById('open').onclick=async()=>{"), ("  msg.textContent=\n   error?.message||\n   'Could not submit dispute. Please try again.';", "  msg.textContent=\n   error?.message||\n   'Could not submit dispute. Please try again.';\n  appendAuthReturn199o(msg,error,orderReference);")])}
+        TEST = "const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');\nconst source=fs.readFileSync(process.argv[2],'utf8');\nconst helper=fs.readFileSync(process.argv[3],'utf8');\nfunction make(page,search=''){\n const window={};\n vm.runInNewContext(source,{window,location:{pathname:'/'+page,search},document:{querySelectorAll:()=>[],addEventListener:()=>{}},URLSearchParams,encodeURIComponent});\n return window.ShopDropReturn199h;\n}\nconst h=make('returns.html'),ref='SD-2026-00001234';\nassert.equal(h.safe('returns.html?order='+ref+'&description=private&pin=123456'),'./returns.html?order='+ref);\nassert.equal(h.safe('returns.html?order=x&order=y'),'./returns.html');\nassert.equal(h.safe('returns.html?order=https%3A%2F%2Fevil.example'),'./returns.html');\nfor(const v of ['https://evil.example/returns.html','//evil.example/returns.html','../returns.html','returns.html#evil','admin.html','javascript:alert(1)'])assert.equal(h.safe(v),null);\nconst status={children:[],append(...v){this.children.push(...v);}};\nconst context={window:{ShopDropReturn199h:h},document:{createElement:()=>({}),createTextNode:s=>s},encodeURIComponent};\nvm.runInNewContext(helper+'\\nthis.run=appendAuthReturn199o;',context);\nfor(const error of ['Please sign in to Shop&Drop first.','Session expired. Please sign in again.','Authenticated Shop&Drop session required.']){\n status.children=[];context.run(status,{message:error},ref);\n assert.equal(status.children.length,4);\n const sign=status.children[1].href,reg=status.children[3].href;\n const signSearch=sign.slice(sign.indexOf('?')),regSearch=reg.slice(reg.indexOf('?'));\n assert.equal(make('sign-in.html',signSearch).requested(),'./returns.html?order='+ref);\n assert.equal(make('register.html',regSearch).requested(),'./returns.html?order='+ref);\n assert.equal(make('register.html',regSearch).authLink('sign-in.html'),sign);\n}\nstatus.children=[];context.run(status,{message:'network failure'},ref);assert.equal(status.children.length,0);\nstatus.children=[];context.run(status,{message:'Session expired. Please sign in again.'},'secret?pin=123456');assert.equal(status.children[1].href,'./sign-in.html?next=returns.html');\nstatus.children=[];context.window.ShopDropReturn199h=undefined;context.run(status,{message:'Session expired. Please sign in again.'},ref);assert.equal(status.children[1].href,'./sign-in.html?next=returns.html');\nassert.equal(h.safe('checkout.html?order=ignored'),'./checkout.html');\nassert.equal(h.safe('service-checkout-193e.html?booking_id=12345678-1234-1234-1234-123456789abc'),'./service-checkout-193e.html?booking_id=12345678-1234-1234-1234-123456789abc');\nconsole.log('PASS: returns authentication, order reference, registration continuity, invalid reference stripping, no private description or PIN, unchanged other destinations.');\n"
+        NEW_HELPER = "function appendAuthReturn199o(message,error,orderReference){\n const reason=String(error?.message||'');\n if(!['Please sign in to Shop&Drop first.','Session expired. Please sign in again.','Authenticated Shop&Drop session required.'].includes(reason))return;\n const ref=String(orderReference||'');\n const candidate='returns.html'+(/^[A-Za-z0-9_-]{1,80}$/.test(ref)?'?order='+encodeURIComponent(ref):'');\n const next=window.ShopDropReturn199h?.safe(candidate)||'./returns.html';\n for(const [page,label] of [['sign-in.html','Sign in'],['register.html','Create account']]){\n  const a=document.createElement('a');\n  a.href='./'+page+'?next='+encodeURIComponent(next.slice(2));\n  a.textContent=label;\n  message.append(document.createTextNode(' '),a);\n }\n}\n"
+        BRANCH = 'shopdrop-phase6-integration'
+        def git(*args):
+            return subprocess.check_output(['git', *map(str,args)], text=True).strip()
+        def blob(data):
+            return hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+        def require(ok, message):
+            if not ok: raise SystemExit('SAFETY STOP: '+message)
+        def update(data, changes):
+            result=data
+            for a,b in changes:
+                a,b=a.encode(),b.encode()
+                require(result.count(a)==1,'unexpected replacement anchor count')
+                result=result.replace(a,b,1)
+            original=result
+            for a,b in reversed(changes):
+                a,b=a.encode(),b.encode()
+                require(original.count(b)==1,'unexpected reverse anchor count')
+                original=original.replace(b,a,1)
+            require(original==data,'unrelated code changed')
+            return result
+        require(os.environ.get('GITHUB_REF_NAME')==BRANCH and git('branch','--show-current')==BRANCH,'incorrect branch')
+        require(not git('status','--porcelain'),'dirty checkout')
+        originals={}; updates={}; backups={}
+        for path,(expected,changes) in PATCHES.items():
+            p=Path(path); b=Path('backups/fix199o')/p
+            require(p.is_file() and not p.is_symlink() and not b.is_symlink(),'unexpected path '+path)
+            backups[path]=b
+            if b.exists():
+                old=b.read_bytes()
+                require(blob(old)==expected and p.read_bytes()==update(old,changes),'partial or modified prior fix '+path)
+                originals[path]=old; updates[path]=p.read_bytes()
+            else:
+                old=p.read_bytes()
+                require(blob(old)==expected,'current source changed '+path)
+                originals[path]=old; updates[path]=update(old,changes)
+        existing=sum(p.exists() for p in backups.values())
+        require(existing in (0,len(PATCHES)),'partial prior backup')
+        class Scripts(HTMLParser):
+            def __init__(self):
+                super().__init__(); self.scripts=[]; self.current=None
+            def handle_starttag(self,tag,attrs):
+                if tag=='script':
+                    attrs=dict(attrs)
+                    self.current=None if 'src' in attrs else (attrs.get('type',''),[])
+            def handle_data(self,data):
+                if self.current is not None: self.current[1].append(data)
+            def handle_endtag(self,tag):
+                if tag=='script' and self.current is not None:
+                    self.scripts.append((self.current[0],''.join(self.current[1]))); self.current=None
+        with tempfile.TemporaryDirectory() as td:
+            t=Path(td)
+            for path,data in updates.items():
+                if path.endswith('.js'):
+                    f=t/Path(path).name;f.write_bytes(data)
+                    subprocess.run(['node','--check',str(f)],check=True)
+                else:
+                    before=Scripts();before.feed(originals[path].decode());after=Scripts();after.feed(data.decode())
+                    if path == 'public/returns.html':
+                        restored=[(kind,code.replace(NEW_HELPER,'').replace(PATCHES[path][1][2][1],PATCHES[path][1][2][0])) for kind,code in after.scripts]
+                        require(before.scripts==restored,'unrelated dispute script changed')
+                    else:
+                        require(before.scripts==after.scripts,'inline operational script changed '+path)
+                    for i,(kind,code) in enumerate(after.scripts):
+                        if kind not in ('','module','text/javascript','application/javascript'): continue
+                        f=t/(Path(path).stem+str(i)+('.mjs' if kind=='module' else '.js'));f.write_text(code)
+                        subprocess.run(['node','--check',str(f)],check=True)
+            test=t/'test.cjs';test.write_text(TEST)
+            say=t/'returns-auth.js';say.write_text(NEW_HELPER)
+            subprocess.run(['node',str(test),str(t/'shopdrop-auth-return-199ha.js'),str(say)],check=True)
+        if existing:
+            print('Already installed; all exact backups and patched files verified.');raise SystemExit(0)
+        for path,data in updates.items():
+            b=backups[path];b.parent.mkdir(parents=True,exist_ok=True);b.write_bytes(originals[path]);Path(path).write_bytes(data)
+            require(b.read_bytes()==originals[path] and Path(path).read_bytes()==data,'write mismatch '+path)
+        require(set(git('diff','--name-only').splitlines())==set(PATCHES),'unexpected tracked changes')
+        allowed=set(PATCHES)|{str(b) for b in backups.values()}
+        subprocess.run(['git','add','--',*sorted(allowed)],check=True)
+        require(set(git('diff','--cached','--name-only').splitlines())==allowed,'unexpected staged changes')
+        require(not git('diff','--name-only') and not git('ls-files','--others','--exclude-standard'),'unrelated files')
+        subprocess.run(['git','diff','--cached','--check','--',*PATCHES],check=True)
+        print('PASS: exact source hashes, reversible patches, preserved unrelated inline scripts, syntax, safe auth links and exact staged paths.')
+        PYCODE
+        if ! git diff --cached --quiet; then
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Fix 199O preserve returns sign-in and order reference'
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
