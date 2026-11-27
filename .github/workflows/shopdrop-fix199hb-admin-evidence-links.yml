@@ -1,0 +1,106 @@
+name: ShopDrop Fix 199H-B Administrator Evidence Links
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix199hb-admin-evidence-links.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - name: Verify and connect administrator evidence links
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import hashlib, subprocess, tempfile
+        from html.parser import HTMLParser
+        FILES={'public/admin-review-cases.html': '167d231d45e59791092c337ff40e39881e4e0166', 'public/dispute-evidence.html': '60b46349a1469926b81e6ea62856517ced98ec9d'}
+        PROTECTED={'public/checkout.html': 'dd5e286a45f5210d1b2617a1ee7d734beff921c3', 'public/shopdrop-payment-selection.js': 'de3c06e87bc2f00b18bb48016932282a3bd328c8', 'public/shopdrop-paid-confirmation-199db.js': '06b9e15e56763aca5a1f8ba46704d78c5bebf28f', 'public/shopdrop-single-courier-199da.js': '8a0e194dc65f1d131b7ca9ad07eea6a32c9cb7ed', 'public/shopdrop-customer-evidence-199gb.js': '5d643f8f42cb11c278a856ab7687e74e75596c8d', 'public/shopdrop-service-appointments-193d.js': 'c9b9df4d2973f46d6ab166b2463c8ef34e427f97', 'public/shopdrop-dispatch-appointments-192dd.js': 'd139934300967800e4d023247e4920984f94cdbc', 'public/financial-statement.html': '3f30b32802b2beaeafd85277420eaa3e46c7b9ab', 'public/shopdrop-auth-return-199ha.js': 'ecc90c95f879f88cc26c8782d6547d35dad6e82f', '.github/workflows/shopdrop-integration-pages.yml': '5ca27368c51150bdf8f19a8cba91438c66436a1f'}
+        PATCHES={'public/admin-review-cases.html': [("button.textContent='Hide submission details';", "if(data.case_type==='payment_dispute_opened'){\n try{\n  const result=await supabase.rpc('shopdrop_admin_submission_evidence_199hb',{p_case_id:record.case_id});\n  const linked=result.data;\n  if(result.error)throw Error('Evidence lookup unavailable');\n  if(linked&&typeof linked.dispute_id==='string'&&/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(linked.dispute_id)&&['product','service','dispatch'].includes(linked.dispute_kind)){\n   const labels={product:'Product',service:'Other Services',dispatch:'Transport'};\n   const evidenceLink=node('a','View '+labels[linked.dispute_kind]+' dispute evidence');\n   evidenceLink.href='./dispute-evidence.html?dispute_id='+encodeURIComponent(linked.dispute_id);\n   const evidenceRow=node('p');evidenceRow.append(evidenceLink);container.append(evidenceRow);\n  }else container.append(node('p','No verified evidence case is linked to this submission.'));\n }catch{container.append(node('p','Evidence link unavailable. Retry submission details.'));}\n}\n\nbutton.textContent='Hide submission details';")], 'public/dispute-evidence.html': [("const {data,error}=await supabase.rpc(\n'shopdrop_admin_dispute_evidence_overview'\n);", "const linkedId=(new URLSearchParams(window.location.search).get('dispute_id')||'').trim().toLowerCase();\nif(new URLSearchParams(window.location.search).has('dispute_id')&&!validUuid(linkedId))throw Error('Invalid dispute reference');\nconst {data,error}=linkedId\n?await supabase.rpc('shopdrop_admin_evidence_for_case_199hb',{p_dispute_id:linkedId})\n:await supabase.rpc('shopdrop_admin_dispute_evidence_overview');"), ("reportMessage.textContent='Evidence records loaded.';", "reportMessage.textContent=linkedId?'Evidence for the selected dispute loaded.':'Evidence records loaded.';"), ('async function loadEvidence(){\nrefresh.disabled=true;', 'async function loadEvidence(){\nrender([]);\nrefresh.disabled=true;'), ('form.reset();\nawait loadEvidence();', 'form.reset();\nawait loadSelectedDispute();\nawait loadEvidence();')]}
+        NEW={'supabase/migrations/20261127091828_shopdrop_fix199hb_admin_dispute_evidence_links.sql': "-- Fix 199H-B: read-only links from support submissions to their exact dispute evidence.\nCREATE FUNCTION public.shopdrop_admin_submission_evidence_199hb(p_case_id uuid)\nRETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO ''\nAS $fn$\nDECLARE e public.integration_events%ROWTYPE; k text; linked uuid;\nBEGIN\n IF auth.uid() IS NULL OR NOT public.shopdrop_is_active_admin() THEN\n  RAISE EXCEPTION 'Administrator access required' USING ERRCODE='42501';\n END IF;\n SELECT * INTO e FROM public.integration_events\n WHERE id=p_case_id AND event_type='payment_dispute_opened';\n IF NOT FOUND OR e.entity_id IS NULL THEN RETURN NULL; END IF;\n k:=shopdrop_service_193c.evidence_case_kind_199gc(e.entity_id);\n IF k='product' AND e.entity_type='dispute' THEN\n  SELECT d.id INTO linked FROM public.disputes d\n  WHERE d.id=e.entity_id AND d.customer_dispute_reference=e.external_reference\n   AND d.buyer_id::text=e.payload->>'user_id' AND d.order_id::text=e.payload->>'order_id';\n ELSIF k='service' AND e.entity_type='service_dispute' THEN\n  SELECT d.id INTO linked FROM public.service_disputes d\n  WHERE d.id=e.entity_id AND d.customer_dispute_reference=e.external_reference\n   AND d.buyer_id::text=e.payload->>'user_id' AND d.booking_id::text=e.payload->>'booking_id';\n ELSIF k='dispatch' AND e.entity_type='dispatch_dispute' THEN\n  SELECT d.id INTO linked FROM public.shopdrop_dispatch_disputes_199gc d\n  WHERE d.id=e.entity_id AND d.customer_dispute_reference=e.external_reference\n   AND d.customer_id::text=e.payload->>'user_id' AND d.booking_id::text=e.payload->>'booking_id';\n END IF;\n IF linked IS NULL THEN RETURN NULL; END IF;\n RETURN jsonb_build_object('dispute_id',linked,'dispute_kind',k,'dispute_reference',e.external_reference);\nEND $fn$;\nREVOKE ALL ON FUNCTION public.shopdrop_admin_submission_evidence_199hb(uuid) FROM PUBLIC,anon,authenticated;\nGRANT EXECUTE ON FUNCTION public.shopdrop_admin_submission_evidence_199hb(uuid) TO authenticated;\n\nCREATE FUNCTION public.shopdrop_admin_evidence_for_case_199hb(p_dispute_id uuid)\nRETURNS TABLE(evidence_id uuid, dispute_id uuid, evidence_type text, description text, mime_type text, file_size_bytes bigint, created_at timestamptz)\nLANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO ''\nAS $fn$\nDECLARE k text;\nBEGIN\n IF auth.uid() IS NULL OR NOT public.shopdrop_is_active_admin() THEN\n  RAISE EXCEPTION 'Administrator access required' USING ERRCODE='42501';\n END IF;\n k:=shopdrop_service_193c.evidence_case_kind_199gc(p_dispute_id);\n IF k IS NULL THEN RAISE EXCEPTION 'Dispute unavailable' USING ERRCODE='P0002'; END IF;\n RETURN QUERY SELECT e.id,p_dispute_id,e.evidence_type,e.description,e.mime_type,e.file_size_bytes,e.created_at\n FROM public.dispute_evidence e\n WHERE (k='product' AND e.dispute_id=p_dispute_id)\n OR (k='service' AND e.service_dispute_id=p_dispute_id)\n OR (k='dispatch' AND e.dispatch_dispute_id=p_dispute_id)\n ORDER BY e.created_at DESC,e.id DESC LIMIT 100;\nEND $fn$;\nREVOKE ALL ON FUNCTION public.shopdrop_admin_evidence_for_case_199hb(uuid) FROM PUBLIC,anon,authenticated;\nGRANT EXECUTE ON FUNCTION public.shopdrop_admin_evidence_for_case_199hb(uuid) TO authenticated;\n", 'docs/SHOPDROP_FIX199HB_ADMIN_EVIDENCE_LINKS.md': '# Fix 199H-B — Administrator dispute evidence links\n\nRead-only navigation and exact-case evidence filtering for physical products, Other Services and Transport. Existing general evidence list remains available without a case parameter. Support event identity is checked against the typed case and transaction identity. Missing or mismatched links fail closed. No payment, payout, PIN, courier, booking or customer code is changed.\n\nSupabase migration already installed; this file synchronizes its exact bytes, not a re-run. Database tests passed for all three categories, wrong booking rejection, isolated evidence results, unknown cases, non-administrator and anonymous denial. Test fixtures rolled back. No real files uploaded. Signed-in browser testing remains on the functional checklist.\n'}
+        MIG='supabase/migrations/20261127091828_shopdrop_fix199hb_admin_dispute_evidence_links.sql'
+        CHECKSUM='3331b3f7b8aa6983e16286a1421f3c85'
+        BACKUP='backups/fix199hb/'
+        def require(ok,msg):
+         if not ok: raise SystemExit(msg)
+        def sha(b): return hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()
+        def transform(p,s):
+         for old,new in PATCHES[p]:
+          require(s.count(old)==1,'Unexpected patch anchor: '+p)
+          s=s.replace(old,new,1)
+         return s
+        class Inline(HTMLParser):
+         def __init__(self):super().__init__();self.active=False;self.buf=[];self.scripts=[]
+         def handle_starttag(self,tag,attrs):
+          if tag=='script' and 'src' not in dict(attrs) and dict(attrs).get('type','') in ('','module','text/javascript','application/javascript'):
+           self.active=True;self.buf=[]
+         def handle_data(self,data):
+          if self.active:self.buf.append(data)
+         def handle_endtag(self,tag):
+          if tag=='script' and self.active:self.scripts.append(''.join(self.buf));self.active=False
+
+        def check_js(s):
+         parser=Inline();parser.feed(s);require(bool(parser.scripts),'No inline script found')
+         for js in parser.scripts:
+          with tempfile.NamedTemporaryFile(suffix='.mjs',mode='w') as f:
+           f.write(js);f.flush();subprocess.run(['node','--check',f.name],check=True)
+        def write_new(p,b):
+         f=Path(p)
+         if f.exists():require(f.read_bytes()==b,'Unexpected existing file: '+p)
+         else:f.parent.mkdir(parents=True,exist_ok=True);f.write_bytes(b)
+        def main():
+         for p,h in PROTECTED.items():require(sha(Path(p).read_bytes())==h,'Protected source differs: '+p)
+         require(hashlib.md5(NEW[MIG].encode()).hexdigest()==CHECKSUM,'Migration checksum differs')
+         original={};updated={}
+         for p,h in FILES.items():
+          live=Path(p).read_bytes();backup=Path(BACKUP+p)
+          old=backup.read_bytes() if backup.exists() else live
+          require(sha(old)==h,'Unexpected original: '+p)
+          new=transform(p,old.decode()).encode();require(live in (old,new),'Unexpected current file: '+p)
+          check_js(new.decode());original[p]=old;updated[p]=new
+         for p,s in NEW.items():
+          if Path(p).exists():require(Path(p).read_bytes()==s.encode(),'Unexpected new file: '+p)
+         for p,b in original.items():write_new(BACKUP+p,b)
+         for p,s in NEW.items():write_new(p,s.encode())
+         for p,b in updated.items():Path(p).write_bytes(b)
+         for p,h in PROTECTED.items():require(sha(Path(p).read_bytes())==h,'Protected source changed: '+p)
+         print('Verified exact source anchors, protected files, inline JavaScript and migration checksum.')
+        if __name__=='__main__':main()
+        PYCODE
+        git config user.name 'github-actions[bot]'
+        git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+        git add -- backups/fix199hb/public/admin-review-cases.html backups/fix199hb/public/dispute-evidence.html docs/SHOPDROP_FIX199HB_ADMIN_EVIDENCE_LINKS.md public/admin-review-cases.html public/dispute-evidence.html supabase/migrations/20261127091828_shopdrop_fix199hb_admin_dispute_evidence_links.sql
+        git diff --cached --check -- public/admin-review-cases.html public/dispute-evidence.html supabase/migrations/20261127091828_shopdrop_fix199hb_admin_dispute_evidence_links.sql docs/SHOPDROP_FIX199HB_ADMIN_EVIDENCE_LINKS.md
+        python3 <<'CHECK'
+        import subprocess
+        allowed={'public/dispute-evidence.html', 'supabase/migrations/20261127091828_shopdrop_fix199hb_admin_dispute_evidence_links.sql', 'docs/SHOPDROP_FIX199HB_ADMIN_EVIDENCE_LINKS.md', 'backups/fix199hb/public/dispute-evidence.html', 'public/admin-review-cases.html', 'backups/fix199hb/public/admin-review-cases.html'}
+        changed=set(subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines())
+        if changed and changed!=allowed:raise SystemExit('Unexpected staged changes: '+str(changed^allowed))
+        CHECK
+        if ! git diff --cached --quiet; then
+         git commit -m "Fix 199H-B connect administrator dispute evidence links"
+         git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
