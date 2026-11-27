@@ -1,0 +1,60 @@
+name: ShopDrop Fix 199I-C2 Payout Worker Sync
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix199ic2-payout-worker-sync.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Synchronize verified backend authorization only
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import hashlib
+        p=Path('supabase/functions/create-payout/index.ts')
+        b=Path('backups/fix199ic2/supabase/functions/create-payout/index.ts')
+        old=b.read_bytes() if b.exists() else p.read_bytes()
+        assert hashlib.sha1(b'blob '+str(len(old)).encode()+b'\0'+old).hexdigest()=='8bf35e7655f6af7168fed4edc3815bf9c747ea2b','Original source changed; stop'
+        s=old.decode().replace('\r\n','\n').strip()
+        anchor='    /*\n     * ========================================================\n     * STEP 1\n'
+        guard='    // Fix 199I-C2: only the trusted backend may start this legacy worker.\n    // A valid customer JWT is not payout-worker authorization.\n    const supplied = (req.headers.get("Authorization") ?? "")\n      .match(/^Bearer ([^\\s]+)$/i)?.[1] ?? "";\n    const encoder = new TextEncoder();\n    const [providedHash, expectedHash] = await Promise.all([\n      crypto.subtle.digest("SHA-256", encoder.encode(supplied)),\n      crypto.subtle.digest("SHA-256", encoder.encode(SERVICE_KEY)),\n    ]);\n    const providedBytes = new Uint8Array(providedHash);\n    const expectedBytes = new Uint8Array(expectedHash);\n    let difference = 0;\n    for (let i = 0; i < expectedBytes.length; i++) {\n      difference |= providedBytes[i] ^ expectedBytes[i];\n    }\n    if (!supplied || difference !== 0) {\n      return reply({ ok: false, error: "worker_authorization_required" }, 403);\n    }\n\n'
+        assert s.count(anchor)==1 and 'worker_authorization_required' not in s
+        new=s.replace(anchor,guard+anchor)
+        assert new.replace(guard,'',1)==s
+        assert new.index('worker_authorization_required')<new.index('await createEligiblePayouts()',new.index(anchor))
+        units=new.encode('utf-16-le')
+        h=2166136261
+        for i in range(0,len(units),2): h=((h^int.from_bytes(units[i:i+2],'little'))*16777619)&0xffffffff
+        assert len(units)//2==39000 and h==0xef8633b6,'Deployed source fingerprint mismatch'
+        data=new.encode()+b'\n'
+        assert p.read_bytes() in (old,data),'Unexpected source changes'
+        b.parent.mkdir(parents=True,exist_ok=True);b.write_bytes(old);p.write_bytes(data)
+        print('Deployed source fingerprint verified; original backed up.')
+        PYCODE
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add -- supabase/functions/create-payout/index.ts backups/fix199ic2/supabase/functions/create-payout/index.ts
+        git diff --cached --check -- . ':!backups/**'
+        python3 <<'CHECK'
+        import subprocess
+        allowed={'supabase/functions/create-payout/index.ts','backups/fix199ic2/supabase/functions/create-payout/index.ts'}
+        changed=set(subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines())
+        assert changed<=allowed
+        CHECK
+        if ! git diff --cached --quiet; then
+         git commit -m "Fix 199I-C2 synchronize payout worker authorization"
+         git push origin HEAD:shopdrop-phase6-integration
+        fi
