@@ -1,0 +1,107 @@
+name: ShopDrop Fix 199F-B Read-Only Financial Statement
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix199fb-financial-statement.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - name: Verify and connect read-only financial reporting
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import hashlib, subprocess, tempfile, re
+        PAGE='public/financial-statement.html'
+        SHA='73f280bb4c77c0757955a463a63f8d03fa8ba153'
+        BACKUP='backups/fix199fb/public/financial-statement.html'
+        MIGRATION='supabase/migrations/20261127060855_shopdrop_fix199fa_admin_financial_records.sql'
+        LEDGER='docs/SHOPDROP_FIX199FB_FINANCIAL_REPORTING.md'
+        PROTECTED={'public/checkout.html': 'dd5e286a45f5210d1b2617a1ee7d734beff921c3', 'public/shopdrop-paid-confirmation-199db.js': '06b9e15e56763aca5a1f8ba46704d78c5bebf28f', 'public/shopdrop-payment-selection.js': 'de3c06e87bc2f00b18bb48016932282a3bd328c8', 'public/shopdrop-single-courier-199da.js': '8a0e194dc65f1d131b7ca9ad07eea6a32c9cb7ed', 'public/shopdrop-reference-display-199dc.js': '08c0a192ea04b0a34335a3cfd1f1b8328fb2cd50', 'public/account.html': '3f72ad4d866210260353d6ef7db0fbce53acb227', 'supabase/functions/courier-quotes/index.ts': 'f6298222b285084d37b12932806c641e9efa90f9', 'supabase/functions/create-payment-session/index.ts': '1bf49f552fc38c4d17c973fae56c423b0b119bae', '.github/workflows/shopdrop-integration-pages.yml': '5ca27368c51150bdf8f19a8cba91438c66436a1f'}
+        PATCHES=[('<button id="refresh" type="button">\nRefresh financial records\n</button>', '<button id="refresh" type="button">\nRefresh financial records\n</button>\n<button id="previous199fb" type="button" disabled>Previous page</button>\n<button id="next199fb" type="button" disabled>Next page</button>'), ('Payment, allocation, refund and seller-payout\nrecords are displayed separately to avoid\ndouble-counting the same transaction.\nA dash indicates information not supplied\nby this reporting function.', 'Payments, allocations, refunds, payout records and release requests are separate records of the same transaction. Do not add these rows or columns to calculate revenue or settlement. Pending and failed amounts are recorded amounts, not money received. A dash means no applicable or supplied amount. Processing and bank charges are not available from this reporting function. Currency is not assumed for records without a stored currency.'), ('<th>Customer payment</th>', '<th>Customer payment (recorded)</th>'), ('<th>Processing</th>', '<th>Release request (not payout)</th>'), ('<th>Payout</th>', '<th>Payout record</th>'), ('<th>Settlement</th>', '<th>Recorded status</th>'), ('Payout eligibility requires the applicable\nverified fulfilment or delivery confirmation.', 'The normal process is automatic: physical-product seller release requires independently verified authorised courier collection; service and transport provider release requires verified customer Completion PIN after the agreed work is complete. This page does not authorize or initiate a release.')]
+        RENDER="function render(records){\n rows.replaceChildren();\n if(!records.length){showRow('No financial records on this page.');return;}\n const categories={product:'Physical products',service:'Other Services',dispatch:'Transport Services & Equipment Hire'};\n const types={payment:'Payment record',refund:'Refund record',seller_payout:'Seller payout record',provider_payout:'Provider payout record',release_request:'Release request — not proof of payout','allocation:seller':'Seller allocation','allocation:shopdrop_commission':'Shop&Drop commission allocation','allocation:courier':'Courier allocation'};\n for(const record of records){\n  const tr=document.createElement('tr');\n  const ref=document.createElement('td');\n  const label=document.createElement('strong');\n  label.textContent=(categories[record.category]||display(record.category))+' — '+(types[record.record_type]||display(record.record_type));\n  ref.append(label);\n  for(const [name,value] of [['Order / booking',record.transaction_reference||record.order_id||record.booking_id],['Advertisement',record.advertisement_references],['Record reference',record.record_reference],['Record ID',record.record_id],['Shipment',record.shipment_id],['Provider reference',record.provider_reference]]){\n   if(value){const p=document.createElement('div');p.textContent=name+': '+String(value);ref.append(p);}\n  }\n  tr.append(ref);\n  for(const field of ['customer_payment','sale_service_amount','shopdrop_fee','courier_amount','release_request_amount','refund_amount','provider_proceeds','payout_amount']){\n   addCell(tr,money(record[field],record.currency));\n  }\n  const status=document.createElement('td');\n  const state=document.createElement('strong');state.textContent=display(record.recorded_status).replaceAll('_',' ');status.append(state);\n  const note=document.createElement('div');note.textContent=record.record_type==='release_request'?'Request status only; not bank settlement.':'Recorded status; not independent bank confirmation.';status.append(note);\n  for(const [label,value] of [['Recorded event',record.recorded_event_at],['Created',record.created_at]]){\n   if(value){const dt=new Date(value);if(!Number.isNaN(dt.getTime())){const p=document.createElement('div');p.textContent=label+': '+dt.toLocaleString('en-ZA');status.append(p);}}\n  }\n  tr.append(status);rows.append(tr);\n }\n}\n\nconst previous=document.getElementById('previous199fb');\nconst next=document.getElementById('next199fb');\nconst PAGE=50;\nlet offset=0,busy=false,generation=0,owner=null;\nfunction showRow(text){rows.replaceChildren();const tr=document.createElement('tr');const td=document.createElement('td');td.colSpan=10;td.textContent=text;tr.append(td);rows.append(tr);}\nfunction clearPrivate(){generation++;owner=null;protectedArea.hidden=true;showRow('Sign in to view financial records.');previous.disabled=true;next.disabled=true;}\nfunction controls(isBusy,hasNext=false){busy=isBusy;refresh.disabled=isBusy;previous.disabled=isBusy||offset===0;next.disabled=isBusy||!hasNext||offset>=100000;}\nasync function loadFinancial(target=0){\n if(busy)return;\n if(!Number.isSafeInteger(target)||target<0||target>100000)return;\n const request=++generation;\n protectedArea.hidden=true;showRow('Loading financial records…');controls(true);\n message.textContent='Loading financial records…';\n let hasNext=false;\n try{\n  if(!await checkAdmin()){clearPrivate();return;}\n  const {data:session,error:sessionError}=await supabase.auth.getUser();\n  if(sessionError||!session?.user||request!==generation){clearPrivate();return;}\n  const userId=session.user.id;owner=userId;\n  // Fetch one additional record to determine if there is another page.\n  const {data,error}=await supabase.rpc('shopdrop_admin_financial_records_199fa',{p_limit:PAGE+1,p_offset:target});\n  if(request!==generation)return;\n  if(error||!Array.isArray(data)||data.length>PAGE+1)throw Error('Financial records unavailable');\n  const {data:current,error:currentError}=await supabase.auth.getUser();\n  if(request!==generation)return;\n  if(currentError||current?.user?.id!==userId){clearPrivate();deny('Administrator sign-in required.');return;}\n  offset=target;hasNext=data.length>PAGE;\n  render(data.slice(0,PAGE));\n  message.textContent=data.length?'Showing records '+(offset+1)+'–'+(offset+Math.min(PAGE,data.length))+'. Read-only.':'No financial records on this page. Read-only.';\n }catch(_){\n  if(request!==generation)return;\n  showRow('Financial records unavailable. Please refresh.');message.textContent='Unable to load financial records.';\n }finally{\n  controls(false,request===generation&&hasNext);\n  if(!owner){previous.disabled=true;next.disabled=true;}\n }\n}\nrefresh.addEventListener('click',()=>loadFinancial(0));\nprevious.addEventListener('click',()=>loadFinancial(Math.max(0,offset-PAGE)));\nnext.addEventListener('click',()=>loadFinancial(offset+PAGE));\nsupabase.auth.onAuthStateChange((event,session)=>{\n if(event==='SIGNED_OUT'||(owner&&session?.user?.id!==owner)){clearPrivate();deny('Administrator sign-in required.');}\n});\nwindow.addEventListener('pagehide',clearPrivate);\nwindow.addEventListener('pageshow',event=>{if(event.persisted)loadFinancial(0);});\nawait loadFinancial(0);\n"
+        SQL="-- Fix 199F-A: read-only administrator reconciliation across all marketplace categories.\n-- Do not aggregate payments, allocations, release requests and payouts as revenue.\n-- Never infer settlement or change payment, refund, release, or payout status.\nCREATE FUNCTION public.shopdrop_admin_financial_records_199fa(p_limit integer DEFAULT 100,p_offset integer DEFAULT 0)\nRETURNS TABLE(category text,record_type text,record_id uuid,order_id uuid,booking_id uuid,shipment_id uuid,\n transaction_reference text,advertisement_references text,record_reference text,provider_reference text,\n recorded_status text,currency text,recorded_amount numeric,customer_payment numeric,sale_service_amount numeric,\n shopdrop_fee numeric,courier_amount numeric,refund_amount numeric,provider_proceeds numeric,payout_amount numeric,\n release_request_amount numeric,recorded_event_at timestamptz,created_at timestamptz)\nLANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO ''\nAS $fn$\nBEGIN\n IF auth.uid() IS NULL OR NOT public.shopdrop_is_active_admin() THEN\n  RAISE EXCEPTION 'Administrator access required' USING ERRCODE='42501';\n END IF;\n IF p_limit IS NULL OR p_limit NOT BETWEEN 1 AND 100 OR p_offset IS NULL OR p_offset NOT BETWEEN 0 AND 100000 THEN\n  RAISE EXCEPTION 'Invalid financial record page' USING ERRCODE='22023';\n END IF;\n RETURN QUERY\n WITH records AS (\n  SELECT 'product'::text cat,'payment'::text kind,p.id rid,p.order_id oid,NULL::uuid bid,NULL::uuid sid,\n   p.payment_reference ref,p.provider_payment_reference pref,p.payment_status st,p.currency cur,p.total_paid amt,\n   p.total_paid customer,p.product_amount sale,p.shopdrop_commission fee,p.courier_amount courier,\n   NULL::numeric refund,p.seller_payout_amount proceeds,NULL::numeric payout,NULL::numeric release,p.paid_at event_at,p.created_at ts\n  FROM public.payments p\n  UNION ALL\n  SELECT 'product','allocation:'||a.allocation_type,a.id,a.order_id,NULL,NULL,\n   NULL,a.provider_settlement_reference,a.status,a.currency,a.amount,\n   NULL,NULL,CASE WHEN a.allocation_type='shopdrop_commission' THEN a.amount END,\n   CASE WHEN a.allocation_type='courier' THEN a.amount END,NULL,\n   CASE WHEN a.allocation_type='seller' THEN a.amount END,NULL,NULL,a.settled_at,a.created_at\n  FROM public.payment_allocations a\n  UNION ALL\n  SELECT 'product','refund',r.id,r.order_id,NULL,NULL,r.refund_reference,r.provider_refund_reference,r.refund_status,\n   p.currency,r.refund_amount,NULL,NULL,NULL,NULL,r.refund_amount,NULL,NULL,NULL,r.processed_at,r.created_at\n  FROM public.refunds r LEFT JOIN public.payments p ON p.id=r.payment_id AND p.order_id=r.order_id\n  UNION ALL\n  SELECT 'product','seller_payout',s.id,s.order_id,NULL,NULL,s.payout_reference,NULL,s.payout_status,o.currency,s.payout_amount,\n   NULL,NULL,NULL,NULL,NULL,NULL,s.payout_amount,NULL,s.paid_at,s.created_at\n  FROM public.seller_payouts s LEFT JOIN public.orders o ON o.id=s.order_id\n  UNION ALL\n  SELECT 'service','payment',p.id,NULL,p.booking_id,NULL,p.payment_reference,NULL,p.payment_status,NULL,p.gross_amount,\n   p.gross_amount,p.provider_amount,p.commission_amount,NULL,NULL,p.provider_amount,NULL,NULL,p.paid_at,p.created_at\n  FROM public.service_payments p\n  UNION ALL\n  SELECT 'service','refund',r.id,NULL,r.booking_id,NULL,r.refund_reference,NULL,r.refund_status,NULL,r.refund_amount,\n   NULL,NULL,NULL,NULL,r.refund_amount,NULL,NULL,NULL,r.processed_at,r.created_at\n  FROM public.service_refunds r\n  UNION ALL\n  SELECT 'service','provider_payout',s.id,NULL,s.booking_id,NULL,s.payout_reference,NULL,s.payout_status,NULL,s.payout_amount,\n   NULL,NULL,NULL,NULL,NULL,NULL,s.payout_amount,NULL,s.paid_at,s.created_at\n  FROM public.service_provider_payouts s\n  UNION ALL\n  SELECT 'dispatch','payment',p.id,NULL,p.booking_id,NULL,p.payment_reference,NULL,p.payment_status,p.currency,p.gross_amount,\n   p.gross_amount,p.provider_amount,p.commission_amount,NULL,NULL,p.provider_amount,NULL,NULL,p.paid_at,p.created_at\n  FROM public.dispatch_payments p\n  UNION ALL\n  SELECT r.booking_type,'release_request',r.id,\n   CASE WHEN r.booking_type='product' THEN sh.order_id END,\n   CASE WHEN r.booking_type IN ('service','dispatch') THEN r.booking_id END,\n   CASE WHEN r.booking_type='product' THEN sh.id END,\n   r.payment_reference,r.provider_release_reference,r.release_status,r.currency,r.amount,\n   NULL,NULL,NULL,NULL,NULL,NULL,NULL,r.amount,NULL,r.created_at\n  FROM public.shopdrop_provider_release_requests r\n  LEFT JOIN public.shipments sh ON r.booking_type='product' AND sh.id=r.booking_id AND sh.seller_id=r.payee_id\n  WHERE r.booking_type IN ('product','service','dispatch')\n ), page AS (\n  SELECT x.* FROM records x ORDER BY x.ts DESC NULLS LAST,x.kind,x.rid DESC LIMIT p_limit OFFSET p_offset\n )\n SELECT x.cat,x.kind,x.rid,x.oid,x.bid,x.sid,\n  CASE WHEN x.cat='product' THEN o.order_reference ELSE x.bid::text END,\n  CASE WHEN x.cat='product' THEN\n    (SELECT string_agg(DISTINCT i.listing_reference_snapshot,', ' ORDER BY i.listing_reference_snapshot)\n     FROM public.order_items i WHERE i.order_id=x.oid)\n   WHEN x.cat='service' THEN sb.advertisement_reference_snapshot\n   WHEN x.cat='dispatch' THEN coalesce(db.advertisement_reference_snapshot,db.offer_reference_snapshot)\n  END,\n  x.ref,x.pref,x.st,x.cur,x.amt,x.customer,x.sale,x.fee,x.courier,x.refund,x.proceeds,x.payout,x.release,x.event_at,x.ts\n FROM page x\n LEFT JOIN public.orders o ON x.cat='product' AND o.id=x.oid\n LEFT JOIN public.service_bookings sb ON x.cat='service' AND sb.id=x.bid\n LEFT JOIN public.dispatch_bookings db ON x.cat='dispatch' AND db.id=x.bid\n ORDER BY x.ts DESC NULLS LAST,x.kind,x.rid DESC;\nEND $fn$;\nREVOKE ALL ON FUNCTION public.shopdrop_admin_financial_records_199fa(integer,integer) FROM PUBLIC,anon,authenticated;\nGRANT EXECUTE ON FUNCTION public.shopdrop_admin_financial_records_199fa(integer,integer) TO authenticated;\n"
+        NOTES='# Fix 199F-B — Read-only financial statement\n\n- Existing administrator-only read function `shopdrop_admin_financial_records_199fa` connected to the financial statement.\n- All three categories; original item/advertisement references, recorded amounts, status, provider references, date and page navigation.\n- No new authorization step: existing administrator security check permits viewing only. No payment, payout, refund, release or approval writes.\n- Separate release requests and payout records; no revenue totals derived from overlapping financial rows. No inferred currency or bank charges.\n- Supabase migration 20261127060855 already installed; exact copy for source history, not executed by this workflow.\n- SQL verification used rolled-back pending product and dispatch payments and failed service payment records; pagination and non-admin denial passed. Positive payout/refund/settlement tests and signed-in browser inspection remain outstanding. No actual funds moved.\n- Existing private customer/provider financial history not changed in this patch. Provider activation and independent settlement verification remain outstanding.\n'
+
+        def git_sha(p):
+         return subprocess.check_output(['git','hash-object',p],text=True).strip()
+        def transform(text):
+         for before,after in PATCHES:
+          if text.count(before)!=1: raise SystemExit('Unexpected source anchor: '+before[:60])
+          text=text.replace(before,after,1)
+         start='function render(records){'
+         end='\n</script>\n</body>\n</html>'
+         if text.count(start)!=1 or text.count(end)!=1: raise SystemExit('Unexpected report module')
+         i=text.index(start);j=text.index(end,i)
+         if 'shopdrop_admin_financial_overview' not in text[i:j]: raise SystemExit('Unexpected report source')
+         text=text[:i]+RENDER+text[j:]
+         if text.count('<th>')!=10 or text.count('shopdrop_admin_financial_records_199fa')!=1: raise SystemExit('Invalid table or RPC')
+         return text
+
+        def check_js(text):
+         scripts=re.findall(r'<script type="module">([\s\S]*?)</script>',text)
+         if len(scripts)!=1: raise SystemExit('Expected one report module')
+         with tempfile.TemporaryDirectory() as d:
+          p=Path(d)/'report.mjs';p.write_text(scripts[0]);subprocess.run(['node','--check',str(p)],check=True)
+         assert 'shopdrop_admin_financial_records_199fa' in scripts[0]
+         assert '.insert(' not in scripts[0] and '.update(' not in scripts[0] and '.delete(' not in scripts[0] and '.upsert(' not in scripts[0]
+         assert set(re.findall(r"supabase\.rpc\(\s*'([^']+)'",scripts[0]))=={'shopdrop_is_active_admin','shopdrop_admin_financial_records_199fa'}
+
+        def write_new(p,content):
+         dest=Path(p);dest.parent.mkdir(parents=True,exist_ok=True)
+         if dest.exists() and dest.read_bytes()!=content: raise SystemExit('Existing file differs: '+p)
+         dest.write_bytes(content)
+
+        def main():
+         for p,expected in PROTECTED.items():
+          if git_sha(p)!=expected:raise SystemExit('Protected file changed: '+p)
+         if hashlib.md5(SQL.encode()).hexdigest()!='cc6a5a13aa5a5048b106b0fb962f774b':raise SystemExit('SQL checksum mismatch')
+         original=Path(PAGE).read_bytes()
+         if git_sha(PAGE)!=SHA:
+          if not Path(BACKUP).exists() or git_sha(BACKUP)!=SHA:raise SystemExit('Financial source differs; no change')
+          if original!=transform(Path(BACKUP).read_text()).encode():raise SystemExit('Unexpected modified financial report')
+          check_js(original.decode());print('Already installed');return
+         updated=transform(original.decode());check_js(updated)
+         write_new(BACKUP,original);write_new(MIGRATION,SQL.encode());write_new(LEDGER,NOTES.encode());Path(PAGE).write_bytes(updated.encode())
+         for p,expected in PROTECTED.items():
+          if git_sha(p)!=expected:raise SystemExit('Protected file changed: '+p)
+         print('Verified read-only report module, original source and exact migration checksum')
+        if __name__=='__main__':main()
+        PYCODE
+        git config user.name 'github-actions[bot]'
+        git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+        git add -- public/financial-statement.html backups/fix199fb/public/financial-statement.html supabase/migrations/20261127060855_shopdrop_fix199fa_admin_financial_records.sql docs/SHOPDROP_FIX199FB_FINANCIAL_REPORTING.md
+        python3 <<'CHECK'
+        import subprocess
+        allowed={'supabase/migrations/20261127060855_shopdrop_fix199fa_admin_financial_records.sql', 'docs/SHOPDROP_FIX199FB_FINANCIAL_REPORTING.md', 'public/financial-statement.html', 'backups/fix199fb/public/financial-statement.html'}
+        changed=set(subprocess.check_output(["git","diff","--cached","--name-only"],text=True).splitlines())
+        if changed and changed!=allowed: raise SystemExit("Unexpected staged changes: "+str(changed^allowed))
+        CHECK
+        if ! git diff --cached --quiet; then
+         git commit -m "Fix 199F-B connect read-only financial statement across all categories"
+         git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
