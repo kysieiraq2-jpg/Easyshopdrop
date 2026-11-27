@@ -90,6 +90,8 @@ payouts can be initiated here.
 <button id="refresh" type="button">
 Refresh financial records
 </button>
+<button id="previous199fb" type="button" disabled>Previous page</button>
+<button id="next199fb" type="button" disabled>Next page</button>
 
 <p id="message" role="status" aria-live="polite"></p>
 
@@ -97,11 +99,7 @@ Refresh financial records
 <h2>Recorded Financial Transactions</h2>
 
 <p class="muted">
-Payment, allocation, refund and seller-payout
-records are displayed separately to avoid
-double-counting the same transaction.
-A dash indicates information not supplied
-by this reporting function.
+Payments, allocations, refunds, payout records and release requests are separate records of the same transaction. Do not add these rows or columns to calculate revenue or settlement. Pending and failed amounts are recorded amounts, not money received. A dash means no applicable or supplied amount. Processing and bank charges are not available from this reporting function. Currency is not assumed for records without a stored currency.
 </p>
 
 <div class="tablewrap">
@@ -109,15 +107,15 @@ by this reporting function.
 <thead>
 <tr>
 <th>Reference</th>
-<th>Customer payment</th>
+<th>Customer payment (recorded)</th>
 <th>Sale/service amount</th>
 <th>Shop&amp;Drop service fee</th>
 <th>Courier</th>
-<th>Processing</th>
+<th>Release request (not payout)</th>
 <th>Refund/adjustment</th>
 <th>Seller/provider proceeds</th>
-<th>Payout</th>
-<th>Settlement</th>
+<th>Payout record</th>
+<th>Recorded status</th>
 </tr>
 </thead>
 
@@ -142,8 +140,7 @@ paid out from Shop&amp;Drop's own bank account.
 
 <p>
 <strong>Seller payout:</strong>
-Payout eligibility requires the applicable
-verified fulfilment or delivery confirmation.
+The normal process is automatic: physical-product seller release requires independently verified authorised courier collection; service and transport provider release requires verified customer Completion PIN after the agreed work is complete. This page does not authorize or initiate a release.
 </p>
 
 <p>
@@ -253,120 +250,79 @@ function addCell(tr,value){
 }
 
 function render(records){
-
  rows.replaceChildren();
-
- if(records.length===0){
-  const tr=document.createElement('tr');
-  const td=document.createElement('td');
-  td.colSpan=10;
-  td.textContent='No financial records available.';
-  tr.appendChild(td);
-  rows.appendChild(tr);
-  return;
- }
-
+ if(!records.length){showRow('No financial records on this page.');return;}
+ const categories={product:'Physical products',service:'Other Services',dispatch:'Transport Services & Equipment Hire'};
+ const types={payment:'Payment record',refund:'Refund record',seller_payout:'Seller payout record',provider_payout:'Provider payout record',release_request:'Release request — not proof of payout','allocation:seller':'Seller allocation','allocation:shopdrop_commission':'Shop&Drop commission allocation','allocation:courier':'Courier allocation'};
  for(const record of records){
-
   const tr=document.createElement('tr');
-  const type=record.record_type;
-  const amount=money(
-   record.amount,
-   record.currency
-  );
-
-  const reference=
-   type+' / '+display(record.record_id);
-
-  const customerPayment=
-   type==='payment'?amount:'—';
-
-  const refund=
-   type==='refund'?amount:'—';
-
-  const payout=
-   type==='seller_payout'?amount:'—';
-
-  const allocation=
-   type==='allocation'?amount:'—';
-
-  const status=
-   display(record.record_status);
-
-  addCell(tr,reference);
-  addCell(tr,customerPayment);
-  addCell(tr,allocation);
-  addCell(tr,'—');
-  addCell(tr,'—');
-  addCell(tr,'—');
-  addCell(tr,refund);
-  addCell(tr,'—');
-  addCell(tr,payout);
-  addCell(tr,status);
-
-  rows.appendChild(tr);
+  const ref=document.createElement('td');
+  const label=document.createElement('strong');
+  label.textContent=(categories[record.category]||display(record.category))+' — '+(types[record.record_type]||display(record.record_type));
+  ref.append(label);
+  for(const [name,value] of [['Order / booking',record.transaction_reference||record.order_id||record.booking_id],['Advertisement',record.advertisement_references],['Record reference',record.record_reference],['Record ID',record.record_id],['Shipment',record.shipment_id],['Provider reference',record.provider_reference]]){
+   if(value){const p=document.createElement('div');p.textContent=name+': '+String(value);ref.append(p);}
+  }
+  tr.append(ref);
+  for(const field of ['customer_payment','sale_service_amount','shopdrop_fee','courier_amount','release_request_amount','refund_amount','provider_proceeds','payout_amount']){
+   addCell(tr,money(record[field],record.currency));
+  }
+  const status=document.createElement('td');
+  const state=document.createElement('strong');state.textContent=display(record.recorded_status).replaceAll('_',' ');status.append(state);
+  const note=document.createElement('div');note.textContent=record.record_type==='release_request'?'Request status only; not bank settlement.':'Recorded status; not independent bank confirmation.';status.append(note);
+  for(const [label,value] of [['Recorded event',record.recorded_event_at],['Created',record.created_at]]){
+   if(value){const dt=new Date(value);if(!Number.isNaN(dt.getTime())){const p=document.createElement('div');p.textContent=label+': '+dt.toLocaleString('en-ZA');status.append(p);}}
+  }
+  tr.append(status);rows.append(tr);
  }
 }
 
-async function loadFinancial(){
-
- refresh.disabled=true;
- message.textContent='Loading financial records...';
-
+const previous=document.getElementById('previous199fb');
+const next=document.getElementById('next199fb');
+const PAGE=50;
+let offset=0,busy=false,generation=0,owner=null;
+function showRow(text){rows.replaceChildren();const tr=document.createElement('tr');const td=document.createElement('td');td.colSpan=10;td.textContent=text;tr.append(td);rows.append(tr);}
+function clearPrivate(){generation++;owner=null;protectedArea.hidden=true;showRow('Sign in to view financial records.');previous.disabled=true;next.disabled=true;}
+function controls(isBusy,hasNext=false){busy=isBusy;refresh.disabled=isBusy;previous.disabled=isBusy||offset===0;next.disabled=isBusy||!hasNext||offset>=100000;}
+async function loadFinancial(target=0){
+ if(busy)return;
+ if(!Number.isSafeInteger(target)||target<0||target>100000)return;
+ const request=++generation;
+ protectedArea.hidden=true;showRow('Loading financial records…');controls(true);
+ message.textContent='Loading financial records…';
+ let hasNext=false;
  try{
-
-  const {data,error}=await supabase.rpc(
-   'shopdrop_admin_financial_overview'
-  );
-
-  if(error)throw error;
-
-  if(!Array.isArray(data)){
-   throw Error('Invalid financial response.');
-  }
-
-  render(data);
-
-  message.textContent=
-   'Financial records loaded successfully. Read-only.';
-
- }catch(error){
-
-  rows.replaceChildren();
-
-  const tr=document.createElement('tr');
-  const td=document.createElement('td');
-  td.colSpan=10;
-  td.textContent=
-   'Financial records unavailable. Please refresh.';
-  tr.appendChild(td);
-  rows.appendChild(tr);
-
-  message.textContent=
-   'Unable to load financial records.';
-
+  if(!await checkAdmin()){clearPrivate();return;}
+  const {data:session,error:sessionError}=await supabase.auth.getUser();
+  if(sessionError||!session?.user||request!==generation){clearPrivate();return;}
+  const userId=session.user.id;owner=userId;
+  // Fetch one additional record to determine if there is another page.
+  const {data,error}=await supabase.rpc('shopdrop_admin_financial_records_199fa',{p_limit:PAGE+1,p_offset:target});
+  if(request!==generation)return;
+  if(error||!Array.isArray(data)||data.length>PAGE+1)throw Error('Financial records unavailable');
+  const {data:current,error:currentError}=await supabase.auth.getUser();
+  if(request!==generation)return;
+  if(currentError||current?.user?.id!==userId){clearPrivate();deny('Administrator sign-in required.');return;}
+  offset=target;hasNext=data.length>PAGE;
+  render(data.slice(0,PAGE));
+  message.textContent=data.length?'Showing records '+(offset+1)+'–'+(offset+Math.min(PAGE,data.length))+'. Read-only.':'No financial records on this page. Read-only.';
+ }catch(_){
+  if(request!==generation)return;
+  showRow('Financial records unavailable. Please refresh.');message.textContent='Unable to load financial records.';
  }finally{
-  refresh.disabled=false;
+  controls(false,request===generation&&hasNext);
+  if(!owner){previous.disabled=true;next.disabled=true;}
  }
 }
-
-refresh.addEventListener('click',async()=>{
-
- refresh.disabled=true;
-
- try{
-  if(await checkAdmin()){
-   await loadFinancial();
-  }
- }finally{
-  refresh.disabled=false;
- }
-
+refresh.addEventListener('click',()=>loadFinancial(0));
+previous.addEventListener('click',()=>loadFinancial(Math.max(0,offset-PAGE)));
+next.addEventListener('click',()=>loadFinancial(offset+PAGE));
+supabase.auth.onAuthStateChange((event,session)=>{
+ if(event==='SIGNED_OUT'||(owner&&session?.user?.id!==owner)){clearPrivate();deny('Administrator sign-in required.');}
 });
-
-if(await checkAdmin()){
- await loadFinancial();
-}
+window.addEventListener('pagehide',clearPrivate);
+window.addEventListener('pageshow',event=>{if(event.persisted)loadFinancial(0);});
+await loadFinancial(0);
 
 </script>
 </body>
