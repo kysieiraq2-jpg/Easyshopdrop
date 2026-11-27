@@ -1,0 +1,51 @@
+name: ShopDrop Fix 199I-B Private Records Sync
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix199ib-private-records-sync.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Record verified database correction only
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import hashlib
+        FILES = {'supabase/migrations/20261127124459_shopdrop_fix199ib_private_integration_records.sql': '-- Fix 199I-B: remove legacy permissive access without altering transaction procedures.\nREVOKE ALL ON public.shopdrop_public_vehicle_adverts, public.shopdrop_public_vehicle_ad_photos FROM PUBLIC, anon, authenticated;\nGRANT SELECT ON public.shopdrop_public_vehicle_adverts, public.shopdrop_public_vehicle_ad_photos TO anon, authenticated;\n\nDROP POLICY IF EXISTS "V26 integration events authenticated insert" ON public.integration_events;\nDROP POLICY IF EXISTS "V26 integration events authenticated select" ON public.integration_events;\nDROP POLICY IF EXISTS shopdrop_support_events_private_read_199b ON public.integration_events;\nDROP POLICY IF EXISTS shopdrop_support_events_server_insert_199b ON public.integration_events;\nDROP POLICY IF EXISTS "V26 integration logs authenticated select" ON public.integration_logs;\nDROP POLICY IF EXISTS "V26 webhook events authenticated select" ON public.webhook_events;\n\nREVOKE ALL ON public.integration_events, public.integration_logs, public.webhook_events FROM PUBLIC, anon, authenticated;\nGRANT SELECT ON public.integration_events, public.integration_logs, public.webhook_events TO authenticated;\nCREATE POLICY shopdrop_integration_events_private_read_199ib ON public.integration_events FOR SELECT TO authenticated\nUSING ((SELECT public.shopdrop_is_active_admin()) OR (\nevent_type IN (\'platform_feedback\',\'payment_dispute_opened\',\'cancellation_requested\',\'listing_report_submitted\')\nAND (payload->>\'user_id\')=(SELECT auth.uid())::text));\nCREATE POLICY shopdrop_integration_logs_admin_read_199ib ON public.integration_logs FOR SELECT TO authenticated\nUSING ((SELECT public.shopdrop_is_active_admin()));\nCREATE POLICY shopdrop_webhook_events_admin_read_199ib ON public.webhook_events FOR SELECT TO authenticated\nUSING ((SELECT public.shopdrop_is_active_admin()));\n', 'docs/SHOPDROP_FIX199IB_PRIVATE_RECORDS.md': '# Fix 199I-B — Private integration records\n\nApplied to Supabase on 27 November 2026, migration 20261127124459.\nMigration MD5: `fc25434ffb6a4fdf0d7bff21d61e7579`.\n\n- Public vehicle advertisement and photo views retain SELECT for anonymous and authenticated users; mutation grants removed.\n- Internal events: authenticated users read their own supported case events only; active administrators retain read access.\n- Integration logs and webhook records: active administrators only; anonymous access and ordinary client writes removed.\n- Service-role grants retained. No changes to transaction procedures, Edge Functions, public pages or provider configuration.\n\nLive database rollback tests passed: customer scope, administrator access and existing case RPC, anonymous/client mutation restrictions, public-view read grants, service-role access. Test records rolled back.\n\nThis workflow records the already applied SQL. It does not execute SQL, deploy functions, or activate any provider. Signed-in browser regression testing remains on the functional test checklist.\n'}
+        assert hashlib.md5(FILES['supabase/migrations/20261127124459_shopdrop_fix199ib_private_integration_records.sql'].encode()).hexdigest() == 'fc25434ffb6a4fdf0d7bff21d61e7579'
+        for name,content in FILES.items():
+         p=Path(name); data=content.encode()
+         if p.exists():
+          assert p.read_bytes()==data, 'Unexpected existing file: '+name
+         else:
+          p.parent.mkdir(parents=True,exist_ok=True)
+          p.write_bytes(data)
+        print('Verified exact deployed migration; no frontend or function changes.')
+        PYCODE
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add -- supabase/migrations/20261127124459_shopdrop_fix199ib_private_integration_records.sql docs/SHOPDROP_FIX199IB_PRIVATE_RECORDS.md
+        git diff --cached --check
+        python3 <<'CHECK'
+        import subprocess
+        allowed={'docs/SHOPDROP_FIX199IB_PRIVATE_RECORDS.md', 'supabase/migrations/20261127124459_shopdrop_fix199ib_private_integration_records.sql'}
+        changed=set(subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines())
+        assert changed <= allowed, 'Unexpected changed paths'
+        CHECK
+        if ! git diff --cached --quiet; then
+         git commit -m "Fix 199I-B synchronize private integration records migration"
+         git push origin HEAD:shopdrop-phase6-integration
+        fi
