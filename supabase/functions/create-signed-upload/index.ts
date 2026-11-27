@@ -1,4 +1,3 @@
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -168,6 +167,20 @@ Deno.serve(async (req) => {
 
     const fileSize = Number(body?.file_size);
 
+    // Fix 199I-A: private evidence follows the case-checked Storage/RPC path.
+    // Courier proof is backend-only. Do not mint customer upload tickets for either bucket.
+    if (uploadType === "dispute_evidence" || uploadType === "proof_of_delivery") {
+      return json(
+        {
+          code: "protected_evidence_upload_required",
+          user_message: uploadType === "dispute_evidence"
+            ? "Use My Dispute Evidence to upload evidence for your existing case."
+            : "Proof of delivery is recorded through the verified courier process.",
+        },
+        403,
+      );
+    }
+
     const config = uploadTypes[uploadType];
 
     if (!config) {
@@ -274,4 +287,3 @@ Deno.serve(async (req) => {
     );
   }
 });
-
