@@ -1,0 +1,51 @@
+name: ShopDrop Fix 199I-C1 Payout Profile Sync
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix199ic1-payout-profile-sync.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Record verified database correction only
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import hashlib
+        FILES = {'supabase/migrations/20261127133057_shopdrop_fix199ic1_payout_profile_protection.sql': '-- Fix 199I-C1: provider-verified payout profiles are backend-managed.\n-- Preserve private owner read access; no change to payout execution.\nDROP POLICY IF EXISTS "V26 own payout profile delete" ON public.payout_profiles;\nDROP POLICY IF EXISTS "V26 own payout profile insert" ON public.payout_profiles;\nDROP POLICY IF EXISTS "V26 own payout profile update" ON public.payout_profiles;\nREVOKE ALL ON public.payout_profiles FROM PUBLIC, anon, authenticated;\nGRANT SELECT ON public.payout_profiles TO authenticated;\n', 'docs/SHOPDROP_FIX199IC1_PAYOUT_PROFILE_PROTECTION.md': '# Fix 199I-C1 — Payout profile protection\n\nApplied to Supabase on 27 November 2026, migration 20261127133057.\nMigration MD5: `3765427da343b803ef2049e35e61e21d`.\n\n- Removed client insert, update and delete access to legacy payout profiles.\n- Retained authenticated owner-only read access and trusted backend permissions.\n- Verified owner privacy, blocked self-verification and preserved backend grants using rolled-back test records.\n- No change to payout execution, frontend, Edge Functions or provider configuration.\n\nThe audit also identified a legacy create-payout function referencing seller_payout_profiles, which was not present in the queried public schema. Its compatibility with the selected provider-held settlement model remains to be audited before activation. No provider was activated or paid.\n\nThis installer records the already-applied migration; it does not execute SQL.\n'}
+        assert hashlib.md5(FILES['supabase/migrations/20261127133057_shopdrop_fix199ic1_payout_profile_protection.sql'].encode()).hexdigest() == '3765427da343b803ef2049e35e61e21d'
+        for name,content in FILES.items():
+         p=Path(name); data=content.encode()
+         if p.exists():
+          assert p.read_bytes()==data, 'Unexpected existing file: '+name
+         else:
+          p.parent.mkdir(parents=True,exist_ok=True)
+          p.write_bytes(data)
+        print('Verified exact deployed migration; no frontend or function changes.')
+        PYCODE
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add -- supabase/migrations/20261127133057_shopdrop_fix199ic1_payout_profile_protection.sql docs/SHOPDROP_FIX199IC1_PAYOUT_PROFILE_PROTECTION.md
+        git diff --cached --check
+        python3 <<'CHECK'
+        import subprocess
+        allowed={'docs/SHOPDROP_FIX199IC1_PAYOUT_PROFILE_PROTECTION.md', 'supabase/migrations/20261127133057_shopdrop_fix199ic1_payout_profile_protection.sql'}
+        changed=set(subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines())
+        assert changed <= allowed, 'Unexpected changed paths'
+        CHECK
+        if ! git diff --cached --quiet; then
+         git commit -m "Fix 199I-C1 synchronize payout profile protection migration"
+         git push origin HEAD:shopdrop-phase6-integration
+        fi
