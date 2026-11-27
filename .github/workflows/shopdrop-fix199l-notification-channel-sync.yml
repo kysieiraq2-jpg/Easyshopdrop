@@ -1,0 +1,75 @@
+name: ShopDrop Fix 199L Notification Channel Sync
+'on':
+  push:
+    branches: [shopdrop-phase6-integration]
+    paths: [.github/workflows/shopdrop-fix199l-notification-channel-sync.yml]
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: shopdrop-fix199l-sync
+  cancel-in-progress: false
+jobs:
+  sync:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+      - name: Record already deployed and verified changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PYCODE'
+          from pathlib import Path
+          import hashlib, subprocess, os
+          OLD = b'  const { data: messages, error: claimError } =\n    await admin.rpc(\n      "claim_outbox_messages",\n      {\n        p_limit: 5,\n      },\n    );'
+          NEW = b'  // Fix 199L: disabled channels remain pending without consuming attempts.\n  const enabledChannels: string[] = [];\n  if (env("SHOPDROP_EMAIL_ENABLED") === "true") {\n    enabledChannels.push("email");\n  }\n  if (env("SHOPDROP_WHATSAPP_ENABLED") === "true") {\n    enabledChannels.push("whatsapp");\n  }\n  if (enabledChannels.length === 0) {\n    return reply({\n      ok: true,\n      enabled: true,\n      claimed: 0,\n      sent: 0,\n      failed: 0,\n      held: 0,\n    });\n  }\n\n  const { data: messages, error: claimError } =\n    await admin.rpc(\n      "shopdrop_claim_outbox_channels_199l",\n      {\n        p_limit: 5,\n        p_channels: enabledChannels,\n      },\n    );'
+          SQL = b"-- Fix 199L: select only enabled notification channels; preserve existing claim RPC.\nCREATE FUNCTION public.shopdrop_claim_outbox_channels_199l(p_limit integer, p_channels text[])\nRETURNS SETOF public.message_outbox\nLANGUAGE plpgsql\nSECURITY DEFINER\nSET search_path TO ''\nAS $function$\nBEGIN\n  IF auth.role() IS DISTINCT FROM 'service_role' THEN\n    RAISE EXCEPTION 'backend_only';\n  END IF;\n  IF p_channels IS NULL OR cardinality(p_channels)=0 THEN\n    RETURN;\n  END IF;\n  IF EXISTS (SELECT 1 FROM unnest(p_channels) c WHERE c IS NULL OR c NOT IN ('email','whatsapp')) THEN\n    RAISE EXCEPTION 'unsupported_channel';\n  END IF;\n  RETURN QUERY\n  WITH claimed AS (\n    SELECT m.id\n    FROM public.message_outbox m\n    WHERE m.status = 'pending'\n      AND m.channel = ANY(p_channels)\n      AND m.next_attempt_at <= now()\n      AND m.attempt_count < m.max_attempts\n    ORDER BY m.created_at\n    FOR UPDATE SKIP LOCKED\n    LIMIT least(greatest(p_limit, 1), 25)\n  )\n  UPDATE public.message_outbox m\n  SET status = 'processing',\n      attempt_count = m.attempt_count + 1,\n      updated_at = now()\n  FROM claimed\n  WHERE m.id = claimed.id\n  RETURNING m.*;\nEND;\n$function$;\nREVOKE ALL ON FUNCTION public.shopdrop_claim_outbox_channels_199l(integer,text[]) FROM PUBLIC, anon, authenticated;\nGRANT EXECUTE ON FUNCTION public.shopdrop_claim_outbox_channels_199l(integer,text[]) TO service_role;\n"
+          SRC = Path('supabase/functions/Send-Notifications/index.ts')
+          MIG = Path('supabase/migrations/20261127151009_shopdrop_fix199l_notification_channel_claim.sql')
+          BACK = Path('backups/fix199l/Send-Notifications-index.ts')
+          OLD_SHA = 'd108cb339522969d4e5d0827651d65437fcc7b53'
+          NEW_SHA = '0314ea39796040bbabebe5658d9b6e0032fac4ee'
+          BRANCH = 'shopdrop-phase6-integration'
+          def git(*a):
+              return subprocess.check_output(['git', *map(str,a)], text=True).strip()
+          def blob(b):
+              return hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()
+          def require(ok, msg):
+              if not ok: raise SystemExit('SAFETY STOP: '+msg)
+          require(os.environ.get('GITHUB_REF_NAME') == BRANCH and git('branch','--show-current') == BRANCH, 'wrong branch')
+          require(not git('status','--porcelain'), 'dirty checkout')
+          for p in (SRC,MIG,BACK):
+              require(not p.is_symlink(), 'symlink: '+str(p))
+          original = SRC.read_bytes()
+          if blob(original) == NEW_SHA:
+              require(BACK.is_file() and blob(BACK.read_bytes()) == OLD_SHA and MIG.is_file() and MIG.read_bytes() == SQL, 'partial or inconsistent prior sync')
+              print('Already synchronized; exact hashes verified.')
+              raise SystemExit(0)
+          require(blob(original)==OLD_SHA, 'worker source changed')
+          require(not BACK.exists() and not MIG.exists(), 'unexpected existing archive/migration')
+          require(original.count(OLD)==1 and NEW not in original,'anchor mismatch')
+          updated=original.replace(OLD,NEW,1)
+          require(blob(updated)==NEW_SHA and updated.replace(NEW,OLD,1)==original,'deployed code mismatch')
+          BACK.parent.mkdir(parents=True,exist_ok=True)
+          MIG.parent.mkdir(parents=True,exist_ok=True)
+          BACK.write_bytes(original)
+          MIG.write_bytes(SQL)
+          SRC.write_bytes(updated)
+          require(blob(BACK.read_bytes())==OLD_SHA and blob(SRC.read_bytes())==NEW_SHA and MIG.read_bytes()==SQL,'write verification failed')
+          subprocess.run(['git','add','--',str(SRC),str(MIG),str(BACK)],check=True)
+          require(set(git('diff','--cached','--name-only').splitlines())=={str(SRC),str(MIG),str(BACK)},'unexpected staged files')
+          require(not git('diff','--name-only'),'unexpected unstaged changes')
+          # Backup is an exact historic source; check new edits separately to avoid legacy whitespace.
+          subprocess.run(['git','diff','--cached','--check','--',str(SRC),str(MIG)],check=True)
+          print('PASS: exact deployed worker, original backup, and applied SQL recorded. No deployment or SQL execution.')
+          PYCODE
+          if ! git diff --cached --quiet; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'Fix 199L synchronize verified notification channel correction'
+            git push origin HEAD:shopdrop-phase6-integration
+          fi
