@@ -21,7 +21,8 @@ else {
  const country=field('Country code (ISO 2 letters, e.g. ZA)','country_code',true);
  const button=document.createElement('button');button.type='submit';button.textContent='Save private contact details';form.append(button);
  const message=document.createElement('p');message.setAttribute('role','status');message.setAttribute('aria-live','polite');panel.append(message);
- const host=document.querySelector('main');host?.append(panel);
+ const host=document.querySelector('main');const profileSection=document.getElementById('shopdropAccountProfile199r');
+ if(profileSection)profileSection.after(panel);else host?.append(panel);
  const [{data:profile,error:profileError},{data:addresses,error:addressError}]=await Promise.all([
   sb.from('profiles').select('full_name,mobile_number,country_code').eq('id',user.id).maybeSingle(),
   sb.from('addresses').select('id,recipient_name,mobile_number,address_label,address_line_1,address_line_2,city,state_province,postal_code,country_code,is_default').eq('user_id',user.id).eq('is_default',true).limit(1)

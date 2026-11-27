@@ -129,8 +129,9 @@ a{color:#0f766e}
 <a href="./returns.html">Open Returns & Disputes Centre</a>
 </section>
 
-<section class="panel">
+<section class="panel" id="shopdropAccountProfile199r">
 <h2>Account & profile</h2>
+<p id="shopdropProfileSignIn199r"><a href="./sign-in.html?next=account.html%23shopdropAccountProfile199r">Sign in to manage your private details</a></p>
 <p class="muted">When signed in, manage your profile and contact details, saved delivery addresses, password/security settings and notification preferences here.</p>
 </section>
 
@@ -401,6 +402,8 @@ if(error||!user){
 
  who.append(signout);
  document.getElementById('shopdropPaymentPurpose195a').hidden=false;
+ document.getElementById('shopdropProfileSignIn199r').hidden=true;
+ if(location.hash==='#shopdropPaymentPurpose195a')document.getElementById('shopdropPaymentPurpose195a').scrollIntoView();
 // Fix39: seller records the courier reference; independent courier evidence is also mandatory.
 // Browser never authorizes payments or treats this reference as proof of collection.
 const pickupForm=document.getElementById('sellerCourierPickupForm');
@@ -563,7 +566,7 @@ pickupForm.addEventListener('submit',async event=>{
 </script>
 
 <script src="v26-bridge.js"></script>
-<script type="module" src="./shopdrop-private-contact.js"></script>
+<script type="module" src="./shopdrop-private-contact.js?v=199r"></script>
 <script defer src="./shopdrop-paid-booking-contacts.js"></script>
 <script defer src="./shopdrop-service-schedule-ui.js"></script>
 <script defer src="./shopdrop-dispatch-schedule-ui.js"></script>
@@ -602,5 +605,6 @@ pickupForm.addEventListener('submit',async event=>{
 
 <script defer src="./shopdrop-seller-alias.js?v=52"></script>
 <script defer src="shopdrop-seller-language.js"></script>
+<script src="./shopdrop-auth-return-199ha.js?v=199r"></script>
 </body>
 </html>

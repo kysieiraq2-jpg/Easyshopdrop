@@ -26,20 +26,22 @@ const rules=Object.freeze({
  'dispatch-appointments-192dd.html':{role:'role',booking_id:'uuid',item:'uuid',from_notification:'flag'},
  'customer-dispute-evidence-199gb.html':{dispute_id:'uuid',booking_type:'type',booking_id:'uuid',role:'role'}
 });
+const accountSections=new Set(['orders','seller-courier-pickup-panel','shopdropPaymentPurpose195a','notifications','shopdropAccountProfile199r']);
 const valid={uuid:v=>/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v),ref:v=>/^[A-Za-z0-9_-]{1,120}$/.test(v),token:v=>/^[a-z_]{1,32}$/.test(v),role:v=>['customer','provider','buyer','seller'].includes(v),type:v=>['service','dispatch'].includes(v),flag:v=>v==='1'};
 function safe(raw){
  if(typeof raw!=='string'||raw.length>900)return null;
- const match=/^(?:\.\/)?([a-z0-9-]+\.html)(?:\?([^#]*))?$/.exec(raw);
+ const match=/^(?:\.\/)?([a-z0-9-]+\.html)(?:\?([^#]*))?(?:#([A-Za-z0-9-]+))?$/.exec(raw);
  if(!match||!Object.hasOwn(rules,match[1]))return null;
+ if(match[3]&&(match[1]!=='account.html'||!accountSections.has(match[3])))return null;
  const out=new URLSearchParams(),input=new URLSearchParams(match[2]||'');
  for(const [key,type] of Object.entries(rules[match[1]])){
   const values=input.getAll(key);if(values.length===1&&valid[type](values[0]))out.set(key,values[0]);
  }
- return './'+match[1]+(out.size?'?'+out.toString():'');
+ return './'+match[1]+(out.size?'?'+out.toString():'')+(match[3]?'#'+match[3]:'');
 }
 const page=location.pathname.split('/').pop();
 function requested(){return safe(new URLSearchParams(location.search).get('next'));}
-function current(){return safe(page+location.search);}
+function current(){return safe(page+location.search+(location.hash||''));}
 function authLink(target){
  if(target!=='sign-in.html'&&target!=='register.html')return null;
  const next=(page==='sign-in.html'||page==='register.html')?requested():current();
