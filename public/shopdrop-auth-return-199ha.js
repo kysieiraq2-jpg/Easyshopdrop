@@ -5,6 +5,8 @@ const rules=Object.freeze({
  'sell-item.html':{},
  'account.html':{},
  'checkout.html':{},
+ 'my-product-advertisements-194d.html':{},
+ 'shopdrop-provider-completion.html':{booking_type:'type',booking_id:'uuid'},
  'returns.html':{order:'ref'},
  'order.html':{'id':'ref'},
  'product-orders-194f.html':{'role':'role'},

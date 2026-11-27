@@ -69,6 +69,7 @@ I confirm that I am the assigned provider, that the agreed job has been complete
 <p class="muted">Successful verification records completion and prepares the payment-release request. Funds are not transferred until an approved payment provider is activated and confirms settlement.</p>
 </section>
 </main>
+<script src="./shopdrop-auth-return-199ha.js?v=199q"></script>
 <script type="module">
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
 const sb=createClient(
@@ -172,7 +173,7 @@ try{
   $('loginStatus').replaceChildren();
   $('loginStatus').append('Please sign in before confirming completed work. ');
   const a=document.createElement('a');
-  a.href='./sign-in.html';
+  a.href=window.ShopDropReturn199h?.authLink('sign-in.html')||'./sign-in.html';
   a.textContent='Sign in';
   $('loginStatus').append(a);
   $('submitButton').disabled=true;
