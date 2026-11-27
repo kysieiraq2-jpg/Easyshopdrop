@@ -1,0 +1,85 @@
+name: ShopDrop Fix 199P Availability Navigation
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix199p-availability-navigation.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: shopdrop-fix199p
+  cancel-in-progress: false
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+        persist-credentials: true
+    - name: Connect availability page to existing provider tools
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 <<'PYCODE'
+        from pathlib import Path
+        from html.parser import HTMLParser
+        from urllib.parse import urlsplit, parse_qs
+        import hashlib, os, subprocess
+        BRANCH='shopdrop-phase6-integration'
+        TARGET=Path('public/availability.html')
+        BACKUP=Path('backups/fix199p/public/availability.html')
+        EXPECTED='3a973bd2a8785bd1688da3f260c7fd58abfb3684'
+        NEW=b'<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Availability &amp; Appointments | Shop&amp;Drop</title>\n<style>*{box-sizing:border-box}body{margin:0;background:#f3f5f8;color:#17202a;font:16px/1.5 Arial,sans-serif}main{max-width:760px;margin:auto;padding:20px 14px 40px}.panel{background:#fff;border:1px solid #dce2ea;border-radius:12px;padding:18px;margin:14px 0}h1{font-size:clamp(24px,5vw,32px);line-height:1.2}h2{font-size:21px}a{color:#0f766e}.action{display:block;background:#0f766e;color:#fff;text-align:center;text-decoration:none;font-weight:bold;padding:14px;margin:12px 0;border-radius:8px;min-height:50px}a:focus-visible{outline:3px solid #17202a;outline-offset:3px}.muted{color:#475569}</style></head>\n<body><main><a href="./my-purchases-sales-198j.html?v=199a">\xe2\x86\x90 My Account</a>\n<h1>Provider Availability &amp; Appointments</h1>\n<p>Set availability when entering the rates and operating times for your advertisement. View requests and confirmed appointments in the matching division below.</p>\n<section class="panel"><h2>Other Services</h2><p>Use the service advertisement form to specify rates and availability. Review requests and appointments through your provider account.</p>\n<a class="action" href="./seller.html#list-service">Advertise a service / set its availability</a>\n<a class="action" href="./service-appointments-193d.html?role=provider">My service requests and appointments</a></section>\n<section class="panel"><h2>Transport Services &amp; Equipment Hire</h2><p>Set rates and operating times for your transport or equipment advertisement. Use the existing rate management and appointment tools.</p>\n<a class="action" href="./shopdrop-vehicle-draft-private.html">Advertise transport / set its availability</a>\n<a class="action" href="./shopdrop-vehicle-draft-private.html#shopdrop-dispatch-rate-manager">Manage my existing transport rates</a>\n<a class="action" href="./dispatch-appointments-192dd.html?role=provider">My transport requests and appointments</a></section>\n<p class="muted">Availability belongs to the individual advertisement and rate. Use the appropriate provider tools; this page does not create or change any booking, cancel an existing appointment, or collect payment.</p>\n<a href="./my-purchases-sales-198j.html?v=199a">Back to My Account</a></main></body></html>\n'
+        LINKS=['./dispatch-appointments-192dd.html?role=provider', './my-purchases-sales-198j.html?v=199a', './seller.html#list-service', './service-appointments-193d.html?role=provider', './shopdrop-vehicle-draft-private.html', './shopdrop-vehicle-draft-private.html#shopdrop-dispatch-rate-manager']
+        def require(ok,msg):
+            if not ok: raise SystemExit('SAFETY STOP: '+msg)
+        def git(*args): return subprocess.check_output(['git',*map(str,args)],text=True).strip()
+        def blob(b): return hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()
+        require(os.environ.get('GITHUB_REF_NAME')==BRANCH and git('branch','--show-current')==BRANCH,'wrong branch')
+        require(not git('status','--porcelain'),'dirty checkout')
+        require(TARGET.is_file() and not TARGET.is_symlink() and not BACKUP.is_symlink(),'unexpected path')
+        if BACKUP.exists():
+            require(blob(BACKUP.read_bytes())==EXPECTED and TARGET.read_bytes()==NEW,'partial or modified prior fix')
+            print('Already installed; no changes'); raise SystemExit(0)
+        original=TARGET.read_bytes()
+        require(blob(original)==EXPECTED,'source changed')
+        require(b'id="availabilityForm"' in original and b'Save Availability' in original,'legacy placeholder changed')
+        class Page(HTMLParser):
+            def __init__(self): super().__init__(); self.links=[]; self.tags=[]
+            def handle_starttag(self,tag,attrs):
+                self.tags.append(tag); attrs=dict(attrs)
+                if tag=='a': self.links.append(attrs.get('href',''))
+        page=Page(); page.feed(NEW.decode())
+        require(set(page.links)==set(LINKS),'unexpected link set')
+        require(not set(page.tags)&{'form','input','script','button'},'unexpected mutation control')
+        for href in page.links:
+            u=urlsplit(href); require(not u.scheme and not u.netloc and u.path.startswith('./'),'external link')
+            p=Path('public')/u.path[2:]; require(p.is_file() and not p.is_symlink(),'missing destination '+str(p))
+            if u.path.endswith('appointments-193d.html') or u.path.endswith('appointments-192dd.html'):
+                require(parse_qs(u.query)=={'role':['provider']} and 'value="provider"' in p.read_text(),'provider role not supported')
+        require('id="list-service"' in Path('public/seller.html').read_text(),'service form missing')
+        require('shopdrop-dispatch-rate-management.js' in Path('public/shopdrop-vehicle-draft-private.html').read_text(),'rate manager not loaded')
+        require("section.id = 'shopdrop-dispatch-rate-manager'" in Path('public/shopdrop-dispatch-rate-management.js').read_text(),'rate manager anchor missing')
+        BACKUP.parent.mkdir(parents=True,exist_ok=True); BACKUP.write_bytes(original); TARGET.write_bytes(NEW)
+        require(BACKUP.read_bytes()==original and TARGET.read_bytes()==NEW,'write verification failed')
+        git('add',TARGET,BACKUP)
+        require(set(git('diff','--cached','--name-only').splitlines())=={str(TARGET),str(BACKUP)},'unexpected staged paths')
+        git('diff','--cached','--check')
+        print('PASS: exact legacy backup, local links, provider roles, existing destinations, no new booking or payment controls')
+        PYCODE
+        if git diff --cached --quiet; then exit 0; fi
+        git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Fix 199P connect availability page to existing provider tools'
+        git push origin HEAD:shopdrop-phase6-integration
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
