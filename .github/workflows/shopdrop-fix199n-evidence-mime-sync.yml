@@ -1,0 +1,60 @@
+name: ShopDrop Fix 199N Evidence MIME Sync
+'on':
+  push:
+    branches: [shopdrop-phase6-integration]
+    paths: [.github/workflows/shopdrop-fix199n-evidence-mime-sync.yml]
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: shopdrop-fix199n-sync
+  cancel-in-progress: false
+jobs:
+  sync:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+      - name: Record already-applied and verified migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PYCODE'
+          from pathlib import Path
+          import os, subprocess, hashlib
+          SQL = b"DO $fix199n$\nDECLARE\n  original text := pg_get_functiondef('public.shopdrop_register_dispute_evidence(uuid,text,text,text,text)'::regprocedure);\n  anchor constant text := 'if v_mime not in (''image/jpeg'',''image/png'',''image/webp'',''application/pdf'')';\n  replacement constant text := 'if v_mime is null or v_mime not in (''image/jpeg'',''image/png'',''image/webp'',''application/pdf'')';\n  updated text;\nBEGIN\n  IF md5(original) <> '5401ec4a515781972aae424c66618a36' THEN\n    RAISE EXCEPTION 'Fix199N: unexpected evidence registration source';\n  END IF;\n  IF (length(original)-length(replace(original,anchor,'')))/length(anchor) <> 1 THEN\n    RAISE EXCEPTION 'Fix199N: expected MIME condition not unique';\n  END IF;\n  updated := replace(original,anchor,replacement);\n  IF replace(updated,replacement,anchor) <> original THEN\n    RAISE EXCEPTION 'Fix199N: unrelated code changed';\n  END IF;\n  EXECUTE updated;\n  IF pg_get_functiondef('public.shopdrop_register_dispute_evidence(uuid,text,text,text,text)'::regprocedure) <> updated THEN\n    RAISE EXCEPTION 'Fix199N: verification failed';\n  END IF;\nEND;\n$fix199n$;\n"
+          PRIOR = Path('supabase/migrations/20261127082526_shopdrop_fix199gc1_typed_dispute_evidence.sql')
+          MIG = Path('supabase/migrations/20261127152818_shopdrop_fix199n_evidence_mime_validation.sql')
+          EXPECTED = '456ae0eae37151abf96648454479300395357286'
+          BRANCH = 'shopdrop-phase6-integration'
+          def git(*args):
+              return subprocess.check_output(['git', *map(str,args)],text=True).strip()
+          def require(ok, message):
+              if not ok: raise SystemExit('SAFETY STOP: '+message)
+          def blob(data):
+              return hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+          require(os.environ.get('GITHUB_REF_NAME')==BRANCH and git('branch','--show-current')==BRANCH,'wrong branch')
+          require(not git('status','--porcelain'),'dirty checkout')
+          require(not any(p.is_symlink() for target in (PRIOR,MIG) for p in (target,*target.parents)),'symlink detected')
+          require(PRIOR.is_file() and blob(PRIOR.read_bytes())==EXPECTED,'prior migration differs from verified source')
+          if MIG.exists():
+              require(MIG.is_file() and MIG.read_bytes()==SQL,'migration already exists with different content')
+              print('Already synchronized; exact SQL verified.')
+              raise SystemExit(0)
+          MIG.write_bytes(SQL)
+          require(MIG.read_bytes()==SQL,'write verification failed')
+          subprocess.run(['git','add','--',str(MIG)],check=True)
+          require(git('diff','--cached','--name-only')==str(MIG),'unexpected staged files')
+          require(not git('diff','--name-only'),'unexpected unstaged changes')
+          subprocess.run(['git','diff','--cached','--check','--',str(MIG)],check=True)
+          print('PASS: recorded exact already-applied migration. No SQL execution, deployment or other source changes.')
+          PYCODE
+          if ! git diff --cached --quiet; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'Fix 199N synchronize verified evidence MIME validation'
+            git push origin HEAD:shopdrop-phase6-integration
+          fi
