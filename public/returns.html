@@ -290,6 +290,7 @@
 
 <!-- FIX 4: Reuse existing authenticated Supabase adapter -->
 <script src="./supabase-adapter.js"></script>
+<script src="./shopdrop-auth-return-199ha.js?v=199o"></script>
 
 <script>
 /*
@@ -309,6 +310,19 @@
  link.addEventListener('click',sync);
  sync();
 })();
+function appendAuthReturn199o(message,error,orderReference){
+ const reason=String(error?.message||'');
+ if(!['Please sign in to Shop&Drop first.','Session expired. Please sign in again.','Authenticated Shop&Drop session required.'].includes(reason))return;
+ const ref=String(orderReference||'');
+ const candidate='returns.html'+(/^[A-Za-z0-9_-]{1,80}$/.test(ref)?'?order='+encodeURIComponent(ref):'');
+ const next=window.ShopDropReturn199h?.safe(candidate)||'./returns.html';
+ for(const [page,label] of [['sign-in.html','Sign in'],['register.html','Create account']]){
+  const a=document.createElement('a');
+  a.href='./'+page+'?next='+encodeURIComponent(next.slice(2));
+  a.textContent=label;
+  message.append(document.createTextNode(' '),a);
+ }
+}
 document.getElementById('open').onclick=async()=>{
  const orderId=document.getElementById('orderId');
  const reason=document.getElementById('reason');
@@ -377,6 +391,7 @@ document.getElementById('open').onclick=async()=>{
   msg.textContent=
    error?.message||
    'Could not submit dispute. Please try again.';
+  appendAuthReturn199o(msg,error,orderReference);
  }finally{
   button.disabled=false;
  }
