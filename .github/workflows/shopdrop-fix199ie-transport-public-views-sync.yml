@@ -1,0 +1,46 @@
+name: ShopDrop Fix 199I-E Transport Public Views Sync
+'on':
+  push:
+    branches: [shopdrop-phase6-integration]
+    paths: [.github/workflows/shopdrop-fix199ie-transport-public-views-sync.yml]
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+      - name: Record verified database migration only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+          python3 <<'PYCODE'
+          from pathlib import Path
+          import hashlib
+          files = {'supabase/migrations/20261127144727_shopdrop_fix199ie_transport_public_views.sql': "CREATE SCHEMA shopdrop_transport_public_199ie;\nREVOKE ALL ON SCHEMA shopdrop_transport_public_199ie FROM PUBLIC;\nGRANT USAGE ON SCHEMA shopdrop_transport_public_199ie TO anon, authenticated, service_role;\nCREATE FUNCTION shopdrop_transport_public_199ie.adverts()\nRETURNS TABLE (id uuid, vehicle_title text, vehicle_description text, vehicle_type text, base_town text, base_province text, coverage_mode text, covered_areas text[], created_at timestamptz)\nLANGUAGE sql STABLE SECURITY DEFINER SET search_path = ''\nAS $$ SELECT v.id,v.vehicle_title,v.vehicle_description,v.vehicle_type,v.base_town,v.base_province,v.coverage_mode,v.covered_areas,v.created_at FROM public.shopdrop_vehicle_adverts v WHERE v.listing_status = 'approved' $$;\nCREATE FUNCTION shopdrop_transport_public_199ie.photos()\nRETURNS TABLE (vehicle_advert_id uuid, photo_position integer, storage_bucket text, storage_path text)\nLANGUAGE sql STABLE SECURITY DEFINER SET search_path = ''\nAS $$ SELECT p.vehicle_advert_id,p.photo_position,p.storage_bucket,p.storage_path FROM public.shopdrop_vehicle_ad_photos p JOIN public.shopdrop_vehicle_adverts v ON v.id=p.vehicle_advert_id WHERE v.listing_status = 'approved' AND p.storage_bucket = 'shopdrop-vehicle-ad-gallery' $$;\nREVOKE ALL ON FUNCTION shopdrop_transport_public_199ie.adverts(), shopdrop_transport_public_199ie.photos() FROM PUBLIC;\nGRANT EXECUTE ON FUNCTION shopdrop_transport_public_199ie.adverts(), shopdrop_transport_public_199ie.photos() TO anon, authenticated, service_role;\nCREATE OR REPLACE VIEW public.shopdrop_public_vehicle_adverts WITH (security_invoker=true, security_barrier=true) AS SELECT id,vehicle_title,vehicle_description,vehicle_type,base_town,base_province,coverage_mode,covered_areas,created_at FROM shopdrop_transport_public_199ie.adverts();\nCREATE OR REPLACE VIEW public.shopdrop_public_vehicle_ad_photos WITH (security_invoker=true, security_barrier=true) AS SELECT vehicle_advert_id,photo_position,storage_bucket,storage_path FROM shopdrop_transport_public_199ie.photos();\n", 'docs/SHOPDROP_FIX199IE_TRANSPORT_PUBLIC_VIEWS.md': '# Fix 199I-E — Transport public views\n\nApplied migration 20261127144727 in Supabase. SHA256: 9d49355cc7c7f54b0c30927fbde60024fa475aad1c01d8b88d32f41621c2d88f.\nRollback assertions passed for anonymous, authenticated non-owner and owner access to published and draft advert/photo metadata. Both views verified as security invoker and security barrier after installation. Private storage bucket retained. No test records remain. No frontend, payment or publication trigger changes. Actual photo download and browser tests remain outstanding. This workflow records SQL only; it does not execute SQL.\n'}
+          assert hashlib.sha256(files['supabase/migrations/20261127144727_shopdrop_fix199ie_transport_public_views.sql'].encode()).hexdigest() == '9d49355cc7c7f54b0c30927fbde60024fa475aad1c01d8b88d32f41621c2d88f'
+          for name,content in files.items():
+              f=Path(name)
+              if f.exists():
+                  assert f.read_bytes()==content.encode(), 'Unexpected existing file: '+name
+              else:
+                  f.parent.mkdir(parents=True,exist_ok=True)
+                  f.write_bytes(content.encode())
+          PYCODE
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- supabase/migrations/20261127144727_shopdrop_fix199ie_transport_public_views.sql docs/SHOPDROP_FIX199IE_TRANSPORT_PUBLIC_VIEWS.md
+          git diff --cached --check
+          python3 <<'CHECK'
+          import subprocess
+          assert set(subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines()) <= {'docs/SHOPDROP_FIX199IE_TRANSPORT_PUBLIC_VIEWS.md', 'supabase/migrations/20261127144727_shopdrop_fix199ie_transport_public_views.sql'}
+          CHECK
+          if ! git diff --cached --quiet; then
+            git commit -m 'Fix 199I-E synchronize transport public views migration'
+            git push origin HEAD:shopdrop-phase6-integration
+          fi
