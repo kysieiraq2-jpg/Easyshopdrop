@@ -187,6 +187,7 @@
       actions.append(link(provider?'Confirm completion and view payment release':'My Completion PIN and payment release','./service-completion-status-193g.html?booking_type=dispatch&booking_id='+encodeURIComponent(row.booking_id)));
     }
     if(row.booking_id&&['pending_payment','confirmed'].includes(row.booking_status))actions.append(link('Request Cancellation','./cancellations.html?kind=transport&reference='+encodeURIComponent(row.booking_id)));
+    if((typeof row.booking_id==='string'&&/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(row.booking_id))&&(row.payment_status==='paid'||row.booking_status==='disputed'))actions.append(link(provider?'View dispute / attach evidence':'Report a problem / attach evidence','./customer-dispute-evidence-199gb.html?booking_type=dispatch&booking_id='+encodeURIComponent(row.booking_id)+'&role='+(provider?'provider':'customer')));
     card.append(actions,msg);list.append(card);
   }
   async function load(notice=''){

@@ -93,6 +93,7 @@
     if(row.booking_status==='completed'&&row.payment_status==='paid')actions.append(link('View completion and payment release','./service-completion-status-193g.html?booking_type=service&booking_id='+encodeURIComponent(row.booking_id)));
     card.append(el('p','Booking reference: '+row.booking_id));
     if(!inactive&&!['arrival_verified','completed'].includes(row.booking_status))actions.append(link('Request Cancellation','./cancellations.html?kind=service&reference='+encodeURIComponent(row.booking_id)));
+    if((uuid(row.booking_id))&&(row.payment_status==='paid'||row.booking_status==='disputed'))actions.append(link(provider?'View dispute / attach evidence':'Report a problem / attach evidence','./customer-dispute-evidence-199gb.html?booking_type=service&booking_id='+encodeURIComponent(row.booking_id)+'&role='+(provider?'provider':'customer')));
     card.append(actions,feedback);list.append(card);
   }
   async function load(notice=''){
