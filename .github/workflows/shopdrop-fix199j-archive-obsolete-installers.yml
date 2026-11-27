@@ -1,0 +1,104 @@
+name: ShopDrop Fix 199J Archive Obsolete Installers
+'on':
+  push:
+    branches: [shopdrop-phase6-integration]
+    paths: [.github/workflows/shopdrop-fix199j-archive-obsolete-installers.yml]
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: shopdrop-fix199j-archive
+  cancel-in-progress: false
+jobs:
+  archive:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+      - name: Verify and archive historical one-time installers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PYCODE'
+          from pathlib import Path
+          import subprocess
+          import os
+
+          EXPECTED = {'shopdrop-fix40-seller-photos.yml': '331da9d5974b5a2361470f19cb7094dacf8309e4', 'shopdrop-fix40-repair.yml': '2fdcee6582b55f14fe9b92f4cb032852cea93183', 'shopdrop-fix70-dropdown-cleanup.yml': '973b715f6b2faf04b0cd250b6cfbbd7fae72e9de', 'shopdrop-fix71-dropdown-repair.yml': 'a56546e0f0d0b9dd5cd891aaaaf23d1c9e6f62d4', 'shopdrop-fix178a-photo-upload-guard.yml': 'c8d793805612e61ea6b1f0515f0c29aae44cf6a2', 'shopdrop-fix181a-province-dropdown.yml': 'c6e66f8ee0e254f806d0f1e49c9561a4fd509212', 'shopdrop-fix185e-province-first.yml': '9f89a3a9c6e727c605e7fbb8c93b02323cf9501f'}
+          SOURCE = Path('.github/workflows')
+          ARCHIVE = Path('backups/fix199j/retired-workflows')
+          BRANCH = 'shopdrop-phase6-integration'
+
+          def git(*args):
+              return subprocess.check_output(['git', *map(str, args)], text=True).strip()
+
+          def require(ok, message):
+              if not ok:
+                  raise SystemExit('SAFETY STOP: ' + message)
+
+          def blob(path):
+              return git('hash-object', '--no-filters', path)
+
+          require(os.environ.get('GITHUB_REF_NAME') == BRANCH, 'wrong event branch')
+          require(git('branch', '--show-current') == BRANCH, 'wrong checkout branch')
+          require(not git('status', '--porcelain'), 'checkout is not clean')
+
+          # Validate every source and destination before touching any file.
+          # A complete previous archive is a verified no-op; mixed state is rejected.
+          states = []
+          for name, expected in EXPECTED.items():
+              src, dst = SOURCE / name, ARCHIVE / name
+              require(not src.is_symlink() and not dst.is_symlink(), 'symlink: ' + name)
+              if src.is_file() and not dst.exists():
+                  require(blob(src) == expected, 'source changed: ' + name)
+                  require(git('ls-files', '--', src) == str(src), 'source not tracked: ' + name)
+                  states.append('pending')
+              elif not src.exists() and dst.is_file():
+                  require(blob(dst) == expected, 'archived bytes differ: ' + name)
+                  require(git('ls-files', '--', dst) == str(dst), 'archive not tracked: ' + name)
+                  states.append('done')
+              else:
+                  require(False, 'missing or conflicting archive/source: ' + name)
+
+          if all(s == 'done' for s in states):
+              print('Already archived: exact original hashes verified. No changes.')
+              raise SystemExit(0)
+          require(all(s == 'pending' for s in states), 'partial archive; manual inspection required')
+          require(not ARCHIVE.exists(), 'unexpected archive directory')
+          ARCHIVE.mkdir(parents=True)
+          for name in EXPECTED:
+              subprocess.run(['git', 'mv', '--', str(SOURCE / name), str(ARCHIVE / name)], check=True)
+
+          # Exact source bytes preserved. Only seven installer relocations are staged.
+          allowed = {str(folder / name) for folder in (SOURCE, ARCHIVE) for name in EXPECTED}
+          actual = set(git('diff', '--cached', '--name-only', '--no-renames').splitlines())
+          require(actual == allowed, 'unexpected staged paths')
+          for name, expected in EXPECTED.items():
+              src, dst = SOURCE / name, ARCHIVE / name
+              require(not src.exists() and blob(dst) == expected, 'archive verification failed: ' + name)
+              require(git('rev-parse', ':' + str(dst)) == expected, 'staged archive differs: ' + name)
+          # Exact renames avoid modifying original whitespace in legacy source.
+          expected_renames = {'R100\t' + str(SOURCE / name) + '\t' + str(ARCHIVE / name) for name in EXPECTED}
+          require(set(git('diff', '--cached', '--name-status', '-M100%').splitlines()) == expected_renames, 'not byte-identical renames')
+          subprocess.run(['git', 'diff', '--cached', '--check', '-M100%'], check=True)
+          require(not git('diff', '--name-only'), 'unstaged changes detected')
+          print('PASS: seven exact historical installer relocations; no website, SQL, or active deployment code changed.')
+          PYCODE
+      - name: Commit exact archives to integration branch only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = shopdrop-phase6-integration
+          test "$(git branch --show-current)" = shopdrop-phase6-integration
+          if git diff --cached --quiet; then
+            echo 'Already archived; no changes required.'
+            exit 0
+          fi
+          git diff --cached --check -M100%
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Fix 199J archive obsolete one-time installers without runtime changes'
+          git push origin HEAD:shopdrop-phase6-integration
