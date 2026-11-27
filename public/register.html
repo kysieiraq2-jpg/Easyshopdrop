@@ -4,7 +4,7 @@ import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
 const supabase=createClient('https://dtkdvvxpwonywtsgqmdx.supabase.co','sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q',{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 const form=document.getElementById('form');
 const message=document.getElementById('message');
-if(new URLSearchParams(location.search).get('next')==='sell-item.html'){const link=document.querySelector('a[href="./sign-in.html"]');if(link)link.href='./sign-in.html?next=sell-item.html';}
+// Safe authentication return links are connected by Fix 199H-A.
 form.addEventListener('submit',async e=>{
  e.preventDefault();
  const button=form.querySelector('button');button.disabled=true;
@@ -24,9 +24,9 @@ form.addEventListener('submit',async e=>{
   const {data,error}=await supabase.auth.signUp({email,password,options:{data:{full_name:fullName,mobile_number:mobileNumber,shopdrop_public_alias:publicAlias}}});
   if(error)throw error;
   document.getElementById('password').value='';
-  if(data.session){const next=new URLSearchParams(location.search).get('next');if(next==='sell-item.html'){window.location.assign('./sell-item.html');return;}ShopDrop.msg(message,'Account created. You can now buy or advertise items.');}
+  if(data.session){const next=window.ShopDropReturn199h?.requested();if(next){window.location.assign(next);return;}ShopDrop.msg(message,'Account created. You can now buy or advertise items.');}
   else{ShopDrop.msg(message,'Registration received. If email confirmation is required, confirm it first, then sign in to continue.');}
  }catch(err){ShopDrop.msg(message,err.message||'Registration could not be completed.','error');}
  finally{button.disabled=false;}
 });
-</script><script src="v26-bridge.js"></script><script defer src="shopdrop-account-language.js"></script><script defer src="shopdrop-form-language.js"></script></body></html>
+</script><script src="v26-bridge.js"></script><script defer src="shopdrop-account-language.js"></script><script defer src="shopdrop-form-language.js"></script><script src="./shopdrop-auth-return-199ha.js?v=199ha"></script></body></html>

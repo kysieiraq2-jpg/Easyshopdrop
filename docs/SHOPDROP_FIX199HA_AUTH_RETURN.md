@@ -1,0 +1,3 @@
+# Fix 199H-A — Customer navigation
+
+Verified source audit: 30 customer-facing pages, no missing literal local file links in that sample. Confirmed sign-in and registration previously retained only sell-item.html. This fix preserves allowed order, dispute, booking and role references for selected customer pages and rejects external destinations and arbitrary query fields. No private contact fields, financial operations, provider activation, admin permissions or backend changes. Existing registration confirmation behavior remains unchanged when no session is returned. Actual signed-in mobile testing remains outstanding; additional dynamic routes and test pages still require audit.
