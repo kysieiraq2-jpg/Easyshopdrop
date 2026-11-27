@@ -7,6 +7,7 @@
   if(!role||!heading||!reload||!status||!list)return;
   const params=new URLSearchParams(location.search);
   if(params.get('role')==='provider')role.value='provider';
+  let notificationTargetPending199eb=params.get('from_notification')==='1';
   const uuid=v=>typeof v==='string'&&/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v);
   const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
   const money=v=>new Intl.NumberFormat('en-ZA',{style:'currency',currency:'ZAR'}).format(Number(v));
@@ -96,14 +97,25 @@
   }
   async function load(notice=''){
     if(busy)return;busy=true;role.disabled=true;reload.disabled=true;list.replaceChildren();message(status,'Loading your private appointments…');
-    const provider=role.value==='provider';heading.textContent=provider?'Requests for My Service Advertisements':'My Service Appointments';
+    let provider=role.value==='provider';heading.textContent=provider?'Requests for My Service Advertisements':'My Service Appointments';
     try{
-      const rows=await rpc('shopdrop_service_appointments_193d',{p_as_provider:provider});
+      let rows=await rpc('shopdrop_service_appointments_193d',{p_as_provider:provider});
       if(!Array.isArray(rows))throw Error('Invalid appointment response');
+      const notificationTarget=params.get('booking_id');
+      if(notificationTargetPending199eb&&uuid(notificationTarget)){
+        if(!rows.some(r=>r.booking_id===notificationTarget)){
+          const alternate=await rpc('shopdrop_service_appointments_193d',{p_as_provider:!provider});
+          if(!Array.isArray(alternate))throw Error('Invalid appointment response');
+          if(alternate.some(r=>r.booking_id===notificationTarget)){provider=!provider;role.value=provider?'provider':'customer';rows=alternate;}
+        }
+        if(!rows.some(r=>r.booking_id===notificationTarget))notice='The linked appointment is unavailable in your account.';
+        notificationTargetPending199eb=false;
+        heading.textContent=provider?'Requests for My Service Advertisements':'My Service Appointments';
+      }
       await window.ShopDropReferences199dc?.attach(rows,rpc,'service_booking','booking_id');
       message(status,(notice?notice+' ':'')+(rows.length?rows.length+' appointment(s).':provider?'No requests for your service advertisements.':'You have no service appointments yet.'));
       if(!rows.length&&!provider)list.append(link('Search Other Services','./services.html?view=search'));
-      const target=params.get('booking_id');const ordered=uuid(target)&&!provider?[...rows].sort((a,b)=>Number(b.booking_id===target)-Number(a.booking_id===target)):rows;
+      const target=params.get('booking_id');const ordered=uuid(target)&&(!provider||params.get('from_notification')==='1')?[...rows].sort((a,b)=>Number(b.booking_id===target)-Number(a.booking_id===target)):rows;
       for(const row of ordered)render(row,provider);
     }catch(e){fail(status,e);}finally{busy=false;role.disabled=false;reload.disabled=false;}
   }

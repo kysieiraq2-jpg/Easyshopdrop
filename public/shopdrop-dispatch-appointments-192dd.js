@@ -9,6 +9,7 @@
   if(!role||!reload||!status||!list) return;
   const params=new URLSearchParams(location.search);
   if(params.get('role')==='provider') role.value='provider';
+  let notificationTargetPending199eb=params.get('from_notification')==='1';
   let clientPromise, locationsPromise, busy=false;
   const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
   const money=n=>new Intl.NumberFormat('en-ZA',{style:'currency',currency:'ZAR'}).format(Number(n));
@@ -190,8 +191,18 @@
   }
   async function load(notice=''){
     if(busy)return;busy=true;role.disabled=true;reload.disabled=true;list.replaceChildren();status.textContent='Loading your private appointments…';
-    try{const provider=role.value==='provider';const rows=await rpc('shopdrop_dispatch_bag_appointments_192dd',{p_as_provider:provider});if(!Array.isArray(rows))throw Error('Invalid response');
-      await window.ShopDropReferences199dc?.dispatch(rows,rpc);status.textContent=(notice?notice+' ':'')+(rows.length?`${rows.length} appointment selection(s).`:provider?'No appointment requests for your advertisements.':'No Transport Bag selections yet.');if(!rows.length&&!provider)list.append(link('Search Transport Services & Equipment Hire','./transport-search.html'));const target=params.get('item');const ordered=target&&!provider?[...rows].sort((a,b)=>Number(b.id===target)-Number(a.id===target)):rows;for(const row of ordered)render(row,provider);}
+    try{let provider=role.value==='provider';let rows=await rpc('shopdrop_dispatch_bag_appointments_192dd',{p_as_provider:provider});if(!Array.isArray(rows))throw Error('Invalid response');
+      const notificationTarget=params.get('booking_id');
+      if(notificationTargetPending199eb&&typeof notificationTarget==='string'&&/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(notificationTarget)){
+        if(!rows.some(r=>r.booking_id===notificationTarget)){
+          const alternate=await rpc('shopdrop_dispatch_bag_appointments_192dd',{p_as_provider:!provider});
+          if(!Array.isArray(alternate))throw Error('Invalid response');
+          if(alternate.some(r=>r.booking_id===notificationTarget)){provider=!provider;role.value=provider?'provider':'customer';rows=alternate;}
+        }
+        if(!rows.some(r=>r.booking_id===notificationTarget))notice='The linked appointment is unavailable in your account.';
+        notificationTargetPending199eb=false;
+      }
+      await window.ShopDropReferences199dc?.dispatch(rows,rpc);status.textContent=(notice?notice+' ':'')+(rows.length?`${rows.length} appointment selection(s).`:provider?'No appointment requests for your advertisements.':'No Transport Bag selections yet.');if(!rows.length&&!provider)list.append(link('Search Transport Services & Equipment Hire','./transport-search.html'));const bookingTarget=params.get('from_notification')==='1'?params.get('booking_id'):null;const target=params.get('item');const ordered=bookingTarget?[...rows].sort((a,b)=>Number(b.booking_id===bookingTarget)-Number(a.booking_id===bookingTarget)):target&&!provider?[...rows].sort((a,b)=>Number(b.id===target)-Number(a.id===target)):rows;for(const row of ordered)render(row,provider);}
     catch(e){displayError(status,e);}finally{busy=false;role.disabled=false;reload.disabled=false;}
   }
   role.addEventListener('change',()=>load());reload.addEventListener('click',()=>load());load();

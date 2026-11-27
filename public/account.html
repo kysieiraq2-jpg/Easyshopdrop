@@ -274,83 +274,88 @@ async function loadMyOrders(userId){
 }
 const notifications=document.getElementById('notifications');
 
+// Fix 199E-B: private account notifications, typed destinations and read receipts.
+let notificationGeneration199eb=0;
+let notificationOwner199eb=null;
+const notificationUuid199eb=value=>typeof value==='string'&&/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value);
+function clearNotifications199eb(){
+ notificationGeneration199eb++;
+ notificationOwner199eb=null;
+ notifications.textContent='Sign in to view your notifications.';
+}
+supabase.auth.onAuthStateChange((event,session)=>{
+ if(event==='SIGNED_OUT'||(notificationOwner199eb&&session?.user?.id!==notificationOwner199eb))clearNotifications199eb();
+});
+function notificationLink199eb(item){
+ const targets=[
+  [item.related_order_id,'Open order','./order.html?id='],
+  [item.service_booking_id||item.booking_id,'Open service appointment','./service-appointments-193d.html?from_notification=1&booking_id='],
+  [item.dispatch_booking_id,'Open transport appointment','./dispatch-appointments-192dd.html?from_notification=1&booking_id=']
+ ].filter(([id])=>notificationUuid199eb(id));
+ if(targets.length!==1)return null;
+ const [id,label,path]=targets[0];
+ const link=document.createElement('a');
+ link.textContent=label;link.href=path+encodeURIComponent(id);
+ return link;
+}
 async function loadMyNotifications(userId){
+ const generation=++notificationGeneration199eb;
+ notificationOwner199eb=userId;
+ const current=()=>generation===notificationGeneration199eb&&notificationOwner199eb===userId;
  notifications.textContent='Loading your notifications…';
  try{
-  // Existing Supabase RLS restricts both tables to their owners.
-  // Read only: leave message queues and delivery workers untouched.
   const [general,service]=await Promise.all([
    supabase.from('notifications')
-    .select('id,notification_type,title,message,is_read,created_at')
-    .eq('user_id',userId)
-    .order('created_at',{ascending:false})
-    .limit(30),
+    .select('id,notification_type,title,message,is_read,created_at,related_order_id,service_booking_id,dispatch_booking_id')
+    .eq('user_id',userId).order('created_at',{ascending:false}).limit(30),
    supabase.from('service_notifications')
-    .select('id,notification_type,title,message,is_read,created_at')
-    .eq('user_id',userId)
-    .order('created_at',{ascending:false})
-    .limit(30)
+    .select('id,notification_type,title,message,is_read,created_at,booking_id,dispatch_booking_id')
+    .eq('user_id',userId).order('created_at',{ascending:false}).limit(30)
   ]);
-
-  if(general.error||service.error)throw new Error('Notification read failed');
-
+  const {data:owner,error:ownerError}=await supabase.auth.getUser();
+  if(!current())return;
+  if(ownerError||owner?.user?.id!==userId){clearNotifications199eb();return;}
+  if(general.error||service.error)throw Error('Notification read failed');
   const entries=[
-   ...(general.data||[]),
-   ...(service.data||[])
+   ...(general.data||[]).map(item=>({...item,source199eb:'notifications'})),
+   ...(service.data||[]).map(item=>({...item,source199eb:'service_notifications'}))
   ].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,50);
-
   notifications.replaceChildren();
-
-  const refresh=document.createElement('button');
-  refresh.type='button';
-  refresh.textContent='Refresh notifications';
-  refresh.addEventListener('click',()=>loadMyNotifications(userId));
-  notifications.append(refresh);
-
-  if(entries.length===0){
-   const empty=document.createElement('p');
-   empty.className='muted';
-   empty.textContent='No notifications yet.';
-   notifications.append(empty);
-   return;
-  }
-
+  const refresh=document.createElement('button');refresh.type='button';refresh.textContent='Refresh notifications';
+  refresh.addEventListener('click',()=>loadMyNotifications(userId));notifications.append(refresh);
+  if(!entries.length){const empty=document.createElement('p');empty.className='muted';empty.textContent='No notifications yet.';notifications.append(empty);return;}
   for(const item of entries){
-   const article=document.createElement('div');
-   article.className='item';
-
-   const title=document.createElement('strong');
-   title.textContent=item.title||'Shop&Drop notification';
-   article.append(title);
-
-   if(item.is_read===false){
-    const unread=document.createElement('span');
-    unread.className='muted';
-    unread.textContent=' · Unread';
-    article.append(unread);
+   const article=document.createElement('div');article.className='item';
+   const title=document.createElement('strong');title.textContent=item.title||'Shop&Drop notification';article.append(title);
+   const unread=document.createElement('span');unread.className='muted';unread.textContent=item.is_read===false?' · Unread':' · Read';article.append(unread);
+   const message=document.createElement('p');message.textContent=item.message||'';article.append(message);
+   const link=notificationLink199eb(item);
+   if(link){const line=document.createElement('p');line.append(link);article.append(line);}
+   if(item.created_at){const stamp=document.createElement('small');stamp.className='muted';const date=new Date(item.created_at);stamp.textContent=Number.isNaN(date.getTime())?'':date.toLocaleString('en-ZA');article.append(stamp);}
+   if(item.is_read===false&&notificationUuid199eb(item.id)){
+    const button=document.createElement('button');button.type='button';button.textContent='Mark as read';
+    const feedback=document.createElement('p');feedback.setAttribute('role','status');
+    button.addEventListener('click',async()=>{
+     if(!current()||button.disabled)return;
+     button.disabled=true;feedback.textContent='';
+     try{
+      const {data:identity,error:authError}=await supabase.auth.getUser();
+      if(!current())return;
+      if(authError||identity?.user?.id!==userId){clearNotifications199eb();return;}
+      const {data,error}=await supabase.from(item.source199eb).update({is_read:true,read_at:new Date().toISOString()})
+       .eq('id',item.id).eq('user_id',userId).select('id,is_read');
+      if(!current())return;
+      if(error||!Array.isArray(data)||data.length!==1||data[0].id!==item.id||data[0].is_read!==true)throw Error('Read update not confirmed');
+      unread.textContent=' · Read';button.remove();feedback.textContent='Marked as read.';
+     }catch(_){if(current()){feedback.textContent='Could not mark as read. Try again.';button.disabled=false;}}
+    });article.append(button,feedback);
    }
-
-   const message=document.createElement('p');
-   message.textContent=item.message||'';
-   article.append(message);
-
-   if(item.created_at){
-    const stamp=document.createElement('small');
-    stamp.className='muted';
-    const date=new Date(item.created_at);
-    stamp.textContent=Number.isNaN(date.getTime())?'':date.toLocaleString('en-ZA');
-    article.append(stamp);
-   }
-
    notifications.append(article);
   }
- }catch{
+ }catch(_){
+  if(!current())return;
   notifications.textContent='Unable to load notifications right now.';
-  const retry=document.createElement('button');
-  retry.type='button';
-  retry.textContent='Retry';
-  retry.addEventListener('click',()=>loadMyNotifications(userId));
-  notifications.append(retry);
+  const retry=document.createElement('button');retry.type='button';retry.textContent='Retry';retry.addEventListener('click',()=>loadMyNotifications(userId));notifications.append(retry);
  }
 }
 
