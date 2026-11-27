@@ -91,7 +91,9 @@ jobs:
         git config user.name 'github-actions[bot]'
         git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
         git add -- backups/fix199gb/public/returns.html backups/fix199gb/supabase/functions/disputes/index.ts docs/SHOPDROP_FIX199GB_CUSTOMER_DISPUTE_EVIDENCE.md public/customer-dispute-evidence-199gb.html public/returns.html public/shopdrop-customer-evidence-199gb.js supabase/functions/disputes/index.ts supabase/migrations/20261127070613_shopdrop_fix199ga_private_evidence.sql supabase/migrations/20261127073658_shopdrop_fix199gb1_product_dispute_case.sql
-        git diff --cached --check
+        # The byte-for-byte backup of the old Edge source has a pre-existing blank line at EOF.
+        # Its original Git blob SHA is checked above; retain the whitespace check for everything else.
+        git diff --cached --check -- . ':(exclude)backups/fix199gb/supabase/functions/disputes/index.ts'
         python3 <<'CHECK'
         import subprocess
         allowed={'public/customer-dispute-evidence-199gb.html', 'public/returns.html', 'docs/SHOPDROP_FIX199GB_CUSTOMER_DISPUTE_EVIDENCE.md', 'supabase/functions/disputes/index.ts', 'backups/fix199gb/supabase/functions/disputes/index.ts', 'supabase/migrations/20261127070613_shopdrop_fix199ga_private_evidence.sql', 'supabase/migrations/20261127073658_shopdrop_fix199gb1_product_dispute_case.sql', 'public/shopdrop-customer-evidence-199gb.js', 'backups/fix199gb/public/returns.html'}
