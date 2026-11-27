@@ -1,0 +1,132 @@
+name: ShopDrop Fix 199Q Provider And Advertisement Auth Return
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix199q-provider-advertisement-auth-return.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: shopdrop-fix199q
+  cancel-in-progress: false
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+        persist-credentials: true
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - name: Correct and verify provider and advertisement sign-in return
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import hashlib, os, subprocess, tempfile
+        from html.parser import HTMLParser
+        PATCHES = {'public/shopdrop-auth-return-199ha.js': ('d306c944ec78c4941e7c73c1a44ea289b670f865', [(" 'checkout.html':{},", " 'checkout.html':{},\n 'my-product-advertisements-194d.html':{},\n 'shopdrop-provider-completion.html':{booking_type:'type',booking_id:'uuid'},")]), 'public/sign-in.html': ('e6d1248a052b67476a24360532cf53cab9f5636c', [('./shopdrop-auth-return-199ha.js?v=199o', './shopdrop-auth-return-199ha.js?v=199q')]), 'public/register.html': ('8b5bbba40d0d0a08044b03a63f8a660e81f8fe39', [('./shopdrop-auth-return-199ha.js?v=199o', './shopdrop-auth-return-199ha.js?v=199q')]), 'public/shopdrop-provider-completion.html': ('7685401e4fba45c97d2fee2efd0fe82452791f6c', [('<script type="module">\nimport {createClient}', '<script src="./shopdrop-auth-return-199ha.js?v=199q"></script>\n<script type="module">\nimport {createClient}'), ("  a.href='./sign-in.html';", "  a.href=window.ShopDropReturn199h?.authLink('sign-in.html')||'./sign-in.html';")])}
+        TEST = "const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');\nconst source=fs.readFileSync(process.argv[2],'utf8');\nfunction make(page,search=''){\n const window={};\n vm.runInNewContext(source,{window,location:{pathname:'/'+page,search},document:{querySelectorAll:()=>[],addEventListener:()=>{}},URLSearchParams,encodeURIComponent});\n return window.ShopDropReturn199h;\n}\nconst id='12345678-1234-1234-1234-123456789abc';\nconst ads='my-product-advertisements-194d.html';\nconst completion='shopdrop-provider-completion.html';\nassert.equal(make('sign-in.html','?next='+ads).requested(),'./'+ads);\nassert.equal(make('register.html','?next='+ads).requested(),'./'+ads);\nfor(const kind of ['service','dispatch']){\n const target=completion+'?booking_type='+kind+'&booking_id='+id;\n const h=make(completion,'?booking_type='+kind+'&booking_id='+id+'&completion_pin=123456&pin=123456');\n const link=h.authLink('sign-in.html');\n assert.equal(make('sign-in.html',link.slice(link.indexOf('?'))).requested(),'./'+target);\n const register=h.authLink('register.html');\n assert.equal(make('register.html',register.slice(register.indexOf('?'))).requested(),'./'+target);\n assert(!link.includes('123456&')&&!link.includes('pin'));\n}\nconst h=make(completion);\nassert.equal(h.safe(completion+'?booking_type=bad&booking_id=bad&pin=999999'),'./'+completion);\nassert.equal(h.safe(completion+'?booking_type=service&booking_type=dispatch'),'./'+completion);\nassert.equal(h.safe(ads+'?pin=999999'),'./'+ads);\nfor(const v of ['https://evil.example/'+completion,'//evil.example/'+completion,'../'+completion,completion+'#pin','admin.html','javascript:alert(1)'])assert.equal(h.safe(v),null);\nassert.equal(h.safe('returns.html?order=SD-2026-0001'),'./returns.html?order=SD-2026-0001');\nassert.equal(h.safe('checkout.html?pin=123456'),'./checkout.html');\nassert.equal(h.safe('service-checkout-193e.html?booking_id='+id),'./service-checkout-193e.html?booking_id='+id);\nconsole.log('PASS: product advertisements and provider booking authentication returns; PIN and external redirect rejection; existing checkout and returns retained.');\n"
+        BRANCH = 'shopdrop-phase6-integration'
+        def git(*args):
+            return subprocess.check_output(['git', *map(str,args)], text=True).strip()
+        def blob(data):
+            return hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+        def require(ok, message):
+            if not ok: raise SystemExit('SAFETY STOP: '+message)
+        def update(data, changes):
+            result=data
+            for a,b in changes:
+                a,b=a.encode(),b.encode()
+                require(result.count(a)==1,'unexpected replacement anchor count')
+                result=result.replace(a,b,1)
+            original=result
+            for a,b in reversed(changes):
+                a,b=a.encode(),b.encode()
+                require(original.count(b)==1,'unexpected reverse anchor count')
+                original=original.replace(b,a,1)
+            require(original==data,'unrelated code changed')
+            return result
+        require(os.environ.get('GITHUB_REF_NAME')==BRANCH and git('branch','--show-current')==BRANCH,'incorrect branch')
+        require(not git('status','--porcelain'),'dirty checkout')
+        originals={}; updates={}; backups={}
+        for path,(expected,changes) in PATCHES.items():
+            p=Path(path); b=Path('backups/fix199q')/p
+            require(p.is_file() and not p.is_symlink() and not b.is_symlink(),'unexpected path '+path)
+            backups[path]=b
+            if b.exists():
+                old=b.read_bytes()
+                require(blob(old)==expected and p.read_bytes()==update(old,changes),'partial or modified prior fix '+path)
+                originals[path]=old; updates[path]=p.read_bytes()
+            else:
+                old=p.read_bytes()
+                require(blob(old)==expected,'current source changed '+path)
+                originals[path]=old; updates[path]=update(old,changes)
+        existing=sum(p.exists() for p in backups.values())
+        require(existing in (0,len(PATCHES)),'partial prior backup')
+        class Scripts(HTMLParser):
+            def __init__(self):
+                super().__init__(); self.scripts=[]; self.current=None
+            def handle_starttag(self,tag,attrs):
+                if tag=='script':
+                    attrs=dict(attrs)
+                    self.current=None if 'src' in attrs else (attrs.get('type',''),[])
+            def handle_data(self,data):
+                if self.current is not None: self.current[1].append(data)
+            def handle_endtag(self,tag):
+                if tag=='script' and self.current is not None:
+                    self.scripts.append((self.current[0],''.join(self.current[1]))); self.current=None
+        with tempfile.TemporaryDirectory() as td:
+            t=Path(td)
+            for path,data in updates.items():
+                if path.endswith('.js'):
+                    f=t/Path(path).name;f.write_bytes(data)
+                    subprocess.run(['node','--check',str(f)],check=True)
+                else:
+                    before=Scripts();before.feed(originals[path].decode());after=Scripts();after.feed(data.decode())
+                    if path == 'public/shopdrop-provider-completion.html':
+                        old,new=PATCHES[path][1][1]
+                        restored=[(kind,code.replace(new,old)) for kind,code in after.scripts]
+                        require(before.scripts==restored,'unrelated completion or payment script changed')
+                    else:
+                        require(before.scripts==after.scripts,'inline operational script changed '+path)
+                    for i,(kind,code) in enumerate(after.scripts):
+                        if kind not in ('','module','text/javascript','application/javascript'): continue
+                        f=t/(Path(path).stem+str(i)+('.mjs' if kind=='module' else '.js'));f.write_text(code)
+                        subprocess.run(['node','--check',str(f)],check=True)
+            test=t/'test.cjs';test.write_text(TEST)
+            subprocess.run(['node',str(test),str(t/'shopdrop-auth-return-199ha.js')],check=True)
+        if existing:
+            print('Already installed; all exact backups and patched files verified.');raise SystemExit(0)
+        for path,data in updates.items():
+            b=backups[path];b.parent.mkdir(parents=True,exist_ok=True);b.write_bytes(originals[path]);Path(path).write_bytes(data)
+            require(b.read_bytes()==originals[path] and Path(path).read_bytes()==data,'write mismatch '+path)
+        require(set(git('diff','--name-only').splitlines())==set(PATCHES),'unexpected tracked changes')
+        allowed=set(PATCHES)|{str(b) for b in backups.values()}
+        subprocess.run(['git','add','--',*sorted(allowed)],check=True)
+        require(set(git('diff','--cached','--name-only').splitlines())==allowed,'unexpected staged changes')
+        require(not git('diff','--name-only') and not git('ls-files','--others','--exclude-standard'),'unrelated files')
+        subprocess.run(['git','diff','--cached','--check','--',*PATCHES],check=True)
+        print('PASS: exact source hashes, reversible patches, preserved unrelated inline scripts, syntax, safe auth links and exact staged paths.')
+        PYCODE
+        if ! git diff --cached --quiet; then
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Fix 199Q preserve provider and advertisement sign-in return'
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
