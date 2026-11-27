@@ -403,11 +403,31 @@ Deno.serve(async (request: Request) => {
     });
   }
 
+  // Fix 199L: disabled channels remain pending without consuming attempts.
+  const enabledChannels: string[] = [];
+  if (env("SHOPDROP_EMAIL_ENABLED") === "true") {
+    enabledChannels.push("email");
+  }
+  if (env("SHOPDROP_WHATSAPP_ENABLED") === "true") {
+    enabledChannels.push("whatsapp");
+  }
+  if (enabledChannels.length === 0) {
+    return reply({
+      ok: true,
+      enabled: true,
+      claimed: 0,
+      sent: 0,
+      failed: 0,
+      held: 0,
+    });
+  }
+
   const { data: messages, error: claimError } =
     await admin.rpc(
-      "claim_outbox_messages",
+      "shopdrop_claim_outbox_channels_199l",
       {
         p_limit: 5,
+        p_channels: enabledChannels,
       },
     );
 
