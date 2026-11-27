@@ -1,0 +1,56 @@
+name: ShopDrop Fix 199I-D2 Advertiser Identity Sync
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix199id2-advertiser-identity-sync.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+    - name: Record verified database correction only
+      shell: bash
+      run: "set -euo pipefail\ntest \"$GITHUB_REF_NAME\" = shopdrop-phase6-integration\n\
+        python3 <<'PYCODE'\nfrom pathlib import Path\nimport hashlib\nFILES = {'supabase/migrations/20261127140425_shopdrop_fix199id2_advertiser_identity_protection.sql':\
+        \ '-- Fix 199I-D2: preserve permanent advertiser numbers while keeping profile\
+        \ editing.\\nREVOKE INSERT, UPDATE ON public.profiles FROM PUBLIC, anon, authenticated;\\\
+        nGRANT INSERT (id, full_name, country_code, mobile_number, whatsapp_number,\
+        \ created_at, updated_at, seller_public_alias) ON public.profiles TO authenticated;\\\
+        nGRANT UPDATE (id, full_name, country_code, mobile_number, whatsapp_number,\
+        \ created_at, updated_at, seller_public_alias) ON public.profiles TO authenticated;\\\
+        nREVOKE INSERT (advertiser_public_number), UPDATE (advertiser_public_number)\
+        \ ON public.profiles FROM PUBLIC, anon, authenticated;\\nCREATE UNIQUE INDEX\
+        \ shopdrop_profiles_advertiser_public_number_199id2 ON public.profiles (advertiser_public_number);\\\
+        n', 'docs/SHOPDROP_FIX199ID2_ADVERTISER_IDENTITY.md': '# Fix 199I-D2 — Permanent\
+        \ advertiser identity\\n\\nApplied Supabase migration 20261127140425 on 27\
+        \ November 2026.\\nMigration MD5: `2909dd5ef172d70a2e0322352977098a`.\\n\\\
+        n- Customer write access to advertiser_public_number removed; existing number\
+        \ generation retained.\\n- Unique index verified. Existing three profiles\
+        \ had distinct positive numbers before migration.\\n- Authenticated profile\
+        \ and public alias editing tested successfully. Attempt to change advertiser\
+        \ number to DEFAULT rejected. Test changes rolled back.\\n- No website files,\
+        \ transaction procedures, or provider settings modified.\\n\\nThis installer\
+        \ records the already-applied migration only; it does not execute SQL. Full\
+        \ signed-in browser testing remains separate.\\n'}\nassert hashlib.md5(FILES['supabase/migrations/20261127140425_shopdrop_fix199id2_advertiser_identity_protection.sql'].encode()).hexdigest()\
+        \ == '2909dd5ef172d70a2e0322352977098a'\nfor name,content in FILES.items():\n\
+        \ p=Path(name); data=content.encode()\n if p.exists():\n  assert p.read_bytes()==data,\
+        \ 'Unexpected existing file: '+name\n else:\n  p.parent.mkdir(parents=True,exist_ok=True)\n\
+        \  p.write_bytes(data)\nprint('Verified exact deployed migration; no frontend\
+        \ or function changes.')\nPYCODE\ngit config user.name \"github-actions[bot]\"\
+        \ngit config user.email \"41898282+github-actions[bot]@users.noreply.github.com\"\
+        \ngit add -- supabase/migrations/20261127140425_shopdrop_fix199id2_advertiser_identity_protection.sql\
+        \ docs/SHOPDROP_FIX199ID2_ADVERTISER_IDENTITY.md\ngit diff --cached --check\n\
+        python3 <<'CHECK'\nimport subprocess\nallowed={'supabase/migrations/20261127140425_shopdrop_fix199id2_advertiser_identity_protection.sql',\
+        \ 'docs/SHOPDROP_FIX199ID2_ADVERTISER_IDENTITY.md'}\nchanged=set(subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines())\n\
+        assert changed <= allowed, 'Unexpected changed paths'\nCHECK\nif ! git diff\
+        \ --cached --quiet; then\n git commit -m \"Fix 199I-D2 synchronize advertiser\
+        \ identity protection migration\"\n git push origin HEAD:shopdrop-phase6-integration\n\
+        fi\n"
