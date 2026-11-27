@@ -321,17 +321,20 @@ rows.appendChild(tr);
 }
 
 async function loadEvidence(){
+render([]);
 refresh.disabled=true;
 reportMessage.textContent='Loading evidence records...';
 
 try{
-const {data,error}=await supabase.rpc(
-'shopdrop_admin_dispute_evidence_overview'
-);
+const linkedId=(new URLSearchParams(window.location.search).get('dispute_id')||'').trim().toLowerCase();
+if(new URLSearchParams(window.location.search).has('dispute_id')&&!validUuid(linkedId))throw Error('Invalid dispute reference');
+const {data,error}=linkedId
+?await supabase.rpc('shopdrop_admin_evidence_for_case_199hb',{p_dispute_id:linkedId})
+:await supabase.rpc('shopdrop_admin_dispute_evidence_overview');
 if(error)throw error;
 if(!Array.isArray(data))throw Error('Invalid response');
 render(data);
-reportMessage.textContent='Evidence records loaded.';
+reportMessage.textContent=linkedId?'Evidence for the selected dispute loaded.':'Evidence records loaded.';
 }catch(error){
 reportMessage.textContent='Evidence records unavailable.';
 }finally{
@@ -449,6 +452,7 @@ uploadMessage.textContent=
 registered.evidence_id;
 
 form.reset();
+await loadSelectedDispute();
 await loadEvidence();
 
 }catch(error){

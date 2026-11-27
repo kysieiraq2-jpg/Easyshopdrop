@@ -272,6 +272,20 @@ const notice=node(
 notice.className='muted';
 container.append(notice);
 
+if(data.case_type==='payment_dispute_opened'){
+ try{
+  const result=await supabase.rpc('shopdrop_admin_submission_evidence_199hb',{p_case_id:record.case_id});
+  const linked=result.data;
+  if(result.error)throw Error('Evidence lookup unavailable');
+  if(linked&&typeof linked.dispute_id==='string'&&/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(linked.dispute_id)&&['product','service','dispatch'].includes(linked.dispute_kind)){
+   const labels={product:'Product',service:'Other Services',dispatch:'Transport'};
+   const evidenceLink=node('a','View '+labels[linked.dispute_kind]+' dispute evidence');
+   evidenceLink.href='./dispute-evidence.html?dispute_id='+encodeURIComponent(linked.dispute_id);
+   const evidenceRow=node('p');evidenceRow.append(evidenceLink);container.append(evidenceRow);
+  }else container.append(node('p','No verified evidence case is linked to this submission.'));
+ }catch{container.append(node('p','Evidence link unavailable. Retry submission details.'));}
+}
+
 button.textContent='Hide submission details';
 
 }catch(error){
