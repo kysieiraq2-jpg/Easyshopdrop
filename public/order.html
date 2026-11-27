@@ -374,7 +374,8 @@ if(initialReference){
  summary.textContent=user
   ?'Enter your order reference to view its details.'
   :'Sign in to view your order details.';
+ if(!user){const a=document.createElement('a');a.href='./sign-in.html';a.textContent='Sign in';summary.append(document.createTextNode(' '),a);}
 }
 </script>
-</body>
+<script src="./shopdrop-auth-return-199ha.js?v=199hc"></script></body>
 </html>
