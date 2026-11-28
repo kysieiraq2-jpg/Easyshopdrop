@@ -1,0 +1,128 @@
+name: ShopDrop Fix 199Z Admin Report Privacy
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix199z-admin-report-privacy.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: shopdrop-fix199z
+  cancel-in-progress: false
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+        persist-credentials: true
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - name: Protect and test administrator read-only reports
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import hashlib, os, subprocess, tempfile
+        from html.parser import HTMLParser
+        PATCHES = {'public/admin-marketplace.html': ('9ad5720a51b4d31447f691f7495ec465c1f3ed81', [('function deny(reason){\nprotectedArea.hidden=true;', "let adminEpoch199z=0,adminOwner199z=null,adminBusy199z=false;\nconst adminTargets199z=['listings', 'categories', 'moderation', 'applications'];\nfunction clearAdmin199z(){\n adminEpoch199z++;adminOwner199z=null;adminBusy199z=false;\n protectedArea.hidden=true;refresh.disabled=true;message.textContent='';\n for(const target of adminTargets199z)document.getElementById(target).textContent='Waiting for records.';\n}\nfunction deny(reason){\nclearAdmin199z();"), ("async function checkAdmin(){\nconst {data:userData,error:userError}=\nawait supabase.auth.getUser();\n\nif(userError||!userData?.user){\ndeny('Administrator sign-in required.');\nreturn false;\n}\n\nconst {data:allowed,error:adminError}=\nawait supabase.rpc('shopdrop_is_active_admin');\n\nif(adminError||allowed!==true){\ndeny('Administrator access denied or unavailable.');\nreturn false;\n}\n\naccess.hidden=true;\nprotectedArea.hidden=false;\nreturn true;\n}", "async function checkAdmin(epoch){\nconst {data:userData,error:userError}=await supabase.auth.getUser();\nif(epoch!==adminEpoch199z)return false;\nif(userError||!userData?.user){deny('Administrator sign-in required.');return false;}\nadminOwner199z=userData.user.id;\nreturn await confirmAdmin199z(epoch);\n}\nasync function confirmAdmin199z(epoch){\nif(epoch!==adminEpoch199z||!adminOwner199z)return false;\nconst {data:allowed,error:adminError}=await supabase.rpc('shopdrop_is_active_admin');\nif(epoch!==adminEpoch199z)return false;\nconst {data:current,error}=await supabase.auth.getUser();\nif(epoch!==adminEpoch199z)return false;\nif(adminError||allowed!==true||error||current?.user?.id!==adminOwner199z){deny('Administrator access denied or unavailable.');return false;}\nreturn true;\n}"), ('async function loadMarketplace(){', 'async function loadMarketplace(epoch){'), ('const {data,error}=await supabase.rpc(report.rpc);\nif(error)throw error;', 'const {data,error}=await supabase.rpc(report.rpc);\nif(epoch!==adminEpoch199z)return;\nif(!await confirmAdmin199z(epoch))return;\nif(epoch!==adminEpoch199z)return;\nif(error)throw error;'), ('}catch(error){\nfailures++;', '}catch(error){\nif(epoch!==adminEpoch199z)return;\nfailures++;'), ('message.textContent=failures\n', 'if(epoch!==adminEpoch199z)return;\nmessage.textContent=failures\n'), ("refresh.addEventListener('click',async()=>{\nrefresh.disabled=true;\ntry{\nif(await checkAdmin()){\nawait loadMarketplace();\n}\n}finally{\nrefresh.disabled=false;\n}\n});\n\nif(await checkAdmin()){\nawait loadMarketplace();\n}", "async function refreshAdmin199z(){\n if(adminBusy199z)return;\n clearAdmin199z();const epoch=adminEpoch199z;adminBusy199z=true;\n try{\n  if(await checkAdmin(epoch))await loadMarketplace(epoch);\n  if(epoch===adminEpoch199z&&adminOwner199z&&await confirmAdmin199z(epoch)){access.hidden=true;protectedArea.hidden=false;}\n }catch(_){if(epoch===adminEpoch199z)deny('Administrator reports unavailable. Sign in again.');}\n finally{if(epoch===adminEpoch199z){adminBusy199z=false;refresh.disabled=false;}}\n}\nrefresh.addEventListener('click',refreshAdmin199z);\nsupabase.auth.onAuthStateChange((event,session)=>{\n if(event==='SIGNED_OUT'||(adminOwner199z&&session?.user?.id!==adminOwner199z))deny('Administrator sign-in required.');\n});\nwindow.addEventListener('pagehide',clearAdmin199z);\nwindow.addEventListener('pageshow',event=>{if(event.persisted)refreshAdmin199z();});\nawait refreshAdmin199z();")]), 'public/admin-tracking.html': ('c8f9f4c36dce026a6a4d66ae29117acd49eee04f', [('function deny(reason){\nprotectedArea.hidden=true;', "let adminEpoch199z=0,adminOwner199z=null,adminBusy199z=false;\nconst adminTargets199z=['orders', 'shipments', 'payments'];\nfunction clearAdmin199z(){\n adminEpoch199z++;adminOwner199z=null;adminBusy199z=false;\n protectedArea.hidden=true;refresh.disabled=true;message.textContent='';\n for(const target of adminTargets199z)document.getElementById(target).textContent='Waiting for records.';\n}\nfunction deny(reason){\nclearAdmin199z();"), ("async function checkAdmin(){\nconst {data:userData,error:userError}=\nawait supabase.auth.getUser();\n\nif(userError||!userData?.user){\ndeny('Administrator sign-in required.');\nreturn false;\n}\n\nconst {data:allowed,error:adminError}=\nawait supabase.rpc('shopdrop_is_active_admin');\n\nif(adminError||allowed!==true){\ndeny('Administrator access denied or unavailable.');\nreturn false;\n}\n\naccess.hidden=true;\nprotectedArea.hidden=false;\nreturn true;\n}", "async function checkAdmin(epoch){\nconst {data:userData,error:userError}=await supabase.auth.getUser();\nif(epoch!==adminEpoch199z)return false;\nif(userError||!userData?.user){deny('Administrator sign-in required.');return false;}\nadminOwner199z=userData.user.id;\nreturn await confirmAdmin199z(epoch);\n}\nasync function confirmAdmin199z(epoch){\nif(epoch!==adminEpoch199z||!adminOwner199z)return false;\nconst {data:allowed,error:adminError}=await supabase.rpc('shopdrop_is_active_admin');\nif(epoch!==adminEpoch199z)return false;\nconst {data:current,error}=await supabase.auth.getUser();\nif(epoch!==adminEpoch199z)return false;\nif(adminError||allowed!==true||error||current?.user?.id!==adminOwner199z){deny('Administrator access denied or unavailable.');return false;}\nreturn true;\n}"), ('async function loadTracking(){', 'async function loadTracking(epoch){'), ('const {data,error}=await supabase.rpc(report.rpc);\nif(error)throw error;', 'const {data,error}=await supabase.rpc(report.rpc);\nif(epoch!==adminEpoch199z)return;\nif(!await confirmAdmin199z(epoch))return;\nif(epoch!==adminEpoch199z)return;\nif(error)throw error;'), ('}catch(error){\nfailures++;', '}catch(error){\nif(epoch!==adminEpoch199z)return;\nfailures++;'), ('message.textContent=failures\n', 'if(epoch!==adminEpoch199z)return;\nmessage.textContent=failures\n'), ("refresh.addEventListener('click',async()=>{\nrefresh.disabled=true;\ntry{\nif(await checkAdmin()){\nawait loadTracking();\n}\n}finally{\nrefresh.disabled=false;\n}\n});\n\nif(await checkAdmin()){\nawait loadTracking();\n}", "async function refreshAdmin199z(){\n if(adminBusy199z)return;\n clearAdmin199z();const epoch=adminEpoch199z;adminBusy199z=true;\n try{\n  if(await checkAdmin(epoch))await loadTracking(epoch);\n  if(epoch===adminEpoch199z&&adminOwner199z&&await confirmAdmin199z(epoch)){access.hidden=true;protectedArea.hidden=false;}\n }catch(_){if(epoch===adminEpoch199z)deny('Administrator reports unavailable. Sign in again.');}\n finally{if(epoch===adminEpoch199z){adminBusy199z=false;refresh.disabled=false;}}\n}\nrefresh.addEventListener('click',refreshAdmin199z);\nsupabase.auth.onAuthStateChange((event,session)=>{\n if(event==='SIGNED_OUT'||(adminOwner199z&&session?.user?.id!==adminOwner199z))deny('Administrator sign-in required.');\n});\nwindow.addEventListener('pagehide',clearAdmin199z);\nwindow.addEventListener('pageshow',event=>{if(event.persisted)refreshAdmin199z();});\nawait refreshAdmin199z();")])}
+        TEST = "const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');\nconst source=fs.readFileSync(process.argv[2],'utf8').replace(/import\\s*\\{createClient\\}\\s*from\\s*'[^']+';/,'');\nconst marketplace=process.argv[3]==='admin-marketplace';const target=marketplace?'listings':'orders';\nfunction el(){return {children:[],listeners:{},hidden:false,disabled:false,_text:'',set textContent(x){this._text=String(x);this.children=[]},get textContent(){return this._text+this.children.map(c=>typeof c==='string'?c:c.textContent).join(' ')},append(...xs){this.children.push(...xs)},appendChild(x){this.children.push(x)},replaceChildren(...xs){this._text='';this.children=xs},addEventListener(k,f){this.listeners[k]=f}}}\nconst tick=()=>new Promise(r=>setImmediate(r));\nasync function setup(mode){let uid='A',allowed=true,cb,resolveReport,rejectReport,calls=0;const dom=new Map(),events={};const get=id=>{if(!dom.has(id))dom.set(id,el());return dom.get(id)};\n const sb={auth:{getUser:async()=>({data:{user:uid?{id:uid}:null},error:null}),onAuthStateChange(f){cb=f}},rpc:async(name)=>{if(name==='shopdrop_is_active_admin')return {data:allowed,error:null};calls++;if(mode==='delay'||mode==='fail'){mode='normal';return new Promise((resolve,reject)=>{resolveReport=()=>resolve({data:[{listing_type:'PRIVATE',case_type:'PRIVATE'}],error:null});rejectReport=()=>reject(Error('network'))})}return {data:[{listing_type:'PRIVATE',case_type:'PRIVATE',applicant_name:'PRIVATE'}],error:null}}};\n const pending=vm.runInNewContext('(async()=>{'+source+'\\n})()',{createClient:()=>sb,document:{getElementById:get,createElement:el,createTextNode:v=>String(v)},window:{addEventListener:(k,f)=>events[k]=f},Date,Number,console});await tick();return {pending,get,events,emit(e,u){uid=u;cb(e,u?{user:{id:u}}:null)},release:()=>resolveReport(),fail:()=>rejectReport(),revoke:()=>{allowed=false},get calls(){return calls}};}\n(async()=>{let t=await setup('normal');await t.pending;assert.match(t.get(target).textContent,/PRIVATE/);assert.equal(t.get('protected').hidden,false);t.emit('TOKEN_REFRESHED','A');assert.match(t.get(target).textContent,/PRIVATE/);t.emit('SIGNED_OUT',null);assert.doesNotMatch(t.get(target).textContent,/PRIVATE/);assert.equal(t.get('protected').hidden,true);\n t=await setup('delay');t.emit('SIGNED_IN','B');t.release();await t.pending;assert.equal(t.get('protected').hidden,true);assert.doesNotMatch(t.get(target).textContent,/PRIVATE/);assert.equal(t.calls,1);\n t=await setup('fail');t.emit('SIGNED_OUT',null);t.fail();await t.pending;assert.equal(t.get('protected').hidden,true);assert.doesNotMatch(t.get(target).textContent,/PRIVATE/);\n t=await setup('delay');t.revoke();t.release();await t.pending;assert.equal(t.get('protected').hidden,true);assert.doesNotMatch(t.get(target).textContent,/PRIVATE/);\n t=await setup('normal');await t.pending;t.events.pagehide();assert.equal(t.get('protected').hidden,true);assert.doesNotMatch(t.get(target).textContent,/PRIVATE/);t.events.pageshow({persisted:true});await tick();assert.match(t.get(target).textContent,/PRIVATE/);console.log('PASS: '+process.argv[3]+' normal, token refresh, logout, account switch, late success/failure, permission revocation, page restore');})().catch(e=>{console.error(e);process.exitCode=1});"
+        BRANCH = 'shopdrop-phase6-integration'
+        def git(*args):
+            return subprocess.check_output(['git', *map(str,args)], text=True).strip()
+        def blob(data):
+            return hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+        def require(ok, message):
+            if not ok: raise SystemExit('SAFETY STOP: '+message)
+        def update(data, changes):
+            result=data
+            for a,b in changes:
+                a,b=a.encode(),b.encode()
+                require(result.count(a)==1,'unexpected replacement anchor count')
+                result=result.replace(a,b,1)
+            original=result
+            for a,b in reversed(changes):
+                a,b=a.encode(),b.encode()
+                require(original.count(b)==1,'unexpected reverse anchor count')
+                original=original.replace(b,a,1)
+            require(original==data,'unrelated code changed')
+            return result
+        require(os.environ.get('GITHUB_REF_NAME')==BRANCH and git('branch','--show-current')==BRANCH,'incorrect branch')
+        require(not git('status','--porcelain'),'dirty checkout')
+        originals={}; updates={}; backups={}
+        for path,(expected,changes) in PATCHES.items():
+            p=Path(path); b=Path('backups/fix199z')/p
+            require(p.is_file() and not p.is_symlink() and not b.is_symlink(),'unexpected path '+path)
+            backups[path]=b
+            if b.exists():
+                old=b.read_bytes()
+                require(blob(old)==expected and p.read_bytes()==update(old,changes),'partial or modified prior fix '+path)
+                originals[path]=old; updates[path]=p.read_bytes()
+            else:
+                old=p.read_bytes()
+                require(blob(old)==expected,'current source changed '+path)
+                originals[path]=old; updates[path]=update(old,changes)
+        existing=sum(p.exists() for p in backups.values())
+        require(existing in (0,len(PATCHES)),'partial prior backup')
+        class Scripts(HTMLParser):
+            def __init__(self):
+                super().__init__(); self.scripts=[]; self.current=None
+            def handle_starttag(self,tag,attrs):
+                if tag=='script':
+                    attrs=dict(attrs)
+                    self.current=None if 'src' in attrs else (attrs.get('type',''),[])
+            def handle_data(self,data):
+                if self.current is not None: self.current[1].append(data)
+            def handle_endtag(self,tag):
+                if tag=='script' and self.current is not None:
+                    self.scripts.append((self.current[0],''.join(self.current[1]))); self.current=None
+        with tempfile.TemporaryDirectory() as td:
+            t=Path(td)
+            for path,data in updates.items():
+                if path.endswith('.js'):
+                    f=t/(Path(path).stem+('.mjs' if path.endswith('shopdrop-private-contact.js') else '.js'));f.write_bytes(data)
+                    subprocess.run(['node','--check',str(f)],check=True)
+                else:
+                    before=Scripts();before.feed(originals[path].decode());after=Scripts();after.feed(data.decode())
+                    require(len(before.scripts)==len(after.scripts)==1 and before.scripts[0][0]==after.scripts[0][0]=='module','unexpected module structure')
+                    for i,(kind,code) in enumerate(after.scripts):
+                        if kind not in ('','module','text/javascript','application/javascript'): continue
+                        f=t/(Path(path).stem+str(i)+('.mjs' if kind=='module' else '.js'));f.write_text(code)
+                        subprocess.run(['node','--check',str(f)],check=True)
+            test=t/'test.cjs';test.write_text(TEST)
+            for page in ['admin-marketplace','admin-tracking']:
+                subprocess.run(['node',str(test),str(t/(page+'0.mjs')),page],check=True)
+        if existing:
+            print('Already installed; all exact backups and patched files verified.');raise SystemExit(0)
+        for path,data in updates.items():
+            b=backups[path];b.parent.mkdir(parents=True,exist_ok=True);b.write_bytes(originals[path]);Path(path).write_bytes(data)
+            require(b.read_bytes()==originals[path] and Path(path).read_bytes()==data,'write mismatch '+path)
+        require(set(git('diff','--name-only').splitlines())==set(PATCHES),'unexpected tracked changes')
+        allowed=set(PATCHES)|{str(b) for b in backups.values()}
+        subprocess.run(['git','add','--',*sorted(allowed)],check=True)
+        require(set(git('diff','--cached','--name-only').splitlines())==allowed,'unexpected staged changes')
+        require(not git('diff','--name-only') and not git('ls-files','--others','--exclude-standard'),'unrelated files')
+        subprocess.run(['git','diff','--cached','--check','--',*PATCHES],check=True)
+        print('PASS: exact source hashes, reversible patches, preserved unrelated inline scripts, syntax, administrator session mock tests and exact staged paths.')
+        PYCODE
+        if ! git diff --cached --quiet; then
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Fix 199Z protect administrator read-only reports'
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
