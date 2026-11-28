@@ -1,0 +1,127 @@
+name: ShopDrop Fix 199W Refund History
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix199w-refund-history.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: shopdrop-fix199w
+  cancel-in-progress: false
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+        persist-credentials: true
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - name: Connect and verify read-only refund history
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import hashlib, os, subprocess, tempfile
+        from html.parser import HTMLParser
+        PATCHES = {'public/receipts.html': ('4cc66d6f86d474a04ac4e33c0b23f8d36bbf05a1', [('View Shop&amp;Drop order, payment, shipment and payout references linked to your account.', 'View Shop&amp;Drop order, payment, shipment, refund and payout references linked to your account.'), ('A pending transaction is not proof of payment or a completed payout.', 'A pending transaction is not proof of payment, a completed refund or a completed payout.'), ('function line(parent,label,value){', "// Refunds are recorded in separate owner-scoped tables. Never infer an unrecorded currency.\nfunction refundAmount199w(value,currency){\n if(value===null||value===undefined||value===''||!Number.isFinite(Number(value)))return 'Not recorded';\n if(typeof currency==='string'&&/^[A-Z]{3}$/.test(currency))return amount(value,currency);\n return Number(value).toFixed(2)+' (currency not recorded)';\n}\nfunction line(parent,label,value){"), ('// Queries are READ-ONLY. All seven existing tables enforce owner-specific RLS.', '// Queries are READ-ONLY and use existing owner-specific RLS.'), ("    ['Service booking',r.service_booking_id],['Details',r.description],['Created',date(r.created_at)]])}\n ];", "    ['Service booking',r.service_booking_id],['Details',r.description],['Created',date(r.created_at)]])},\n  {label:'Product refunds',run:supabase.from('refunds')\n   .select('id,order_id,buyer_id,payment_id,refund_amount,refund_status,refund_reference,refund_type,requested_at,processed_at,created_at,payment:payments!refunds_payment_id_fkey(currency,payment_reference),order:orders!refunds_order_id_fkey(currency,order_reference)')\n   .eq('buyer_id',userId).order('created_at',{ascending:false}).limit(40),\n   show:(p,r)=>card(p,'Product refund · '+text(r.refund_reference,r.id),[\n    ['Order reference',r.order?.order_reference||r.order_id],['Payment reference',r.payment?.payment_reference||r.payment_id],\n    ['Recorded refund amount',refundAmount199w(r.refund_amount,r.payment?.currency||r.order?.currency)],['Refund type',r.refund_type?status(r.refund_type):null],\n    ['Recorded status',status(r.refund_status)],['Requested at',r.requested_at?date(r.requested_at):null],\n    ['Processed at',r.processed_at?date(r.processed_at):null],['Created',date(r.created_at)],\n    ['Note','Recorded status only — not independent bank settlement confirmation.']])},\n  {label:'Service refunds',run:supabase.from('service_refunds')\n   .select('id,booking_id,buyer_id,provider_id,payment_id,refund_amount,refund_status,refund_reference,requested_at,processed_at,created_at,payment:service_payments!service_refunds_payment_id_fkey(payment_reference)')\n   .or('buyer_id.eq.'+userId+',provider_id.eq.'+userId).order('created_at',{ascending:false}).limit(40),\n   show:(p,r)=>card(p,'Service refund · '+text(r.refund_reference,r.id),[\n    ['Booking reference',r.booking_id],['Payment reference',r.payment?.payment_reference||r.payment_id],\n    ['Recorded refund amount',refundAmount199w(r.refund_amount)],['Recorded status',status(r.refund_status)],\n    ['Requested at',r.requested_at?date(r.requested_at):null],['Processed at',r.processed_at?date(r.processed_at):null],\n    ['Created',date(r.created_at)],['Note','Recorded status only — not independent bank settlement confirmation.']])}\n ];")])}
+        TEST = 'const fs=require(\'node:fs\'),vm=require(\'node:vm\'),assert=require(\'node:assert/strict\');\nconst original=fs.readFileSync(process.argv[2],\'utf8\');\nconst importLine="import {createClient} from \'https://esm.sh/@supabase/supabase-js@2\';";\nassert.equal(original.split(importLine).length,2);\nconst source=original.replace(importLine,\'\');\nconst A=\'12345678-1234-1234-1234-123456789abc\',B=\'12345678-1234-1234-1234-123456789abd\',C=\'12345678-1234-1234-1234-123456789abe\';\nconst refund={id:\'p-refund\',buyer_id:A,order_id:\'order-a\',payment_id:\'pay-a\',refund_amount:125.5,refund_status:\'pending\',refund_reference:\'SD-REF-1\',refund_type:\'product\',payment:{currency:\'ZAR\',payment_reference:\'SD-PAY-1\'},order:{currency:\'ZAR\',order_reference:\'SD-ORD-1\'}};\nconst service={id:\'s-refund\',buyer_id:A,provider_id:B,booking_id:\'booking-a\',payment_id:\'pay-s\',refund_amount:100,refund_status:\'processed\',refund_reference:\'SD-REF-2\',payment:{payment_reference:\'SD-PAY-2\'}};\nconst fixture={orders:[{id:\'order-a\',buyer_id:A,seller_id:B,order_reference:\'SD-ORD-1\',product_total:125.5,currency:\'ZAR\'}],refunds:[refund,{...refund,buyer_id:C,refund_reference:\'PRIVATE-OTHER-PRODUCT\'}],service_refunds:[service,{...service,buyer_id:C,provider_id:C,refund_reference:\'PRIVATE-OTHER-SERVICE\'}]};\nfunction el(tag){return {tag,children:[],_text:\'\',set textContent(x){this._text=String(x);this.children=[]},get textContent(){return this._text+this.children.map(c=>typeof c===\'string\'?c:c.textContent).join(\' \')},get lastElementChild(){return this.children.at(-1)},append(...xs){this.children.push(...xs)},replaceChildren(...xs){this._text=\'\';this.children=xs},addEventListener(){}}}\nasync function run({user=A,fail=\'\',changed=false,missingCurrency=false}={}){\n const history=el(\'history\'),calls=[];let authCalls=0;\n const data=structuredClone(fixture);\n if(missingCurrency){data.refunds[0].payment.currency=null;data.refunds[0].order.currency=null;}\n const sb={auth:{getUser:async()=>({data:{user:user&&{id:changed&&++authCalls>1?C:user}},error:null})},from(table){\n  const q={table};calls.push(q);let predicates=[];const api={select(cols){q.cols=cols;return api},eq(k,v){q.filter=[k,v];predicates.push(r=>r[k]===v);return api},or(v){q.or=v;predicates.push(r=>v.split(\',\').some(x=>{const [k,op,id]=x.split(\'.\');return op===\'eq\'&&r[k]===id}));return api},order(k,v){q.order=k;return api},limit(n){q.limit=n;return Promise.resolve({data:table===fail?null:(data[table]||[]).filter(r=>predicates.every(p=>p(r))).slice(0,n),error:table===fail?{message:\'unavailable\'}:null})}};return api}};\n const references={orderRefs:async(db,keys)=>new Map(keys.filter(k=>k===\'order-a\').map(k=>[k,\'SD-ITEM-1\'])),dbRPC:()=>{},collect:async(rpc,k,keys)=>new Map(keys.filter(k=>k===\'booking-a\').map(k=>[k,{advertisement_reference:\'SD-SVC-1\'}])),financial:async()=>({data:[],error:false}),kindLabel:k=>k};\n const ctx={createClient:()=>sb,document:{getElementById:()=>history,createElement:el,createTextNode:v=>String(v)},window:{ShopDropReferences199dc:references},Intl,Date,Number,console};\n await vm.runInNewContext(\'(async()=>{\'+source+\'\\n})()\',ctx);\n return {out:history.textContent,calls};\n}\n(async()=>{\n let r=await run();assert.equal(r.calls.length,9);assert.match(r.out,/Product refunds \\(1\\)/);assert.match(r.out,/Service refunds \\(1\\)/);assert.match(r.out,/SD-REF-1/);assert.match(r.out,/SD-PAY-1/);assert.match(r.out,/SD-ORD-1/);assert.match(r.out,/SD-REF-2/);assert.match(r.out,/SD-PAY-2/);assert.match(r.out,/SD-ITEM-1/);assert.match(r.out,/SD-SVC-1/);assert.match(r.out,/pending/);assert.match(r.out,/processed/);assert.match(r.out,/currency not recorded/);assert.match(r.out,/not independent bank settlement confirmation/);assert.match(r.out,/Purchase/);assert.doesNotMatch(r.out,/PRIVATE-OTHER/);\n assert.deepEqual(r.calls.find(x=>x.table===\'refunds\').filter,[\'buyer_id\',A]);assert.equal(r.calls.find(x=>x.table===\'service_refunds\').or,\'buyer_id.eq.\'+A+\',provider_id.eq.\'+A);\n r=await run({user:B});assert.doesNotMatch(r.out,/SD-REF-1/);assert.match(r.out,/SD-REF-2/);assert.doesNotMatch(r.out,/PRIVATE-OTHER/);\n r=await run({user:null});assert.equal(r.calls.length,0);assert.match(r.out,/Sign in to view/);\n r=await run({changed:true});assert.match(r.out,/Sign-in changed/);assert.doesNotMatch(r.out,/SD-REF/);\n r=await run({fail:\'refunds\'});assert.match(r.out,/Some history sections are unavailable/);assert.match(r.out,/SD-REF-2/);assert.doesNotMatch(r.out,/SD-REF-1/);\n r=await run({missingCurrency:true});assert.match(r.out,/125\\.50 \\(currency not recorded\\)/);\n console.log(\'PASS: owner refund history, provider access, signed-out denial, account change, partial failure, unrecorded currency; existing reference/history behavior preserved.\');\n})().catch(e=>{console.error(e);process.exitCode=1});'
+        BRANCH = 'shopdrop-phase6-integration'
+        def git(*args):
+            return subprocess.check_output(['git', *map(str,args)], text=True).strip()
+        def blob(data):
+            return hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+        def require(ok, message):
+            if not ok: raise SystemExit('SAFETY STOP: '+message)
+        def update(data, changes):
+            result=data
+            for a,b in changes:
+                a,b=a.encode(),b.encode()
+                require(result.count(a)==1,'unexpected replacement anchor count')
+                result=result.replace(a,b,1)
+            original=result
+            for a,b in reversed(changes):
+                a,b=a.encode(),b.encode()
+                require(original.count(b)==1,'unexpected reverse anchor count')
+                original=original.replace(b,a,1)
+            require(original==data,'unrelated code changed')
+            return result
+        require(os.environ.get('GITHUB_REF_NAME')==BRANCH and git('branch','--show-current')==BRANCH,'incorrect branch')
+        require(not git('status','--porcelain'),'dirty checkout')
+        originals={}; updates={}; backups={}
+        for path,(expected,changes) in PATCHES.items():
+            p=Path(path); b=Path('backups/fix199w')/p
+            require(p.is_file() and not p.is_symlink() and not b.is_symlink(),'unexpected path '+path)
+            backups[path]=b
+            if b.exists():
+                old=b.read_bytes()
+                require(blob(old)==expected and p.read_bytes()==update(old,changes),'partial or modified prior fix '+path)
+                originals[path]=old; updates[path]=p.read_bytes()
+            else:
+                old=p.read_bytes()
+                require(blob(old)==expected,'current source changed '+path)
+                originals[path]=old; updates[path]=update(old,changes)
+        existing=sum(p.exists() for p in backups.values())
+        require(existing in (0,len(PATCHES)),'partial prior backup')
+        class Scripts(HTMLParser):
+            def __init__(self):
+                super().__init__(); self.scripts=[]; self.current=None
+            def handle_starttag(self,tag,attrs):
+                if tag=='script':
+                    attrs=dict(attrs)
+                    self.current=None if 'src' in attrs else (attrs.get('type',''),[])
+            def handle_data(self,data):
+                if self.current is not None: self.current[1].append(data)
+            def handle_endtag(self,tag):
+                if tag=='script' and self.current is not None:
+                    self.scripts.append((self.current[0],''.join(self.current[1]))); self.current=None
+        with tempfile.TemporaryDirectory() as td:
+            t=Path(td)
+            for path,data in updates.items():
+                if path.endswith('.js'):
+                    f=t/(Path(path).stem+('.mjs' if path.endswith('shopdrop-private-contact.js') else '.js'));f.write_bytes(data)
+                    subprocess.run(['node','--check',str(f)],check=True)
+                else:
+                    before=Scripts();before.feed(originals[path].decode());after=Scripts();after.feed(data.decode())
+                    require(len(before.scripts)==len(after.scripts)==1 and before.scripts[0][0]==after.scripts[0][0]=='module','unexpected module structure')
+                    for i,(kind,code) in enumerate(after.scripts):
+                        if kind not in ('','module','text/javascript','application/javascript'): continue
+                        f=t/(Path(path).stem+str(i)+('.mjs' if kind=='module' else '.js'));f.write_text(code)
+                        subprocess.run(['node','--check',str(f)],check=True)
+            test=t/'test.cjs';test.write_text(TEST)
+            subprocess.run(['node',str(test),str(t/'receipts0.mjs')],check=True)
+        if existing:
+            print('Already installed; all exact backups and patched files verified.');raise SystemExit(0)
+        for path,data in updates.items():
+            b=backups[path];b.parent.mkdir(parents=True,exist_ok=True);b.write_bytes(originals[path]);Path(path).write_bytes(data)
+            require(b.read_bytes()==originals[path] and Path(path).read_bytes()==data,'write mismatch '+path)
+        require(set(git('diff','--name-only').splitlines())==set(PATCHES),'unexpected tracked changes')
+        allowed=set(PATCHES)|{str(b) for b in backups.values()}
+        subprocess.run(['git','add','--',*sorted(allowed)],check=True)
+        require(set(git('diff','--cached','--name-only').splitlines())==allowed,'unexpected staged changes')
+        require(not git('diff','--name-only') and not git('ls-files','--others','--exclude-standard'),'unrelated files')
+        subprocess.run(['git','diff','--cached','--check','--',*PATCHES],check=True)
+        print('PASS: exact source hashes, reversible patches, preserved unrelated inline scripts, syntax, refund history mock tests and exact staged paths.')
+        PYCODE
+        if ! git diff --cached --quiet; then
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Fix 199W connect refund history'
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
