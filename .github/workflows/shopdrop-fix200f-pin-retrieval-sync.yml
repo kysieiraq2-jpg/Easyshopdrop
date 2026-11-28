@@ -1,0 +1,57 @@
+name: ShopDrop Fix 200F PIN Retrieval Sync
+'on':
+  push:
+    branches: [shopdrop-phase6-integration]
+    paths: [.github/workflows/shopdrop-fix200f-pin-retrieval-sync.yml]
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: shopdrop-fix200f-sync
+  cancel-in-progress: false
+jobs:
+  sync:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+      - name: Record already-applied and verified migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PYCODE'
+          from pathlib import Path
+          import os, subprocess, hashlib
+          SQL = b"DO $fix200f$\nDECLARE\n  f record;\n  original text;\n  updated text;\n  anchor constant text := E'  v_user_id := auth.uid();\\n\\n  IF v_user_id IS NULL THEN\\n    RAISE EXCEPTION ''Authentication required'';\\n  END IF;';\n  gate text;\nBEGIN\n  IF md5(pg_get_functiondef('public.shopdrop_completion_state_193g(text,uuid)'::regprocedure)) <> 'c39f12f8ebd052911c29e34f11b2e017' THEN\n    RAISE EXCEPTION 'Fix200F: completion-state source changed';\n  END IF;\n  FOR f IN SELECT * FROM (VALUES\n    ('public.shopdrop_get_my_service_arrival_pin(uuid)','service','3a106224f52e358db2a7ba41ff8586f1'),\n    ('public.shopdrop_get_my_dispatch_arrival_pin(uuid)','dispatch','b02db773610ed2d39771addcdba60930')\n  ) AS v(signature,kind,expected_md5)\n  LOOP\n    original := pg_get_functiondef(f.signature::regprocedure);\n    IF md5(original) <> f.expected_md5 THEN\n      RAISE EXCEPTION 'Fix200F: unexpected PIN getter source: %', f.signature;\n    END IF;\n    IF (length(original)-length(replace(original,anchor,'')))/length(anchor) <> 1 THEN\n      RAISE EXCEPTION 'Fix200F: nonunique insertion anchor';\n    END IF;\n    gate := format(E'\\n\\n  -- Fix 200F: legacy account retrieval must satisfy the existing completion-state gate.\\n  IF (public.shopdrop_completion_state_193g(%L,p_booking_id)->>''pin_available'') IS DISTINCT FROM ''true'' THEN\\n    RAISE EXCEPTION ''Customer completion PIN unavailable'' USING ERRCODE=''42501'';\\n  END IF;', f.kind);\n    updated := replace(original,anchor,anchor||gate);\n    IF replace(updated,anchor||gate,anchor) <> original THEN\n      RAISE EXCEPTION 'Fix200F: unrelated code changed';\n    END IF;\n    EXECUTE updated;\n    IF pg_get_functiondef(f.signature::regprocedure) <> updated THEN\n      RAISE EXCEPTION 'Fix200F: installed source mismatch';\n    END IF;\n    IF has_function_privilege('anon',f.signature,'execute') OR NOT has_function_privilege('authenticated',f.signature,'execute') OR NOT has_function_privilege('service_role',f.signature,'execute') THEN\n      RAISE EXCEPTION 'Fix200F: existing grants changed';\n    END IF;\n  END LOOP;\nEND;\n$fix200f$;\n"
+          MIG = Path('supabase/migrations/20261128124149_shopdrop_fix200f_pin_retrieval_gate.sql')
+          BRANCH = 'shopdrop-phase6-integration'
+          def git(*args):
+              return subprocess.check_output(['git', *map(str,args)],text=True).strip()
+          def require(ok, message):
+              if not ok: raise SystemExit('SAFETY STOP: '+message)
+          require(os.environ.get('GITHUB_REF_NAME')==BRANCH and git('branch','--show-current')==BRANCH,'wrong branch')
+          require(not git('status','--porcelain'),'dirty checkout')
+          require(hashlib.md5(SQL).hexdigest()=='ac19e12cef2ba05dd133fc729cbc7aee' and len(SQL)==2071,'migration content differs from live history')
+          require(not any(p.is_symlink() for p in (MIG,*MIG.parents)),'symlink detected')
+          require(MIG.parent.is_dir(),'migration directory missing')
+          if MIG.exists():
+              require(MIG.is_file() and MIG.read_bytes()==SQL,'migration already exists with different content')
+              print('Already synchronized; exact SQL verified.')
+              raise SystemExit(0)
+          MIG.write_bytes(SQL)
+          require(MIG.read_bytes()==SQL,'write verification failed')
+          subprocess.run(['git','add','--',str(MIG)],check=True)
+          require(git('diff','--cached','--name-only')==str(MIG),'unexpected staged files')
+          require(not git('diff','--name-only') and not git('ls-files','--others','--exclude-standard'),'unrelated changes')
+          subprocess.run(['git','diff','--cached','--check','--',str(MIG)],check=True)
+          print('PASS: recorded exact already-applied migration. No SQL execution, deployment or other source changes.')
+          PYCODE
+          if ! git diff --cached --quiet; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'Fix 200F synchronize verified completion PIN retrieval gate'
+            git push origin HEAD:shopdrop-phase6-integration
+          fi
