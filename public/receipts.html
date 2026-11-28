@@ -97,7 +97,19 @@ function section(parent,label,rows,display){
  for(const row of rows)display(part,row);
  parent.append(part);
 }
+let financialOwner199x=null;
+let financialEpoch199x=0;
+function clearFinancialHistory199x(){
+ financialOwner199x=null;financialEpoch199x++;
+ history.replaceChildren();
+ const message=document.createElement('p');
+ message.textContent='Sign-in changed. Sign in again to view your own records.';
+ const link=document.createElement('a');link.href='./sign-in.html';link.textContent='Sign in';
+ history.append(message,link);
+}
 async function loadHistory(userId){
+ if(financialOwner199x!==userId)return;
+ const epoch=++financialEpoch199x;
  history.textContent='Loading your transaction history…';
  // Queries are READ-ONLY and use existing owner-specific RLS.
  const sources=[
@@ -179,7 +191,8 @@ async function loadHistory(userId){
    R.orderRefs(supabase,productKeys),R.collect(R.dbRPC(supabase),'service_booking',serviceKeys),R.financial(supabase,'receipt')
   ]);
   const {data:currentUser,error:currentUserError}=await supabase.auth.getUser();
-  if(currentUserError||currentUser?.user?.id!==userId){history.textContent='Sign-in changed. Reload to view your own records.';return;}
+  if(epoch!==financialEpoch199x||financialOwner199x!==userId)return;
+  if(currentUserError||currentUser?.user?.id!==userId){clearFinancialHistory199x();return;}
   for(let i=0;i<results.length;i++)for(const row of results[i].data||[]){
    row.original_reference_199dc=productRefs.get(i===0?row.id:row.order_id)||serviceRefs.get(row.booking_id||row.service_booking_id)?.advertisement_reference||null;
   }
@@ -220,6 +233,7 @@ async function loadHistory(userId){
    history.append(p);
   }
  }catch{
+  if(epoch!==financialEpoch199x||financialOwner199x!==userId)return;
   history.textContent='Unable to load transaction history right now.';
   const retry=document.createElement('button');
   retry.type='button';
@@ -238,6 +252,10 @@ if(error||!user){
  link.textContent='Sign in';
  history.append(message,link);
 }else{
+ financialOwner199x=user.id;
+ supabase.auth.onAuthStateChange((event,session)=>{
+  if(financialOwner199x&&(event==='SIGNED_OUT'||session?.user?.id!==financialOwner199x))clearFinancialHistory199x();
+ });
  await loadHistory(user.id);
 }
 </script>

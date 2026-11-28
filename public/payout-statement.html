@@ -109,7 +109,19 @@ function latestHoldMap(holds,key){
  return map;
 }
 
+let financialOwner199x=null;
+let financialEpoch199x=0;
+function clearFinancialPayouts199x(){
+ financialOwner199x=null;financialEpoch199x++;
+ refresh.hidden=true;refresh.disabled=true;
+ clearRows('Not signed in.');
+ message.textContent='Sign-in changed. Sign in again to view your own payout statement.';
+ const link=document.createElement('a');link.href='./sign-in.html';link.textContent='Sign in';
+ message.append(document.createTextNode(' '),link);
+}
 async function loadPayouts(userId){
+ if(financialOwner199x!==userId)return;
+ const epoch=++financialEpoch199x;
  refresh.disabled=true;
  message.textContent='Loading your payout statement…';
  clearRows('Loading…');
@@ -152,7 +164,8 @@ async function loadPayouts(userId){
   ]);
   if(extra.error)errors.push('Provider release request records');
   const {data:currentUser,error:currentUserError}=await supabase.auth.getUser();
-  if(currentUserError||currentUser?.user?.id!==userId){clearRows('Sign-in changed. Reload to view your own records.');message.textContent='Sign in to view your payout statement.';return;}
+  if(epoch!==financialEpoch199x||financialOwner199x!==userId)return;
+  if(currentUserError||currentUser?.user?.id!==userId){clearFinancialPayouts199x();return;}
   const combined=[
    ...sellers.map(row=>({kind:'Seller',row,hold:sellerHoldMap.get(row.id),holdError:!!sellerHolds.error})),
    ...providers.map(row=>({kind:'Service provider',row,hold:providerHoldMap.get(row.id),holdError:!!providerHolds.error}))
@@ -211,10 +224,11 @@ async function loadPayouts(userId){
    ?'Some sections are temporarily unavailable: '+errors.join(', ')+'. Please refresh.'
    :(combined.length+extra.data.length)+' payout or release request record(s) displayed. Only your own records are available.';
  }catch{
+  if(epoch!==financialEpoch199x||financialOwner199x!==userId)return;
   message.textContent='Unable to load your payout statement right now. Please retry.';
   clearRows('Payout history unavailable.');
  }finally{
-  refresh.disabled=false;
+  if(epoch===financialEpoch199x&&financialOwner199x===userId)refresh.disabled=false;
  }
 }
 
@@ -227,6 +241,10 @@ if(error||!user){
  link.textContent='Sign in';
  message.append(document.createTextNode(' '),link);
 }else{
+ financialOwner199x=user.id;
+ supabase.auth.onAuthStateChange((event,session)=>{
+  if(financialOwner199x&&(event==='SIGNED_OUT'||session?.user?.id!==financialOwner199x))clearFinancialPayouts199x();
+ });
  refresh.hidden=false;
  refresh.addEventListener('click',()=>loadPayouts(user.id));
  await loadPayouts(user.id);
