@@ -8,7 +8,7 @@ else {
  const panel=document.createElement('section');panel.className='panel';
  const title=document.createElement('h2');title.textContent='Private courier contact and address';panel.append(title);
  const note=document.createElement('p');note.className='muted';note.textContent='Only you can edit these details. Shop&Drop may share necessary pickup or delivery details with your assigned courier after an authorized paid shipment.';panel.append(note);
- const form=document.createElement('form');form.autocomplete='on';panel.append(form);
+ const form=document.createElement('form');form.autocomplete='on';form.addEventListener('submit',e=>e.preventDefault());panel.append(form);
  const field=(label,key,required=false,kind='text')=>{const l=document.createElement('label');l.textContent=label;l.style.display='block';const i=document.createElement('input');i.name=key;i.type=kind;i.required=required;i.style.width='min(100%,460px)';i.style.display='block';l.append(i);form.append(l);return i};
  const name=field('Full name','full_name',true);
  const phone=field('Mobile number (+country code)','mobile_number',true,'tel');
@@ -19,7 +19,7 @@ else {
  const state=field('State / province','state_province');
  const postal=field('Postal code','postal_code');
  const country=field('Country code (ISO 2 letters, e.g. ZA)','country_code',true);
- const button=document.createElement('button');button.type='submit';button.textContent='Save private contact details';form.append(button);
+ const button=document.createElement('button');button.type='submit';button.textContent='Save private contact details';button.disabled=true;form.append(button);
  const message=document.createElement('p');message.setAttribute('role','status');message.setAttribute('aria-live','polite');panel.append(message);
  const host=document.querySelector('main');const profileSection=document.getElementById('shopdropAccountProfile199r');
  if(profileSection)profileSection.after(panel);else host?.append(panel);
@@ -34,18 +34,26 @@ else {
   phone.value=profile?.mobile_number||a.mobile_number||'';
   for(const input of [label,line1,line2,city,state,postal])input.value=a[input.name]||'';
   country.value=a.country_code||profile?.country_code||'';
+  button.disabled=false;
   form.addEventListener('submit',async e=>{
-   e.preventDefault();button.disabled=true;message.textContent='Saving…';
+   e.preventDefault();if(button.disabled)return;button.disabled=true;message.textContent='Saving…';
+   let profileSaved=false;
    try {
+    const {data:verified,error:verifyError}=await sb.auth.getUser();
+    if(verifyError||verified?.user?.id!==user.id)throw Error('Your sign-in changed. Refresh this page and sign in again.');
     const cc=country.value.trim().toUpperCase();const mobile=phone.value.trim();
     if(!/^[A-Z]{2}$/.test(cc))throw Error('Enter a valid two-letter country code.');
     if(!/^\+[1-9]\d{6,14}$/.test(mobile))throw Error('Enter a mobile number in international format, e.g. +27821234567.');
     const person=name.value.trim();if(!person||!line1.value.trim()||!city.value.trim())throw Error('Name, street and city are required.');
-    const {error:pe}=await sb.from('profiles').update({full_name:person,mobile_number:mobile,country_code:cc}).eq('id',user.id);if(pe)throw pe;
+    const {data:savedProfile,error:pe}=await sb.from('profiles').update({full_name:person,mobile_number:mobile,country_code:cc}).eq('id',user.id).select('id').single();if(pe)throw pe;
+    if(savedProfile?.id!==user.id)throw Error('Profile update could not be confirmed. Refresh before retrying.');
+    profileSaved=true;
     const record={user_id:user.id,recipient_name:person,mobile_number:mobile,address_label:label.value.trim()||'Primary',address_line_1:line1.value.trim(),address_line_2:line2.value.trim()||null,city:city.value.trim(),state_province:state.value.trim()||null,postal_code:postal.value.trim()||null,country_code:cc,is_default:true};
     const result=a.id?await sb.from('addresses').update(record).eq('id',a.id).eq('user_id',user.id).select('id').single():await sb.from('addresses').insert(record).select('id').single();
-    if(result.error)throw result.error;a.id=result.data.id;message.textContent='Private contact details saved.';
-   } catch(err){message.textContent='Save failed: '+(err?.message||'Please try again.')} finally{button.disabled=false}
+    if(result.error)throw result.error;
+    if(!result.data?.id||(a.id&&result.data.id!==a.id))throw Error('Address update could not be confirmed. Refresh before retrying.');
+    a.id=result.data.id;message.textContent='Private contact details saved.';
+   } catch(err){message.textContent=(profileSaved?'Profile saved, but address save was not confirmed. ':'Save failed: ')+(err?.message||'Please try again.')} finally{button.disabled=false}
   });
  }
 }
