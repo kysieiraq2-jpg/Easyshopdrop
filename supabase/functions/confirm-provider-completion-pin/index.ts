@@ -54,6 +54,7 @@ Deno.serve(async (req: Request) => {
     return reply({ ok: false, error: "invalid_booking_or_completion_pin" }, 400);
   }
 
+  // Do not let an arrival submission masquerade as completed work.
   if (input.work_completed !== true) {
     return reply({ ok: false, error: "completed_work_confirmation_required" }, 400);
   }
@@ -72,6 +73,9 @@ Deno.serve(async (req: Request) => {
     return reply({ ok: false, error: "paid_active_booking_required" }, 409);
   }
 
+  // Service-role RPC checks customer PIN, original paid booking, provider,
+  // dispute/hold, PIN attempt limit, and exactly one idempotent staging request.
+  // No actual payout is made. The PIN is never logged or returned.
   const { data: result, error: verifyError } = await admin.rpc(
     "shopdrop_confirm_provider_completion_pin",
     {

@@ -1,7 +1,6 @@
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const VERSION = "SHOPDROP-R7-FEEDBACK-V2";
+const VERSION = "SHOPDROP-R7-FEEDBACK-V3-CONTACT";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY =
@@ -167,10 +166,27 @@ Deno.serve(async (req) => {
    * never from the browser payload.
    */
 
+  /*
+   * FIX 6C: Preserve optional reply preferences in the
+   * protected event for administrator-only case handling.
+   */
+  const category = cleanText(input.category, 100) || null;
+  const replyEmail = cleanText(input.reply_email, 254) || null;
+  const replyWhatsApp = cleanText(input.reply_whatsapp, 32) || null;
+  if (replyEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(replyEmail)) {
+    return json({ ok: false, error: "invalid_reply_email" }, 400);
+  }
+  if (replyWhatsApp && !/^\+?[0-9 ()-]{7,32}$/.test(replyWhatsApp)) {
+    return json({ ok: false, error: "invalid_reply_whatsapp" }, 400);
+  }
+
   const payload = {
     user_id: user.id,
     feedback_reference: reference,
     feedback_type: normalizedType,
+    category,
+    reply_email: replyEmail,
+    reply_whatsapp: replyWhatsApp,
     subject: subject || null,
     message,
     country_code:
@@ -209,4 +225,3 @@ Deno.serve(async (req) => {
     status: "submitted",
   });
 });
-
