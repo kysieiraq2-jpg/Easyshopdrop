@@ -18,30 +18,70 @@
   };
   let clientPromise;
   let cart = [];
+  let checkoutOwner200b=null,checkoutEpoch200b=0,checkoutLocked200b=false,checkoutReady200b=false,loadSequence200b=0;
+  function clearCheckoutDisplay200b(){
+    checkoutReady200b=false;cart=[];
+    $('items').replaceChildren();$('items').textContent='Shopping bag not available. Refresh or sign in again.';
+    $('addresses').replaceChildren();$('selectedAddressSummary').textContent='';
+    $('savedAddressArea').hidden=true;$('savedAddressPicker').hidden=true;$('newAddressFields').hidden=true;
+    $('cancelAddAddress').hidden=true;$('total').textContent='Product subtotal unavailable.';
+    $('quote').textContent='Delivery fee and final payable total: not yet quoted.';
+    $('previewOrderButton').disabled=true;
+    window.ShopDropSingleCourier199da?.clear('Verify your shopping bag and delivery address before continuing.');
+  }
+  function lockCheckout200b(preserveCountdown=false){
+    if(checkoutLocked200b)return;
+    checkoutLocked200b=true;checkoutEpoch200b++;loadSequence200b++;checkoutOwner200b=null;
+    pendingOrderId=null;pendingOrderAddressId=null;pendingOrderCartSignature=null;
+    clearCheckoutDisplay200b();if(!preserveCountdown)window.ShopDropReservationCountdown?.clear?.();
+    for(const id of ['label','recipient','line1','city','region','postal']){
+      const field=$(id);if(field)field.value='';
+    }
+    $('saveDeliveryAddressButton').disabled=true;$('addAnotherAddressButton').disabled=true;
+    $('addressStatus').textContent='Sign-in changed. Reload this page before continuing.';
+    say('Sign-in changed. Please reload or sign in again.',{needsSignIn:true});
+  }
+  function assertCheckout200b(epoch){
+    if(checkoutLocked200b||epoch!==checkoutEpoch200b)throw Object.assign(Error('Sign-in changed. Reload checkout.'),{needsSignIn:true});
+  }
   function client() {
-    if (!clientPromise) clientPromise = import('https://esm.sh/@supabase/supabase-js@2').then(m => m.createClient(URL, KEY, {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}));
+    if (!clientPromise) clientPromise = import('https://esm.sh/@supabase/supabase-js@2').then(m => {
+      const db=m.createClient(URL, KEY, {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+      db.auth.onAuthStateChange((event,session)=>{
+        if(event==='SIGNED_OUT'||(checkoutOwner200b&&session?.user?.id!==checkoutOwner200b))lockCheckout200b();
+      });
+      return db;
+    }).catch(error=>{clientPromise=null;throw error;});
     return clientPromise;
   }
   async function current() {
+    const epoch=checkoutEpoch200b;assertCheckout200b(epoch);
     const db = await client();
     const {data,error} = await db.auth.getUser();
-    if (error || !data?.user?.id) throw Object.assign(new Error('Sign in to view your shopping bag and addresses.'),{needsSignIn:true});
-    return {db, uid:data.user.id};
+    assertCheckout200b(epoch);
+    if (error || !data?.user?.id || (checkoutOwner200b&&checkoutOwner200b!==data.user.id)) {
+      if(checkoutOwner200b)lockCheckout200b();
+      throw Object.assign(new Error('Sign in to view your shopping bag and addresses.'),{needsSignIn:true});
+    }
+    checkoutOwner200b=data.user.id;
+    return {db, uid:data.user.id,epoch};
   }
   async function load(preferredAddressId = '') {
+    if(checkoutLocked200b)return false;
+    const seq=++loadSequence200b;checkoutReady200b=false;$('previewOrderButton').disabled=true;
     try {
-      const {db,uid} = await current();
+      const {db,uid,epoch} = await current();
       const [c,a] = await Promise.all([
         db.from('cart_items').select('id,product_id,quantity').eq('user_id',uid).order('created_at'),
         db.from('addresses').select('id,address_label,address_line_1,city,country_code,is_default').eq('user_id',uid).order('created_at')
       ]);
       if(c.error) throw c.error;
       if(a.error) throw a.error;
-      cart = c.data || [];
+      const nextCart = c.data || [];
       // A152: display approved product names and trusted catalogue prices.
       // This is informational; the server must independently calculate checkout totals.
       // Listing reference added for permanent item identification.
-      const productIds = [...new Set(cart.map(row => row.product_id))];
+      const productIds = [...new Set(nextCart.map(row => row.product_id))];
       let productMap = new Map();
       if (productIds.length) {
         const {data: products, error: productError} = await db.from('products')
@@ -64,6 +104,9 @@
           } catch (_) { /* Optional display only; checkout remains unchanged. */ }
         }));
       }
+      await current();assertCheckout200b(epoch);
+      if(seq!==loadSequence200b)return false;
+      cart=nextCart;checkoutReady200b=true;
       let subtotal = 0;
       let subtotalCurrency = null;
       let totalsAvailable = cart.length > 0;
@@ -140,45 +183,59 @@
         :'';
       $('newAddressFields').hidden=Boolean(chosen);
       $('cancelAddAddress').hidden=true;
-      $('previewOrderButton').disabled=!chosen||Boolean(pendingOrderId);
+      $('previewOrderButton').disabled=!chosen||!cart.length||Boolean(pendingOrderId);
       if(pendingOrderId&&!isCurrentCheckout())window.ShopDropSingleCourier199da?.clear('Checkout changed. Prepare a new order before obtaining a quotation.');
       $('addressStatus').textContent=chosen?'Your delivery address is selected.':'Complete the address fields above, then tap Save delivery address.';
       say('One seller per checkout. You may purchase multiple items from this seller. Payment is not yet enabled.');
-    } catch(e) {say('Cannot load cart/addresses: '+e.message,e);}
+      return true;
+    } catch(e) {
+      if(!checkoutLocked200b&&seq===loadSequence200b){clearCheckoutDisplay200b();say('Cannot load cart/addresses: '+e.message,e);}
+      return false;
+    }
   }
   async function change(item,quantity){
+    if(!checkoutReady200b||checkoutLocked200b)return;
     try{
-      const {db,uid}=await current();
+      const {db,uid,epoch}=await current();
+      assertCheckout200b(epoch);
+      if(!checkoutReady200b||!cart.some(row=>row.id===item.id))return;
       const result=quantity<=0
         ?await db.from('cart_items').delete().eq('id',item.id).eq('user_id',uid)
         :await db.from('cart_items').update({quantity}).eq('id',item.id).eq('user_id',uid);
+      assertCheckout200b(epoch);await current();assertCheckout200b(epoch);
       if(result.error)throw result.error;
       window.ShopDropReservationCountdown?.clear?.();
       await load();
-    }catch(e){say('Cart update failed: '+e.message,e);}
+    }catch(e){if(!checkoutLocked200b)say('Cart update failed: '+e.message,e);}
   }
   async function saveAddress(){
     const saveButton=$('saveDeliveryAddressButton');
-    if(saveButton.disabled)return;
+    if(saveButton.disabled||checkoutLocked200b||!checkoutReady200b)return;
     saveButton.disabled=true;
     try{
-      const {db,uid}=await current();
+      const {db,uid,epoch}=await current();assertCheckout200b(epoch);
       // South African delivery addresses require a province.
       if($('country').value.trim().toUpperCase()==='ZA'&&!$('region').value.trim())throw new Error('Choose your province before saving the delivery address.');
       const required=['recipient','line1','city','country'];
       if(required.some(id=>!$(id).value.trim()))throw new Error('Enter recipient, street, city and country.');
       const data={user_id:uid,address_label:$('label').value.trim()||'Delivery',recipient_name:$('recipient').value.trim(),address_line_1:$('line1').value.trim(),city:$('city').value.trim(),state_province:$('region').value.trim()||null,postal_code:$('postal').value.trim()||null,country_code:$('country').value.trim().toUpperCase(),is_default:false};
       const {data:saved,error}=await db.from('addresses').insert(data).select('id').single();
+      assertCheckout200b(epoch);await current();assertCheckout200b(epoch);
       if(error)throw error;
       if(!saved?.id)throw Error('Address save confirmation unavailable. Refresh before trying again.');
       window.ShopDropReservationCountdown?.clear?.();
-      await load(saved.id);
+      const loaded=await load(saved.id);assertCheckout200b(epoch);
+      if(!loaded||$('addresses').value!==saved.id){
+        $('addressStatus').textContent='Address saved, but selection could not be verified. Refresh before continuing.';
+        say('Delivery address saved, but checkout must be refreshed.');return;
+      }
       $('addressStatus').textContent='Address saved and selected.';
       say('Delivery address saved. Payment remains disabled.');
     }catch(e){
+      if(checkoutLocked200b)return;
       $('addressStatus').textContent='Address not saved: '+e.message;
       say('Address save failed: '+e.message,e);
-    }finally{saveButton.disabled=false;}
+    }finally{if(!checkoutLocked200b)saveButton.disabled=false;}
   }
   let creatingOrder = false;
   let pendingOrderId = null;
@@ -192,14 +249,15 @@
       quantity: Number(item.quantity)
     })).sort((a,b) => a.product_id.localeCompare(b.product_id)));
   }
-  function isCurrentCheckout(){return Boolean(pendingOrderId&&pendingOrderAddressId&&$('addresses').value===pendingOrderAddressId&&pendingOrderCartSignature===cartSignature()&&$('newAddressFields').hidden);}
+  function isCurrentCheckout(){return Boolean(checkoutReady200b&&!checkoutLocked200b&&pendingOrderId&&pendingOrderAddressId&&$('addresses').value===pendingOrderAddressId&&pendingOrderCartSignature===cartSignature()&&$('newAddressFields').hidden);}
   async function place(){
-    if (creatingOrder) return;
+    if (creatingOrder||!checkoutReady200b||checkoutLocked200b) return;
     const button=$('previewOrderButton');
     creatingOrder=true;
     if(button) button.disabled=true;
     try {
-      await current();
+      const {epoch}=await current();assertCheckout200b(epoch);
+      if(!checkoutReady200b)throw Error('Refresh checkout before continuing.');
       if (!cart.length) throw Error('Add a product to your shopping bag first.');
       if (!$('addresses').value) throw Error('Select a delivery address first.');
       if (!window.ShopDropCheckoutConnector?.createOrder) throw Error('Secure order connector is unavailable.');
@@ -227,10 +285,14 @@
         await window.ShopDropReservationCountdown?.refresh?.();
         const createSession=window.ShopDropSupabaseAdapter?.authenticatedFunctions?.createPaymentSession;
         if (typeof createSession!=='function') throw Error('Secure payment connector unavailable.');
+        await current();assertCheckout200b(epoch);
+        if(!isCurrentCheckout())throw Error('Checkout changed. Refresh before continuing.');
         const payment=await createSession({order_id:pendingOrderId,delivery_method:'integrated_courier',method_code:method.method_code,country_code:method.country_code});
+        assertCheckout200b(epoch);await current();assertCheckout200b(epoch);
         if (payment?.ok===false || payment?.error) throw Error(payment.error||'Payment session was not created.');
         // Reservation begins inside create-payment-session. Read its real expiry now.
         await window.ShopDropReservationCountdown?.refresh?.();
+        assertCheckout200b(epoch);
         const checkoutUrl=payment?.checkout_url||payment?.redirect_url||payment?.url;
         if (checkoutUrl) {
           const parsed=new URL(checkoutUrl);
@@ -247,6 +309,7 @@
       const requestedAddressId=$('addresses').value;
       const requestedCartSignature=cartSignature();
       const result=await window.ShopDropCheckoutConnector.createOrder(items, requestedAddressId);
+      assertCheckout200b(epoch);await current();assertCheckout200b(epoch);
       if ($('addresses').value!==requestedAddressId || cartSignature()!==requestedCartSignature)
         throw Error('Checkout details changed while creating the order. Refresh your bag before continuing.');
       const order=result?.order || result?.data?.order || result;
@@ -259,23 +322,26 @@
         if(button){button.textContent='Proceed to secure payment';button.disabled=true;}
         await window.ShopDropSingleCourier199da?.refresh();
       }
+      assertCheckout200b(epoch);
       say(reference ? 'Secure order created: '+reference+'. Select the appointed courier to obtain a quotation. No payment has been made.' : 'Secure order request accepted. No payment taken. Check your order status before trying again.');
       // Keep the stable request ID until checkout/payment is safely completed.
-    } catch(e) {const msg=String(e?.message||'');say(msg.includes('one_seller_per_checkout')?'Only one seller is permitted per checkout. Please purchase from each seller separately.':'Order creation failed: '+(msg||'Please try again.'),e);}
-    finally {creatingOrder=false;if(button)button.disabled=pendingOrderId?!window.ShopDropSingleCourier199da?.canPay():!$('addresses').value;}
+    } catch(e) {if(checkoutLocked200b)return;const msg=String(e?.message||'');say(msg.includes('one_seller_per_checkout')?'Only one seller is permitted per checkout. Please purchase from each seller separately.':'Order creation failed: '+(msg||'Please try again.'),e);}
+    finally {creatingOrder=false;if(button)button.disabled=checkoutLocked200b||!checkoutReady200b||!cart.length||(pendingOrderId?!window.ShopDropSingleCourier199da?.canPay():!$('addresses').value);}
   }
   const button=$('previewOrderButton');
   if(button) button.textContent='Prepare order';
   $('addAnotherAddressButton').addEventListener('click',()=>{
+    if(checkoutLocked200b||!checkoutReady200b)return;
     $('newAddressFields').hidden=false;
     $('cancelAddAddress').hidden=false;
     if(button)button.disabled=true;
     $('addressStatus').textContent='Complete the new address fields above, then tap Save delivery address.';
   });
   $('cancelAddAddress').addEventListener('click',()=>{
+    if(checkoutLocked200b||!checkoutReady200b)return;
     $('newAddressFields').hidden=true;
     $('cancelAddAddress').hidden=true;
-    if(button)button.disabled=Boolean(pendingOrderId)||!$('addresses').value;
+    if(button)button.disabled=Boolean(pendingOrderId)||!cart.length||!$('addresses').value;
     $('addressStatus').textContent='Your saved delivery address is selected.';
   });
   $('addresses').addEventListener('change',()=>{
@@ -286,5 +352,7 @@
   window.place=place;
   window.ShopDropPhase6CartAddress=Object.freeze({load,getPendingOrderId:()=>pendingOrderId,isCurrentCheckout});
   if(window.ShopDropGeo?.countryOptions) $('country').innerHTML=window.ShopDropGeo.countryOptions('ZA');
+  window.addEventListener('pagehide',()=>lockCheckout200b(true));
+  window.addEventListener('pageshow',event=>{if(event.persisted)location.reload();});
   load();
 })();
