@@ -1,0 +1,127 @@
+name: ShopDrop Fix 200A Admin Case Session Privacy
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix200a-admin-case-session-privacy.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: shopdrop-fix200a
+  cancel-in-progress: false
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+        persist-credentials: true
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - name: Protect and test exceptional case sessions
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import hashlib, os, subprocess, tempfile
+        from html.parser import HTMLParser
+        PATCHES = {'public/admin-review-cases.html': ('ac1ba92b83482372770e1679faafd2120ecf0193', [("function deny(message){\n$('protected').hidden=true;", "let reviewOwner200a=null,reviewEpoch200a=0,reviewLocked200a=false;\nfunction deny(message){\nreviewEpoch200a++;reviewOwner200a=null;reviewLocked200a=true;\n$('protected').hidden=true;\n$('reviews').replaceChildren();$('cases').replaceChildren();\n$('message').textContent='';$('refresh').disabled=true;"), ("async function authorized(){\nconst {data,error}=await supabase.auth.getUser();\n\nif(error||!data?.user){\ndeny('Sign-in required.');\nreturn false;\n}\n\nconst check=await supabase.rpc(\n'shopdrop_is_active_admin'\n);\n\nif(check.error||check.data!==true){\ndeny('Administrator access denied.');\nreturn false;\n}\n\n$('access').textContent='Administrator access confirmed.';\n$('protected').hidden=false;\nreturn true;\n}", "async function authorized(){\nif(reviewLocked200a)return false;\nconst epoch=reviewEpoch200a;\ntry{\n const {data,error}=await supabase.auth.getUser();\n if(epoch!==reviewEpoch200a||reviewLocked200a)return false;\n if(error||!data?.user||(reviewOwner200a&&reviewOwner200a!==data.user.id)){\n  deny('Administrator sign-in changed. Please sign in again.');return false;\n }\n reviewOwner200a=data.user.id;\n const check=await supabase.rpc('shopdrop_is_active_admin');\n if(epoch!==reviewEpoch200a||reviewLocked200a)return false;\n const {data:current,error:currentError}=await supabase.auth.getUser();\n if(epoch!==reviewEpoch200a||reviewLocked200a)return false;\n if(check.error||check.data!==true||currentError||current?.user?.id!==reviewOwner200a){\n  deny('Administrator access denied or unavailable.');return false;\n }\n $('access').textContent='Administrator access confirmed.';\n $('protected').hidden=false;\n return true;\n}catch(_){\n if(epoch===reviewEpoch200a)deny('Administrator access unavailable. Please sign in again.');\n return false;\n}\n}"), ('))return;\n\nbuttons.forEach(b=>b.disabled=true);', '))return;\n\nif(!feedback.isConnected||!await authorized()||!feedback.isConnected)return;\nbuttons.forEach(b=>b.disabled=true);'), ('p_note:note\n}\n);\n\nif(error||data?.audited!==true){', 'p_note:note\n}\n);\n\nif(!await authorized()||!feedback.isConnected)return;\nif(error||data?.audited!==true){'), ('async function showSubmissionDetails(record,container,button){\nif(!await authorized())return;', 'async function showSubmissionDetails(record,container,button){\nif(!container.isConnected||!await authorized()||!container.isConnected)return;'), ("throw Error('Unexpected submission response');\n}\n\ncontainer.replaceChildren();", "throw Error('Unexpected submission response');\n}\n\nif(!await authorized()||!container.isConnected)return;\ncontainer.replaceChildren();"), ('  const linked=result.data;', '  if(!await authorized()||!container.isConnected)return;\n  const linked=result.data;'), ('async function showCustomerCaseReview(record,container,button){\nif(!await authorized())return;', 'async function showCustomerCaseReview(record,container,button){\nif(!container.isConnected||!await authorized()||!container.isConnected)return;'), ("throw Error('Unexpected investigation response');\n}\n\ncontainer.replaceChildren();", "throw Error('Unexpected investigation response');\n}\n\nif(!await authorized()||!container.isConnected)return;\ncontainer.replaceChildren();"), ('))return;\n\nsave.disabled=true;', '))return;\n\nif(!save.isConnected||!await authorized()||!save.isConnected)return;\nsave.disabled=true;'), ('if(saveError)throw saveError;', 'if(!await authorized()||!save.isConnected)return;\nif(saveError)throw saveError;'), ("async function load(){\nconst refresh=$('refresh');", "async function load(){\nif(reviewLocked200a)return;\nconst epoch=reviewEpoch200a;\nconst refresh=$('refresh');"), ('if(reviews.error)throw reviews.error;', 'if(epoch!==reviewEpoch200a||!await authorized()||epoch!==reviewEpoch200a)return;\nif(reviews.error)throw reviews.error;'), ("}catch(error){\n$('message').textContent=", "}catch(error){\nif(epoch!==reviewEpoch200a||reviewLocked200a)return;\n$('message').textContent="), ("}finally{\nrefresh.disabled=false;\n}\n}\n\n$('refresh').onclick", "}finally{\nif(epoch===reviewEpoch200a&&!reviewLocked200a)refresh.disabled=false;\n}\n}\n\n$('refresh').onclick"), ('if(await authorized())await load();\n</script>', "supabase.auth.onAuthStateChange((event,session)=>{\n if(event==='SIGNED_OUT'||(reviewOwner200a&&session?.user?.id!==reviewOwner200a))deny('Administrator sign-in changed. Please sign in again.');\n});\nwindow.addEventListener('pagehide',()=>deny('Administrator session must be verified again.'));\nwindow.addEventListener('pageshow',event=>{if(event.persisted)location.reload();});\nif(await authorized())await load();\n</script>")])}
+        TEST = "const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');\nconst source=fs.readFileSync(process.argv[2],'utf8').replace(/import\\s*\\{createClient\\}\\s*from\\s*'[^']+';/,'');\nfunction el(){return {children:[],hidden:false,disabled:false,isConnected:true,_text:'',set textContent(x){this._text=String(x);this.children=[]},get textContent(){return this._text+this.children.map(c=>typeof c==='string'?c:c.textContent).join(' ')},append(...xs){this.children.push(...xs)},replaceChildren(...xs){for(const c of this.children)if(typeof c==='object')c.isConnected=false;this._text='';this.children=xs},setAttribute(){},style:{}}}\nconst tick=()=>new Promise(r=>setImmediate(r));\nasync function setup(mode){let uid='A',allowed=true,cb,resolveReport,failReport,reads=0,mutations=0,reloads=0;const dom=new Map(),events={};const get=id=>{if(!dom.has(id))dom.set(id,el());return dom.get(id)};\n const sb={auth:{getUser:async()=>({data:{user:uid?{id:uid}:null},error:null}),onAuthStateChange(f){cb=f}},rpc:async(name)=>{if(name==='shopdrop_is_active_admin')return {data:allowed,error:null};if(name.includes('update')){mutations++;return {data:{audited:true},error:null}};reads++;if(name==='shopdrop_admin_review_queue_readonly'&&mode==='delay')return new Promise((r,j)=>{resolveReport=()=>r({data:[{review_id:'PRIVATE',review_status:'pending'}],error:null});failReport=()=>j(Error('network'))});return {data:name==='shopdrop_admin_case_overview'?[{case_id:'CASE',case_type:'customer_feedback',case_status:'received'}]:[{review_id:'PRIVATE',review_status:'pending'}],error:null}}};\n const pending=vm.runInNewContext('(async()=>{'+source+'\\n})()',{createClient:()=>sb,document:{getElementById:get,createElement:el},window:{addEventListener:(k,f)=>events[k]=f},location:{reload:()=>reloads++},confirm:()=>true,Date,Number,console});await tick();return {pending,get,events,emit(e,u){uid=u;cb(e,u?{user:{id:u}}:null)},release:()=>resolveReport(),fail:()=>failReport(),revoke:()=>{allowed=false},get reads(){return reads},get mutations(){return mutations},get reloads(){return reloads}};}\n(async()=>{let t=await setup('normal');await t.pending;assert.match(t.get('reviews').textContent,/PRIVATE/);assert.equal(t.get('protected').hidden,false);t.emit('TOKEN_REFRESHED','A');assert.match(t.get('reviews').textContent,/PRIVATE/);t.emit('SIGNED_OUT',null);assert.equal(t.get('protected').hidden,true);assert.equal(t.get('reviews').textContent,'');assert.equal(t.get('cases').textContent,'');await t.get('refresh').onclick();assert.equal(t.reads,2);assert.equal(t.mutations,0);\n t=await setup('delay');t.emit('SIGNED_IN','B');t.release();await t.pending;assert.equal(t.get('protected').hidden,true);assert.equal(t.get('reviews').textContent,'');assert.equal(t.get('cases').textContent,'');\n t=await setup('delay');t.revoke();t.release();await t.pending;assert.equal(t.get('protected').hidden,true);assert.equal(t.get('reviews').textContent,'');\n t=await setup('delay');t.emit('SIGNED_OUT',null);t.fail();await t.pending;assert.equal(t.get('message').textContent,'');assert.equal(t.get('refresh').disabled,true);\n t=await setup('normal');await t.pending;t.events.pagehide();assert.equal(t.get('reviews').textContent,'');t.events.pageshow({persisted:true});assert.equal(t.reloads,1);console.log('PASS: normal, same-account refresh, sign-out, account switch during load, revoked admin, late failure and restored page');})().catch(e=>{console.error(e);process.exitCode=1});"
+        BRANCH = 'shopdrop-phase6-integration'
+        def git(*args):
+            return subprocess.check_output(['git', *map(str,args)], text=True).strip()
+        def blob(data):
+            return hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+        def require(ok, message):
+            if not ok: raise SystemExit('SAFETY STOP: '+message)
+        def update(data, changes):
+            result=data
+            for a,b in changes:
+                a,b=a.encode(),b.encode()
+                require(result.count(a)==1,'unexpected replacement anchor count')
+                result=result.replace(a,b,1)
+            original=result
+            for a,b in reversed(changes):
+                a,b=a.encode(),b.encode()
+                require(original.count(b)==1,'unexpected reverse anchor count')
+                original=original.replace(b,a,1)
+            require(original==data,'unrelated code changed')
+            return result
+        require(os.environ.get('GITHUB_REF_NAME')==BRANCH and git('branch','--show-current')==BRANCH,'incorrect branch')
+        require(not git('status','--porcelain'),'dirty checkout')
+        originals={}; updates={}; backups={}
+        for path,(expected,changes) in PATCHES.items():
+            p=Path(path); b=Path('backups/fix200a')/p
+            require(p.is_file() and not p.is_symlink() and not b.is_symlink(),'unexpected path '+path)
+            backups[path]=b
+            if b.exists():
+                old=b.read_bytes()
+                require(blob(old)==expected and p.read_bytes()==update(old,changes),'partial or modified prior fix '+path)
+                originals[path]=old; updates[path]=p.read_bytes()
+            else:
+                old=p.read_bytes()
+                require(blob(old)==expected,'current source changed '+path)
+                originals[path]=old; updates[path]=update(old,changes)
+        existing=sum(p.exists() for p in backups.values())
+        require(existing in (0,len(PATCHES)),'partial prior backup')
+        class Scripts(HTMLParser):
+            def __init__(self):
+                super().__init__(); self.scripts=[]; self.current=None
+            def handle_starttag(self,tag,attrs):
+                if tag=='script':
+                    attrs=dict(attrs)
+                    self.current=None if 'src' in attrs else (attrs.get('type',''),[])
+            def handle_data(self,data):
+                if self.current is not None: self.current[1].append(data)
+            def handle_endtag(self,tag):
+                if tag=='script' and self.current is not None:
+                    self.scripts.append((self.current[0],''.join(self.current[1]))); self.current=None
+        with tempfile.TemporaryDirectory() as td:
+            t=Path(td)
+            for path,data in updates.items():
+                if path.endswith('.js'):
+                    f=t/(Path(path).stem+('.mjs' if path.endswith('shopdrop-private-contact.js') else '.js'));f.write_bytes(data)
+                    subprocess.run(['node','--check',str(f)],check=True)
+                else:
+                    before=Scripts();before.feed(originals[path].decode());after=Scripts();after.feed(data.decode())
+                    require(len(before.scripts)==len(after.scripts)==1 and before.scripts[0][0]==after.scripts[0][0]=='module','unexpected module structure')
+                    for i,(kind,code) in enumerate(after.scripts):
+                        if kind not in ('','module','text/javascript','application/javascript'): continue
+                        f=t/(Path(path).stem+str(i)+('.mjs' if kind=='module' else '.js'));f.write_text(code)
+                        subprocess.run(['node','--check',str(f)],check=True)
+            test=t/'test.cjs';test.write_text(TEST)
+            subprocess.run(['node',str(test),str(t/'admin-review-cases0.mjs')],check=True)
+        if existing:
+            print('Already installed; all exact backups and patched files verified.');raise SystemExit(0)
+        for path,data in updates.items():
+            b=backups[path];b.parent.mkdir(parents=True,exist_ok=True);b.write_bytes(originals[path]);Path(path).write_bytes(data)
+            require(b.read_bytes()==originals[path] and Path(path).read_bytes()==data,'write mismatch '+path)
+        require(set(git('diff','--name-only').splitlines())==set(PATCHES),'unexpected tracked changes')
+        allowed=set(PATCHES)|{str(b) for b in backups.values()}
+        subprocess.run(['git','add','--',*sorted(allowed)],check=True)
+        require(set(git('diff','--cached','--name-only').splitlines())==allowed,'unexpected staged changes')
+        require(not git('diff','--name-only') and not git('ls-files','--others','--exclude-standard'),'unrelated files')
+        subprocess.run(['git','diff','--cached','--check','--',*PATCHES],check=True)
+        print('PASS: exact source hashes, reversible patches, preserved unrelated inline scripts, syntax, exceptional case session mock tests and exact staged paths.')
+        PYCODE
+        if ! git diff --cached --quiet; then
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Fix 200A protect exceptional case sessions'
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
