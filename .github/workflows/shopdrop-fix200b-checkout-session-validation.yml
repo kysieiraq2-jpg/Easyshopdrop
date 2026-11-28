@@ -1,0 +1,128 @@
+name: ShopDrop Fix 200B Checkout Session Validation
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix200b-checkout-session-validation.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: shopdrop-fix200b
+  cancel-in-progress: false
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+        persist-credentials: true
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - name: Protect and test checkout session and reload validation
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import hashlib, os, subprocess, tempfile
+        from html.parser import HTMLParser
+        PATCHES = {'public/shopdrop-cart-address-bridge.js': ('e7713fb5a79740e7b1fb62b24944dfa3cb26fff9', [('  let cart = [];', "  let cart = [];\n  let checkoutOwner200b=null,checkoutEpoch200b=0,checkoutLocked200b=false,checkoutReady200b=false,loadSequence200b=0;\n  function clearCheckoutDisplay200b(){\n    checkoutReady200b=false;cart=[];\n    $('items').replaceChildren();$('items').textContent='Shopping bag not available. Refresh or sign in again.';\n    $('addresses').replaceChildren();$('selectedAddressSummary').textContent='';\n    $('savedAddressArea').hidden=true;$('savedAddressPicker').hidden=true;$('newAddressFields').hidden=true;\n    $('cancelAddAddress').hidden=true;$('total').textContent='Product subtotal unavailable.';\n    $('quote').textContent='Delivery fee and final payable total: not yet quoted.';\n    $('previewOrderButton').disabled=true;\n    window.ShopDropSingleCourier199da?.clear('Verify your shopping bag and delivery address before continuing.');\n  }\n  function lockCheckout200b(preserveCountdown=false){\n    if(checkoutLocked200b)return;\n    checkoutLocked200b=true;checkoutEpoch200b++;loadSequence200b++;checkoutOwner200b=null;\n    pendingOrderId=null;pendingOrderAddressId=null;pendingOrderCartSignature=null;\n    clearCheckoutDisplay200b();if(!preserveCountdown)window.ShopDropReservationCountdown?.clear?.();\n    for(const id of ['label','recipient','line1','city','region','postal']){\n      const field=$(id);if(field)field.value='';\n    }\n    $('saveDeliveryAddressButton').disabled=true;$('addAnotherAddressButton').disabled=true;\n    $('addressStatus').textContent='Sign-in changed. Reload this page before continuing.';\n    say('Sign-in changed. Please reload or sign in again.',{needsSignIn:true});\n  }\n  function assertCheckout200b(epoch){\n    if(checkoutLocked200b||epoch!==checkoutEpoch200b)throw Object.assign(Error('Sign-in changed. Reload checkout.'),{needsSignIn:true});\n  }"), ("    if (!clientPromise) clientPromise = import('https://esm.sh/@supabase/supabase-js@2').then(m => m.createClient(URL, KEY, {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}));", "    if (!clientPromise) clientPromise = import('https://esm.sh/@supabase/supabase-js@2').then(m => {\n      const db=m.createClient(URL, KEY, {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});\n      db.auth.onAuthStateChange((event,session)=>{\n        if(event==='SIGNED_OUT'||(checkoutOwner200b&&session?.user?.id!==checkoutOwner200b))lockCheckout200b();\n      });\n      return db;\n    }).catch(error=>{clientPromise=null;throw error;});"), ("    const db = await client();\n    const {data,error} = await db.auth.getUser();\n    if (error || !data?.user?.id) throw Object.assign(new Error('Sign in to view your shopping bag and addresses.'),{needsSignIn:true});\n    return {db, uid:data.user.id};", "    const epoch=checkoutEpoch200b;assertCheckout200b(epoch);\n    const db = await client();\n    const {data,error} = await db.auth.getUser();\n    assertCheckout200b(epoch);\n    if (error || !data?.user?.id || (checkoutOwner200b&&checkoutOwner200b!==data.user.id)) {\n      if(checkoutOwner200b)lockCheckout200b();\n      throw Object.assign(new Error('Sign in to view your shopping bag and addresses.'),{needsSignIn:true});\n    }\n    checkoutOwner200b=data.user.id;\n    return {db, uid:data.user.id,epoch};"), ("  async function load(preferredAddressId = '') {\n    try {\n      const {db,uid} = await current();", "  async function load(preferredAddressId = '') {\n    if(checkoutLocked200b)return false;\n    const seq=++loadSequence200b;checkoutReady200b=false;$('previewOrderButton').disabled=true;\n    try {\n      const {db,uid,epoch} = await current();"), ('      cart = c.data || [];', '      const nextCart = c.data || [];'), ('      const productIds = [...new Set(cart.map(row => row.product_id))];', '      const productIds = [...new Set(nextCart.map(row => row.product_id))];'), ('      let subtotal = 0;', '      await current();assertCheckout200b(epoch);\n      if(seq!==loadSequence200b)return false;\n      cart=nextCart;checkoutReady200b=true;\n      let subtotal = 0;'), ("      $('previewOrderButton').disabled=!chosen||Boolean(pendingOrderId);", "      $('previewOrderButton').disabled=!chosen||!cart.length||Boolean(pendingOrderId);"), ("    } catch(e) {say('Cannot load cart/addresses: '+e.message,e);}", "      return true;\n    } catch(e) {\n      if(!checkoutLocked200b&&seq===loadSequence200b){clearCheckoutDisplay200b();say('Cannot load cart/addresses: '+e.message,e);}\n      return false;\n    }"), ('  async function change(item,quantity){\n    try{\n      const {db,uid}=await current();', '  async function change(item,quantity){\n    if(!checkoutReady200b||checkoutLocked200b)return;\n    try{\n      const {db,uid,epoch}=await current();\n      assertCheckout200b(epoch);\n      if(!checkoutReady200b||!cart.some(row=>row.id===item.id))return;'), ('      if(result.error)throw result.error;\n      window.ShopDropReservationCountdown?.clear?.();', '      assertCheckout200b(epoch);await current();assertCheckout200b(epoch);\n      if(result.error)throw result.error;\n      window.ShopDropReservationCountdown?.clear?.();'), ("    }catch(e){say('Cart update failed: '+e.message,e);}", "    }catch(e){if(!checkoutLocked200b)say('Cart update failed: '+e.message,e);}"), ('    if(saveButton.disabled)return;\n    saveButton.disabled=true;\n    try{\n      const {db,uid}=await current();', '    if(saveButton.disabled||checkoutLocked200b||!checkoutReady200b)return;\n    saveButton.disabled=true;\n    try{\n      const {db,uid,epoch}=await current();assertCheckout200b(epoch);'), ('      if(error)throw error;\n      if(!saved?.id)', '      assertCheckout200b(epoch);await current();assertCheckout200b(epoch);\n      if(error)throw error;\n      if(!saved?.id)'), ("      await load(saved.id);\n      $('addressStatus').textContent='Address saved and selected.';", "      const loaded=await load(saved.id);assertCheckout200b(epoch);\n      if(!loaded||$('addresses').value!==saved.id){\n        $('addressStatus').textContent='Address saved, but selection could not be verified. Refresh before continuing.';\n        say('Delivery address saved, but checkout must be refreshed.');return;\n      }\n      $('addressStatus').textContent='Address saved and selected.';"), ("    }catch(e){\n      $('addressStatus').textContent='Address not saved: '+e.message;", "    }catch(e){\n      if(checkoutLocked200b)return;\n      $('addressStatus').textContent='Address not saved: '+e.message;"), ('    }finally{saveButton.disabled=false;}', '    }finally{if(!checkoutLocked200b)saveButton.disabled=false;}'), ('function isCurrentCheckout(){return Boolean(pendingOrderId', 'function isCurrentCheckout(){return Boolean(checkoutReady200b&&!checkoutLocked200b&&pendingOrderId'), ('    if (creatingOrder) return;', '    if (creatingOrder||!checkoutReady200b||checkoutLocked200b) return;'), ('      await current();\n      if (!cart.length)', "      const {epoch}=await current();assertCheckout200b(epoch);\n      if(!checkoutReady200b)throw Error('Refresh checkout before continuing.');\n      if (!cart.length)"), ('        const payment=await createSession(', "        await current();assertCheckout200b(epoch);\n        if(!isCurrentCheckout())throw Error('Checkout changed. Refresh before continuing.');\n        const payment=await createSession("), ('        if (payment?.ok===false', '        assertCheckout200b(epoch);await current();assertCheckout200b(epoch);\n        if (payment?.ok===false'), ('        const checkoutUrl=payment?.checkout_url', '        assertCheckout200b(epoch);\n        const checkoutUrl=payment?.checkout_url'), ("      if ($('addresses').value!==requestedAddressId", "      assertCheckout200b(epoch);await current();assertCheckout200b(epoch);\n      if ($('addresses').value!==requestedAddressId"), ("      say(reference ? 'Secure order created:", "      assertCheckout200b(epoch);\n      say(reference ? 'Secure order created:"), ("    } catch(e) {const msg=String(e?.message||'');say(msg.includes", "    } catch(e) {if(checkoutLocked200b)return;const msg=String(e?.message||'');say(msg.includes"), ("finally {creatingOrder=false;if(button)button.disabled=pendingOrderId?!window.ShopDropSingleCourier199da?.canPay():!$('addresses').value;}", "finally {creatingOrder=false;if(button)button.disabled=checkoutLocked200b||!checkoutReady200b||!cart.length||(pendingOrderId?!window.ShopDropSingleCourier199da?.canPay():!$('addresses').value);}"), ("  $('addAnotherAddressButton').addEventListener('click',()=>{\n", "  $('addAnotherAddressButton').addEventListener('click',()=>{\n    if(checkoutLocked200b||!checkoutReady200b)return;\n"), ("  $('cancelAddAddress').addEventListener('click',()=>{\n", "  $('cancelAddAddress').addEventListener('click',()=>{\n    if(checkoutLocked200b||!checkoutReady200b)return;\n"), ("if(button)button.disabled=Boolean(pendingOrderId)||!$('addresses').value;", "if(button)button.disabled=Boolean(pendingOrderId)||!cart.length||!$('addresses').value;"), ('  load();\n})();', "  window.addEventListener('pagehide',()=>lockCheckout200b(true));\n  window.addEventListener('pageshow',event=>{if(event.persisted)location.reload();});\n  load();\n})();")]), 'public/checkout.html': ('6346c807038d44eb7d446748a612b502a025d9d8', [('shopdrop-cart-address-bridge.js?v=199m', 'shopdrop-cart-address-bridge.js?v=200b')])}
+        TEST = 'const fs=require(\'node:fs\'),vm=require(\'node:vm\'),assert=require(\'node:assert/strict\');\nconst original=fs.readFileSync(process.argv[2],\'utf8\');const remote="import(\'https://esm.sh/@supabase/supabase-js@2\')";assert.equal(original.split(remote).length,2);const source=original.replace(remote,\'mockImport()\');\nconst tick=()=>new Promise(r=>setImmediate(r));\nfunction el(){return {children:[],hidden:false,disabled:false,value:\'\',_text:\'\',set textContent(v){this._text=String(v);this.children=[]},get textContent(){return this._text+this.children.map(c=>typeof c===\'string\'?c:c.textContent||\'\').join(\' \')},append(...v){this.children.push(...v)},replaceChildren(...v){this._text=\'\';this.children=v;this.value=\'\'},add(v){this.children.push(v)},addEventListener(){},setAttribute(){},style:{}}}\nasync function setup(mode=\'ok\'){\n let user=\'A\',cb,fail=false,delayResolve,readCount=0,orders=0,payments=0;const nodes=new Map(),events={};const get=id=>{if(!nodes.has(id))nodes.set(id,el());return nodes.get(id)};get(\'newAddressFields\').hidden=true;get(\'country\').value=\'ZA\';\n const cart=[{id:\'c\',product_id:\'p\',quantity:1}],addresses=[{id:\'a\',address_label:\'Private A\',city:\'Town\',is_default:true}],products=[{id:\'p\',title:\'Private item\',price:100,currency:\'ZAR\',quantity:1,listing_status:\'active\'}];\n const db={auth:{getUser:async()=>({data:{user:user?{id:user}:null},error:null}),onAuthStateChange:f=>{cb=f}},from(table){let q={select:()=>q,eq:()=>q,in:()=>q,order:()=>q,then:(r,j)=>{readCount++;if(mode===\'delay\'&&table===\'cart_items\'&&!delayResolve){return new Promise(x=>{delayResolve=x}).then(r,j)}return Promise.resolve({data:table===\'cart_items\'?cart:table===\'addresses\'?addresses:products,error:fail?Error(\'network\'):null}).then(r,j)}};return q},rpc:async()=>({data:{seller_alias:\'Public alias\'},error:null})};\n const window={addEventListener:(k,f)=>events[k]=f,ShopDropSingleCourier199da:{clear(){},canPay:()=>false,refresh:async()=>{}},ShopDropReservationCountdown:{clear(){},remember(){},refresh:async()=>{}},ShopDropCheckoutConnector:{createOrder:async()=>{orders++;return {id:\'12345678-1234-1234-1234-123456789abc\'}}},ShopDropSupabaseAdapter:{authenticatedFunctions:{createPaymentSession:async()=>{payments++}}}};\n vm.runInNewContext(source,{window,document:{getElementById:get,createElement:el,createTextNode:s=>s},Option:function(text,value){this.textContent=text;this.value=value},mockImport:async()=>({createClient:()=>db}),Intl,location:{reload(){}},console});await tick();await tick();\n return {get,window,events,emit(e,u){user=u;cb(e,u?{user:{id:u}}:null)},fail(){fail=true},resolve(){delayResolve({data:cart,error:null})},get orders(){return orders},get payments(){return payments},get reads(){return readCount}};\n}\n(async()=>{let h=await setup();assert.match(h.get(\'items\').textContent,/Private item/);assert.equal(h.get(\'addresses\').value,\'a\');assert.equal(h.get(\'previewOrderButton\').disabled,false);h.emit(\'TOKEN_REFRESHED\',\'A\');assert.match(h.get(\'items\').textContent,/Private item/);h.emit(\'SIGNED_OUT\',null);assert.equal(h.get(\'addresses\').value,\'\');assert.doesNotMatch(h.get(\'items\').textContent,/Private item/);assert.equal(h.get(\'previewOrderButton\').disabled,true);await h.window.place();assert.equal(h.orders,0);assert.equal(h.payments,0);\n h=await setup(\'delay\');h.emit(\'SIGNED_IN\',\'B\');h.resolve();await tick();await tick();assert.doesNotMatch(h.get(\'items\').textContent,/Private item/);assert.equal(h.get(\'previewOrderButton\').disabled,true);\n h=await setup();h.fail();assert.equal(await h.window.ShopDropPhase6CartAddress.load(),false);assert.equal(h.get(\'addresses\').value,\'\');assert.equal(h.get(\'previewOrderButton\').disabled,true);await h.window.place();assert.equal(h.orders,0);\n h=await setup();h.events.pagehide();assert.equal(h.get(\'addresses\').value,\'\');assert.equal(h.get(\'previewOrderButton\').disabled,true);console.log(\'PASS: normal checkout, token refresh, sign-out, account change during read, failed reload, blocked stale order, pagehide\');})().catch(e=>{console.error(e);process.exitCode=1});'
+        BRANCH = 'shopdrop-phase6-integration'
+        def git(*args):
+            return subprocess.check_output(['git', *map(str,args)], text=True).strip()
+        def blob(data):
+            return hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+        def require(ok, message):
+            if not ok: raise SystemExit('SAFETY STOP: '+message)
+        def update(data, changes):
+            result=data
+            for a,b in changes:
+                a,b=a.encode(),b.encode()
+                require(result.count(a)==1,'unexpected replacement anchor count')
+                result=result.replace(a,b,1)
+            original=result
+            for a,b in reversed(changes):
+                a,b=a.encode(),b.encode()
+                require(original.count(b)==1,'unexpected reverse anchor count')
+                original=original.replace(b,a,1)
+            require(original==data,'unrelated code changed')
+            return result
+        require(os.environ.get('GITHUB_REF_NAME')==BRANCH and git('branch','--show-current')==BRANCH,'incorrect branch')
+        require(not git('status','--porcelain'),'dirty checkout')
+        originals={}; updates={}; backups={}
+        for path,(expected,changes) in PATCHES.items():
+            p=Path(path); b=Path('backups/fix200b')/p
+            require(p.is_file() and not p.is_symlink() and not b.is_symlink(),'unexpected path '+path)
+            backups[path]=b
+            if b.exists():
+                old=b.read_bytes()
+                require(blob(old)==expected and p.read_bytes()==update(old,changes),'partial or modified prior fix '+path)
+                originals[path]=old; updates[path]=p.read_bytes()
+            else:
+                old=p.read_bytes()
+                require(blob(old)==expected,'current source changed '+path)
+                originals[path]=old; updates[path]=update(old,changes)
+        existing=sum(p.exists() for p in backups.values())
+        require(existing in (0,len(PATCHES)),'partial prior backup')
+        class Scripts(HTMLParser):
+            def __init__(self):
+                super().__init__(); self.scripts=[]; self.current=None
+            def handle_starttag(self,tag,attrs):
+                if tag=='script':
+                    attrs=dict(attrs)
+                    self.current=None if 'src' in attrs else (attrs.get('type',''),[])
+            def handle_data(self,data):
+                if self.current is not None: self.current[1].append(data)
+            def handle_endtag(self,tag):
+                if tag=='script' and self.current is not None:
+                    self.scripts.append((self.current[0],''.join(self.current[1]))); self.current=None
+        with tempfile.TemporaryDirectory() as td:
+            t=Path(td)
+            for path,data in updates.items():
+                if path.endswith('.js'):
+                    f=t/(Path(path).stem+('.mjs' if path.endswith('shopdrop-private-contact.js') else '.js'));f.write_bytes(data)
+                    subprocess.run(['node','--check',str(f)],check=True)
+                else:
+                    before=Scripts();before.feed(originals[path].decode());after=Scripts();after.feed(data.decode())
+                    restored=after.scripts
+                    require(before.scripts==restored,'unrelated inline operational script changed '+path)
+                    for i,(kind,code) in enumerate(after.scripts):
+                        if kind not in ('','module','text/javascript','application/javascript'): continue
+                        f=t/(Path(path).stem+str(i)+('.mjs' if kind=='module' else '.js'));f.write_text(code)
+                        subprocess.run(['node','--check',str(f)],check=True)
+            test=t/'test.cjs';test.write_text(TEST)
+            subprocess.run(['node',str(test),str(t/'shopdrop-cart-address-bridge.js')],check=True)
+        if existing:
+            print('Already installed; all exact backups and patched files verified.');raise SystemExit(0)
+        for path,data in updates.items():
+            b=backups[path];b.parent.mkdir(parents=True,exist_ok=True);b.write_bytes(originals[path]);Path(path).write_bytes(data)
+            require(b.read_bytes()==originals[path] and Path(path).read_bytes()==data,'write mismatch '+path)
+        require(set(git('diff','--name-only').splitlines())==set(PATCHES),'unexpected tracked changes')
+        allowed=set(PATCHES)|{str(b) for b in backups.values()}
+        subprocess.run(['git','add','--',*sorted(allowed)],check=True)
+        require(set(git('diff','--cached','--name-only').splitlines())==allowed,'unexpected staged changes')
+        require(not git('diff','--name-only') and not git('ls-files','--others','--exclude-standard'),'unrelated files')
+        subprocess.run(['git','diff','--cached','--check','--',*PATCHES],check=True)
+        print('PASS: exact source hashes, reversible patches, preserved unrelated inline scripts, syntax, checkout session mock tests and exact staged paths.')
+        PYCODE
+        if ! git diff --cached --quiet; then
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Fix 200B protect checkout account and reload state'
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
