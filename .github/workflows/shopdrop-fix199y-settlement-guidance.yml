@@ -1,0 +1,116 @@
+name: ShopDrop Fix 199Y Settlement Guidance
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix199y-settlement-guidance.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: shopdrop-fix199y
+  cancel-in-progress: false
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+        persist-credentials: true
+    - name: Align and verify customer settlement guidance
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import hashlib, os, subprocess
+        from html.parser import HTMLParser
+        PATCHES = {'public/payout-statement.html': ('53172538861637334f4514c23e2d6c20333eb520', [('<p class="muted">The status shown is the recorded Shop&amp;Drop status, not an independent bank confirmation. Funds are released only through the approved provider after the applicable delivery or arrival verification.</p>', '<p class="muted">The status shown is the recorded Shop&amp;Drop status, not an independent bank confirmation. For physical products, seller proceeds are intended for release after independently verified collection by the authorised courier. For Other Services and Transport Services &amp; Equipment Hire, provider proceeds are intended for release after the agreed work is completed and the customer-held six-digit Completion PIN is securely verified. A courier reference alone or arrival alone is not sufficient. Actual release remains subject to payment-provider approval, activation and applicable safeguards.</p>')]), 'public/terms.html': ('c667ce099ed5c4d8d271de3d524d92cf9d650711', [('<p>For physical goods, the intended checkout has one coordinated buyer payment with two provider-managed legs: the product amount plus Shop&amp;Drop marketplace commission, and the courier fee allocated directly to the authorized courier. Seller proceeds remain under the approved payment provider until independently verified courier collection. Shop&amp;Drop does not receive the entire payment into its own bank account. Actual operation remains subject to provider approval.</p>', "<p>For physical goods, the intended checkout has one buyer payment to the approved holding and settlement provider, including the product amount, Shop&amp;Drop's buyer-paid marketplace commission and the selected courier charge. The provider is intended to hold the total and allocate the applicable amounts to the seller, courier and Shop&amp;Drop under the approved settlement arrangement. Seller proceeds and courier payment are intended for release following independently verified authorized courier collection, subject to the applicable safeguards and approved provider terms. Shop&amp;Drop does not receive the entire payment into its own bank account. Actual operation remains subject to provider approval, activation and successful testing.</p>")])}
+        BRANCH = 'shopdrop-phase6-integration'
+        def git(*args):
+            return subprocess.check_output(['git', *map(str,args)], text=True).strip()
+        def blob(data):
+            return hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+        def require(ok, message):
+            if not ok: raise SystemExit('SAFETY STOP: '+message)
+        def update(data, changes):
+            result=data
+            for a,b in changes:
+                a,b=a.encode(),b.encode()
+                require(result.count(a)==1,'unexpected replacement anchor count')
+                result=result.replace(a,b,1)
+            original=result
+            for a,b in reversed(changes):
+                a,b=a.encode(),b.encode()
+                require(original.count(b)==1,'unexpected reverse anchor count')
+                original=original.replace(b,a,1)
+            require(original==data,'unrelated code changed')
+            return result
+        require(os.environ.get('GITHUB_REF_NAME')==BRANCH and git('branch','--show-current')==BRANCH,'incorrect branch')
+        require(not git('status','--porcelain'),'dirty checkout')
+        originals={}; updates={}; backups={}
+        for path,(expected,changes) in PATCHES.items():
+            p=Path(path); b=Path('backups/fix199y')/p
+            require(p.is_file() and not p.is_symlink() and not b.is_symlink(),'unexpected path '+path)
+            backups[path]=b
+            if b.exists():
+                old=b.read_bytes()
+                require(blob(old)==expected and p.read_bytes()==update(old,changes),'partial or modified prior fix '+path)
+                originals[path]=old; updates[path]=p.read_bytes()
+            else:
+                old=p.read_bytes()
+                require(blob(old)==expected,'current source changed '+path)
+                originals[path]=old; updates[path]=update(old,changes)
+        existing=sum(p.exists() for p in backups.values())
+        require(existing in (0,len(PATCHES)),'partial prior backup')
+        class Structure(HTMLParser):
+            def __init__(self):
+                super().__init__(convert_charrefs=True); self.tags=[]; self.scripts=[]; self.current=None
+            def handle_starttag(self,tag,attrs):
+                self.tags.append(('start',tag,attrs))
+                if tag=='script': self.current=[]
+            def handle_startendtag(self,tag,attrs): self.tags.append(('void',tag,attrs))
+            def handle_endtag(self,tag):
+                self.tags.append(('end',tag))
+                if tag=='script' and self.current is not None:
+                    self.scripts.append(''.join(self.current)); self.current=None
+            def handle_data(self,data):
+                if self.current is not None: self.current.append(data)
+        for path,data in updates.items():
+            before=Structure();before.feed(originals[path].decode());after=Structure();after.feed(data.decode())
+            require(before.tags==after.tags,'HTML structure or attributes changed '+path)
+            require(before.scripts==after.scripts,'script changed '+path)
+            for a,b in PATCHES[path][1]:
+                require(a.encode() not in data and data.count(b.encode())==1,'guidance verification failed '+path)
+            print('PASS: only approved guidance changed, HTML structure and scripts preserved:',path)
+        if existing:
+            print('Already installed; all exact backups and patched files verified.');raise SystemExit(0)
+        for path,data in updates.items():
+            b=backups[path];b.parent.mkdir(parents=True,exist_ok=True);b.write_bytes(originals[path]);Path(path).write_bytes(data)
+            require(b.read_bytes()==originals[path] and Path(path).read_bytes()==data,'write mismatch '+path)
+        require(set(git('diff','--name-only').splitlines())==set(PATCHES),'unexpected tracked changes')
+        allowed=set(PATCHES)|{str(b) for b in backups.values()}
+        subprocess.run(['git','add','--',*sorted(allowed)],check=True)
+        require(set(git('diff','--cached','--name-only').splitlines())==allowed,'unexpected staged changes')
+        require(not git('diff','--name-only') and not git('ls-files','--others','--exclude-standard'),'unrelated files')
+        subprocess.run(['git','diff','--cached','--check','--',*PATCHES],check=True)
+        print('PASS: exact source hashes, reversible patches, unchanged HTML structure and scripts and exact staged paths.')
+        PYCODE
+        if ! git diff --cached --quiet; then
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Fix 199Y align settlement guidance'
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
