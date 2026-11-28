@@ -71,7 +71,11 @@ jobs:
           subprocess.run(['git','add','--',*sorted(allowed)],check=True)
           require(set(git('diff','--cached','--name-only').splitlines())==allowed,'unexpected staged paths')
           require(not git('diff','--name-only') and not git('ls-files','--others','--exclude-standard'),'unrelated changes')
-          subprocess.run(['git','diff','--cached','--check'],check=True)
+          # Backups are byte-exact historic sources, including existing whitespace.
+          # Check only the operational source diff; every backup is already hash-checked.
+          subprocess.run(['git','diff','--cached','--no-renames','--check','--',*sorted(str(p) for p in new_paths)],check=True)
+          for p,data in old_paths.items():
+              require(subprocess.check_output(['git','show',':'+str(p)])==data,'staged backup mismatch '+str(p))
           print('PASS: all five sources synchronized; three original files preserved. No live function deployment, SQL execution or website changes.')
           PYCODE
           if ! git diff --cached --quiet; then
