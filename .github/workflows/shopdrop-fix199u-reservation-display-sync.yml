@@ -1,0 +1,57 @@
+name: ShopDrop Fix 199U Reservation Display Sync
+'on':
+  push:
+    branches: [shopdrop-phase6-integration]
+    paths: [.github/workflows/shopdrop-fix199u-reservation-display-sync.yml]
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: shopdrop-fix199u-sync
+  cancel-in-progress: false
+jobs:
+  sync:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: shopdrop-phase6-integration
+          persist-credentials: true
+      - name: Record already-applied and verified migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PYCODE'
+          from pathlib import Path
+          import os, subprocess, hashlib
+          SQL = b"DO $fix199u$\nDECLARE\n  original text := pg_get_functiondef('public.shopdrop_a176_checkout_reservation_expiry(uuid)'::regprocedure);\n  updated text;\n  old_aggregate constant text := 'SELECT MAX(r.expires_at)';\n  new_aggregate constant text := 'SELECT MIN(r.expires_at)';\n  old_filter constant text := 'WHERE r.order_id = p_order_id;';\n  new_filter constant text := 'WHERE r.order_id = p_order_id AND r.status = ''reserved'';';\nBEGIN\n  IF md5(original) <> 'a22bc8eff603a19b29c8a8e64190b818' THEN\n    RAISE EXCEPTION 'Fix199U: unexpected reservation display source';\n  END IF;\n  IF (length(original)-length(replace(original,old_aggregate,'')))/length(old_aggregate) <> 1\n     OR (length(original)-length(replace(original,old_filter,'')))/length(old_filter) <> 1 THEN\n    RAISE EXCEPTION 'Fix199U: replacement anchors not unique';\n  END IF;\n  updated := replace(replace(original,old_aggregate,new_aggregate),old_filter,new_filter);\n  IF replace(replace(updated,new_filter,old_filter),new_aggregate,old_aggregate) <> original THEN\n    RAISE EXCEPTION 'Fix199U: unrelated code changed';\n  END IF;\n  EXECUTE updated;\n  IF pg_get_functiondef('public.shopdrop_a176_checkout_reservation_expiry(uuid)'::regprocedure) <> updated THEN\n    RAISE EXCEPTION 'Fix199U: verification failed';\n  END IF;\nEND;\n$fix199u$;\n"
+          MIG = Path('supabase/migrations/20261128113438_shopdrop_fix199u_reservation_display_expiry.sql')
+          BRANCH = 'shopdrop-phase6-integration'
+          def git(*args):
+              return subprocess.check_output(['git', *map(str,args)],text=True).strip()
+          def require(ok, message):
+              if not ok: raise SystemExit('SAFETY STOP: '+message)
+          def blob(data):
+              return hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+          require(os.environ.get('GITHUB_REF_NAME')==BRANCH and git('branch','--show-current')==BRANCH,'wrong branch')
+          require(not git('status','--porcelain'),'dirty checkout')
+          require(not any(p.is_symlink() for target in (MIG,) for p in (target,*target.parents)),'symlink detected')
+          if MIG.exists():
+              require(MIG.is_file() and MIG.read_bytes()==SQL,'migration already exists with different content')
+              print('Already synchronized; exact SQL verified.')
+              raise SystemExit(0)
+          MIG.write_bytes(SQL)
+          require(MIG.read_bytes()==SQL,'write verification failed')
+          subprocess.run(['git','add','--',str(MIG)],check=True)
+          require(git('diff','--cached','--name-only')==str(MIG),'unexpected staged files')
+          require(not git('diff','--name-only'),'unexpected unstaged changes')
+          subprocess.run(['git','diff','--cached','--check','--',str(MIG)],check=True)
+          print('PASS: recorded exact already-applied migration. No SQL execution, deployment or other source changes.')
+          PYCODE
+          if ! git diff --cached --quiet; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'Fix 199U synchronize verified reservation display expiry'
+            git push origin HEAD:shopdrop-phase6-integration
+          fi
