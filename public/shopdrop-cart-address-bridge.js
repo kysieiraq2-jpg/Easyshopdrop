@@ -255,6 +255,7 @@
     const button=$('previewOrderButton');
     creatingOrder=true;
     if(button) button.disabled=true;
+    $('refreshCheckout200c').disabled=true;
     try {
       const {epoch}=await current();assertCheckout200b(epoch);
       if(!checkoutReady200b)throw Error('Refresh checkout before continuing.');
@@ -326,10 +327,22 @@
       say(reference ? 'Secure order created: '+reference+'. Select the appointed courier to obtain a quotation. No payment has been made.' : 'Secure order request accepted. No payment taken. Check your order status before trying again.');
       // Keep the stable request ID until checkout/payment is safely completed.
     } catch(e) {if(checkoutLocked200b)return;const msg=String(e?.message||'');say(msg.includes('one_seller_per_checkout')?'Only one seller is permitted per checkout. Please purchase from each seller separately.':'Order creation failed: '+(msg||'Please try again.'),e);}
-    finally {creatingOrder=false;if(button)button.disabled=checkoutLocked200b||!checkoutReady200b||!cart.length||(pendingOrderId?!window.ShopDropSingleCourier199da?.canPay():!$('addresses').value);}
+    finally {creatingOrder=false;$('refreshCheckout200c').disabled=false;if(button)button.disabled=checkoutLocked200b||!checkoutReady200b||!cart.length||(pendingOrderId?!window.ShopDropSingleCourier199da?.canPay():!$('addresses').value);}
   }
   const button=$('previewOrderButton');
   if(button) button.textContent='Prepare order';
+  // Refresh only: retain the existing idempotency key and server-side order state.
+  // Do not reset, cancel, create an order or start a payment from this control.
+  $('refreshCheckout200c').addEventListener('click',()=>{
+    if(creatingOrder)return;
+    location.reload();
+  });
+  function recheckOriginalCheckout200c(){
+    // Run after the courier address-change listener has invalidated its old quote.
+    Promise.resolve().then(()=>{
+      if(!creatingOrder&&isCurrentCheckout())return window.ShopDropSingleCourier199da?.refresh();
+    }).catch(()=>{if(!checkoutLocked200b)say('Unable to recheck the prepared order. Refresh checkout and try again.');});
+  }
   $('addAnotherAddressButton').addEventListener('click',()=>{
     if(checkoutLocked200b||!checkoutReady200b)return;
     $('newAddressFields').hidden=false;
@@ -343,10 +356,12 @@
     $('cancelAddAddress').hidden=true;
     if(button)button.disabled=Boolean(pendingOrderId)||!cart.length||!$('addresses').value;
     $('addressStatus').textContent='Your saved delivery address is selected.';
+    recheckOriginalCheckout200c();
   });
   $('addresses').addEventListener('change',()=>{
     const option=$('addresses').selectedOptions[0];
     $('selectedAddressSummary').textContent=option?.value?'Deliver to: '+option.textContent:'Choose a delivery address';
+    recheckOriginalCheckout200c();
   });
   window.saveAddress=saveAddress;
   window.place=place;
