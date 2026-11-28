@@ -1,0 +1,278 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Marketplace Management | Shop&amp;Drop Admin</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f3f5f8;color:#17202a;font:16px Arial,sans-serif;line-height:1.5}
+main{max-width:1100px;margin:auto;padding:20px 14px 40px}
+h1{font-size:clamp(26px,5vw,36px)}
+h2{font-size:21px}
+a{color:#0f766e}
+.panel{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px;margin:16px 0}
+.notice{background:#eef2ff;border-radius:9px;padding:13px}
+.warning{background:#fff7ed;border-radius:9px;padding:13px}
+.muted{color:#64748b}
+button{background:#0f766e;color:white;border:0;border-radius:8px;padding:12px 18px;font:inherit;cursor:pointer}
+button:disabled{opacity:.6}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:11px;border-bottom:1px solid #e2e8f0;overflow-wrap:anywhere;vertical-align:top}
+th{background:#f8fafc}
+#protected[hidden]{display:none}
+</style>
+</head>
+<body>
+<main>
+<a href="./admin.html">← Admin Control Centre</a>
+<h1>Marketplace, Inventory &amp; Services</h1>
+
+<div id="access" class="notice" role="status">
+Verifying administrator access...
+</div>
+
+<div id="protected" hidden>
+<p class="warning">
+<strong>Administrator marketplace overview.</strong>
+Products, services, categories and moderation records are retrieved from the protected Supabase backend.
+Listing approval, rejection and suspension controls remain disabled on this page until the full browser workflow is verified.
+</p>
+
+<button id="refresh" type="button">Refresh marketplace</button>
+<p id="message" role="status" aria-live="polite"></p>
+
+<section class="panel">
+<h2>Product &amp; Service Listings</h2>
+<p class="muted">Latest 100 listings, including their recorded approval statuses.</p>
+<div id="listings" class="tablewrap">Waiting for records.</div>
+</section>
+
+<section class="panel">
+<h2>Categories &amp; Subcategories</h2>
+<p class="muted">Categories currently used by products and services.</p>
+<div id="categories" class="tablewrap">Waiting for records.</div>
+</section>
+
+<section class="panel">
+<h2>Listing Moderation Queue</h2>
+<p class="muted">Cases awaiting administrator review or further investigation.</p>
+<div id="moderation" class="tablewrap">Waiting for records.</div>
+</section>
+
+<section class="panel">
+<h2>Seller &amp; Service-Provider Applications</h2>
+<p class="muted">Applications and their current statuses.</p>
+<div id="applications" class="tablewrap">Waiting for records.</div>
+</section>
+
+<section class="panel">
+<h2>Marketplace Safeguards</h2>
+<p class="muted">
+Shop&amp;Drop launches in South Africa with ZAR listings.
+Product and service approvals use different public listing statuses.
+Seller identity, account and payout verification must be completed before protected approval.
+Private seller contact and banking information are not displayed here.
+</p>
+</section>
+</div>
+</main>
+
+<script type="module">
+import {createClient} from
+'https://esm.sh/@supabase/supabase-js@2';
+
+const supabase=createClient(
+'https://dtkdvvxpwonywtsgqmdx.supabase.co',
+'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q',
+{
+auth:{
+persistSession:true,
+autoRefreshToken:true,
+detectSessionInUrl:true
+}
+}
+);
+
+const access=document.getElementById('access');
+const protectedArea=document.getElementById('protected');
+const message=document.getElementById('message');
+const refresh=document.getElementById('refresh');
+
+function deny(reason){
+protectedArea.hidden=true;
+access.hidden=false;
+access.replaceChildren();
+access.append(document.createTextNode(reason+' '));
+
+const link=document.createElement('a');
+link.href='./admin-login.html';
+link.textContent='Administrator Sign In';
+access.append(link);
+}
+
+async function checkAdmin(){
+const {data:userData,error:userError}=
+await supabase.auth.getUser();
+
+if(userError||!userData?.user){
+deny('Administrator sign-in required.');
+return false;
+}
+
+const {data:allowed,error:adminError}=
+await supabase.rpc('shopdrop_is_active_admin');
+
+if(adminError||allowed!==true){
+deny('Administrator access denied or unavailable.');
+return false;
+}
+
+access.hidden=true;
+protectedArea.hidden=false;
+return true;
+}
+
+function dateText(value){
+if(!value)return '—';
+const date=new Date(value);
+return Number.isNaN(date.getTime())
+?'—':date.toLocaleString('en-ZA');
+}
+
+function renderTable(target,headers,rows){
+const container=document.getElementById(target);
+container.replaceChildren();
+
+if(!Array.isArray(rows)||rows.length===0){
+container.textContent='No records available.';
+return;
+}
+
+const table=document.createElement('table');
+const head=document.createElement('thead');
+const headerRow=document.createElement('tr');
+
+for(const heading of headers){
+const th=document.createElement('th');
+th.textContent=heading;
+headerRow.appendChild(th);
+}
+head.appendChild(headerRow);
+table.appendChild(head);
+
+const body=document.createElement('tbody');
+
+for(const values of rows){
+const tr=document.createElement('tr');
+
+for(const value of values){
+const td=document.createElement('td');
+td.textContent=String(value??'—');
+tr.appendChild(td);
+}
+
+body.appendChild(tr);
+}
+table.appendChild(body);
+container.appendChild(table);
+}
+
+async function loadMarketplace(){
+refresh.disabled=true;
+message.textContent='Loading marketplace records...';
+
+const reports=[
+{
+rpc:'shopdrop_admin_listing_overview',
+target:'listings',
+headers:['Type','Listing ID','Title','Category','Status','Country','Created'],
+map:r=>[
+r.listing_type,
+r.listing_id,
+r.title,
+r.category,
+r.listing_status,
+r.country_code,
+dateText(r.created_at)
+]
+},
+{
+rpc:'shopdrop_admin_category_overview',
+target:'categories',
+headers:['Marketplace','Category','Subcategory','Listings'],
+map:r=>[
+r.source_type,
+r.category,
+r.subcategory,
+r.listing_count
+]
+},
+{
+rpc:'shopdrop_admin_moderation_queue_readonly',
+target:'moderation',
+headers:['Type','Listing ID','Reason','Status','Priority','Created'],
+map:r=>[
+r.entity_type,
+r.entity_id,
+r.reason,
+r.status,
+r.priority,
+dateText(r.created_at)
+]
+},
+{
+rpc:'shopdrop_admin_list_applications',
+target:'applications',
+headers:['Applicant','Type','Status','Submitted'],
+map:r=>[
+r.applicant_name,
+r.applicant_type,
+r.status,
+dateText(r.submitted_at)
+]
+}
+];
+
+let failures=0;
+
+for(const report of reports){
+try{
+const {data,error}=await supabase.rpc(report.rpc);
+if(error)throw error;
+if(!Array.isArray(data)){
+throw Error('Unexpected report response');
+}
+renderTable(report.target,report.headers,data.map(report.map));
+}catch(error){
+failures++;
+document.getElementById(report.target).textContent=
+'Report unavailable. Please try Refresh marketplace.';
+}
+}
+
+message.textContent=failures
+?failures+' marketplace report(s) unavailable.'
+:'Marketplace records loaded successfully. Read-only.';
+refresh.disabled=false;
+}
+
+refresh.addEventListener('click',async()=>{
+refresh.disabled=true;
+try{
+if(await checkAdmin()){
+await loadMarketplace();
+}
+}finally{
+refresh.disabled=false;
+}
+});
+
+if(await checkAdmin()){
+await loadMarketplace();
+}
+</script>
+</body>
+</html>

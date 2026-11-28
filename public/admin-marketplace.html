@@ -101,8 +101,15 @@ const protectedArea=document.getElementById('protected');
 const message=document.getElementById('message');
 const refresh=document.getElementById('refresh');
 
+let adminEpoch199z=0,adminOwner199z=null,adminBusy199z=false;
+const adminTargets199z=['listings', 'categories', 'moderation', 'applications'];
+function clearAdmin199z(){
+ adminEpoch199z++;adminOwner199z=null;adminBusy199z=false;
+ protectedArea.hidden=true;refresh.disabled=true;message.textContent='';
+ for(const target of adminTargets199z)document.getElementById(target).textContent='Waiting for records.';
+}
 function deny(reason){
-protectedArea.hidden=true;
+clearAdmin199z();
 access.hidden=false;
 access.replaceChildren();
 access.append(document.createTextNode(reason+' '));
@@ -113,25 +120,20 @@ link.textContent='Administrator Sign In';
 access.append(link);
 }
 
-async function checkAdmin(){
-const {data:userData,error:userError}=
-await supabase.auth.getUser();
-
-if(userError||!userData?.user){
-deny('Administrator sign-in required.');
-return false;
+async function checkAdmin(epoch){
+const {data:userData,error:userError}=await supabase.auth.getUser();
+if(epoch!==adminEpoch199z)return false;
+if(userError||!userData?.user){deny('Administrator sign-in required.');return false;}
+adminOwner199z=userData.user.id;
+return await confirmAdmin199z(epoch);
 }
-
-const {data:allowed,error:adminError}=
-await supabase.rpc('shopdrop_is_active_admin');
-
-if(adminError||allowed!==true){
-deny('Administrator access denied or unavailable.');
-return false;
-}
-
-access.hidden=true;
-protectedArea.hidden=false;
+async function confirmAdmin199z(epoch){
+if(epoch!==adminEpoch199z||!adminOwner199z)return false;
+const {data:allowed,error:adminError}=await supabase.rpc('shopdrop_is_active_admin');
+if(epoch!==adminEpoch199z)return false;
+const {data:current,error}=await supabase.auth.getUser();
+if(epoch!==adminEpoch199z)return false;
+if(adminError||allowed!==true||error||current?.user?.id!==adminOwner199z){deny('Administrator access denied or unavailable.');return false;}
 return true;
 }
 
@@ -180,7 +182,7 @@ table.appendChild(body);
 container.appendChild(table);
 }
 
-async function loadMarketplace(){
+async function loadMarketplace(epoch){
 refresh.disabled=true;
 message.textContent='Loading marketplace records...';
 
@@ -241,38 +243,45 @@ let failures=0;
 for(const report of reports){
 try{
 const {data,error}=await supabase.rpc(report.rpc);
+if(epoch!==adminEpoch199z)return;
+if(!await confirmAdmin199z(epoch))return;
+if(epoch!==adminEpoch199z)return;
 if(error)throw error;
 if(!Array.isArray(data)){
 throw Error('Unexpected report response');
 }
 renderTable(report.target,report.headers,data.map(report.map));
 }catch(error){
+if(epoch!==adminEpoch199z)return;
 failures++;
 document.getElementById(report.target).textContent=
 'Report unavailable. Please try Refresh marketplace.';
 }
 }
 
+if(epoch!==adminEpoch199z)return;
 message.textContent=failures
 ?failures+' marketplace report(s) unavailable.'
 :'Marketplace records loaded successfully. Read-only.';
 refresh.disabled=false;
 }
 
-refresh.addEventListener('click',async()=>{
-refresh.disabled=true;
-try{
-if(await checkAdmin()){
-await loadMarketplace();
+async function refreshAdmin199z(){
+ if(adminBusy199z)return;
+ clearAdmin199z();const epoch=adminEpoch199z;adminBusy199z=true;
+ try{
+  if(await checkAdmin(epoch))await loadMarketplace(epoch);
+  if(epoch===adminEpoch199z&&adminOwner199z&&await confirmAdmin199z(epoch)){access.hidden=true;protectedArea.hidden=false;}
+ }catch(_){if(epoch===adminEpoch199z)deny('Administrator reports unavailable. Sign in again.');}
+ finally{if(epoch===adminEpoch199z){adminBusy199z=false;refresh.disabled=false;}}
 }
-}finally{
-refresh.disabled=false;
-}
+refresh.addEventListener('click',refreshAdmin199z);
+supabase.auth.onAuthStateChange((event,session)=>{
+ if(event==='SIGNED_OUT'||(adminOwner199z&&session?.user?.id!==adminOwner199z))deny('Administrator sign-in required.');
 });
-
-if(await checkAdmin()){
-await loadMarketplace();
-}
+window.addEventListener('pagehide',clearAdmin199z);
+window.addEventListener('pageshow',event=>{if(event.persisted)refreshAdmin199z();});
+await refreshAdmin199z();
 </script>
 </body>
 </html>
