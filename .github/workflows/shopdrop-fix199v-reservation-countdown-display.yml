@@ -1,0 +1,128 @@
+name: ShopDrop Fix 199V Reservation Countdown Display
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix199v-reservation-countdown-display.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: shopdrop-fix199v
+  cancel-in-progress: false
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+        persist-credentials: true
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - name: Correct and verify reservation countdown display
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import hashlib, os, subprocess, tempfile
+        from html.parser import HTMLParser
+        PATCHES = {'public/shopdrop-checkout-countdown.js': ('a6f88eb17645ade66cb6adde41e2116e1bd07c59', [('    .then(m=>m.createClient(endpoint,key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}));', '    .then(m=>m.createClient(endpoint,key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}))\n    .catch(error=>{clientPromise=null;throw error;});'), ("  let currentOrder='', expiryMs=0, lastSync=0;", "  let currentOrder='', expiryMs=0, lastSync=0;\n  let reservationState='waiting', requestVersion=0;"), ('  function remember(id){', "  function resetDisplay(id=''){\n    currentOrder=id;expiryMs=0;lastSync=0;reservationState='waiting';requestVersion++;\n  }\n  function remember(id){"), ("    currentOrder='';expiryMs=0;lastSync=0;sync();", '    resetDisplay(orderId());update();sync();'), ("    currentOrder='';expiryMs=0;lastSync=0;update();\n", '    resetDisplay(orderId());update();\n'), ("    if(id!==currentOrder){currentOrder=id;expiryMs=0;lastSync=0;}\n    if(!id){display.textContent='Awaiting inventory reservation';return;}\n    if(!expiryMs){display.textContent='Reservation time unavailable';return;}", "    if(id!==currentOrder)resetDisplay(id);\n    if(!id||!expiryMs){\n      panel.dataset.expired='false';\n      if(id&&reservationState==='error'){\n        display.textContent='Reservation time unavailable';\n        note.textContent='Unable to verify reservation expiry. Payment remains subject to server-side checks.';\n      } else if(id&&reservationState==='none'){\n        display.textContent='No active reservation';\n        note.textContent='No reserved stock is currently recorded for this order. Check your checkout status.';\n      } else {\n        display.textContent='Awaiting inventory reservation';\n        note.textContent='The 30-minute countdown starts only when Supabase reserves your items.';\n      }\n      return;\n    }"), ('    if(!/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id))return;\n    try {', '    if(!validId(id))return;\n    if(id!==currentOrder)resetDisplay(id);\n    const version=++requestVersion;\n    lastSync=Date.now();\n    try {'), ('      if(id!==orderId())return;\n      const expiry=data?.expires_at;\n      const parsed=expiry?Date.parse(expiry):NaN;\n      expiryMs=Number.isFinite(parsed)?parsed:0;', "      if(version!==requestVersion||id!==orderId())return;\n      if(data?.order_id!==id||!Object.hasOwn(data,'expires_at'))throw Error('Invalid reservation response');\n      const expiry=data.expires_at;\n      const parsed=typeof expiry==='string'?Date.parse(expiry):NaN;\n      if(expiry!==null&&!Number.isFinite(parsed))throw Error('Invalid reservation expiry');\n      expiryMs=Number.isFinite(parsed)?parsed:0;\n      reservationState=expiry===null?'none':'verified';"), ("    } catch (_) {\n      note.textContent='Unable to verify reservation expiry. Payment remains subject to server-side checks.';\n    }", "    } catch (_) {\n      if(version!==requestVersion||id!==orderId())return;\n      expiryMs=0;reservationState='error';lastSync=Date.now();update();\n    }")]), 'public/checkout.html': ('21fcc98db8bcc00dea110d54486ee550fae37824', [('<script src="./shopdrop-checkout-countdown.js" defer></script>', '<script src="./shopdrop-checkout-countdown.js?v=199v" defer></script>')])}
+        TEST = 'const fs=require(\'node:fs\'),vm=require(\'node:vm\'),assert=require(\'node:assert/strict\');\nconst original=fs.readFileSync(process.argv[2],\'utf8\');\n// Replace only the remote import in this offline test; exercise the actual remaining script.\nconst remote="import(\'https://esm.sh/@supabase/supabase-js@2\')";\nassert.equal(original.split(remote).length,2);\nconst source=original.replace(remote,\'mockImport()\');\nconst A=\'12345678-1234-1234-1234-123456789abc\',B=\'12345678-1234-1234-1234-123456789abd\';\nconst t=Date.parse(\'2026-11-28T11:00:00Z\');\nfunction harness(saved=\'\'){\n let now=t,active=\'\',timer,panel,queue=[];\n const el=()=>({children:[],style:{},dataset:{},setAttribute(){},append(...x){this.children.push(...x)}});\n const host={insertBefore(n){panel=n}};\n const window={ShopDropPhase6CartAddress:{getPendingOrderId:()=>active}};\n const storage={getItem:()=>saved,setItem(k,v){saved=v},removeItem(){saved=\'\'}};\n const mockImport=async()=>({createClient:()=>({rpc:(name,args)=>{assert.equal(name,\'shopdrop_a176_checkout_reservation_expiry\');return new Promise((resolve,reject)=>queue.push({id:args.p_order_id,resolve,reject}));}})});\n vm.runInNewContext(source,{window,document:{createElement:el,querySelector:()=>host},sessionStorage:storage,Date:{now:()=>now,parse:Date.parse},setInterval:fn=>{timer=fn},mockImport});\n return {api:window.ShopDropReservationCountdown,queue,panel,text:()=>panel.children[1].textContent,note:()=>panel.children[2].textContent,advance:ms=>{now+=ms;timer()},setActive:v=>{active=v},tick:()=>timer()};\n}\nconst flush=()=>new Promise(resolve=>setImmediate(resolve));\nconst valid=(id,minutes)=>({data:{order_id:id,expires_at:minutes===null?null:new Date(t+minutes*60000).toISOString()},error:null});\n(async()=>{\n let h=harness();assert.equal(h.text(),\'Awaiting inventory reservation\');assert.equal(h.api.mayStartPayment(),false);\n h.api.remember(A);await flush();assert.equal(h.queue.length,1);h.queue.shift().resolve(valid(A,30));await flush();assert.equal(h.text(),\'30:00\');assert.equal(h.api.mayStartPayment(),true);\n h.advance(60000);await flush();assert.equal(h.text(),\'29:00\');h.queue.shift().resolve(valid(A,30));await flush();assert.equal(h.text(),\'29:00\');\n let p=h.api.refresh();await flush();h.queue.shift().resolve({data:null,error:Error(\'network\')});await p;assert.equal(h.text(),\'Reservation time unavailable\');assert.match(h.note(),/Unable to verify/);assert.equal(h.api.mayStartPayment(),false);h.tick();assert.match(h.note(),/Unable to verify/);\n p=h.api.refresh();await flush();h.queue.shift().resolve(valid(A,null));await p;assert.equal(h.text(),\'No active reservation\');assert.equal(h.panel.dataset.expired,\'false\');assert.equal(h.api.mayStartPayment(),false);\n p=h.api.refresh();await flush();h.queue.shift().resolve(valid(A,0));await p;assert.equal(h.text(),\'00:00\');assert.equal(h.panel.dataset.expired,\'true\');assert.equal(h.api.mayStartPayment(),false);\n h.api.clear();assert.equal(h.text(),\'Awaiting inventory reservation\');assert.equal(h.panel.dataset.expired,\'false\');assert.match(h.note(),/30-minute countdown/);\n h=harness(A);p=h.api.refresh();await flush();let newer=h.api.refresh();await flush();assert.equal(h.queue.length,2);h.queue[1].resolve(valid(A,null));await newer;h.queue[0].resolve(valid(A,30));await p;assert.equal(h.text(),\'No active reservation\');assert.equal(h.api.mayStartPayment(),false);\n h=harness(A);p=h.api.refresh();await flush();h.setActive(B);newer=h.api.refresh();await flush();h.queue[1].resolve(valid(B,20));await newer;h.queue[0].resolve({data:null,error:Error(\'old request\')});await p;assert.equal(h.text(),\'20:00\');assert.equal(h.api.mayStartPayment(),true);\n p=h.api.refresh();await flush();h.queue.pop().resolve(valid(A,30));await p;assert.equal(h.text(),\'Reservation time unavailable\');assert.equal(h.api.mayStartPayment(),false);\n p=h.api.refresh();await flush();h.queue.pop().resolve({data:{order_id:B,expires_at:\'invalid\'},error:null});await p;assert.equal(h.text(),\'Reservation time unavailable\');\n h=harness(A);p=h.api.refresh();await flush();h.api.clear();h.queue[0].resolve(valid(A,30));await p;assert.equal(h.text(),\'Awaiting inventory reservation\');assert.equal(h.api.mayStartPayment(),false);\n console.log(\'PASS: countdown, refresh continuity, failure, no active hold, expiry, clear, out-of-order response, changed order, wrong order, malformed expiry, cleared in-flight request\');\n})().catch(e=>{console.error(e);process.exitCode=1});'
+        BRANCH = 'shopdrop-phase6-integration'
+        def git(*args):
+            return subprocess.check_output(['git', *map(str,args)], text=True).strip()
+        def blob(data):
+            return hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+        def require(ok, message):
+            if not ok: raise SystemExit('SAFETY STOP: '+message)
+        def update(data, changes):
+            result=data
+            for a,b in changes:
+                a,b=a.encode(),b.encode()
+                require(result.count(a)==1,'unexpected replacement anchor count')
+                result=result.replace(a,b,1)
+            original=result
+            for a,b in reversed(changes):
+                a,b=a.encode(),b.encode()
+                require(original.count(b)==1,'unexpected reverse anchor count')
+                original=original.replace(b,a,1)
+            require(original==data,'unrelated code changed')
+            return result
+        require(os.environ.get('GITHUB_REF_NAME')==BRANCH and git('branch','--show-current')==BRANCH,'incorrect branch')
+        require(not git('status','--porcelain'),'dirty checkout')
+        originals={}; updates={}; backups={}
+        for path,(expected,changes) in PATCHES.items():
+            p=Path(path); b=Path('backups/fix199v')/p
+            require(p.is_file() and not p.is_symlink() and not b.is_symlink(),'unexpected path '+path)
+            backups[path]=b
+            if b.exists():
+                old=b.read_bytes()
+                require(blob(old)==expected and p.read_bytes()==update(old,changes),'partial or modified prior fix '+path)
+                originals[path]=old; updates[path]=p.read_bytes()
+            else:
+                old=p.read_bytes()
+                require(blob(old)==expected,'current source changed '+path)
+                originals[path]=old; updates[path]=update(old,changes)
+        existing=sum(p.exists() for p in backups.values())
+        require(existing in (0,len(PATCHES)),'partial prior backup')
+        class Scripts(HTMLParser):
+            def __init__(self):
+                super().__init__(); self.scripts=[]; self.current=None
+            def handle_starttag(self,tag,attrs):
+                if tag=='script':
+                    attrs=dict(attrs)
+                    self.current=None if 'src' in attrs else (attrs.get('type',''),[])
+            def handle_data(self,data):
+                if self.current is not None: self.current[1].append(data)
+            def handle_endtag(self,tag):
+                if tag=='script' and self.current is not None:
+                    self.scripts.append((self.current[0],''.join(self.current[1]))); self.current=None
+        with tempfile.TemporaryDirectory() as td:
+            t=Path(td)
+            for path,data in updates.items():
+                if path.endswith('.js'):
+                    f=t/(Path(path).stem+('.mjs' if path.endswith('shopdrop-private-contact.js') else '.js'));f.write_bytes(data)
+                    subprocess.run(['node','--check',str(f)],check=True)
+                else:
+                    before=Scripts();before.feed(originals[path].decode());after=Scripts();after.feed(data.decode())
+                    restored=after.scripts
+                    require(before.scripts==restored,'unrelated inline operational script changed '+path)
+                    for i,(kind,code) in enumerate(after.scripts):
+                        if kind not in ('','module','text/javascript','application/javascript'): continue
+                        f=t/(Path(path).stem+str(i)+('.mjs' if kind=='module' else '.js'));f.write_text(code)
+                        subprocess.run(['node','--check',str(f)],check=True)
+            test=t/'test.cjs';test.write_text(TEST)
+            subprocess.run(['node',str(test),str(t/'shopdrop-checkout-countdown.js')],check=True)
+        if existing:
+            print('Already installed; all exact backups and patched files verified.');raise SystemExit(0)
+        for path,data in updates.items():
+            b=backups[path];b.parent.mkdir(parents=True,exist_ok=True);b.write_bytes(originals[path]);Path(path).write_bytes(data)
+            require(b.read_bytes()==originals[path] and Path(path).read_bytes()==data,'write mismatch '+path)
+        require(set(git('diff','--name-only').splitlines())==set(PATCHES),'unexpected tracked changes')
+        allowed=set(PATCHES)|{str(b) for b in backups.values()}
+        subprocess.run(['git','add','--',*sorted(allowed)],check=True)
+        require(set(git('diff','--cached','--name-only').splitlines())==allowed,'unexpected staged changes')
+        require(not git('diff','--name-only') and not git('ls-files','--others','--exclude-standard'),'unrelated files')
+        subprocess.run(['git','diff','--cached','--check','--',*PATCHES],check=True)
+        print('PASS: exact source hashes, reversible patches, preserved unrelated inline scripts, syntax, reservation countdown mock tests and exact staged paths.')
+        PYCODE
+        if ! git diff --cached --quiet; then
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Fix 199V correct reservation countdown display'
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
