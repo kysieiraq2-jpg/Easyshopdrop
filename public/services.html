@@ -260,7 +260,7 @@ Provider contact and banking details remain private.
 <p class="muted">Open-ended quotation-heavy building/painting projects are outside the initial service scope.</p>
 </section>
 
-<section class="panel">
+<section class="panel" id="shopdropCategorySuggestion199t">
 <h2>Can't find the right category?</h2>
 <input id="cat" style="width:100%;padding:10px" placeholder="Suggest a product or service category">
 <textarea id="desc" style="width:100%;padding:10px;margin-top:8px" placeholder="Tell Shop&Drop what should be added"></textarea>
@@ -624,6 +624,7 @@ search('');
 
 <!-- SHOPDROP FIX 7: Additive category suggestion integration -->
 <script src="./supabase-adapter.js"></script>
+<script src="./shopdrop-auth-return-199ha.js?v=199t"></script>
 <script>
 (function(){
  'use strict';
@@ -684,6 +685,7 @@ search('');
   }catch(error){
    status.textContent=
     error?.message||'Unable to submit suggestion.';
+   window.ShopDropReturn199h?.appendSupportLinks(status,error,'services.html#shopdropCategorySuggestion199t');
   }finally{
    button.disabled=false;
   }

@@ -5,6 +5,8 @@ const rules=Object.freeze({
  'sell-item.html':{},
  'account.html':{},
  'checkout.html':{},
+ 'feedback.html':{},
+ 'services.html':{},
  'my-product-advertisements-194d.html':{},
  'shopdrop-provider-completion.html':{booking_type:'type',booking_id:'uuid'},
  'returns.html':{order:'ref'},
@@ -32,7 +34,7 @@ function safe(raw){
  if(typeof raw!=='string'||raw.length>900)return null;
  const match=/^(?:\.\/)?([a-z0-9-]+\.html)(?:\?([^#]*))?(?:#([A-Za-z0-9-]+))?$/.exec(raw);
  if(!match||!Object.hasOwn(rules,match[1]))return null;
- if(match[3]&&(match[1]!=='account.html'||!accountSections.has(match[3])))return null;
+ if(match[3]&&!((match[1]==='account.html'&&accountSections.has(match[3]))||(match[1]==='services.html'&&match[3]==='shopdropCategorySuggestion199t')))return null;
  const out=new URLSearchParams(),input=new URLSearchParams(match[2]||'');
  for(const [key,type] of Object.entries(rules[match[1]])){
   const values=input.getAll(key);if(values.length===1&&valid[type](values[0]))out.set(key,values[0]);
@@ -52,7 +54,20 @@ function rewrite(a){
  const match=/^(?:\.\/)?(sign-in|register)\.html$/.exec(value);
  if(match){const next=authLink(match[1]+'.html');if(next)a.setAttribute('href',next);}
 }
-window.ShopDropReturn199h=Object.freeze({safe,requested,authLink});
+function appendSupportLinks(status,error,target){
+ const authErrors=['Please sign in to Shop&Drop first.','Session expired. Please sign in again.'];
+ if(!status||!authErrors.includes(error?.message))return false;
+ const next=safe(target);
+ if(!next)return false;
+ for(const [page,label] of [['sign-in.html','Sign in'],['register.html','Create account']]){
+  const a=document.createElement('a');
+  a.href='./'+page+'?next='+encodeURIComponent(next.slice(2));
+  a.textContent=label;
+  status.append(document.createTextNode(' '),a);
+ }
+ return true;
+}
+window.ShopDropReturn199h=Object.freeze({safe,requested,authLink,appendSupportLinks});
 for(const a of document.querySelectorAll('a[href]'))rewrite(a);
 // Dynamic sign-in links are also handled on the normal click/keyboard activation path.
 document.addEventListener('click',event=>{const a=event.target?.closest?.('a[href]');rewrite(a);},true);

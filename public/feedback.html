@@ -256,6 +256,7 @@
 
 <!-- SHOPDROP FIX 3: Reuse existing Supabase adapter -->
 <script src="supabase-adapter.js"></script>
+<script src="./shopdrop-auth-return-199ha.js?v=199t"></script>
 
 <script>
 /*
@@ -346,6 +347,7 @@
       status.textContent =
         error?.message ||
         'Submission failed. Please try again.';
+      window.ShopDropReturn199h?.appendSupportLinks(status,error,'feedback.html');
 
     } finally {
       button.disabled = false;
