@@ -1,0 +1,128 @@
+name: ShopDrop Fix 199X Financial Session Privacy
+'on':
+  push:
+    branches:
+    - shopdrop-phase6-integration
+    paths:
+    - .github/workflows/shopdrop-fix199x-financial-session-privacy.yml
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: shopdrop-fix199x
+  cancel-in-progress: false
+jobs:
+  fix:
+    if: github.ref == 'refs/heads/shopdrop-phase6-integration'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: shopdrop-phase6-integration
+        persist-credentials: true
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - name: Protect and test financial history on session changes
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 <<'PYCODE'
+        from pathlib import Path
+        import hashlib, os, subprocess, tempfile
+        from html.parser import HTMLParser
+        PATCHES = {'public/receipts.html': ('443acc478ade7bc1eaba7d59041aeff93a192cd7', [('async function loadHistory(userId){', "let financialOwner199x=null;\nlet financialEpoch199x=0;\nfunction clearFinancialHistory199x(){\n financialOwner199x=null;financialEpoch199x++;\n history.replaceChildren();\n const message=document.createElement('p');\n message.textContent='Sign-in changed. Sign in again to view your own records.';\n const link=document.createElement('a');link.href='./sign-in.html';link.textContent='Sign in';\n history.append(message,link);\n}\nasync function loadHistory(userId){\n if(financialOwner199x!==userId)return;\n const epoch=++financialEpoch199x;"), ("  if(currentUserError||currentUser?.user?.id!==userId){history.textContent='Sign-in changed. Reload to view your own records.';return;}", '  if(epoch!==financialEpoch199x||financialOwner199x!==userId)return;\n  if(currentUserError||currentUser?.user?.id!==userId){clearFinancialHistory199x();return;}'), (" }catch{\n  history.textContent='Unable to load transaction history right now.';", " }catch{\n  if(epoch!==financialEpoch199x||financialOwner199x!==userId)return;\n  history.textContent='Unable to load transaction history right now.';"), ('}else{\n await loadHistory(user.id);', "}else{\n financialOwner199x=user.id;\n supabase.auth.onAuthStateChange((event,session)=>{\n  if(financialOwner199x&&(event==='SIGNED_OUT'||session?.user?.id!==financialOwner199x))clearFinancialHistory199x();\n });\n await loadHistory(user.id);")]), 'public/payout-statement.html': ('7dadc0a0286507719e99072d6fd792fd42979a99', [('async function loadPayouts(userId){', "let financialOwner199x=null;\nlet financialEpoch199x=0;\nfunction clearFinancialPayouts199x(){\n financialOwner199x=null;financialEpoch199x++;\n refresh.hidden=true;refresh.disabled=true;\n clearRows('Not signed in.');\n message.textContent='Sign-in changed. Sign in again to view your own payout statement.';\n const link=document.createElement('a');link.href='./sign-in.html';link.textContent='Sign in';\n message.append(document.createTextNode(' '),link);\n}\nasync function loadPayouts(userId){\n if(financialOwner199x!==userId)return;\n const epoch=++financialEpoch199x;"), ("  if(currentUserError||currentUser?.user?.id!==userId){clearRows('Sign-in changed. Reload to view your own records.');message.textContent='Sign in to view your payout statement.';return;}", '  if(epoch!==financialEpoch199x||financialOwner199x!==userId)return;\n  if(currentUserError||currentUser?.user?.id!==userId){clearFinancialPayouts199x();return;}'), (" }catch{\n  message.textContent='Unable to load your payout statement right now. Please retry.';", " }catch{\n  if(epoch!==financialEpoch199x||financialOwner199x!==userId)return;\n  message.textContent='Unable to load your payout statement right now. Please retry.';"), (' }finally{\n  refresh.disabled=false;', ' }finally{\n  if(epoch===financialEpoch199x&&financialOwner199x===userId)refresh.disabled=false;'), ('}else{\n refresh.hidden=false;', "}else{\n financialOwner199x=user.id;\n supabase.auth.onAuthStateChange((event,session)=>{\n  if(financialOwner199x&&(event==='SIGNED_OUT'||session?.user?.id!==financialOwner199x))clearFinancialPayouts199x();\n });\n refresh.hidden=false;")])}
+        TEST = 'const fs=require(\'node:fs\'),vm=require(\'node:vm\'),assert=require(\'node:assert/strict\');\nconst A=\'12345678-1234-1234-1234-123456789abc\',B=\'12345678-1234-1234-1234-123456789abd\';\nconst source=fs.readFileSync(process.argv[2],\'utf8\').replace("import {createClient} from \'https://esm.sh/@supabase/supabase-js@2\';",\'\');\nconst isPayout=process.argv[3]===\'payout\';\nfunction el(tag){return {tag,children:[],listeners:{},_text:\'\',hidden:false,disabled:false,set textContent(x){this._text=String(x);this.children=[]},get textContent(){return this._text+this.children.map(c=>typeof c===\'string\'?c:c.textContent).join(\' \')},get lastElementChild(){return this.children.at(-1)},append(...xs){this.children.push(...xs)},replaceChildren(...xs){this._text=\'\';this.children=xs},addEventListener(k,f){this.listeners[k]=f}}}\nconst tick=()=>new Promise(r=>setImmediate(r));\nasync function setup(mode){\n let uid=A,cb,release,fail,started=0;const dom=new Map();const get=id=>{if(!dom.has(id))dom.set(id,el(id));return dom.get(id)};\n const rows={orders:[{id:A,buyer_id:A,seller_id:B,order_reference:\'PRIVATE-ORDER\',product_total:10,currency:\'ZAR\'}],seller_payouts:[{id:A,order_id:A,seller_id:A,payout_reference:\'PRIVATE-PAYOUT\',payout_amount:9,payout_status:\'pending\'}]};\n const sb={auth:{getUser:async()=>({data:{user:uid?{id:uid}:null},error:null}),onAuthStateChange(f){cb=f;return {data:{subscription:{unsubscribe(){}}}}}},from(table){const q={select(){return q},eq(){return q},or(){return q},in(){return q},order(){return q},limit(){started++;if(mode===\'delayed\'||mode===\'failure\')return new Promise((resolve,reject)=>{if(!release){release=()=>{mode=\'normal\';resolve({data:rows[table]||[],error:null})};fail=()=>{mode=\'normal\';reject(Error(\'network\'))}}else resolve({data:[],error:null})});return Promise.resolve({data:rows[table]||[],error:null})}};return q}};\n const refs={orderRefs:async()=>new Map(),collect:async()=>new Map(),dbRPC:()=>{},financial:async()=>({data:[],error:false}),kindLabel:k=>k};\n const ctx={createClient:()=>sb,document:{getElementById:get,createElement:el,createTextNode:v=>String(v)},window:{ShopDropReferences199dc:refs},Intl,Date,Number,console};\n const pending=vm.runInNewContext(\'(async()=>{\'+source+\'\\n})()\',ctx);await tick();\n const output=()=>[...dom.values()].map(v=>v.textContent).join(\' \');\n return {pending,get,output,emit(event,who){uid=who;cb(event,who?{user:{id:who}}:null)},release:()=>release(),fail:()=>fail(),get started(){return started}};\n}\n(async()=>{\n let t=await setup(\'normal\');await t.pending;assert.match(t.output(),/PRIVATE-/);const count=t.started;\n t.emit(\'TOKEN_REFRESHED\',A);assert.match(t.output(),/PRIVATE-/);t.emit(\'SIGNED_OUT\',null);assert.doesNotMatch(t.output(),/PRIVATE-/);assert.match(t.output(),/Sign-in changed/);\n if(isPayout){assert.equal(t.get(\'refreshPayouts\').hidden,true);t.get(\'refreshPayouts\').listeners.click();await tick();assert.equal(t.started,count)}\n t=await setup(\'normal\');await t.pending;t.emit(\'SIGNED_IN\',B);assert.doesNotMatch(t.output(),/PRIVATE-/);assert.match(t.output(),/Sign-in changed/);\n t=await setup(\'delayed\');t.emit(\'SIGNED_OUT\',null);t.release();await t.pending;assert.doesNotMatch(t.output(),/PRIVATE-/);assert.match(t.output(),/Sign-in changed/);\n t=await setup(\'failure\');t.emit(\'SIGNED_IN\',B);t.fail();await t.pending;assert.doesNotMatch(t.output(),/PRIVATE-/);assert.match(t.output(),/Sign-in changed/);\n if(isPayout)assert.equal(t.get(\'refreshPayouts\').disabled,true);\n console.log(\'PASS: \'+(isPayout?\'payout\':\'receipt\')+\' display, token refresh, sign-out, account switch, stale success and stale failure.\');\n})().catch(e=>{console.error(e);process.exitCode=1});'
+        BRANCH = 'shopdrop-phase6-integration'
+        def git(*args):
+            return subprocess.check_output(['git', *map(str,args)], text=True).strip()
+        def blob(data):
+            return hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+        def require(ok, message):
+            if not ok: raise SystemExit('SAFETY STOP: '+message)
+        def update(data, changes):
+            result=data
+            for a,b in changes:
+                a,b=a.encode(),b.encode()
+                require(result.count(a)==1,'unexpected replacement anchor count')
+                result=result.replace(a,b,1)
+            original=result
+            for a,b in reversed(changes):
+                a,b=a.encode(),b.encode()
+                require(original.count(b)==1,'unexpected reverse anchor count')
+                original=original.replace(b,a,1)
+            require(original==data,'unrelated code changed')
+            return result
+        require(os.environ.get('GITHUB_REF_NAME')==BRANCH and git('branch','--show-current')==BRANCH,'incorrect branch')
+        require(not git('status','--porcelain'),'dirty checkout')
+        originals={}; updates={}; backups={}
+        for path,(expected,changes) in PATCHES.items():
+            p=Path(path); b=Path('backups/fix199x')/p
+            require(p.is_file() and not p.is_symlink() and not b.is_symlink(),'unexpected path '+path)
+            backups[path]=b
+            if b.exists():
+                old=b.read_bytes()
+                require(blob(old)==expected and p.read_bytes()==update(old,changes),'partial or modified prior fix '+path)
+                originals[path]=old; updates[path]=p.read_bytes()
+            else:
+                old=p.read_bytes()
+                require(blob(old)==expected,'current source changed '+path)
+                originals[path]=old; updates[path]=update(old,changes)
+        existing=sum(p.exists() for p in backups.values())
+        require(existing in (0,len(PATCHES)),'partial prior backup')
+        class Scripts(HTMLParser):
+            def __init__(self):
+                super().__init__(); self.scripts=[]; self.current=None
+            def handle_starttag(self,tag,attrs):
+                if tag=='script':
+                    attrs=dict(attrs)
+                    self.current=None if 'src' in attrs else (attrs.get('type',''),[])
+            def handle_data(self,data):
+                if self.current is not None: self.current[1].append(data)
+            def handle_endtag(self,tag):
+                if tag=='script' and self.current is not None:
+                    self.scripts.append((self.current[0],''.join(self.current[1]))); self.current=None
+        with tempfile.TemporaryDirectory() as td:
+            t=Path(td)
+            for path,data in updates.items():
+                if path.endswith('.js'):
+                    f=t/(Path(path).stem+('.mjs' if path.endswith('shopdrop-private-contact.js') else '.js'));f.write_bytes(data)
+                    subprocess.run(['node','--check',str(f)],check=True)
+                else:
+                    before=Scripts();before.feed(originals[path].decode());after=Scripts();after.feed(data.decode())
+                    require(len(before.scripts)==len(after.scripts)==1 and before.scripts[0][0]==after.scripts[0][0]=='module','unexpected module structure')
+                    for i,(kind,code) in enumerate(after.scripts):
+                        if kind not in ('','module','text/javascript','application/javascript'): continue
+                        f=t/(Path(path).stem+str(i)+('.mjs' if kind=='module' else '.js'));f.write_text(code)
+                        subprocess.run(['node','--check',str(f)],check=True)
+            test=t/'test.cjs';test.write_text(TEST)
+            subprocess.run(['node',str(test),str(t/'receipts0.mjs'),'receipt'],check=True)
+            subprocess.run(['node',str(test),str(t/'payout-statement0.mjs'),'payout'],check=True)
+        if existing:
+            print('Already installed; all exact backups and patched files verified.');raise SystemExit(0)
+        for path,data in updates.items():
+            b=backups[path];b.parent.mkdir(parents=True,exist_ok=True);b.write_bytes(originals[path]);Path(path).write_bytes(data)
+            require(b.read_bytes()==originals[path] and Path(path).read_bytes()==data,'write mismatch '+path)
+        require(set(git('diff','--name-only').splitlines())==set(PATCHES),'unexpected tracked changes')
+        allowed=set(PATCHES)|{str(b) for b in backups.values()}
+        subprocess.run(['git','add','--',*sorted(allowed)],check=True)
+        require(set(git('diff','--cached','--name-only').splitlines())==allowed,'unexpected staged changes')
+        require(not git('diff','--name-only') and not git('ls-files','--others','--exclude-standard'),'unrelated files')
+        subprocess.run(['git','diff','--cached','--check','--',*PATCHES],check=True)
+        print('PASS: exact source hashes, reversible patches, preserved unrelated inline scripts, syntax, financial session mock tests and exact staged paths.')
+        PYCODE
+        if ! git diff --cached --quiet; then
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Fix 199X clear financial records on session change'
+          git push origin HEAD:shopdrop-phase6-integration
+        fi
+  deploy:
+    needs: fix
+    uses: ./.github/workflows/shopdrop-integration-pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
