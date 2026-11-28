@@ -1,0 +1,654 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shop&Drop | Administrator Case Reviews</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f3f5f8;color:#17202a;font:16px Arial,sans-serif;line-height:1.5}
+main{max-width:1050px;margin:auto;padding:20px 14px}
+a{color:#0f766e}
+.panel{background:#fff;border:1px solid #dce3e9;border-radius:12px;padding:16px;margin:14px 0}
+button{background:#0f766e;color:white;border:0;border-radius:7px;padding:10px 14px;margin:4px;cursor:pointer}
+button:disabled{opacity:.6}
+textarea{display:block;width:100%;min-height:85px;padding:10px;font:inherit;border:1px solid #ccd5df;border-radius:7px}
+.muted{color:#526272}
+.error{color:#a12323}
+#protected[hidden]{display:none}
+</style>
+</head>
+<body>
+<main>
+<a href="./admin.html">← Administrator Control Centre</a>
+<h1>Complaints &amp; Exceptional Case Reviews</h1>
+<p>
+For complaints and exceptional investigations only.
+Shop&Drop registration, listings, checkout, payments,
+dispatch, delivery, refunds and payouts remain automated.
+This page cannot approve listings or release money.
+</p>
+
+<div id="access" role="status">
+Checking administrator access...
+</div>
+
+<section id="protected" hidden>
+<button id="refresh" type="button">Refresh cases</button>
+<p id="message" role="status" aria-live="polite"></p>
+
+<h2>Exception Review Queue</h2>
+<div id="reviews"></div>
+
+<h2>Orders, Disputes, Refunds &amp; Dispatch Cases</h2>
+<div id="cases"></div>
+</section>
+</main>
+
+<script type="module">
+import {createClient} from
+'https://esm.sh/@supabase/supabase-js@2';
+
+const supabase=createClient(
+'https://dtkdvvxpwonywtsgqmdx.supabase.co',
+'sb_publishable_yHOcyzuuSWDzshhcAF9N8Q_7JiGFq2q',
+{
+auth:{
+persistSession:true,
+autoRefreshToken:true,
+detectSessionInUrl:true
+}
+}
+);
+
+const $=id=>document.getElementById(id);
+
+function node(tag,text){
+const e=document.createElement(tag);
+if(text!==undefined)e.textContent=String(text??'—');
+return e;
+}
+
+function deny(message){
+$('protected').hidden=true;
+$('access').replaceChildren(
+node('span',message+' ')
+);
+const a=node('a','Administrator sign in');
+a.href='./admin-login.html';
+$('access').append(a);
+}
+
+async function authorized(){
+const {data,error}=await supabase.auth.getUser();
+
+if(error||!data?.user){
+deny('Sign-in required.');
+return false;
+}
+
+const check=await supabase.rpc(
+'shopdrop_is_active_admin'
+);
+
+if(check.error||check.data!==true){
+deny('Administrator access denied.');
+return false;
+}
+
+$('access').textContent='Administrator access confirmed.';
+$('protected').hidden=false;
+return true;
+}
+
+async function updateReview(
+record,status,note,feedback,buttons
+){
+if(note.length<10||note.length>2000){
+feedback.textContent=
+'Provide a note of 10–2000 characters.';
+return;
+}
+
+if(!await authorized())return;
+
+if(!confirm(
+'Update this exceptional review to '+status+'?'
+))return;
+
+buttons.forEach(b=>b.disabled=true);
+feedback.textContent='Saving...';
+
+const {data,error}=await supabase.rpc(
+'shopdrop_admin_update_review',{
+p_review_id:record.review_id,
+p_status:status,
+p_note:note
+}
+);
+
+if(error||data?.audited!==true){
+feedback.textContent=
+'Could not save: '+
+(error?.message||'Unexpected response');
+buttons.forEach(b=>b.disabled=false);
+return;
+}
+
+feedback.textContent='Saved and audited.';
+await load();
+}
+
+function renderReviews(rows){
+const root=$('reviews');
+root.replaceChildren();
+
+if(!rows.length){
+root.textContent='No exceptional reviews queued.';
+return;
+}
+
+for(const record of rows){
+const card=node('article');
+card.className='panel';
+
+card.append(
+node('h3',
+(record.review_type||'Review')+
+' — '+(record.review_status||'Unknown')
+),
+node('p','Reference: '+record.review_id),
+node('p','Reason: '+(record.review_reason||'—')),
+node('p','Priority: '+(record.priority||'—'))
+);
+
+const current=String(
+record.review_status||''
+).toLowerCase();
+
+if(['pending','in_review'].includes(current)){
+const note=node('textarea');
+note.placeholder=
+'Investigation note (minimum 10 characters)';
+note.maxLength=2000;
+note.setAttribute(
+'aria-label','Investigation note'
+);
+card.append(note);
+
+const status=node('p');
+status.setAttribute('role','status');
+const buttons=[];
+
+for(const next of ['pending','in_review']){
+if(next===current)continue;
+
+const b=node(
+'button',
+next==='in_review'
+?'Start investigation'
+:'Return to pending'
+);
+
+b.type='button';
+
+b.onclick=()=>updateReview(
+record,next,note.value.trim(),
+status,buttons
+);
+
+buttons.push(b);
+card.append(b);
+}
+
+card.append(status);
+}
+
+root.append(card);
+}
+}
+
+/*
+ SHOPDROP FIX 5 — Preserved.
+ Administrator-only customer submission viewer.
+ FIX 6E adds protected contact information.
+*/
+async function showSubmissionDetails(record,container,button){
+if(!await authorized())return;
+
+button.disabled=true;
+container.replaceChildren(
+node('p','Loading submission details...')
+);
+
+try{
+const {data,error}=await supabase.rpc(
+'shopdrop_admin_submission_detail',{
+p_case_id:record.case_id
+}
+);
+
+if(error)throw error;
+if(!data||typeof data!=='object'){
+throw Error('Unexpected submission response');
+}
+
+container.replaceChildren();
+
+const details=[
+['Submission reference',data.reference],
+['Submission type',data.case_type],
+['Status',data.status],
+['Category',data.category],
+['Subject',data.subject],
+['Reason',data.reason],
+['Message / Description',data.message],
+['Transaction reference',data.transaction_reference],
+['Created',data.created_at
+ ?new Date(data.created_at).toLocaleString('en-ZA')
+ :'—'],
+['Reply email',data.reply_email],
+['Reply WhatsApp',data.reply_whatsapp]
+];
+
+for(const [label,value] of details){
+const paragraph=node('p');
+const heading=node('strong',label+': ');
+paragraph.append(
+heading,
+node('span',value||'—')
+);
+container.append(paragraph);
+}
+
+const notice=node(
+'p',
+'Customer contact information is for authorised '+
+'administrator case handling only. '+
+'Viewing this submission does not release money, '+
+'approve a refund or automatically hold a payout.'
+);
+notice.className='muted';
+container.append(notice);
+
+if(data.case_type==='payment_dispute_opened'){
+ try{
+  const result=await supabase.rpc('shopdrop_admin_submission_evidence_199hb',{p_case_id:record.case_id});
+  const linked=result.data;
+  if(result.error)throw Error('Evidence lookup unavailable');
+  if(linked&&typeof linked.dispute_id==='string'&&/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(linked.dispute_id)&&['product','service','dispatch'].includes(linked.dispute_kind)){
+   const labels={product:'Product',service:'Other Services',dispatch:'Transport'};
+   const evidenceLink=node('a','View '+labels[linked.dispute_kind]+' dispute evidence');
+   evidenceLink.href='./dispute-evidence.html?dispute_id='+encodeURIComponent(linked.dispute_id);
+   const evidenceRow=node('p');evidenceRow.append(evidenceLink);container.append(evidenceRow);
+  }else container.append(node('p','No verified evidence case is linked to this submission.'));
+ }catch{container.append(node('p','Evidence link unavailable. Retry submission details.'));}
+}
+
+button.textContent='Hide submission details';
+
+}catch(error){
+container.replaceChildren(
+node('p',
+'Unable to load submission: '+
+(error?.message||'Unknown error')
+)
+);
+button.textContent='Retry submission details';
+}finally{
+button.disabled=false;
+}
+}
+
+/*
+ SHOPDROP FIX 6E
+ Customer complaint and dispute investigation.
+
+ Uses separate administrator-only review functions.
+ Does not change the original integration event.
+ Does not release funds, approve refunds or change
+ the underlying financial dispute status.
+*/
+async function showCustomerCaseReview(record,container,button){
+if(!await authorized())return;
+
+button.disabled=true;
+container.replaceChildren(
+node('p','Loading investigation...')
+);
+
+try{
+const {data,error}=await supabase.rpc(
+'shopdrop_admin_customer_submission_review',{
+p_case_id:record.case_id
+}
+);
+
+if(error)throw error;
+if(!data||typeof data!=='object'){
+throw Error('Unexpected investigation response');
+}
+
+container.replaceChildren();
+
+container.append(
+node('h3','Customer Case Investigation')
+);
+
+container.append(
+node('p',
+'Current review status: '+
+(data.review_status||'received')
+)
+);
+
+const history=node('div');
+history.append(node('h3','Investigation History'));
+
+const notes=Array.isArray(data.notes)?data.notes:[];
+
+if(!notes.length){
+history.append(
+node('p','No investigation notes recorded.')
+);
+}else{
+for(const entry of notes){
+const item=node('div');
+item.className='panel';
+
+item.append(
+node('strong',entry.status||'Review'),
+node('p',entry.note||'—'),
+node('p',
+entry.created_at
+?new Date(entry.created_at).toLocaleString('en-ZA')
+:'—'
+)
+);
+
+history.append(item);
+}
+}
+
+container.append(history);
+
+const noteLabel=node('label','Investigation note');
+const note=node('textarea');
+note.placeholder=
+'Enter investigation findings or decision';
+note.maxLength=2000;
+note.setAttribute(
+'aria-label','Customer case investigation note'
+);
+
+container.append(noteLabel,note);
+
+const statusLabel=node('label','Review status');
+const select=node('select');
+
+select.setAttribute(
+'aria-label','Customer case review status'
+);
+
+select.style.display='block';
+select.style.width='100%';
+select.style.padding='10px';
+select.style.margin='8px 0';
+select.style.font='inherit';
+
+const choices=[
+['received','Received'],
+['in_review','Under investigation'],
+['resolved','Resolved'],
+['closed','Closed']
+];
+
+for(const [value,label] of choices){
+const option=node('option',label);
+option.value=value;
+select.append(option);
+}
+
+select.value=choices.some(
+item=>item[0]===data.review_status
+)?data.review_status:'received';
+
+container.append(statusLabel,select);
+
+const save=node(
+'button','Save investigation decision'
+);
+save.type='button';
+
+const feedback=node('p');
+feedback.setAttribute('role','status');
+feedback.setAttribute('aria-live','polite');
+
+save.onclick=async()=>{
+const investigationNote=note.value.trim();
+const nextStatus=select.value;
+
+if(
+investigationNote.length<10||
+investigationNote.length>2000
+){
+feedback.textContent=
+'Provide an investigation note of 10–2000 characters.';
+return;
+}
+
+if(!await authorized())return;
+
+if(!confirm(
+'Save this customer case review as '+nextStatus+'?'
+))return;
+
+save.disabled=true;
+feedback.textContent='Saving investigation...';
+
+try{
+const {data:result,error:saveError}=
+await supabase.rpc(
+'shopdrop_admin_update_customer_submission',{
+p_case_id:record.case_id,
+p_status:nextStatus,
+p_note:investigationNote
+}
+);
+
+if(saveError)throw saveError;
+
+if(result?.audited!==true){
+throw Error(
+'Audit confirmation was not received'
+);
+}
+
+feedback.textContent=
+'Investigation saved and audited.';
+
+await showCustomerCaseReview(
+record,container,button
+);
+
+}catch(error){
+feedback.textContent=
+'Unable to save: '+
+(error?.message||'Unknown error');
+}finally{
+save.disabled=false;
+}
+};
+
+container.append(save,feedback);
+
+const notice=node(
+'p',
+'Customer-service review status only. '+
+'This action does not approve a refund, '+
+'resolve a financial dispute or release seller funds.'
+);
+notice.className='muted';
+container.append(notice);
+
+button.textContent='Hide investigation';
+
+}catch(error){
+container.replaceChildren(
+node('p',
+'Unable to load investigation: '+
+(error?.message||'Unknown error')
+)
+);
+button.textContent='Retry investigation';
+}finally{
+button.disabled=false;
+}
+}
+
+function renderCases(rows){
+const root=$('cases');
+root.replaceChildren();
+
+if(!rows.length){
+root.textContent='No cases found.';
+return;
+}
+
+for(const record of rows){
+const card=node('article');
+card.className='panel';
+
+card.append(
+node('strong',
+(record.case_type||'Case')+
+' — '+(record.case_status||'—')
+),
+node('p','Reference: '+record.case_id),
+node('p',
+'Created: '+
+(record.created_at
+?new Date(record.created_at)
+.toLocaleString('en-ZA')
+:'—')
+)
+);
+
+/*
+ FIX 5 preserved: Customer submission viewer.
+ FIX 6E: Add investigation controls separately.
+*/
+if([
+'customer_feedback',
+'customer_dispute_submission',
+'customer_cancellation',
+'customer_listing_report'
+].includes(record.case_type)){
+
+const button=node(
+'button',
+'View submission details'
+);
+button.type='button';
+
+const details=node('div');
+details.hidden=true;
+
+button.onclick=async()=>{
+if(!details.hidden){
+details.hidden=true;
+details.replaceChildren();
+button.textContent='View submission details';
+return;
+}
+
+details.hidden=false;
+
+await showSubmissionDetails(
+record,details,button
+);
+};
+
+card.append(button,details);
+
+const reviewButton=node(
+'button',
+'Open investigation'
+);
+reviewButton.type='button';
+
+const reviewContainer=node('div');
+reviewContainer.hidden=true;
+
+reviewButton.onclick=async()=>{
+if(!reviewContainer.hidden){
+reviewContainer.hidden=true;
+reviewContainer.replaceChildren();
+reviewButton.textContent='Open investigation';
+return;
+}
+
+reviewContainer.hidden=false;
+
+await showCustomerCaseReview(
+record,reviewContainer,reviewButton
+);
+};
+
+card.append(reviewButton,reviewContainer);
+}
+
+root.append(card);
+}
+}
+
+async function load(){
+const refresh=$('refresh');
+refresh.disabled=true;
+$('message').textContent='Loading...';
+
+try{
+const [reviews,cases]=await Promise.all([
+supabase.rpc(
+'shopdrop_admin_review_queue_readonly'
+),
+supabase.rpc(
+'shopdrop_admin_case_overview'
+)
+]);
+
+if(reviews.error)throw reviews.error;
+if(cases.error)throw cases.error;
+
+if(
+!Array.isArray(reviews.data)||
+!Array.isArray(cases.data)
+){
+throw Error('Unexpected response');
+}
+
+renderReviews(reviews.data);
+renderCases(cases.data);
+
+$('message').textContent=
+'Exceptional cases loaded.';
+
+}catch(error){
+$('message').textContent=
+'Unable to load: '+
+(error?.message||'Unknown error');
+$('message').className='error';
+}finally{
+refresh.disabled=false;
+}
+}
+
+$('refresh').onclick=async()=>{
+if(await authorized())await load();
+};
+
+if(await authorized())await load();
+</script>
+</body>
+</html>

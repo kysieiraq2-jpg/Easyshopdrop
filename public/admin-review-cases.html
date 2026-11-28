@@ -70,8 +70,12 @@ if(text!==undefined)e.textContent=String(text??'—');
 return e;
 }
 
+let reviewOwner200a=null,reviewEpoch200a=0,reviewLocked200a=false;
 function deny(message){
+reviewEpoch200a++;reviewOwner200a=null;reviewLocked200a=true;
 $('protected').hidden=true;
+$('reviews').replaceChildren();$('cases').replaceChildren();
+$('message').textContent='';$('refresh').disabled=true;
 $('access').replaceChildren(
 node('span',message+' ')
 );
@@ -81,25 +85,29 @@ $('access').append(a);
 }
 
 async function authorized(){
-const {data,error}=await supabase.auth.getUser();
-
-if(error||!data?.user){
-deny('Sign-in required.');
-return false;
+if(reviewLocked200a)return false;
+const epoch=reviewEpoch200a;
+try{
+ const {data,error}=await supabase.auth.getUser();
+ if(epoch!==reviewEpoch200a||reviewLocked200a)return false;
+ if(error||!data?.user||(reviewOwner200a&&reviewOwner200a!==data.user.id)){
+  deny('Administrator sign-in changed. Please sign in again.');return false;
+ }
+ reviewOwner200a=data.user.id;
+ const check=await supabase.rpc('shopdrop_is_active_admin');
+ if(epoch!==reviewEpoch200a||reviewLocked200a)return false;
+ const {data:current,error:currentError}=await supabase.auth.getUser();
+ if(epoch!==reviewEpoch200a||reviewLocked200a)return false;
+ if(check.error||check.data!==true||currentError||current?.user?.id!==reviewOwner200a){
+  deny('Administrator access denied or unavailable.');return false;
+ }
+ $('access').textContent='Administrator access confirmed.';
+ $('protected').hidden=false;
+ return true;
+}catch(_){
+ if(epoch===reviewEpoch200a)deny('Administrator access unavailable. Please sign in again.');
+ return false;
 }
-
-const check=await supabase.rpc(
-'shopdrop_is_active_admin'
-);
-
-if(check.error||check.data!==true){
-deny('Administrator access denied.');
-return false;
-}
-
-$('access').textContent='Administrator access confirmed.';
-$('protected').hidden=false;
-return true;
 }
 
 async function updateReview(
@@ -117,6 +125,7 @@ if(!confirm(
 'Update this exceptional review to '+status+'?'
 ))return;
 
+if(!feedback.isConnected||!await authorized()||!feedback.isConnected)return;
 buttons.forEach(b=>b.disabled=true);
 feedback.textContent='Saving...';
 
@@ -128,6 +137,7 @@ p_note:note
 }
 );
 
+if(!await authorized()||!feedback.isConnected)return;
 if(error||data?.audited!==true){
 feedback.textContent=
 'Could not save: '+
@@ -215,7 +225,7 @@ root.append(card);
  FIX 6E adds protected contact information.
 */
 async function showSubmissionDetails(record,container,button){
-if(!await authorized())return;
+if(!container.isConnected||!await authorized()||!container.isConnected)return;
 
 button.disabled=true;
 container.replaceChildren(
@@ -234,6 +244,7 @@ if(!data||typeof data!=='object'){
 throw Error('Unexpected submission response');
 }
 
+if(!await authorized()||!container.isConnected)return;
 container.replaceChildren();
 
 const details=[
@@ -275,6 +286,7 @@ container.append(notice);
 if(data.case_type==='payment_dispute_opened'){
  try{
   const result=await supabase.rpc('shopdrop_admin_submission_evidence_199hb',{p_case_id:record.case_id});
+  if(!await authorized()||!container.isConnected)return;
   const linked=result.data;
   if(result.error)throw Error('Evidence lookup unavailable');
   if(linked&&typeof linked.dispute_id==='string'&&/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(linked.dispute_id)&&['product','service','dispatch'].includes(linked.dispute_kind)){
@@ -311,7 +323,7 @@ button.disabled=false;
  the underlying financial dispute status.
 */
 async function showCustomerCaseReview(record,container,button){
-if(!await authorized())return;
+if(!container.isConnected||!await authorized()||!container.isConnected)return;
 
 button.disabled=true;
 container.replaceChildren(
@@ -330,6 +342,7 @@ if(!data||typeof data!=='object'){
 throw Error('Unexpected investigation response');
 }
 
+if(!await authorized()||!container.isConnected)return;
 container.replaceChildren();
 
 container.append(
@@ -444,6 +457,7 @@ if(!confirm(
 'Save this customer case review as '+nextStatus+'?'
 ))return;
 
+if(!save.isConnected||!await authorized()||!save.isConnected)return;
 save.disabled=true;
 feedback.textContent='Saving investigation...';
 
@@ -457,6 +471,7 @@ p_note:investigationNote
 }
 );
 
+if(!await authorized()||!save.isConnected)return;
 if(saveError)throw saveError;
 
 if(result?.audited!==true){
@@ -604,6 +619,8 @@ root.append(card);
 }
 
 async function load(){
+if(reviewLocked200a)return;
+const epoch=reviewEpoch200a;
 const refresh=$('refresh');
 refresh.disabled=true;
 $('message').textContent='Loading...';
@@ -618,6 +635,7 @@ supabase.rpc(
 )
 ]);
 
+if(epoch!==reviewEpoch200a||!await authorized()||epoch!==reviewEpoch200a)return;
 if(reviews.error)throw reviews.error;
 if(cases.error)throw cases.error;
 
@@ -635,12 +653,13 @@ $('message').textContent=
 'Exceptional cases loaded.';
 
 }catch(error){
+if(epoch!==reviewEpoch200a||reviewLocked200a)return;
 $('message').textContent=
 'Unable to load: '+
 (error?.message||'Unknown error');
 $('message').className='error';
 }finally{
-refresh.disabled=false;
+if(epoch===reviewEpoch200a&&!reviewLocked200a)refresh.disabled=false;
 }
 }
 
@@ -648,6 +667,11 @@ $('refresh').onclick=async()=>{
 if(await authorized())await load();
 };
 
+supabase.auth.onAuthStateChange((event,session)=>{
+ if(event==='SIGNED_OUT'||(reviewOwner200a&&session?.user?.id!==reviewOwner200a))deny('Administrator sign-in changed. Please sign in again.');
+});
+window.addEventListener('pagehide',()=>deny('Administrator session must be verified again.'));
+window.addEventListener('pageshow',event=>{if(event.persisted)location.reload();});
 if(await authorized())await load();
 </script>
 </body>
