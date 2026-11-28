@@ -28,11 +28,11 @@ a{color:#0f766e}
 </header>
 <main>
 <h1>Receipts &amp; Transaction History</h1>
-<p>View Shop&amp;Drop order, payment, shipment and payout references linked to your account.</p>
+<p>View Shop&amp;Drop order, payment, shipment, refund and payout references linked to your account.</p>
 <section class="panel">
 <div id="receiptHistory" role="status" aria-live="polite">Sign in to load your transaction history.</div>
 </section>
-<p class="muted small">References may include SD-ORD, SD-PAY, SD-SHP and SD-POT. A pending transaction is not proof of payment or a completed payout.</p>
+<p class="muted small">References may include SD-ORD, SD-PAY, SD-SHP and SD-POT. A pending transaction is not proof of payment, a completed refund or a completed payout.</p>
 <p><a href="./my-purchases-sales-198j.html?v=199a">My Account</a></p>
 </main>
 <script src="common.js"></script>
@@ -62,6 +62,12 @@ const amount=(v,currency='ZAR')=>{
  try{return new Intl.NumberFormat('en-ZA',{style:'currency',currency}).format(Number(v));}
  catch{return String(currency)+' '+Number(v).toFixed(2);}
 };
+// Refunds are recorded in separate owner-scoped tables. Never infer an unrecorded currency.
+function refundAmount199w(value,currency){
+ if(value===null||value===undefined||value===''||!Number.isFinite(Number(value)))return 'Not recorded';
+ if(typeof currency==='string'&&/^[A-Z]{3}$/.test(currency))return amount(value,currency);
+ return Number(value).toFixed(2)+' (currency not recorded)';
+}
 function line(parent,label,value){
  const p=document.createElement('p');
  p.className='meta';
@@ -93,7 +99,7 @@ function section(parent,label,rows,display){
 }
 async function loadHistory(userId){
  history.textContent='Loading your transaction history…';
- // Queries are READ-ONLY. All seven existing tables enforce owner-specific RLS.
+ // Queries are READ-ONLY and use existing owner-specific RLS.
  const sources=[
   {label:'Orders',run:supabase.from('orders')
    .select('id,buyer_id,seller_id,order_reference,order_status,payment_status,fulfilment_status,product_total,currency,created_at')
@@ -145,7 +151,24 @@ async function loadHistory(userId){
    show:(p,r)=>card(p,'Ledger entry · '+text(r.external_reference,r.id),[
     ['Type',status(r.transaction_type)],['Status',status(r.status)],
     ['Amount',amount(r.amount,r.currency||'ZAR')],['Order',r.order_id],
-    ['Service booking',r.service_booking_id],['Details',r.description],['Created',date(r.created_at)]])}
+    ['Service booking',r.service_booking_id],['Details',r.description],['Created',date(r.created_at)]])},
+  {label:'Product refunds',run:supabase.from('refunds')
+   .select('id,order_id,buyer_id,payment_id,refund_amount,refund_status,refund_reference,refund_type,requested_at,processed_at,created_at,payment:payments!refunds_payment_id_fkey(currency,payment_reference),order:orders!refunds_order_id_fkey(currency,order_reference)')
+   .eq('buyer_id',userId).order('created_at',{ascending:false}).limit(40),
+   show:(p,r)=>card(p,'Product refund · '+text(r.refund_reference,r.id),[
+    ['Order reference',r.order?.order_reference||r.order_id],['Payment reference',r.payment?.payment_reference||r.payment_id],
+    ['Recorded refund amount',refundAmount199w(r.refund_amount,r.payment?.currency||r.order?.currency)],['Refund type',r.refund_type?status(r.refund_type):null],
+    ['Recorded status',status(r.refund_status)],['Requested at',r.requested_at?date(r.requested_at):null],
+    ['Processed at',r.processed_at?date(r.processed_at):null],['Created',date(r.created_at)],
+    ['Note','Recorded status only — not independent bank settlement confirmation.']])},
+  {label:'Service refunds',run:supabase.from('service_refunds')
+   .select('id,booking_id,buyer_id,provider_id,payment_id,refund_amount,refund_status,refund_reference,requested_at,processed_at,created_at,payment:service_payments!service_refunds_payment_id_fkey(payment_reference)')
+   .or('buyer_id.eq.'+userId+',provider_id.eq.'+userId).order('created_at',{ascending:false}).limit(40),
+   show:(p,r)=>card(p,'Service refund · '+text(r.refund_reference,r.id),[
+    ['Booking reference',r.booking_id],['Payment reference',r.payment?.payment_reference||r.payment_id],
+    ['Recorded refund amount',refundAmount199w(r.refund_amount)],['Recorded status',status(r.refund_status)],
+    ['Requested at',r.requested_at?date(r.requested_at):null],['Processed at',r.processed_at?date(r.processed_at):null],
+    ['Created',date(r.created_at)],['Note','Recorded status only — not independent bank settlement confirmation.']])}
  ];
  try{
   const results=await Promise.all(sources.map(s=>s.run));
